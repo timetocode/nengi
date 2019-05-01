@@ -1,0 +1,26 @@
+{
+    "name": "nengi",
+    "version": "1.0.0",
+    "description": "multiplayer game networking for node.js and html5",
+    "main": "index.js",
+    "browser": "indexBrowser.js",
+    "keywords": [
+        "multiplayer",
+        "networking",
+        "interpolation",
+        "game",
+        "mmo",
+        "lag",
+        "compensation",
+        "prediction",
+        "binary",
+        "compression"
+    ],
+    "author": "Alex Bennett // timetocode",
+    "license": "Apache 2.0",
+    "dependencies": {
+        "@clusterws/cws": "^0.12.2",
+        "esm": "^3.2.22",
+        "utf8": "^3.0.0"
+    }
+}
