@@ -32,6 +32,7 @@ Join us on [nengi's Discord server](https://discord.gg/7kAa7NJ) or help support 
     * --> nengi can rewind the game state to the point in time that the shot occured given the player's latency
 
 Tutorials and demo games are in the works.
+* [nengi-2d-basic](https://github.com/timetocode/nengi-2d-basic)  - a simple 2d shooter without prediction/compensation
 
 ## Usage
 The [API documentation](https://timetocode.com/nengi) is the place to go for implementation details. But as an appetizer here is a tour of the the functionality associated with one of nengi's core features, the nengi.Entity
