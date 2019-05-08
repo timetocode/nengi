@@ -306,6 +306,10 @@ class Instance {
         return entity
     }
 
+    watch(entity) {
+        this.addEntity(entity)
+    }
+
     getEntity(id) {
         // TODO FIX
         let ent = this.entities.get(id)
@@ -315,8 +319,6 @@ class Instance {
         //console.log('herhehrherhe', id, this._entities.get(id))
         return this._entities.get(id)
     }
-
-
 
     removeEntity(entity) {
         //this.components.removeEntity(entity)
@@ -330,6 +332,10 @@ class Instance {
         this.entities.remove(entity)
 
         return entity
+    }
+
+    unwatch(entity) {
+        this.removeEntity(entity)
     }
 
     addComponent(c) {
