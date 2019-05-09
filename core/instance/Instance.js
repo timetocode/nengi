@@ -290,7 +290,6 @@ class Instance {
     }
 
     addEntity(entity) {
-        console.log('new add')
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
