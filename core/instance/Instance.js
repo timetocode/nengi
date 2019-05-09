@@ -290,10 +290,12 @@ class Instance {
     }
 
     addEntity(entity) {
+        console.log('new add')
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-        entity[this.config.ID_PROPERTY_NAME] = this.entityIdPool.nextId()
+        const id = this.entityIdPool.nextId()
+        entity[this.config.ID_PROPERTY_NAME] = id 
         entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
         this.entities.add(entity)
 
@@ -301,8 +303,7 @@ class Instance {
             this.basicSpace.insertEntity(entity)
         }
 
-        //this.components.addEntity(entity)
-        this.createEntities.push(entity[this.config.ID_PROPERTY_NAME])
+        this.createEntities.push(id)
         return entity
     }
 
@@ -319,15 +320,15 @@ class Instance {
 
 
     removeEntity(entity) {
-        //this.components.removeEntity(entity)
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.entities.remove(entity)
         }
 
-        this.deleteEntities.push(entity[this.config.ID_PROPERTY_NAME])
-        this.entityIdPool.queueReturnId(entity[this.config.ID_PROPERTY_NAME])
-        entity[this.config.ID_PROPERTY_NAME] = -1
+        const id = entity[this.config.ID_PROPERTY_NAME]
+        this.deleteEntities.push(id)
+        this.entityIdPool.queueReturnId(id)
         this.entities.remove(entity)
+        entity[this.config.ID_PROPERTY_NAME] = -1        
 
         return entity
     }

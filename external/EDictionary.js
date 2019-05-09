@@ -23,7 +23,7 @@ EDictionary.prototype.forEach = function(iterator) {
 
 // a copy of the underlying array
 EDictionary.prototype.toArray = function() {
-    return this.array.slice()
+    return this.array
 }
 
 EDictionary.prototype.add = function(obj) {
@@ -43,6 +43,7 @@ EDictionary.prototype.remove = function(obj) {
     }
 }
 
+// TODO: speed this up, could be quite a bit faster
 EDictionary.prototype.removeById = function(id) {
     if (typeof id !== 'undefined') {
         var index = -1
