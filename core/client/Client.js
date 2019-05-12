@@ -1,14 +1,14 @@
-import ProtocolMap from '../protocol/ProtocolMap';
-import metaConfig from '../common/metaConfig';
-import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer';
-import readSnapshotBuffer from '../snapshot/reader/readSnapshotBuffer';
-import EntityCache from '../instance/EntityCache';
-import WorldState from './WorldState';
-import Outbound from './Outbound';
-import Interpolator from './Interpolator';
-import createPongBuffer from '../snapshot/writer/createPongBuffer';
-import Chronus from './Chronus';
-import Predictor from './Predictor';
+import ProtocolMap from '../protocol/ProtocolMap'
+import metaConfig from '../common/metaConfig'
+import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer'
+import readSnapshotBuffer from '../snapshot/reader/readSnapshotBuffer'
+import EntityCache from '../instance/EntityCache'
+import WorldState from './WorldState'
+import Outbound from './Outbound'
+import Interpolator from './Interpolator'
+import createPongBuffer from '../snapshot/writer/createPongBuffer'
+import Chronus from './Chronus'
+import Predictor from './Predictor'
 
 class Client {
     constructor(config, interpDelay) {
@@ -19,7 +19,9 @@ class Client {
         this.connectionOpen = null
         this.connectionClose = null
         this.websocket = null
+    }
 
+    init() {
         this.outbound = new Outbound(this.protocols, this.websocket, this.config)
         this.chronus = new Chronus()
 
@@ -29,12 +31,11 @@ class Client {
         this.snapshots = []
         this.latestWorldState = null
         this.serverTick = 0
-        this.tickLength = 1000 / config.UPDATE_RATE
+        this.tickLength = 1000 / this.config.UPDATE_RATE
 
         this.cr = []
         this.up = []
         this.de = []
-
 
         this.averagePing = 100
         this.pings = []
@@ -64,7 +65,15 @@ class Client {
         this.predictor.addCustom(tick, entity, props)
     }
 
+    disconnect() {
+        if (this.websocket) {
+            this.websocket.close()
+        }
+    }
+
     connect(address, handshake) {
+        this.init()
+
         this.websocket = new WebSocket(address, 'nengi-protocol')
         this.outbound.websocket = this.websocket
         this.websocket.binaryType = 'arraybuffer'
@@ -105,8 +114,6 @@ class Client {
                     return
                 }
 
-
-
                 /* ping */
                 if (snapshot.pingKey !== -1) {
                     var pongBuffer = createPongBuffer(snapshot.pingKey)
@@ -135,8 +142,6 @@ class Client {
                     this.de.push(id)
                 })
 
-
-
                 //console.log('snapshot', this.averagePing, this.avgDiff, snapshot.createEntities.length, snapshot.updateEntities.partial.length, snapshot.deleteEntities.length)
 
                 let worldState = new WorldState(this.serverTick, this.tickLength, snapshot, this.latestWorldState, this.config)
@@ -152,9 +157,9 @@ class Client {
                 if (predictionErrorFrame.entities.size > 0) {
                     this.predictionErrors.push(predictionErrorFrame)
                 }
-                
+
                 this.predictor.cleanUp(worldState.clientTick)
-               // console.log('predictionERrors', this.predictionErrors.length)
+                // console.log('predictionERrors', this.predictionErrors.length)
 
 
                 this.snapshots.push(worldState)
@@ -182,8 +187,8 @@ class Client {
         //console.log('t', this.snapshots.length)
 
         let obj = this.interpolator.interp(
-            this.snapshots, 
-            Date.now() - this.interpDelay - this.chronus.averageTimeDifference, 
+            this.snapshots,
+            Date.now() - this.interpDelay - this.chronus.averageTimeDifference,
             this.predictor
         )
         obj.messages = this.messages.splice(0, this.messages.length)
@@ -214,10 +219,6 @@ class Client {
     addCommand(command) {
         this.outbound.addCommand(command)
     }
-
-
-
-
 }
 
-export default Client;
+export default Client
