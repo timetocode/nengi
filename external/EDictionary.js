@@ -28,8 +28,11 @@ EDictionary.prototype.toArray = function() {
 
 EDictionary.prototype.add = function(obj) {
     if (typeof obj === 'object' && typeof obj[this.ID_PROPERTY_NAME] !== 'undefined') {
-        this.object[obj[this.ID_PROPERTY_NAME]] = obj
-        this.array.push(obj)
+        if (!this.object[obj[this.ID_PROPERTY_NAME]] ) {
+            this.object[obj[this.ID_PROPERTY_NAME]] = obj
+            this.array.push(obj)
+        }
+    
     } else {
         throw new Error('EDictionary could not add object, invalid object or object.id.')
     }

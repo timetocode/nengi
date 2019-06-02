@@ -15,7 +15,11 @@ class Channel {
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-        entity[this.config.ID_PROPERTY_NAME] = this.entityIdPool.nextId()
+
+        if (!entity[this.config.ID_PROPERTY_NAME]) {
+            entity[this.config.ID_PROPERTY_NAME] = this.entityIdPool.nextId()
+        }
+        
         entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
         this.entities.add(entity)
         //console.log('entity added to channel', entity.id)
@@ -33,7 +37,7 @@ class Channel {
         this.entities.remove(entity)
         this.instance._entities.remove(entity)
         this.entityIdPool.queueReturnId(entity[this.config.ID_PROPERTY_NAME])
-        entity[this.config.ID_PROPERTY_NAME] = -1
+        entity[this.config.ID_PROPERTY_NAME] = 0
     }
 
     addMessage(message) {
@@ -44,7 +48,12 @@ class Channel {
 
     subscribe(client) {
         this.clients.set(client.id, client)
-        client.subscribe(this)
+        //client.subscribe(this)
+
+        client.channels.push(this)
+        this.entities.forEach(entity => {
+            client.addCreate(entity[this.config.ID_PROPERTY_NAME])
+        })
     }
 
     unsubscribe(client) {

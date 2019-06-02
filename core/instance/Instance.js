@@ -25,6 +25,7 @@ import NoInterpsMessage from '../common/NoInterpsMessage'
 import Sleep from './Sleep'
 
 import BasicSpace from './BasicSpace'
+import Channel from './Channel'
 
 
 //const Components = require('./Components')
@@ -57,6 +58,8 @@ class Instance {
         this.protocols = new ProtocolMap(config, metaConfig) 
         // console.log(this.protocols.lookupByProtocol.entries().next().value[0])
 
+        //this.defaultChannel = new Channel(config)
+
         this.sleepManager = new Sleep()
         this.tick = 0
 
@@ -87,7 +90,6 @@ class Instance {
         this.transferCallback = null
         this.connectCallback = null
         this.disconnectCallback = null
-
 
         this.httpServer = null
         this.wsServer = null
@@ -293,6 +295,33 @@ class Instance {
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
+
+
+        if (!entity[this.config.ID_PROPERTY_NAME]) {
+            entity[this.config.ID_PROPERTY_NAME] = this.entityIdPool.nextId()
+        }
+        //const id = this.entityIdPool.nextId()
+        //entity[this.config.ID_PROPERTY_NAME] = id 
+        entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
+        this.entities.add(entity)
+
+
+        if (!this._entities.get(entity[this.config.ID_PROPERTY_NAME])) {
+            this._entities.add(entity)
+        }
+
+        if (!this.config.USE_HISTORIAN) {
+            this.basicSpace.insertEntity(entity)
+        }
+
+        this.createEntities.push(entity[this.config.ID_PROPERTY_NAME])
+        return entity
+    }
+
+    addEntity_o(entity) {
+        if (!entity.protocol) {
+            throw new Error('Object is missing a protocol or protocol was not supplied via config.')
+        }
         const id = this.entityIdPool.nextId()
         entity[this.config.ID_PROPERTY_NAME] = id 
         entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
@@ -329,7 +358,7 @@ class Instance {
         this.deleteEntities.push(id)
         this.entityIdPool.queueReturnId(id)
         this.entities.remove(entity)
-        entity[this.config.ID_PROPERTY_NAME] = -1        
+        entity[this.config.ID_PROPERTY_NAME] = 0       
 
         return entity
     }

@@ -45,6 +45,7 @@ class Client {
     }
 
     subscribe(channel) {
+        return
         //console.log('client subscribed to channel')
         this.channels.push(channel)
         channel.entities.forEach(entity => {

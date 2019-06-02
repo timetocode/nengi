@@ -2,11 +2,11 @@
 import Binary from '../binary/Binary';
 
 function IdPool(binaryType) {
-    this.min = 0
+    this.min = 1
     this.max = Binary[binaryType].max
 
     this.pool = []
-    for (var i = 0; i < this.max; i++) {
+    for (var i = 1; i < this.max; i++) {
         this.pool.push(i)
     }
 
