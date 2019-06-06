@@ -10,7 +10,7 @@ var BitBuffer = function(sourceOrLength) {
 		this.bitLength = sourceOrLength
 		this.byteLength = Math.ceil(sourceOrLength / 8)
 		if (typeof Buffer !== 'undefined') {
-			this.byteArray = new Buffer(this.byteLength)
+			this.byteArray = Buffer.allocUnsafe(this.byteLength)
 		} else {
 			this.byteArray = new Uint8Array(this.byteLength)
 		}
@@ -39,7 +39,7 @@ BitBuffer.concat = function(bitViews) {
 	for (var i = 0; i < bitViews.length; i++)	 {	
 		bitLength += bitViews[i].bitLength	
 	}
-	var bitView = new BitBuffer(new Buffer(Math.ceil(bitLength/8)))
+	var bitView = new BitBuffer(Buffer.allocUnsafe(Math.ceil(bitLength/8)))
 	var offset = 0
 	for (var i = 0; i < bitViews.length; i++) {
 		for (var j = 0; j < bitViews[i].bitLength; j++) {

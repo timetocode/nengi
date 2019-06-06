@@ -294,7 +294,8 @@ class Instance {
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-        entity[this.config.ID_PROPERTY_NAME] = this.entityIdPool.nextId()
+        const id = this.entityIdPool.nextId()
+        entity[this.config.ID_PROPERTY_NAME] = id 
         entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
         this.entities.add(entity)
 
@@ -325,7 +326,7 @@ class Instance {
         this.deleteEntities.push(id)
         this.entityIdPool.queueReturnId(id)
         entity[this.config.ID_PROPERTY_NAME] = -1
-        this.entities.remove(entity)
+        this.entities.remove(entity)      
 
         return entity
     }
