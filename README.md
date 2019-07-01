@@ -31,8 +31,17 @@ Join us on [nengi's Discord server](https://discord.gg/7kAa7NJ) or help support 
     * --> a player fires a shot
     * --> nengi can rewind the game state to the point in time that the shot occured given the player's latency
 
+## Templates
+
 Tutorials and demo games are in the works.
-* [nengi-2d-basic](https://github.com/timetocode/nengi-2d-basic)  - a simple 2d shooter without prediction/compensation
+
+* [nengi-barebone](https://github.com/timetocode/nengi-barebone)  - a a barebone nengi template
+* [nengi-2d-basic](https://github.com/timetocode/nengi-2d-basic)  - a simple 2d shooter
+* [3d-top-down](https://github.com/timetocode/3d-top-down)  - a simple 3d shooter
+* [nengi-2d-csp](https://github.com/timetocode/nengi-2d-csp)  - a simple 2d shooter with prediction/compensation
+* [nengi-seams-prototype](https://github.com/timetocode/nengi-seams-prototype) - prototype of multi-instance stitching
+* [nice-proto](https://github.com/timetocode/nice-proto) - prototype of a simpler API layer on top of the existing nengi API
+
 
 ## Usage
 The [API documentation](https://timetocode.com/nengi) is the place to go for implementation details. But as an appetizer here is a tour of the the functionality associated with one of nengi's core features, the nengi.Entity
