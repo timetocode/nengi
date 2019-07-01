@@ -25,7 +25,7 @@ import NoInterpsMessage from '../common/NoInterpsMessage'
 import Sleep from './Sleep'
 
 import BasicSpace from './BasicSpace'
-
+import { EventEmitter } from 'events'
 
 //const Components = require('./Components')
 const defaults = {
@@ -38,8 +38,9 @@ const defaults = {
 }
 
 
-class Instance {
+class Instance extends EventEmitter {
     constructor(config, webConfig) {
+		super()
         /* defaults */
         if (!config) {
             throw new Error('Instance requries a nengiConfig')
