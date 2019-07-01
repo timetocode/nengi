@@ -40,6 +40,7 @@ Tutorials and demo games are in the works.
 * [3d-top-down](https://github.com/timetocode/3d-top-down)  - a simple 3d shooter
 * [nengi-2d-csp](https://github.com/timetocode/nengi-2d-csp)  - a simple 2d shooter with prediction/compensation
 * [nengi-seams-prototype](https://github.com/timetocode/nengi-seams-prototype) - prototype of multi-instance stitching
+* [nice-proto](https://github.com/timetocode/nice-proto) - prototype of a simpler API layer on top of the existing nengi API
 
 
 ## Usage
