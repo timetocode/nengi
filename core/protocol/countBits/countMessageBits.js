@@ -17,6 +17,12 @@ function countMessageBits(proxy, protocol, initialPosition) {
             var arrayIndexBinaryMeta = Binary[propData.arrayIndexType]
             bits += arrayIndexBinaryMeta.bits
             for (var j = 0; j < value.length; j++) {
+
+				if (proxy.text) {
+					//console.log('yo', proxy, proxy.protocol)
+					console.log('aaa', value[j], propData.protocol, ';;', proxy.protocol)
+				}
+
                 bits += countMessageBits(value[j], propData.protocol)
             }      
         } else if (propData.protocol) {
