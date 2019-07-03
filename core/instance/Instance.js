@@ -366,10 +366,34 @@ class Instance extends EventEmitter {
     }
 
     message(message, clientOrClients) {
+
+		const recurse = (message) => {
+			console.log('recurse', message.protocol)
+			message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
+
+			const properties = Object.keys(message.protocol.properties)
+			properties.forEach(prop => {
+				console.log('********', prop, message.protocol.properties[prop])
+			})
+		}
+
+
         if (!message.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-        message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
+		message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
+
+		//recurse(message)
+		
+		if (message.outers) {
+			//console.log('>>>>>', message.protocol, message.outers[0].protocol, message.outers[0].inners[0].protocol)
+
+			//message.outers[0].protocol
+			//message.outers[0].protocol.properties.inners.protocol = message.outers[0].protocol.inners.prototype.protocol 
+		}
+
+
+
         if (Array.isArray(clientOrClients)) {
             clientOrClients.forEach(client => {
                 client.queueMessage(message)
