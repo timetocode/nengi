@@ -44,10 +44,10 @@ var createPropSchema = function(index, propConfig, throwOnAdvancedTypes) {
 
 		// an array of values
 		if (typeof propConfig.indexType !== 'undefined') {
-
-			if (typeof propConfig.type.prototype !== 'undefined') {
+			//console.log('CCC', propConfig, propConfig.type.prototype.protocol)
+			if (typeof propConfig.type === 'function') {
 				// array of type protocol
-				type = propConfig.type.prototype.protocol
+				type = propConfig.type
 				protocol = propConfig.type.prototype.protocol
 				//console.log('array of subprotocols', propConfig)
 			} else {

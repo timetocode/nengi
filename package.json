@@ -22,5 +22,8 @@
         "@clusterws/cws": "^0.14.0",
         "esm": "^3.2.22",
         "utf8": "^3.0.0"
+    },
+    "devDependencies": {
+        "jasmine": "^3.4.0"
     }
 }
