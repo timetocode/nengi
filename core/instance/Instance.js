@@ -52,7 +52,6 @@ class Instance extends EventEmitter {
             }
         }
 
-
         this.config = config
         this.transferPassword = webConfig.transferPassword
         this.protocols = new ProtocolMap(config, metaConfig) 
@@ -99,6 +98,8 @@ class Instance extends EventEmitter {
 
         this.createEntities = []
         this.deleteEntities = []
+
+        this.parents = new Map()
 
         this.debugCount = 0
 
@@ -303,49 +304,79 @@ class Instance extends EventEmitter {
             this.basicSpace.insertEntity(entity)
         }
 
-        this.createEntities.push(id)
+        //this.components.addEntity(entity)
+        //this.createEntities.push(entity[this.config.ID_PROPERTY_NAME])
+
+
+        //console.log('E', entity)
         return entity
-    }
-
-    watch(entity) {
-        this.addEntity(entity)
-    }
-
-    getEntity(id) {
-        // TODO FIX
-        let ent = this.entities.get(id)
-        if (ent) {
-            return ent
-        }
-        //console.log('herhehrherhe', id, this._entities.get(id))
-        return this._entities.get(id)
     }
 
     removeEntity(entity) {
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.entities.remove(entity)
         }
-
         const id = entity[this.config.ID_PROPERTY_NAME]
+        const children = this.parents.get(id)
+
+        if (children && children.size > 0) {
+            console.log(id, 'had children', children)
+            throw new Error('Cannot remove entity without removing its components first.')
+        }
+
         this.deleteEntities.push(id)
         this.entityIdPool.queueReturnId(id)
-        this.entities.remove(entity)
-        entity[this.config.ID_PROPERTY_NAME] = -1        
+        entity[this.config.ID_PROPERTY_NAME] = -1
+        this.entities.remove(entity)      
 
         return entity
     }
 
-    unwatch(entity) {
-        this.removeEntity(entity)
+    addComponent(component, parent) {
+        //console.log('adding component!!!!')
+    
+        const parentId = parent[this.config.ID_PROPERTY_NAME]           
+        const componentId = this.entityIdPool.nextId()
+
+        component[this.config.ID_PROPERTY_NAME] = componentId
+        component[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(component.protocol)
+
+        if (!this._entities.get(componentId)) {
+            this._entities.add(component)
+        }
+
+        if (!this.parents.get(parentId)) {
+            //console.log('creating new component set')
+            this.parents.set(parentId, new Set())
+        }
+        //console.log('adding component')
+        this.parents.get(parentId).add(componentId) 
     }
 
-    addComponent(c) {
-        //this.components.addComponent(c)
+
+    removeComponent(component, parent) {
+        const parentId = parent[this.config.ID_PROPERTY_NAME]           
+        const componentId = component[this.config.ID_PROPERTY_NAME]
+
+        this.entityIdPool.queueReturnId(componentId)
+        this._entities.remove(component)
+        component[this.config.ID_PROPERTY_NAME] = -1
+        this.parents.get(parentId).delete(componentId)
     }
 
-    removeComponent(c) {
-        //this.components.removeComponent(c)
+
+    getEntity(id) {
+        // TEMP for provisional channel / component api
+        // TODO: single source of truth for entities
+        // with spatial entities as a lens
+        const ent = this.entities.get(id)
+        if (ent) {
+            return ent
+        }
+        return this._entities.get(id)
     }
+
+
 
     addLocalMessage(lEvent) {
         if (!lEvent.protocol) {
@@ -484,6 +515,7 @@ class Instance extends EventEmitter {
             'channels', this.channels.toArray().length
         )
         */
+        
 
         //console.log(this.entities.toArray())
         if (this.config.USE_HISTORIAN) {

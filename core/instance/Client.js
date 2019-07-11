@@ -70,6 +70,23 @@ class Client {
         this.jsonQueue.push(json)
     }
 
+    createOrUpdate(id, tick, toCreate, toUpdate) {
+        if (!this.cache[id]) {
+            toCreate.push(id)
+            this.cache[id] = tick
+            this.cacheArr.push(id)
+        } else {
+            this.cache[id] = tick
+            toUpdate.push(id)
+        }        
+
+        const children = this.instance.parents.get(id)
+ 
+        if (children) {
+            children.forEach(id => this.createOrUpdate(id, tick, toCreate,  toUpdate))
+        }
+    }
+
     checkVisibility(spatialStructure, tick) {
         //console.log(this.entityCache)
         const toCreate = []
@@ -98,36 +115,13 @@ class Client {
         for (let i = 0; i < nearby.entities.length; i++) {
             const entity = nearby.entities[i]
             const id = entity[this.config.ID_PROPERTY_NAME]
-
-            if (!this.cache[id]) {
-                //console.log('create', id)
-                toCreate.push(id)
-                this.cache[id] = tick
-                this.cacheArr.push(id)
-            } else {
-                //if (tick % 5 === 0) {
-                this.cache[id] = tick
-                // }
-                //console.log('update', id)
-                toUpdate.push(id)
-            }
+            this.createOrUpdate(id, tick, toCreate, toUpdate)
         }
 
         this.channels.forEach(channel => {
             channel.entities.forEach(entity => {
                 const id = entity[this.config.ID_PROPERTY_NAME]
-
-                if (!this.cache[id]) {
-                    toCreate.push(id)
-                    this.cache[id] = tick
-                    this.cacheArr.push(id)
-                } else {
-                    //if (tick % 5 === 0) {
-                    this.cache[id] = tick
-                    // }
-                    //console.log('update', id)
-                    toUpdate.push(id)
-                }
+                this.createOrUpdate(id, tick, toCreate, toUpdate)
             })
         })
 
