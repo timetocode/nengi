@@ -40,7 +40,8 @@ var BinaryType = createEnum([
     'Rotation8',
     'ASCIIString',
     'UTF8String',
-    'RGB888'
+	'RGB888',
+	'RotationFloat32'
 ])
 
 

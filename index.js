@@ -1,15 +1,6 @@
-/**
-* Please see the NENGI END USER LICENSE available in the LICENSE.txt file
-* By downloading or using this software or related content you are agreeing to 
-* be bounds by the terms of the NENGI END USER LICENSE Agreement. If you do not 
-* or cannot agree to the terms of the Agreement please do not download or use 
-* this software.
-*/
 var nengi = {
     importMode: 'default'
 }
-
-//nengi.config = require('./config')
 
 import BinaryType from './core/binary/BinaryType'
 import Protocol from './core/protocol/Protocol'
@@ -57,7 +48,7 @@ nengi.Number =
 nengi.Float64   = BinaryType.Float64
 nengi.EntityId  = BinaryType.EntityId
 nengi.RGB888    = BinaryType.RGB888
-//nengi.Rotation8 = BinaryType.Rotation8
+nengi.RotationFloat32 = BinaryType.RotationFloat32
 nengi.ASCIIString    = BinaryType.ASCIIString
 nengi.String =
 nengi.UTF8String = BinaryType.UTF8String
@@ -97,6 +88,4 @@ nengi.metaConfig = metaConfig
 //nengi.Client = Client
 //nengi.Interpolator = Interpolator
 
-
-
-export default nengi;
+export default nengi
