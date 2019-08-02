@@ -316,25 +316,30 @@ class Instance extends EventEmitter {
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.entities.remove(entity)
         }
-        const id = entity[this.config.ID_PROPERTY_NAME]
-        const children = this.parents.get(id)
-
-        if (children && children.size > 0) {
-            console.log(id, 'had children', children)
-            throw new Error('Cannot remove entity without removing its components first.')
-        }
-
+		const id = entity[this.config.ID_PROPERTY_NAME]
+		
         this.deleteEntities.push(id)
         this.entityIdPool.queueReturnId(id)
         entity[this.config.ID_PROPERTY_NAME] = -1
         this.entities.remove(entity)      
 
         return entity
+	}
+	
+	removeEntityAndComponents(entity) {
+		const id = entity[this.config.ID_PROPERTY_NAME]
+		const children = this.parents.get(id)
+        if (children && children.size > 0) {
+            children.forEach(nid => {
+                const component = { [this.config.ID_PROPERTY_NAME]: nid }
+				this.removeComponent(component, entity)				
+			})
+		}
+		this.removeEntity(entity)
+        return entity
     }
 
-    addComponent(component, parent) {
-        //console.log('adding component!!!!')
-    
+    addComponent(component, parent) {   
         const parentId = parent[this.config.ID_PROPERTY_NAME]           
         const componentId = this.entityIdPool.nextId()
 
@@ -346,10 +351,8 @@ class Instance extends EventEmitter {
         }
 
         if (!this.parents.get(parentId)) {
-            //console.log('creating new component set')
             this.parents.set(parentId, new Set())
         }
-        //console.log('adding component')
         this.parents.get(parentId).add(componentId) 
     }
 
