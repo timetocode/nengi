@@ -320,14 +320,16 @@ class Instance extends EventEmitter {
         const children = this.parents.get(id)
 
         if (children && children.size > 0) {
-            console.log(id, 'had children', children)
-            throw new Error('Cannot remove entity without removing its components first.')
+            children.forEach(nid => {
+                const component = { [this.config.ID_PROPERTY_NAME]: nid }
+                this.removeComponent(component, entity)
+            })
         }
 
         this.deleteEntities.push(id)
         this.entityIdPool.queueReturnId(id)
         entity[this.config.ID_PROPERTY_NAME] = -1
-        this.entities.remove(entity)      
+        this.entities.remove(entity)
 
         return entity
     }
