@@ -1,14 +1,14 @@
-import ProtocolMap from '../protocol/ProtocolMap'
-import metaConfig from '../common/metaConfig'
-import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer'
-import readSnapshotBuffer from '../snapshot/reader/readSnapshotBuffer'
-import EntityCache from '../instance/EntityCache'
-import WorldState from './WorldState'
-import Outbound from './Outbound'
-import Interpolator from './Interpolator'
-import createPongBuffer from '../snapshot/writer/createPongBuffer'
-import Chronus from './Chronus'
-import Predictor from './Predictor'
+import ProtocolMap from '../protocol/ProtocolMap.js';
+import metaConfig from '../common/metaConfig.js';
+import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer.js';
+import readSnapshotBuffer from '../snapshot/reader/readSnapshotBuffer.js';
+import EntityCache from '../instance/EntityCache.js';
+import WorldState from './WorldState.js';
+import Outbound from './Outbound.js';
+import Interpolator from './Interpolator.js';
+import createPongBuffer from '../snapshot/writer/createPongBuffer.js';
+import Chronus from './Chronus.js';
+import Predictor from './Predictor.js';
 import { EventEmitter } from 'events'
 
 class Client extends EventEmitter {

@@ -1,4 +1,4 @@
-import Binary from '../../binary/Binary';
+import Binary from '../../binary/Binary.js';
 
 export default function(batch) {
     var bits = Binary[batch.idType].bits

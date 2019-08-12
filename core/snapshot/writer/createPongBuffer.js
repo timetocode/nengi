@@ -1,8 +1,8 @@
-import BitBuffer from '../../binary/BitBuffer';
-import BitStream from '../../binary/BitStream';
-import { Chunk } from '../Chunk';
-import countPongBits from './countPongBits';
-import writePong from './writePong';
+import BitBuffer from '../../binary/BitBuffer.js';
+import BitStream from '../../binary/BitStream.js';
+import { Chunk } from '../Chunk.js';
+import countPongBits from './countPongBits.js';
+import writePong from './writePong.js';
 
 function createPongBuffer(pongKey) {
     var bits = 0

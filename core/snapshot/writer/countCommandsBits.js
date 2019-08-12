@@ -1,6 +1,6 @@
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import countMessageBits from '../../protocol/countBits/countMessageBits';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import countMessageBits from '../../protocol/countBits/countMessageBits.js';
 
 function countCommandsBits(commands) {
     var bits = 0

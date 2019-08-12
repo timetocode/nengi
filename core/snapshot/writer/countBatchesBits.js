@@ -1,6 +1,6 @@
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import countBatchBits from '../../protocol/countBits/countBatchBits';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import countBatchBits from '../../protocol/countBits/countBatchBits.js';
 
 function countBatchesBits(batches) {
     var bits = 0

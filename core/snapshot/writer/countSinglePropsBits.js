@@ -1,6 +1,6 @@
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import countPartialBits from '../../protocol/countBits/countSingleBits';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import countPartialBits from '../../protocol/countBits/countSingleBits.js';
 
 function countSinglePropsBits(singleProps) {
 	var bits = 0

@@ -1,4 +1,4 @@
-import NoInterpsMessage from './NoInterpsMessage';
+import NoInterpsMessage from './NoInterpsMessage.js';
 
 export default {
     messages: [

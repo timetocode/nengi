@@ -1,6 +1,6 @@
-import { Chunk } from '../Chunk';
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
+import { Chunk } from '../Chunk.js';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
 
 function writePing(bitStream, key) {
     if (key > -1) {

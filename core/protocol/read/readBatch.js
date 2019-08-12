@@ -1,4 +1,4 @@
-import Binary from '../../binary/Binary';
+import Binary from '../../binary/Binary.js';
 //var config = require('../../../config')
 
 function readBatch(bitStream, entityCache, config) {

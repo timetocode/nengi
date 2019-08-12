@@ -1,4 +1,4 @@
-import B from '../binary/BinaryType';
+import B from '../binary/BinaryType.js';
 
 class NoInterpsMessage {
     constructor(ids) {

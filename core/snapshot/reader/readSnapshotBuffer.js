@@ -1,24 +1,24 @@
-import Binary from '../../binary/Binary';
-import BitBuffer from '../../binary/BitBuffer';
-import BitStream from '../../binary/BitStream';
-import readBatches from './readBatches';
-import readSingleProps from './readSingleProps';
-import readCreateEntities from './readCreateEntities';
-import readDeleteEntities from './readDeleteEntities';
-import readLocalEvents from './readLocalEvents';
-import readMessages from './readMessages';
-import readJSONs from './readJSONs';
-import readTimesync from './readTimesync';
-import readPing from './readPing';
-import readTransfer from './readTransfer';
-import readConnectionResponse from './readConnectionResponse';
-import readEngineMessages from './readEngineMessages';
+import Binary from '../../binary/Binary.js';
+import BitBuffer from '../../binary/BitBuffer.js';
+import BitStream from '../../binary/BitStream.js';
+import readBatches from './readBatches.js';
+import readSingleProps from './readSingleProps.js';
+import readCreateEntities from './readCreateEntities.js';
+import readDeleteEntities from './readDeleteEntities.js';
+import readLocalEvents from './readLocalEvents.js';
+import readMessages from './readMessages.js';
+import readJSONs from './readJSONs.js';
+import readTimesync from './readTimesync.js';
+import readPing from './readPing.js';
+import readTransfer from './readTransfer.js';
+import readConnectionResponse from './readConnectionResponse.js';
+import readEngineMessages from './readEngineMessages.js';
 
 //var config = require('../../../config')
 
-import { Chunk } from '../Chunk';
+import { Chunk } from '../Chunk.js';
 
-import { ChunkReverse } from '../Chunk';
+import { ChunkReverse } from '../Chunk.js';
 
 
 function readSnapshotBuffer(arrayBuffer, protocols, config, connectCallback, transferCallback, protocolResolver) {

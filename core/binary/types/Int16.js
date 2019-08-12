@@ -3,7 +3,7 @@
 * range: -32768 to 32767
 * uses BitBuffer functions for write/read
 */
-import compareInts from './compare/compareIntegers';
+import compareInts from './compare/compareIntegers.js';
 
 var Int16 = {
     'min': -32768,

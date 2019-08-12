@@ -1,4 +1,4 @@
-import proxify from '../protocol/proxify';
+import proxify from '../protocol/proxify.js';
 
 const EPSILON = 0.0001
 

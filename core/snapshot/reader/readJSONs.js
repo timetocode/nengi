@@ -1,6 +1,6 @@
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import readJSON from '../../protocol/read/readJSON';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import readJSON from '../../protocol/read/readJSON.js';
 
 function readJSONs(bitStream) {
     var length = bitStream[Binary[BinaryType.UInt16].read]()

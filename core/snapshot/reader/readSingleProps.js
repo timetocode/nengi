@@ -1,6 +1,6 @@
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import readSingle from '../../protocol/read/readSingle';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import readSingle from '../../protocol/read/readSingle.js';
 //var config = require('../../../config')
 
 function readSingleProps(bitStream, protocolResolver, config) {

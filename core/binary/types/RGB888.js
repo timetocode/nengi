@@ -1,4 +1,4 @@
-import UInt8 from './UInt8';
+import UInt8 from './UInt8.js';
 
 // compare not used yet
 var compare = function(a, b) {

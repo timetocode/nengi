@@ -1,5 +1,5 @@
 
-import Binary from '../binary/Binary';
+import Binary from '../binary/Binary.js';
 
 function IdPool(binaryType) {
     this.min = 0

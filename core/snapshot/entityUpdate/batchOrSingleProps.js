@@ -1,5 +1,5 @@
-import isBatchAtomiclyValid from './isBatchAtomiclyValid';
-import compare from '../../protocol/compare';
+import isBatchAtomiclyValid from './isBatchAtomiclyValid.js';
+import compare from '../../protocol/compare.js';
 
 function batchOrSingleProps(oldProxy, newProxy, schema) {
     var singlePropUpdates = []

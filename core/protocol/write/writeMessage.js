@@ -1,6 +1,6 @@
-import Binary from '../../binary/Binary';
-import writeProp from './writeProp';
-import getValue from '../getValue';
+import Binary from '../../binary/Binary.js';
+import writeProp from './writeProp.js';
+import getValue from '../getValue.js';
 
 var writeMessage = function(bitStream, proxy, protocol, initialPosition) {
 

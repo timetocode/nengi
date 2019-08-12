@@ -1,6 +1,6 @@
-import createPropSchema from './createPropSchema';
-import createOptSchema from './createOptSchema';
-import selectUIntType from './selectUIntType';
+import createPropSchema from './createPropSchema.js';
+import createOptSchema from './createOptSchema.js';
+import selectUIntType from './selectUIntType.js';
 
 function Protocol(schemaConfig, config, optSchemaConfig, components, throwOnAdvancedTypes) {
 	//console.log('creating protocol from', schemaConfig, throwOnAdvancedTypes)

@@ -1,5 +1,5 @@
-import Binary from '../binary/Binary';
-import getValue from './getValue';
+import Binary from '../binary/Binary.js';
+import getValue from './getValue.js';
 
 function compare(proxyA, proxyB, protocol) {
     var diffs = []

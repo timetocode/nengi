@@ -1,8 +1,8 @@
-import BitBuffer from '../../binary/BitBuffer';
-import BitStream from '../../binary/BitStream';
-import Binary from '../../binary/Binary';
-import BinaryType from '../../binary/BinaryType';
-import { Chunk } from '../Chunk';
+import BitBuffer from '../../binary/BitBuffer.js';
+import BitStream from '../../binary/BitStream.js';
+import Binary from '../../binary/Binary.js';
+import BinaryType from '../../binary/BinaryType.js';
+import { Chunk } from '../Chunk.js';
 
 function createHandshakeBuffer(handshake) {
 	var json = JSON.stringify(handshake)

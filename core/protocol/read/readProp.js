@@ -1,4 +1,4 @@
-import Binary from '../../binary/Binary';
+import Binary from '../../binary/Binary.js';
 
 var readProp = function(bitStream, type, arrayIndexType) {
     var binaryMeta = Binary[type]

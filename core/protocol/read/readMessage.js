@@ -1,6 +1,6 @@
-import Binary from '../../binary/Binary';
-import readProp from './readProp';
-import setValue from '../setValue';
+import Binary from '../../binary/Binary.js';
+import readProp from './readProp.js';
+import setValue from '../setValue.js';
 
 var readMessage = function(bitStream, protocol, initialPosition, type, typePropertyName) {
     var start = 0

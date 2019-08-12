@@ -1,8 +1,8 @@
 //var Grid = require('./Grid')
-import EDictionary from '../../external/EDictionary';
+import EDictionary from '../../external/EDictionary.js';
 
-import SpatialStructure from './BasicSpace';
-import proxify from '../protocol/proxify';
+import SpatialStructure from './BasicSpace.js';
+import proxify from '../protocol/proxify.js';
 
 var lerp = function(a, b, portion) {
   return a + ((b - a) * portion)

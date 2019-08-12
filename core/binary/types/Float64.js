@@ -2,7 +2,7 @@
 * Definition of an Float64
 * uses BitBuffer functions for write/read
 */
-import compareFloats from './compare/compareFloats';
+import compareFloats from './compare/compareFloats.js';
 
 var Float64 = {
     'bits': 64,

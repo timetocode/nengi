@@ -1,7 +1,7 @@
-import { Chunk } from '../Chunk';
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import writeMessage from '../../protocol/write/writeMessage';
+import { Chunk } from '../Chunk.js';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import writeMessage from '../../protocol/write/writeMessage.js';
 
 function writeCreateEntities(chunkType, bitStream, entities) {
     if (entities.length > 0) {

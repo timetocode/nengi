@@ -1,5 +1,5 @@
-import calculateValue from './calculateValue';
-import Binary from '../../binary/Binary';
+import calculateValue from './calculateValue.js';
+import Binary from '../../binary/Binary.js';
 
 function isBatchAtomiclyValid(diffs, schema) {
 

@@ -2,7 +2,7 @@
 * Definition of an Float32
 * uses BitBuffer functions for write/read
 */
-import compareFloats from './compare/compareFloats';
+import compareFloats from './compare/compareFloats.js';
 
 var Float32 = {
     'bits': 32,

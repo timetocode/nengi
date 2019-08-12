@@ -1,6 +1,6 @@
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import readMessage from '../../protocol/read/readMessage';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import readMessage from '../../protocol/read/readMessage.js';
 //var config = require('../../../config')
 
 function readMessages(bitStream, protocols, config) {

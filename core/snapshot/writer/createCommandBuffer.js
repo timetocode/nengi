@@ -1,8 +1,8 @@
-import BitBuffer from '../../binary/BitBuffer';
-import BitStream from '../../binary/BitStream';
-import { Chunk } from '../Chunk';
-import countCommandsBits from './countCommandsBits';
-import writeCommands from './writeCommands';
+import BitBuffer from '../../binary/BitBuffer.js';
+import BitStream from '../../binary/BitStream.js';
+import { Chunk } from '../Chunk.js';
+import countCommandsBits from './countCommandsBits.js';
+import writeCommands from './writeCommands.js';
 
 function createCommandBuffer(tick, commands) {
     var bits = 0

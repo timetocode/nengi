@@ -1,6 +1,6 @@
 
 // the most basic spatial structure that will work with nengi's instance
-import EDictionary from '../../external/EDictionary'
+import EDictionary from '../../external/EDictionary.js';
 
 function BasicSpace(ID_PROPERTY_NAME) {
     this.ID_PROPERTY_NAME = ID_PROPERTY_NAME || 'id'

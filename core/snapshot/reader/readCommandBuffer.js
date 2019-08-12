@@ -1,13 +1,13 @@
-import Binary from '../../binary/Binary';
-import BinaryType from '../../binary/BinaryType';
-import BitBuffer from '../../binary/BitBuffer';
-import BitStream from '../../binary/BitStream';
-import { Chunk } from '../Chunk';
-import { ChunkReverse } from '../Chunk';
-import readCommands from './readCommands';
-import readPong from './readPong';
-import readTransferRequest from './readTransferRequest';
-import readTransferResponse from './readTransferResponse';
+import Binary from '../../binary/Binary.js';
+import BinaryType from '../../binary/BinaryType.js';
+import BitBuffer from '../../binary/BitBuffer.js';
+import BitStream from '../../binary/BitStream.js';
+import { Chunk } from '../Chunk.js';
+import { ChunkReverse } from '../Chunk.js';
+import readCommands from './readCommands.js';
+import readPong from './readPong.js';
+import readTransferRequest from './readTransferRequest.js';
+import readTransferResponse from './readTransferResponse.js';
 
 function readCommandBuffer(arrayBuffer, protocols, config) {
     //console.log(arrayBuffer)

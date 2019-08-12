@@ -1,5 +1,5 @@
-import Binary from '../../binary/Binary';
-import writeProp from './writeProp';
+import Binary from '../../binary/Binary.js';
+import writeProp from './writeProp.js';
 
 function writeSingle(bitStream, partial) { 
     bitStream[Binary[partial.idType].write](partial.id)

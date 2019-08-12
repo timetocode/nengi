@@ -3,7 +3,7 @@
 * range: 0 to 2047
 * uses BitBuffer functions for write/read
 */
-import compareInts from './compare/compareIntegers';
+import compareInts from './compare/compareIntegers.js';
 
 var UInt11 = {
     'min': 0,

@@ -16,7 +16,7 @@ const lerpRot = function(a, b, amount) {
     return Math.atan2(s, c)
 }
 
-import compareFloats from './compare/compareFloats';
+import compareFloats from './compare/compareFloats.js';
 
 const RotationFloat32 = {
     'min': 0,

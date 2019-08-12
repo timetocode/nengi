@@ -1,14 +1,14 @@
-import BitBuffer from '../schema/BitBuffer';
-import BitStream from '../schema/BitStream';
-import Binary from '../schema/Binary';
-import BinaryType from '../schema/BinaryType';
-import read from '../schema/read';
-import { Chunk } from './Chunk';
-import { chunkType } from './Chunk';
-import deproxify from '../schema/deproxify';
-import readPartial from '../schema/readPartial';
-import readOptimized from '../schema/readOptimized';
-import EntityCache from './EntityCache';
+import BitBuffer from '../schema/BitBuffer.js';
+import BitStream from '../schema/BitStream.js';
+import Binary from '../schema/Binary.js';
+import BinaryType from '../schema/BinaryType.js';
+import read from '../schema/read.js';
+import { Chunk } from './Chunk.js';
+import { chunkType } from './Chunk.js';
+import deproxify from '../schema/deproxify.js';
+import readPartial from '../schema/readPartial.js';
+import readOptimized from '../schema/readOptimized.js';
+import EntityCache from './EntityCache.js';
 
 function Reader(instance) {
     this.instance = instance

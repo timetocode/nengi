@@ -1,4 +1,4 @@
-import Protocol from './Protocol';
+import Protocol from './Protocol.js';
 //var config = require('../../config')
 
 

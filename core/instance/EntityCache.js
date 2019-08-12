@@ -1,6 +1,6 @@
-import copyProxy from '../protocol/copyProxy';
-import setValue from '../protocol/setValue';
-import getValue from '../protocol/getValue';
+import copyProxy from '../protocol/copyProxy.js';
+import setValue from '../protocol/setValue.js';
+import getValue from '../protocol/getValue.js';
 
 function EntityCache(config) {
     this.config = config

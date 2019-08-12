@@ -1,7 +1,7 @@
-import { Chunk } from '../Chunk';
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import writeDeleteId from '../../protocol/write/writeDeleteId';
+import { Chunk } from '../Chunk.js';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import writeDeleteId from '../../protocol/write/writeDeleteId.js';
 //var config = require('../../../config')
 
 function writeDeleteEntities(chunkType, bitStream, ids, config) {

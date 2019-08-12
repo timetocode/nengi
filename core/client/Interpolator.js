@@ -1,5 +1,5 @@
-import getValue from '../protocol/getValue'
-import Binary from '../binary/Binary'
+import getValue from '../protocol/getValue.js';
+import Binary from '../binary/Binary.js';
 
 const cacheUpdateCheck = (cache, update, value, config) => {
     const id = update[config.ID_PROPERTY_NAME]

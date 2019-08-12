@@ -1,4 +1,4 @@
-import Binary from '../../binary/Binary';
+import Binary from '../../binary/Binary.js';
 
 var readDelete = function(bitStream, idType) {
     bitStream[Binary[idType].read]()

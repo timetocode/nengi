@@ -1,4 +1,4 @@
-import EDictionary from '../../external/EDictionary'
+import EDictionary from '../../external/EDictionary.js';
 
 class Channel {
     constructor(config) {

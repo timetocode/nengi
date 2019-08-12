@@ -1,37 +1,37 @@
-import BinaryType from './BinaryType';
+import BinaryType from './BinaryType.js';
 
-import Bool from './types/Boolean'
+import Bool from './types/Boolean.js';
 
-import UInt2 from './types/UInt2'
-import UInt3 from './types/UInt3'
-import UInt4 from './types/UInt4'
-import UInt5 from './types/UInt5'
-import UInt6 from './types/UInt6'
-import UInt7 from './types/UInt7'
-import UInt8 from './types/UInt8'
-import UInt9 from './types/UInt9'
-import UInt10 from './types/UInt10'
-import UInt11 from './types/UInt11'
-import UInt12 from './types/UInt12'
-import UInt16 from './types/UInt16'
-import UInt32 from './types/UInt32'
+import UInt2 from './types/UInt2.js';
+import UInt3 from './types/UInt3.js';
+import UInt4 from './types/UInt4.js';
+import UInt5 from './types/UInt5.js';
+import UInt6 from './types/UInt6.js';
+import UInt7 from './types/UInt7.js';
+import UInt8 from './types/UInt8.js';
+import UInt9 from './types/UInt9.js';
+import UInt10 from './types/UInt10.js';
+import UInt11 from './types/UInt11.js';
+import UInt12 from './types/UInt12.js';
+import UInt16 from './types/UInt16.js';
+import UInt32 from './types/UInt32.js';
 
-import Int4 from './types/Int4'
-import Int6 from './types/Int6'
-import Int8 from './types/Int8'
-import Int10 from './types/Int10'
-import Int16 from './types/Int16'
-import Int32 from './types/Int32'
+import Int4 from './types/Int4.js';
+import Int6 from './types/Int6.js';
+import Int8 from './types/Int8.js';
+import Int10 from './types/Int10.js';
+import Int16 from './types/Int16.js';
+import Int32 from './types/Int32.js';
 
-import Float32 from './types/Float32'
-import Float64 from './types/Float64'
+import Float32 from './types/Float32.js';
+import Float64 from './types/Float64.js';
 
-import EntityId from './types/EntityId'
-import Rotation8 from './types/Rotation8'
-import RotationFloat32 from './types/RotationFloat32'
-import RGB888 from './types/RGB888'
-import ASCIIString from './types/ASCIIString'
-import UTF8String from './types/UTF8String'
+import EntityId from './types/EntityId.js';
+import Rotation8 from './types/Rotation8.js';
+import RotationFloat32 from './types/RotationFloat32.js';
+import RGB888 from './types/RGB888.js';
+import ASCIIString from './types/ASCIIString.js';
+import UTF8String from './types/UTF8String.js';
 
 
 

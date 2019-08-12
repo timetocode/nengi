@@ -1,5 +1,5 @@
-import calculateValue from './calculateValue';
-import batchOrSingleProps from './batchOrSingleProps';
+import calculateValue from './calculateValue.js';
+import batchOrSingleProps from './batchOrSingleProps.js';
 
 function formatUpdates(idPropertyName, oldProxy, newProxy, schema) {
 

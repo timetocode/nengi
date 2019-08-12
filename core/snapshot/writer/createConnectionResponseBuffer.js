@@ -1,8 +1,8 @@
-import BitBuffer from '../../binary/BitBuffer';
-import BitStream from '../../binary/BitStream';
-import { Chunk } from '../Chunk';
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
+import BitBuffer from '../../binary/BitBuffer.js';
+import BitStream from '../../binary/BitStream.js';
+import { Chunk } from '../Chunk.js';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
 
 function createConnectionReponseBuffer(acceptConnection, text) {
     var bits = 8

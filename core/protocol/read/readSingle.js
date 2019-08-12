@@ -1,7 +1,7 @@
-import Binary from '../../binary/Binary';
+import Binary from '../../binary/Binary.js';
 
 //var config = require('../../../config')
-import readProp from './readProp';
+import readProp from './readProp.js';
 
 function readSingle(bitStream, protocolResolver, config) {    
     var id = bitStream[Binary[config.ID_BINARY_TYPE].read]()

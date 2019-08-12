@@ -1,9 +1,9 @@
-import Protocol from './Protocol';
-import EntityProtocol from './EntityProtocol';
-import MessageProtocol from './MessageProtocol';
-import LocalEventProtocol from './LocalEventProtocol';
-import CommandProtocol from './CommandProtocol';
-import ComponentProtocol from './ComponentProtocol';
+import Protocol from './Protocol.js';
+import EntityProtocol from './EntityProtocol.js';
+import MessageProtocol from './MessageProtocol.js';
+import LocalEventProtocol from './LocalEventProtocol.js';
+import CommandProtocol from './CommandProtocol.js';
+import ComponentProtocol from './ComponentProtocol.js';
 
 function ProtocolMap(config, metaConfig) {
     this.lookupByIndex = new Map()

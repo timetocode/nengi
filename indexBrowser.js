@@ -2,15 +2,15 @@ const nengi = {
     importMode: 'browser'
 }
 
-import BinaryType from './core/binary/BinaryType'
-import Protocol from './core/protocol/Protocol'
-import EntityProtocol from './core/protocol/EntityProtocol'
-import LocalEventProtocol from './core/protocol/LocalEventProtocol'
-import MessageProtocol from './core/protocol/MessageProtocol'
-import CommandProtocol from './core/protocol/CommandProtocol'
-import Client from './core/client/Client'
-import Interpolator from './core/client/Interpolator'
-import proxify from './core/protocol/proxify'
+import BinaryType from './core/binary/BinaryType.js';
+import Protocol from './core/protocol/Protocol.js';
+import EntityProtocol from './core/protocol/EntityProtocol.js';
+import LocalEventProtocol from './core/protocol/LocalEventProtocol.js';
+import MessageProtocol from './core/protocol/MessageProtocol.js';
+import CommandProtocol from './core/protocol/CommandProtocol.js';
+import Client from './core/client/Client.js';
+import Interpolator from './core/client/Interpolator.js';
+import proxify from './core/protocol/proxify.js';
 
 // shortcuts for less typing
 nengi.Boolean   = BinaryType.Boolean

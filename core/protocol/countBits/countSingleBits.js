@@ -1,5 +1,5 @@
-import Binary from '../../binary/Binary';
-import countPropBits from './countPropBits';
+import Binary from '../../binary/Binary.js';
+import countPropBits from './countPropBits.js';
 
 function countBits(single) {  
     var bits = Binary[single.idType].bits

@@ -1,5 +1,5 @@
-import Binary from '../../binary/Binary';
-import countPropBits from './countPropBits';
+import Binary from '../../binary/Binary.js';
+import countPropBits from './countPropBits.js';
 
 function countMessageBits(proxy, protocol, initialPosition) {
     if (!protocol) {

@@ -1,5 +1,5 @@
-import Type from '../binary/BinaryType';
-import Binary from '../binary/Binary';
+import Type from '../binary/BinaryType.js';
+import Binary from '../binary/Binary.js';
 
 var UIntTypes = [
     Type.UInt2,

@@ -1,4 +1,4 @@
-import createCommandBuffer from '../snapshot/writer/createCommandBuffer';
+import createCommandBuffer from '../snapshot/writer/createCommandBuffer.js';
 
 class Outbound {
     constructor(protocols, websocket, config) {

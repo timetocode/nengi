@@ -3,7 +3,7 @@
 * range: -128 to 127
 * uses BitBuffer functions for write/read
 */
-import compareInts from './compare/compareIntegers';
+import compareInts from './compare/compareIntegers.js';
 
 var Int8 = {
     'min': -128,

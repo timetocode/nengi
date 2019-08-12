@@ -1,7 +1,7 @@
-import EDictionary from '../../external/EDictionary';
-import copyProxy from '../protocol/copyProxy';
-import getValue from '../protocol/getValue';
-import setValue from '../protocol/setValue';
+import EDictionary from '../../external/EDictionary.js';
+import copyProxy from '../protocol/copyProxy.js';
+import getValue from '../protocol/getValue.js';
+import setValue from '../protocol/setValue.js';
 
 function WorldState(tick, timeBetweenSnapshots, snapshot, previousWorldState, config) {
     this.config = config

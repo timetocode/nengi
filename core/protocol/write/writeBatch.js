@@ -1,4 +1,4 @@
-import Binary from '../../binary/Binary';
+import Binary from '../../binary/Binary.js';
 
 function writeBatch(bitStream, batch) {
     bitStream[Binary[batch.idType].write](batch.id)

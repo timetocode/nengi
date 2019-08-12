@@ -1,21 +1,21 @@
 
-import writeEntity from '../schema/writeEntity';
-import countEntityBits from '../schema/countEntityBits';
-import writeOptimized from '../schema/writeOptimized';
-import countOptimizedBits from '../schema/countOptimizedBits';
-import writePartial from '../schema/writePartial';
-import countPartialBits from '../schema/countPartialBits';
-import writeDelete from '../schema/writeDelete';
-import countDeleteBits from '../schema/countDeleteBits';
-import BitBuffer from '../schema/BitBuffer';
-import BitStream from '../schema/BitStream';
-import Binary from '../schema/Binary';
-import BinaryType from '../schema/BinaryType';
-import proxify from '../schema/proxify';
-import compare from '../schema/compare';
-import read from '../schema/read';
-import { Chunk } from './Chunk';
-import { chunkType } from './Chunk';
+import writeEntity from '../schema/writeEntity.js';
+import countEntityBits from '../schema/countEntityBits.js';
+import writeOptimized from '../schema/writeOptimized.js';
+import countOptimizedBits from '../schema/countOptimizedBits.js';
+import writePartial from '../schema/writePartial.js';
+import countPartialBits from '../schema/countPartialBits.js';
+import writeDelete from '../schema/writeDelete.js';
+import countDeleteBits from '../schema/countDeleteBits.js';
+import BitBuffer from '../schema/BitBuffer.js';
+import BitStream from '../schema/BitStream.js';
+import Binary from '../schema/Binary.js';
+import BinaryType from '../schema/BinaryType.js';
+import proxify from '../schema/proxify.js';
+import compare from '../schema/compare.js';
+import read from '../schema/read.js';
+import { Chunk } from './Chunk.js';
+import { chunkType } from './Chunk.js';
 
 
 

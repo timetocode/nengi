@@ -1,7 +1,7 @@
-import { Chunk } from '../Chunk';
-import BinaryType from '../../binary/BinaryType';
-import Binary from '../../binary/Binary';
-import writeBatch from '../../protocol/write/writeBatch';
+import { Chunk } from '../Chunk.js';
+import BinaryType from '../../binary/BinaryType.js';
+import Binary from '../../binary/Binary.js';
+import writeBatch from '../../protocol/write/writeBatch.js';
 
 function writeBatches(bitStream, batches) {
     if (batches.length > 0) {

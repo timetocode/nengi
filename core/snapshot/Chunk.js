@@ -1,5 +1,5 @@
 //var selectUIntType = require('../schema/selectUIntType')
-import BinaryType from '../binary/BinaryType';
+import BinaryType from '../binary/BinaryType.js';
 
 var reverse = {}
 function createEnum(values) {

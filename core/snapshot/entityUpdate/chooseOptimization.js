@@ -1,6 +1,6 @@
-import isBatchAtomiclyValid from './isBatchAtomiclyValid';
-import compare from '../../protocol/compare';
-import getValue from '../../protocol/getValue';
+import isBatchAtomiclyValid from './isBatchAtomiclyValid.js';
+import compare from '../../protocol/compare.js';
+import getValue from '../../protocol/getValue.js';
 
 function locateDiff(prop, diffs) {
     for (var i = 0; i < diffs.length; i++) {

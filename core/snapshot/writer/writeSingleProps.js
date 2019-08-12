@@ -1,7 +1,7 @@
-import { Chunk } from '../Chunk';
-import Binary from '../../binary/Binary';
-import BinaryType from '../../binary/BinaryType';
-import writePartial from '../../protocol/write/writeSingle';
+import { Chunk } from '../Chunk.js';
+import Binary from '../../binary/Binary.js';
+import BinaryType from '../../binary/BinaryType.js';
+import writePartial from '../../protocol/write/writeSingle.js';
 
 function writeSingleProps(chunkType, bitStream, singleProps) {
     if (singleProps.length > 0) {

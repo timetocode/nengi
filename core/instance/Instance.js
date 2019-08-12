@@ -1,30 +1,30 @@
 import { default as cws } from '@clusterws/cws'
-import EDictionary from '../../external/EDictionary'
-import Historian from './Historian'
-import IdPool from './IdPool'
-import proxify from '../protocol/proxify'
-import compare from '../protocol/compare'
-import copyProxy from '../protocol/copyProxy'
-import Binary from '../binary/Binary'
-import BinaryType from '../binary/BinaryType'
-import formatUpdates from '../snapshot/entityUpdate/formatUpdates'
-import chooseOptimization from '../snapshot/entityUpdate/chooseOptimization'
-import ProtocolMap from '../protocol/ProtocolMap'
-import Client from './Client'
-import createSnapshotBuffer from '../snapshot/writer/createSnapshotBuffer'
-import readCommandBuffer from '../snapshot/reader/readCommandBuffer'
-import createConnectionResponseBuffer from '../snapshot/writer/createConnectionResponseBuffer'
-import createTransferClientBuffer from '../snapshot/writer/createTransferClientBuffer'
-import createTransferRequestBuffer from '../snapshot/writer/createTransferRequestBuffer'
-import createTransferResponseBuffer from '../snapshot/writer/createTransferResponseBuffer'
-import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer'
+import EDictionary from '../../external/EDictionary.js';
+import Historian from './Historian.js';
+import IdPool from './IdPool.js';
+import proxify from '../protocol/proxify.js';
+import compare from '../protocol/compare.js';
+import copyProxy from '../protocol/copyProxy.js';
+import Binary from '../binary/Binary.js';
+import BinaryType from '../binary/BinaryType.js';
+import formatUpdates from '../snapshot/entityUpdate/formatUpdates.js';
+import chooseOptimization from '../snapshot/entityUpdate/chooseOptimization.js';
+import ProtocolMap from '../protocol/ProtocolMap.js';
+import Client from './Client.js';
+import createSnapshotBuffer from '../snapshot/writer/createSnapshotBuffer.js';
+import readCommandBuffer from '../snapshot/reader/readCommandBuffer.js';
+import createConnectionResponseBuffer from '../snapshot/writer/createConnectionResponseBuffer.js';
+import createTransferClientBuffer from '../snapshot/writer/createTransferClientBuffer.js';
+import createTransferRequestBuffer from '../snapshot/writer/createTransferRequestBuffer.js';
+import createTransferResponseBuffer from '../snapshot/writer/createTransferResponseBuffer.js';
+import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer.js';
 
-import consoleLogLogo from '../common/consoleLogLogo'
-import metaConfig from '../common/metaConfig'
-import NoInterpsMessage from '../common/NoInterpsMessage'
-import Sleep from './Sleep'
+import consoleLogLogo from '../common/consoleLogLogo.js';
+import metaConfig from '../common/metaConfig.js';
+import NoInterpsMessage from '../common/NoInterpsMessage.js';
+import Sleep from './Sleep.js';
 
-import BasicSpace from './BasicSpace'
+import BasicSpace from './BasicSpace.js';
 import { EventEmitter } from 'events'
 
 //const Components = require('./Components')

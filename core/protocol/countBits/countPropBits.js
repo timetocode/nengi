@@ -1,5 +1,5 @@
-import Binary from '../../binary/Binary';
-import BinaryType from '../../binary/BinaryType';
+import Binary from '../../binary/Binary.js';
+import BinaryType from '../../binary/BinaryType.js';
 
 export default function(type, arrayIndexType, value) {
     //console.log('type', type, 'arrayIndexType', arrayIndexType, 'value', value)
