@@ -1,4 +1,4 @@
-import { WebSocketServer } from '@clusterws/cws'
+import { default as cws } from '@clusterws/cws'
 import EDictionary from '../../external/EDictionary'
 import Historian from './Historian'
 import IdPool from './IdPool'
@@ -106,9 +106,9 @@ class Instance extends EventEmitter {
         consoleLogLogo()
 
         if (typeof webConfig.port !== 'undefined') {
-            this.wsServer = new WebSocketServer({ port: webConfig.port })
+            this.wsServer = new cws.WebSocketServer({ port: webConfig.port })
         } else if (typeof webConfig.httpServer !== 'undefined') {
-            this.wsServer = new WebSocketServer({ server: webConfig.httpServer })
+            this.wsServer = new cws.WebSocketServer({ server: webConfig.httpServer })
         } else {
             throw new Error('Instance must be passed a config that contains a port or an http server.')
         }

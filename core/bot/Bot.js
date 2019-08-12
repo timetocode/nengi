@@ -11,7 +11,7 @@ import Outbound from '../client/Outbound';
 
 //const W3CWebSocket = require('websocket').w3cwebsocket
 //const WebSocket = require('ws')
-import { WebSocket } from '@clusterws/cws';
+import { default as cws } from '@clusterws/cws';
 
 class Bot {
     constructor(config, protocols) {
@@ -45,7 +45,7 @@ class Bot {
     }
 
     connect(address, handshake) {
-        this.websocket = new WebSocket(address) //, 'nengi-protocol')
+        this.websocket = new cws.WebSocket(address) //, 'nengi-protocol')
         this.outbound.websocket = this.websocket
         this.websocket.binaryType = 'arraybuffer'
 
