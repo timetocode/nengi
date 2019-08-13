@@ -124,6 +124,10 @@ class Instance extends EventEmitter {
                 this.disconnect(client, event)
             })
         })
+
+        this.wsServer.on('error', err => {
+            console.error(err)
+        });
     }
 
     noInterp(id) {
