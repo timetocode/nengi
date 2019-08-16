@@ -209,7 +209,9 @@ class Instance extends EventEmitter {
     getNextCommand() {
         var cmd = this.commands.shift()
         //console.log(cmd)
-        if (cmd && cmd.client.lastProcessedClientTick < cmd.tick) {
+        // TODO:NN temporary fix
+        // if (cmd && cmd.client.lastProcessedClientTick < cmd.tick) {
+        if (cmd) {
             cmd.client.lastProcessedClientTick = cmd.tick
         }
         return cmd
