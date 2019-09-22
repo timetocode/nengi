@@ -2,8 +2,6 @@ const nengi = {
     importMode: 'browser'
 }
 
-//nengi.config = require('./config')
-
 import BinaryType from './core/binary/BinaryType'
 import Protocol from './core/protocol/Protocol'
 import EntityProtocol from './core/protocol/EntityProtocol'
@@ -39,7 +37,7 @@ nengi.Number =
 nengi.Float64   = BinaryType.Float64
 nengi.EntityId  = BinaryType.EntityId
 nengi.RGB888    = BinaryType.RGB888
-//nengi.Rotation8 = BinaryType.Rotation8
+nengi.RotationFloat32 = BinaryType.RotationFloat32
 nengi.ASCIIString    = BinaryType.ASCIIString
 nengi.String =
 nengi.UTF8String = BinaryType.UTF8String
@@ -61,14 +59,10 @@ nengi.MessageProtocol = MessageProtocol
 nengi.Command =
 nengi.CommandProtocol = CommandProtocol
 
-
 nengi.proxify = proxify
-
 
 // browser
 nengi.Client = Client
 nengi.Interpolator = Interpolator
-
-
 
 export default nengi
