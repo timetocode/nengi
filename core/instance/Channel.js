@@ -10,10 +10,7 @@ class Channel {
 		this.config = instance.config
         this.entities = new EDictionary(this.config.ID_PROPERTY_NAME)
         this.clients = new Map()
-        this.messages = []
-
-        this.entityIdPool = null
-        this.protocols = null        
+        this.messages = []    
     }
 
     addEntity(entity) {
@@ -37,7 +34,7 @@ class Channel {
     removeEntity(entity) {
         this.entities.remove(entity)
         this.instance._entities.remove(entity)
-        this.entityIdPool.queueReturnId(entity[this.config.ID_PROPERTY_NAME])
+        this.instance.entityIdPool.queueReturnId(entity[this.config.ID_PROPERTY_NAME])
         entity[this.config.ID_PROPERTY_NAME] = -1
     }
 

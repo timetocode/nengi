@@ -4,6 +4,9 @@
     "description": "multiplayer game networking for node.js and html5",
     "main": "index.js",
     "browser": "indexBrowser.js",
+    "scripts": {
+        "start": "npx jasmine"
+    },
     "keywords": [
         "multiplayer",
         "networking",
@@ -24,6 +27,6 @@
         "utf8": "^3.0.0"
     },
     "devDependencies": {
-        "jasmine": "^3.4.0"
+        "jasmine": "^3.5.0"
     }
 }
