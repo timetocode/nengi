@@ -50,7 +50,11 @@ class Instance extends EventEmitter {
                     config[prop] = defaults[prop]
                 }
             }
-        }
+		}
+		
+		if (!webConfig) {
+			throw new Error('Instance requries a webConfig')
+		}
 
         this.config = config
         this.transferPassword = webConfig.transferPassword

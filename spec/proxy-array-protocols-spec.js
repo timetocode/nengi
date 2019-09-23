@@ -12,7 +12,7 @@ const config = {
 	ID_PROPERTY_NAME: 'nid',
 	TYPE_PROPERTY_NAME: 'ntype',
 }
-fdescribe('nest proxy', function () {
+describe('nest proxy', function () {
 	/*
 	* Would I really make a game map like this? no. I would make a few arrays
 	* of bytes holding tile data with far less nesting. So this code is really 
@@ -81,7 +81,7 @@ fdescribe('nest proxy', function () {
 		]
 	)
 
-	fit('first layer', function () {
+	it('first layer', function () {
 		const proxy = proxify(world, world.protocol)
 		expect(proxy.name).toEqual(world.name)
 		expect(proxy.width).toEqual(world.width)
@@ -96,7 +96,7 @@ fdescribe('nest proxy', function () {
 		expect(worldClone).not.toBe(world)
 	})
 
-	fit('second layer', function () {
+	it('second layer', function () {
 		const proxy = proxify(world, world.protocol)
 		const worldClone = deproxify(proxy, world.protocol)
 
@@ -105,7 +105,7 @@ fdescribe('nest proxy', function () {
 		expect(worldClone.layers[0].name).toEqual(world.layers[0].name)
 	})
 
-	fit('third layer', function () {
+	it('third layer', function () {
 		const proxy = proxify(world, world.protocol)
 		const worldClone = deproxify(proxy, world.protocol)
 

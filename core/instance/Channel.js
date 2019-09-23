@@ -1,22 +1,27 @@
 import EDictionary from '../../external/EDictionary'
+import Instance from './Instance'
 
 class Channel {
-    constructor(config) {
-        this.entities = new EDictionary(config.ID_PROPERTY_NAME)
+    constructor(instance) {
+		if (!instance || !(instance instanceof Instance)) {
+			throw new Error('Channel constructor must be passed an instance.')
+		}
+		this.instance = instance
+		this.config = instance.config
+        this.entities = new EDictionary(this.config.ID_PROPERTY_NAME)
         this.clients = new Map()
         this.messages = []
 
         this.entityIdPool = null
-        this.protocols = null
-        this.config = config
+        this.protocols = null        
     }
 
     addEntity(entity) {
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-        entity[this.config.ID_PROPERTY_NAME] = this.entityIdPool.nextId()
-        entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
+        entity[this.config.ID_PROPERTY_NAME] = this.instance.entityIdPool.nextId()
+        entity[this.config.TYPE_PROPERTY_NAME] = this.instance.protocols.getIndex(entity.protocol)
         this.entities.add(entity)
         //console.log('entity added to channel', entity.id)
         if (!this.instance._entities.get(entity[this.instance.config.ID_PROPERTY_NAME])) {
