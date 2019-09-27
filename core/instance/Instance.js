@@ -67,7 +67,7 @@ class Instance extends EventEmitter {
         this.clientId = 0
         this.entityId = 0
         this.eventId = 0
-        this.channelId = 0
+        this.channelId = 1
 
         this.entityIdPool = new IdPool(config.ID_BINARY_TYPE)
 
@@ -76,6 +76,8 @@ class Instance extends EventEmitter {
         this.clients = new EDictionary()
         this.entities = new EDictionary(config.ID_PROPERTY_NAME)
         this.channels = new EDictionary()
+
+        this.sources = new Map()
 
         this.localEvents = []
         this.proxyCache = {}
@@ -107,7 +109,9 @@ class Instance extends EventEmitter {
 
         this.debugCount = 0
 
-        consoleLogLogo()
+        if (!config.HIDE_LOGO) {
+            consoleLogLogo()
+        }        
 
         if (typeof webConfig.port !== 'undefined') {
             this.wsServer = new WebSocketServer({ port: webConfig.port })
@@ -274,7 +278,9 @@ class Instance extends EventEmitter {
     }
 
     addChannel(channel) {
+  
         channel.id = this.channelId++
+        console.log('addChannel', channel.id)
         channel.protocols = this.protocols
         channel.config = this.config
         channel.entityIdPool = this.entityIdPool
@@ -283,6 +289,7 @@ class Instance extends EventEmitter {
     }
 
     removeChannel(channel) {
+        console.log('removeChannel', channel.id)
         channel.clients.forEach(client => channel.unsubscribe(client))
         channel.entities.forEach(entity => channel.removeEntity(entity))
         this.channels.remove(channel)
@@ -299,18 +306,52 @@ class Instance extends EventEmitter {
         return this.clients.get(id)
     }
 
+    registerEntity(entity, sourceId) {
+       // const id = this.entityIdPool.nextId()
+        let nid = entity[this.config.ID_PROPERTY_NAME]
+        if (!this.sources.has(nid)) {
+            nid = this.entityIdPool.nextId()
+            entity[this.config.ID_PROPERTY_NAME] = nid 
+            entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
+            this.sources.set(nid, new Set())
+        }
+        const entitySources = this.sources.get(nid)
+        entitySources.add(sourceId)
+        console.log('registered source', sourceId, nid)
+
+        console.log('sources', this.sources)
+    }
+
+    unregisterEntity(entity, sourceId) {
+        const nid = entity[this.config.ID_PROPERTY_NAME]
+        const entitySources = this.sources.get(nid)     
+        entitySources.delete(sourceId)
+        console.log('unregistering source', sourceId, nid)
+
+        if (entitySources.size === 0) {
+            this.sources.delete(nid)
+            this.entityIdPool.queueReturnId(nid)
+            entity[this.config.ID_PROPERTY_NAME] = -1
+            console.log('entity is fully unregistered now')
+        }        
+    }
+
     addEntity(entity) {
+        
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-        const id = this.entityIdPool.nextId()
-        entity[this.config.ID_PROPERTY_NAME] = id 
-        entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
+        this.registerEntity(entity, -1)
+      
+        console.log('instance addEntity', entity[this.config.ID_PROPERTY_NAME])
+
         this.entities.add(entity)
 
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.insertEntity(entity)
         }
+
+        
 
         //this.components.addEntity(entity)
         //this.createEntities.push(entity[this.config.ID_PROPERTY_NAME])
@@ -324,15 +365,19 @@ class Instance extends EventEmitter {
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.entities.remove(entity)
         }
-		const id = entity[this.config.ID_PROPERTY_NAME]
-		
+
+        const id = entity[this.config.ID_PROPERTY_NAME]
+        console.log('instance removeEntity', id)
+       
         this.deleteEntities.push(id)
-        this.entityIdPool.queueReturnId(id)
-        entity[this.config.ID_PROPERTY_NAME] = -1
-        this.entities.remove(entity)      
+        //this.entityIdPool.queueReturnId(id)
+    
+        //entity[this.config.ID_PROPERTY_NAME] = -1
+        this.entities.remove(entity) 
+        this.unregisterEntity(entity, -1)
 
         return entity
-	}
+    }
 	
 	removeEntityAndComponents(entity) {
 		const id = entity[this.config.ID_PROPERTY_NAME]
@@ -542,6 +587,7 @@ class Instance extends EventEmitter {
     }
 
     update() {
+        //console.log('sources', this.sources)
         /*
         console.log(
             'entsA', this.entities.toArray().length, 

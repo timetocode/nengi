@@ -21,6 +21,7 @@ fdescribe('channel', function () {
 		TYPE_BINARY_TYPE: nengi.UInt8,
 		ID_PROPERTY_NAME: 'nid',
 		TYPE_PROPERTY_NAME: 'ntype',
+		HIDE_LOGO: true,
 		protocols: {
 			entities: [
 				['Entity', Entity]
@@ -28,8 +29,7 @@ fdescribe('channel', function () {
 		}
 	}
 
-
-	it('channel basics', function () {
+	it('channel basics', (done) => {
 		const instance = new nengi.Instance(config, { port: 8080 })
 		const channel = new nengi.Channel(instance)
 		instance.addChannel(channel)
@@ -38,16 +38,16 @@ fdescribe('channel', function () {
 		
 		//instance.addEntity(entity)
 
-		console.log('diagnostic', 
+		console.log('diagnostic1', 
 			instance.entities.toArray().length,
 			instance._entities.toArray().length,
 			channel.entities.toArray().length
 		)
 
-		instance.wsServer.close()
+		instance.wsServer.close(() => { done() })
 	})
 
-	it('channel basics2', function () {
+	it('channel basics2', (done) => {
 		const instance = new nengi.Instance(config, { port: 8080 })
 		const channel = new nengi.Channel(instance)
 
@@ -58,10 +58,12 @@ fdescribe('channel', function () {
 		
 		//instance.addEntity(entity)
 
-		console.log('diagnostic', 
+		console.log('diagnostic2', 
 			instance.entities.toArray().length,
 			instance._entities.toArray().length,
 			channel.entities.toArray().length
 		)
+
+		instance.wsServer.close(() => { done() })
 	})
 })

@@ -41,10 +41,10 @@ function createSnapshotBuffer(snapshot, config) {
     //bits += countDeleteEntitiesBits(snapshot.deleteComponents, config)
    
 	bits += countMessagesBits(snapshot.localEvents)
-	console.log('ss msg', snapshot.messages)
-	if (snapshot.messages && snapshot.messages[1]) {
-		console.log('HHHH', snapshot.messages[1].outers[0])
-	}
+	//console.log('ss msg', snapshot.messages)
+	//if (snapshot.messages && snapshot.messages[1]) {
+	//	console.log('HHHH', snapshot.messages[1].outers[0])
+	//}
     bits += countMessagesBits(snapshot.messages)
     bits += countJSONsBits(snapshot.jsons)
 
