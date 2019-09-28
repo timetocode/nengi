@@ -26,6 +26,7 @@ import Sleep from './Sleep'
 
 import BasicSpace from './BasicSpace'
 import { EventEmitter } from 'events'
+import Channel from './Channel'
 
 //const Components = require('./Components')
 const defaults = {
@@ -37,30 +38,27 @@ const defaults = {
     TYPE_BINARY_TYPE: BinaryType.UInt8
 }
 
-
 class Instance extends EventEmitter {
     constructor(config, webConfig) {
-		super()
+        super()
         /* defaults */
         if (!config) {
             throw new Error('Instance requries a nengiConfig')
         } else {
             for (let prop in defaults) {
-                if (typeof(config[prop]) === 'undefined'){
+                if (typeof (config[prop]) === 'undefined') {
                     config[prop] = defaults[prop]
                 }
             }
-		}
-		
-		if (!webConfig) {
-			throw new Error('Instance requries a webConfig')
-		}
+        }
+
+        if (!webConfig) {
+            throw new Error('Instance requries a webConfig')
+        }
 
         this.config = config
         this.transferPassword = webConfig.transferPassword
-        this.protocols = new ProtocolMap(config, metaConfig) 
-        // console.log(this.protocols.lookupByProtocol.entries().next().value[0])
-
+        this.protocols = new ProtocolMap(config, metaConfig)
         this.sleepManager = new Sleep()
         this.tick = 0
 
@@ -70,7 +68,6 @@ class Instance extends EventEmitter {
         this.channelId = 1
 
         this.entityIdPool = new IdPool(config.ID_BINARY_TYPE)
-
         this.pendingClients = new Map()
         this._entities = new EDictionary(config.ID_PROPERTY_NAME)
         this.clients = new EDictionary()
@@ -94,14 +91,11 @@ class Instance extends EventEmitter {
         this.connectCallback = null
         this.disconnectCallback = null
 
-
         this.httpServer = null
         this.wsServer = null
 
         this.noInterps = []
-
         this.transfers = {}
-
         this.createEntities = []
         this.deleteEntities = []
 
@@ -111,7 +105,7 @@ class Instance extends EventEmitter {
 
         if (!config.HIDE_LOGO) {
             consoleLogLogo()
-        }        
+        }
 
         if (typeof webConfig.port !== 'undefined') {
             this.wsServer = new WebSocketServer({ port: webConfig.port })
@@ -149,7 +143,7 @@ class Instance extends EventEmitter {
     isAwake(entity) {
         return this.sleepManager.isAwake(entity.id)
     }
-    
+
     isAsleep(entity) {
         return !this.sleepManager.isAwake(entity.id)
     }
@@ -277,22 +271,14 @@ class Instance extends EventEmitter {
         return client
     }
 
-    addChannel(channel) {
-  
-        channel.id = this.channelId++
-        console.log('addChannel', channel.id)
-        channel.protocols = this.protocols
-        channel.config = this.config
-        channel.entityIdPool = this.entityIdPool
-        channel.instance = this
+    createChannel() {
+        const channel = new Channel(this, this.channelId++)
         this.channels.add(channel)
+        return channel
     }
 
-    removeChannel(channel) {
-        console.log('removeChannel', channel.id)
-        channel.clients.forEach(client => channel.unsubscribe(client))
-        channel.entities.forEach(entity => channel.removeEntity(entity))
-        this.channels.remove(channel)
+    destroyChannel(channel) {
+        channel.destroy()
     }
 
     addClient(client) {
@@ -307,13 +293,14 @@ class Instance extends EventEmitter {
     }
 
     registerEntity(entity, sourceId) {
-       // const id = this.entityIdPool.nextId()
+        // const id = this.entityIdPool.nextId()
         let nid = entity[this.config.ID_PROPERTY_NAME]
         if (!this.sources.has(nid)) {
             nid = this.entityIdPool.nextId()
-            entity[this.config.ID_PROPERTY_NAME] = nid 
+            entity[this.config.ID_PROPERTY_NAME] = nid
             entity[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(entity.protocol)
             this.sources.set(nid, new Set())
+            this._entities.add(entity)
         }
         const entitySources = this.sources.get(nid)
         entitySources.add(sourceId)
@@ -324,39 +311,32 @@ class Instance extends EventEmitter {
 
     unregisterEntity(entity, sourceId) {
         const nid = entity[this.config.ID_PROPERTY_NAME]
-        const entitySources = this.sources.get(nid)     
+        const entitySources = this.sources.get(nid)
         entitySources.delete(sourceId)
         console.log('unregistering source', sourceId, nid)
 
         if (entitySources.size === 0) {
             this.sources.delete(nid)
+            this._entities.remove(entity)
             this.entityIdPool.queueReturnId(nid)
             entity[this.config.ID_PROPERTY_NAME] = -1
             console.log('entity is fully unregistered now')
-        }        
+        }
     }
 
     addEntity(entity) {
-        
         if (!entity.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
         this.registerEntity(entity, -1)
-      
         console.log('instance addEntity', entity[this.config.ID_PROPERTY_NAME])
-
         this.entities.add(entity)
 
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.insertEntity(entity)
         }
-
-        
-
         //this.components.addEntity(entity)
         //this.createEntities.push(entity[this.config.ID_PROPERTY_NAME])
-
-
         //console.log('E', entity)
         return entity
     }
@@ -365,35 +345,29 @@ class Instance extends EventEmitter {
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.entities.remove(entity)
         }
-
         const id = entity[this.config.ID_PROPERTY_NAME]
         console.log('instance removeEntity', id)
-       
         this.deleteEntities.push(id)
-        //this.entityIdPool.queueReturnId(id)
-    
-        //entity[this.config.ID_PROPERTY_NAME] = -1
-        this.entities.remove(entity) 
+        this.entities.remove(entity)
         this.unregisterEntity(entity, -1)
-
         return entity
     }
-	
-	removeEntityAndComponents(entity) {
-		const id = entity[this.config.ID_PROPERTY_NAME]
-		const children = this.parents.get(id)
+
+    removeEntityAndComponents(entity) {
+        const id = entity[this.config.ID_PROPERTY_NAME]
+        const children = this.parents.get(id)
         if (children && children.size > 0) {
             children.forEach(nid => {
                 const component = { [this.config.ID_PROPERTY_NAME]: nid }
-				this.removeComponent(component, entity)				
-			})
-		}
-		this.removeEntity(entity)
+                this.removeComponent(component, entity)
+            })
+        }
+        this.removeEntity(entity)
         return entity
     }
 
-    addComponent(component, parent) {   
-        const parentId = parent[this.config.ID_PROPERTY_NAME]           
+    addComponent(component, parent) {
+        const parentId = parent[this.config.ID_PROPERTY_NAME]
         const componentId = this.entityIdPool.nextId()
 
         component[this.config.ID_PROPERTY_NAME] = componentId
@@ -406,12 +380,12 @@ class Instance extends EventEmitter {
         if (!this.parents.get(parentId)) {
             this.parents.set(parentId, new Set())
         }
-        this.parents.get(parentId).add(componentId) 
+        this.parents.get(parentId).add(componentId)
     }
 
 
     removeComponent(component, parent) {
-        const parentId = parent[this.config.ID_PROPERTY_NAME]           
+        const parentId = parent[this.config.ID_PROPERTY_NAME]
         const componentId = component[this.config.ID_PROPERTY_NAME]
 
         this.entityIdPool.queueReturnId(componentId)
@@ -425,10 +399,10 @@ class Instance extends EventEmitter {
         // TEMP for provisional channel / component api
         // TODO: single source of truth for entities
         // with spatial entities as a lens
-        const ent = this.entities.get(id)
-        if (ent) {
-            return ent
-        }
+        //const ent = this.entities.get(id)
+        //if (ent) {
+        //    return ent
+        //}
         return this._entities.get(id)
     }
 
@@ -441,10 +415,10 @@ class Instance extends EventEmitter {
 
         lEvent[this.config.ID_PROPERTY_NAME] = this.eventId++
         lEvent[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(lEvent.protocol)
-        
+
 
         if (this.config.USE_HISTORIAN) {
-            this.localEvents.push(lEvent)           
+            this.localEvents.push(lEvent)
         } else {
             this.basicSpace.insertEvent(lEvent)
         }
@@ -454,30 +428,30 @@ class Instance extends EventEmitter {
 
     message(message, clientOrClients) {
 
-		const recurse = (message) => {
-			console.log('recurse', message.protocol)
-			message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
+        const recurse = (message) => {
+            console.log('recurse', message.protocol)
+            message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
 
-			const properties = Object.keys(message.protocol.properties)
-			properties.forEach(prop => {
-				console.log('********', prop, message.protocol.properties[prop])
-			})
-		}
+            const properties = Object.keys(message.protocol.properties)
+            properties.forEach(prop => {
+                console.log('********', prop, message.protocol.properties[prop])
+            })
+        }
 
 
         if (!message.protocol) {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
-		message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
+        message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
 
-		//recurse(message)
-		
-		if (message.outers) {
-			//console.log('>>>>>', message.protocol, message.outers[0].protocol, message.outers[0].inners[0].protocol)
+        //recurse(message)
 
-			//message.outers[0].protocol
-			//message.outers[0].protocol.properties.inners.protocol = message.outers[0].protocol.inners.prototype.protocol 
-		}
+        if (message.outers) {
+            //console.log('>>>>>', message.protocol, message.outers[0].protocol, message.outers[0].inners[0].protocol)
+
+            //message.outers[0].protocol
+            //message.outers[0].protocol.properties.inners.protocol = message.outers[0].protocol.inners.prototype.protocol 
+        }
 
 
 
@@ -520,7 +494,7 @@ class Instance extends EventEmitter {
             this.proxyCache[tick].entities[entity.id] = proxy
 
             if (this.proxyCache[tick - 1]) {
-               
+
                 //console.log('here')
                 var proxyOld = this.proxyCache[tick - 1].entities[entity.id]
                 if (proxyOld) {
@@ -540,7 +514,7 @@ class Instance extends EventEmitter {
     proxifyOrGetCachedProxyPerClient(client, entity, tick, isDiff) {
         let proxy
         if (this.proxyCache[tick].entities[entity[this.config.ID_PROPERTY_NAME]]) {
-            proxy =  this.proxyCache[tick].entities[entity[this.config.ID_PROPERTY_NAME]]
+            proxy = this.proxyCache[tick].entities[entity[this.config.ID_PROPERTY_NAME]]
         } else {
             proxy = proxify(entity, entity.protocol)
             this.proxyCache[tick].entities[entity[this.config.ID_PROPERTY_NAME]] = proxy
@@ -552,38 +526,38 @@ class Instance extends EventEmitter {
         //let old = client.entityCache.getEntity(entity.id)
         //console.log('found old', old)
         //if (old) {
-            if (isDiff) {
-                let proxyOld
-                if (this.proxyCache[client.entityCache.lastTick]) {
-                    proxyOld = this.proxyCache[client.entityCache.lastTick].entities[entity[this.config.ID_PROPERTY_NAME]]
-                    //console.log('found old proxy')
-                } else {
-                    //console.log('old')
-                    //proxyOld = proxify(old, entity.protocol)
-                    //this.proxyCache[tick].entities[entity.id] = proxyOld
-                    //console.log('had to reproxify an old object')
-                }
-                //var proxyOld = this.proxyCache[old._nTick].entities[entity.id]//proxify(old, entity.protocol)
-                if (proxyOld) {
-                    this.debugCount++
-                    proxy.diff = chooseOptimization(
-                        this.config.ID_PROPERTY_NAME,
-                        proxyOld,
-                        proxy,
-                        entity.protocol
-                    )
-                    proxy.diffTick = tick
-                } else {
-                    proxy.diff = {
-                        singleProps: []
-                    }
-                    proxy.diffTick = tick
-                }
+        if (isDiff) {
+            let proxyOld
+            if (this.proxyCache[client.entityCache.lastTick]) {
+                proxyOld = this.proxyCache[client.entityCache.lastTick].entities[entity[this.config.ID_PROPERTY_NAME]]
+                //console.log('found old proxy')
+            } else {
+                //console.log('old')
+                //proxyOld = proxify(old, entity.protocol)
+                //this.proxyCache[tick].entities[entity.id] = proxyOld
+                //console.log('had to reproxify an old object')
             }
+            //var proxyOld = this.proxyCache[old._nTick].entities[entity.id]//proxify(old, entity.protocol)
+            if (proxyOld) {
+                this.debugCount++
+                proxy.diff = chooseOptimization(
+                    this.config.ID_PROPERTY_NAME,
+                    proxyOld,
+                    proxy,
+                    entity.protocol
+                )
+                proxy.diffTick = tick
+            } else {
+                proxy.diff = {
+                    singleProps: []
+                }
+                proxy.diffTick = tick
+            }
+        }
 
-       // }
-       //console.log('hey', proxy)
-        return proxy        
+        // }
+        //console.log('hey', proxy)
+        return proxy
     }
 
     update() {
@@ -596,7 +570,7 @@ class Instance extends EventEmitter {
             'channels', this.channels.toArray().length
         )
         */
-        
+
 
         //console.log(this.entities.toArray())
         if (this.config.USE_HISTORIAN) {
@@ -728,12 +702,12 @@ class Instance extends EventEmitter {
         var tempNoInterps = []
         for (var i = 0; i < vision.stillVisible.length; i++) {
             let id = vision.stillVisible[i]
-           // console.log('doing id', id)
+            // console.log('doing id', id)
             let entity = this.getEntity(id)
             if (this.sleepManager.isAwake(entity[this.config.ID_PROPERTY_NAME])) {
                 let proxy = this.proxifyOrGetCachedProxyPerClient(client, entity, tick, true)
                 //console.log(proxy)
-    
+
                 //var proxyOld = client.entityCache.getEntity(id)
 
                 let formattedUpdates = proxy.diff

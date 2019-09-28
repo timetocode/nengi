@@ -1,69 +1,97 @@
 
 require = require("esm")(module/*, options*/)
-const Protocol = require('../core/protocol/Protocol').default
 var nengi = require('..').default
 
+class Entity {
+    constructor(x, y) {
+        this.x = x
+        this.y = y
+    }
+}
+Entity.protocol = {
+    x: nengi.Float32,
+    y: nengi.Float32,
+}
 
-fdescribe('channel', function () {
-	class Entity {
-		constructor(x, y) {
-			this.x = x
-			this.y = y
-		}
-	}
-	Entity.protocol = {
-		x: nengi.Float32,
-		y: nengi.Float32,
-	}
+const config = {
+    ID_BINARY_TYPE: nengi.UInt16,
+    TYPE_BINARY_TYPE: nengi.UInt8,
+    ID_PROPERTY_NAME: 'nid',
+    TYPE_PROPERTY_NAME: 'ntype',
+    HIDE_LOGO: true,
+    protocols: {
+        entities: [
+            ['Entity', Entity]
+        ]
+    }
+}
 
-	const config = {
-		ID_BINARY_TYPE: nengi.UInt16,
-		TYPE_BINARY_TYPE: nengi.UInt8,
-		ID_PROPERTY_NAME: 'nid',
-		TYPE_PROPERTY_NAME: 'ntype',
-		HIDE_LOGO: true,
-		protocols: {
-			entities: [
-				['Entity', Entity]
-			]
-		}
-	}
+fdescribe('channel entity', () => {
+    let instance
+    let channel
+    let entity
 
-	it('channel basics', (done) => {
-		const instance = new nengi.Instance(config, { port: 8080 })
-		const channel = new nengi.Channel(instance)
-		instance.addChannel(channel)
-		const entity = new Entity(50, 50)
-		channel.addEntity(entity)
-		
-		//instance.addEntity(entity)
+    beforeEach(() => {
+        instance = new nengi.Instance(config, { port: 8080 })
+        channel = instance.createChannel()
+        entity = new Entity(50, 50)
+        channel.addEntity(entity)
+    })
 
-		console.log('diagnostic1', 
-			instance.entities.toArray().length,
-			instance._entities.toArray().length,
-			channel.entities.toArray().length
-		)
+    afterEach((done) => {
+        instance.wsServer.close(() => { done() })
+    })
 
-		instance.wsServer.close(() => { done() })
-	})
+    it('is not in the space', () => {
+        expect(instance.entities.toArray().length).toBe(0)
+    })
 
-	it('channel basics2', (done) => {
-		const instance = new nengi.Instance(config, { port: 8080 })
-		const channel = new nengi.Channel(instance)
+    it('is in the private _entities', () => {
+        expect(instance._entities.toArray()[0]).toBe(entity)
+    })
+    
+    it('is in the channel', () => {
+        expect(channel.entities.toArray()[0]).toBe(entity)
+    })
 
-		const entity = new Entity(50, 50)
-		channel.addEntity(entity)
+    it('can be removed', () => {
+        channel.removeEntity(entity)
+        expect(instance._entities.toArray().length).toBe(0)
+        expect(channel.entities.toArray().length).toBe(0)
+    })
+})
 
-		instance.addChannel(channel)
-		
-		//instance.addEntity(entity)
+fdescribe('channel entity', () => {
+    let instance
+    let channel
+    let entity
 
-		console.log('diagnostic2', 
-			instance.entities.toArray().length,
-			instance._entities.toArray().length,
-			channel.entities.toArray().length
-		)
+    beforeEach(() => {
+        instance = new nengi.Instance(config, { port: 8080 })
+        channel = instance.createChannel()
+        entity = new Entity(50, 50)
+        channel.addEntity(entity)
+    })
 
-		instance.wsServer.close(() => { done() })
-	})
+    afterEach((done) => {
+        instance.wsServer.close(() => { done() })
+    })
+
+    it('is not in the space', () => {
+        expect(instance.entities.toArray().length).toBe(0)
+    })
+
+    it('is in the private _entities', () => {
+        expect(instance._entities.toArray()[0]).toBe(entity)
+    })
+    
+    it('is in the channel', () => {
+        expect(channel.entities.toArray()[0]).toBe(entity)
+    })
+
+    it('can be removed', () => {
+        channel.removeEntity(entity)
+        expect(instance._entities.toArray().length).toBe(0)
+        expect(channel.entities.toArray().length).toBe(0)
+    })
 })
