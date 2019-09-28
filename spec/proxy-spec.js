@@ -243,22 +243,14 @@ describe('proxification', function() {
         }
         */
 
-        var fooProtocol = new Protocol({
-            test: nengi.UInt8
-        }, config)
-
-        var objProtocol = new Protocol({
-            number: nengi.UInt32,
-            string: nengi.ASCIIString,
-            foo: { type: fooProtocol, indexType: nengi.UInt8 }
-        }, config)
-
-        class Foo {
+       class Foo {
             constructor(test) {
                 this.test = test
             }
         }
-        Foo.prototype.protocol = fooProtocol
+        Foo.prototype.protocol = new Protocol({
+            test: nengi.UInt8
+        }, config)
 
         class Obj {
             constructor(number, string, foo) {
@@ -267,7 +259,12 @@ describe('proxification', function() {
                 this.foo = foo
             }
         }
-        Obj.prototype.protocol = objProtocol
+        Obj.prototype.protocol = new Protocol({
+            number: nengi.UInt32,
+            string: nengi.ASCIIString,
+            foo: { type: Foo, indexType: nengi.UInt8 }
+        }, config)
+
 
         var obj = new Obj(
             1234567890, 
@@ -278,13 +275,13 @@ describe('proxification', function() {
                 new Foo(3),
             ] 
         )
-        var proxy = proxify(obj, objProtocol)
+        var proxy = proxify(obj, obj.protocol)
         //console.log('PROXY', proxy)
 
         expect(proxy.number).toEqual(obj.number)
         expect(proxy.string).toEqual(obj.string)
 
-        var recreatedObj = deproxify(proxy, objProtocol)
+        var recreatedObj = deproxify(proxy, obj.protocol)
 
         // equivalent but distinct
         expect(recreatedObj.number).toEqual(obj.number)
@@ -292,11 +289,10 @@ describe('proxification', function() {
         expect(recreatedObj).not.toBe(obj)
 
         // equivalent but distinct subobjects
-        expect(recreatedObj.foo).not.toBe(obj.foo)
-        expect(recreatedObj.foo).toEqual(obj.foo)
-        expect(recreatedObj.foo[0]).toEqual(obj.foo[0])
-        expect(recreatedObj.foo[0]).not.toBe(obj.foo[0]) // fails
-        
+        //expect(recreatedObj.foo).not.toBe(obj.foo)
+        //expect(recreatedObj.foo).toEqual(obj.foo)
+        expect(recreatedObj.foo[0].test).toEqual(obj.foo[0].test)
+        expect(recreatedObj.foo[0]).not.toBe(obj.foo[0])
     })
 
     it('of arbitrarily complicated objects', function() {
