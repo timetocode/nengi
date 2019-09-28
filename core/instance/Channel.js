@@ -22,13 +22,13 @@ class Channel {
     }
 
     removeEntity(entity) {
-        console.log('channel removeEntity', entity[this.config.ID_PROPERTY_NAME])
+        //console.log('channel removeEntity', entity[this.config.ID_PROPERTY_NAME])
         this.entities.remove(entity)
         this.instance.unregisterEntity(entity, this.id)
     }
 
     addMessage(message) {
-        console.log('channel addMessage', message)
+        //console.log('channel addMessage', message)
         message[this.config.TYPE_PROPERTY_NAME] = this.instance.protocols.getIndex(message.protocol)
         this.clients.forEach(client => {
             client.queueMessage(message)

@@ -65,7 +65,7 @@ class Instance extends EventEmitter {
         this.clientId = 0
         this.entityId = 0
         this.eventId = 0
-        this.channelId = 1
+        this.channelId = 70000
 
         this.entityIdPool = new IdPool(config.ID_BINARY_TYPE)
         this.pendingClients = new Map()
@@ -257,7 +257,6 @@ class Instance extends EventEmitter {
         this.disconnectCallback = callback
     }
 
-
     disconnect(client, event) {
         if (this.clients.get(client.id)) {
             client.id = -1
@@ -304,23 +303,23 @@ class Instance extends EventEmitter {
         }
         const entitySources = this.sources.get(nid)
         entitySources.add(sourceId)
-        console.log('registered source', sourceId, nid)
-
-        console.log('sources', this.sources)
+        //console.log('registered source', sourceId, nid)
+        //console.log('sources', this.sources)
+        return nid
     }
 
     unregisterEntity(entity, sourceId) {
         const nid = entity[this.config.ID_PROPERTY_NAME]
         const entitySources = this.sources.get(nid)
         entitySources.delete(sourceId)
-        console.log('unregistering source', sourceId, nid)
+        //console.log('unregistering source', sourceId, nid)
 
         if (entitySources.size === 0) {
             this.sources.delete(nid)
             this._entities.remove(entity)
             this.entityIdPool.queueReturnId(nid)
             entity[this.config.ID_PROPERTY_NAME] = -1
-            console.log('entity is fully unregistered now')
+            //console.log('entity is fully unregistered now')
         }
     }
 
@@ -329,15 +328,11 @@ class Instance extends EventEmitter {
             throw new Error('Object is missing a protocol or protocol was not supplied via config.')
         }
         this.registerEntity(entity, -1)
-        console.log('instance addEntity', entity[this.config.ID_PROPERTY_NAME])
         this.entities.add(entity)
 
         if (!this.config.USE_HISTORIAN) {
             this.basicSpace.insertEntity(entity)
         }
-        //this.components.addEntity(entity)
-        //this.createEntities.push(entity[this.config.ID_PROPERTY_NAME])
-        //console.log('E', entity)
         return entity
     }
 
@@ -346,7 +341,6 @@ class Instance extends EventEmitter {
             this.basicSpace.entities.remove(entity)
         }
         const id = entity[this.config.ID_PROPERTY_NAME]
-        console.log('instance removeEntity', id)
         this.deleteEntities.push(id)
         this.entities.remove(entity)
         this.unregisterEntity(entity, -1)
@@ -368,45 +362,23 @@ class Instance extends EventEmitter {
 
     addComponent(component, parent) {
         const parentId = parent[this.config.ID_PROPERTY_NAME]
-        const componentId = this.entityIdPool.nextId()
-
-        component[this.config.ID_PROPERTY_NAME] = componentId
-        component[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(component.protocol)
-
-        if (!this._entities.get(componentId)) {
-            this._entities.add(component)
-        }
-
+        const componentId = this.registerEntity(component, parentId)
         if (!this.parents.get(parentId)) {
             this.parents.set(parentId, new Set())
         }
         this.parents.get(parentId).add(componentId)
     }
 
-
     removeComponent(component, parent) {
         const parentId = parent[this.config.ID_PROPERTY_NAME]
         const componentId = component[this.config.ID_PROPERTY_NAME]
-
-        this.entityIdPool.queueReturnId(componentId)
-        this._entities.remove(component)
-        component[this.config.ID_PROPERTY_NAME] = -1
         this.parents.get(parentId).delete(componentId)
+        this.unregisterEntity(component)
     }
-
 
     getEntity(id) {
-        // TEMP for provisional channel / component api
-        // TODO: single source of truth for entities
-        // with spatial entities as a lens
-        //const ent = this.entities.get(id)
-        //if (ent) {
-        //    return ent
-        //}
         return this._entities.get(id)
     }
-
-
 
     addLocalMessage(lEvent) {
         if (!lEvent.protocol) {
@@ -415,7 +387,6 @@ class Instance extends EventEmitter {
 
         lEvent[this.config.ID_PROPERTY_NAME] = this.eventId++
         lEvent[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(lEvent.protocol)
-
 
         if (this.config.USE_HISTORIAN) {
             this.localEvents.push(lEvent)
@@ -427,7 +398,7 @@ class Instance extends EventEmitter {
     }
 
     message(message, clientOrClients) {
-
+        /*
         const recurse = (message) => {
             console.log('recurse', message.protocol)
             message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
@@ -437,13 +408,6 @@ class Instance extends EventEmitter {
                 console.log('********', prop, message.protocol.properties[prop])
             })
         }
-
-
-        if (!message.protocol) {
-            throw new Error('Object is missing a protocol or protocol was not supplied via config.')
-        }
-        message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
-
         //recurse(message)
 
         if (message.outers) {
@@ -452,8 +416,12 @@ class Instance extends EventEmitter {
             //message.outers[0].protocol
             //message.outers[0].protocol.properties.inners.protocol = message.outers[0].protocol.inners.prototype.protocol 
         }
+        */
 
-
+        if (!message.protocol) {
+            throw new Error('Object is missing a protocol or protocol was not supplied via config.')
+        }
+        message[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(message.protocol)
 
         if (Array.isArray(clientOrClients)) {
             clientOrClients.forEach(client => {

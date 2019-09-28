@@ -1,10 +1,6 @@
 
-//module.exports = require("./serverMain.js")
-
-
-describe('foo', () => {
-	it('hihi', () => {
-		expect(true).toBe(true)
-	})
-
+describe('test placholder', () => {
+    it('passes', () => {
+        expect(true).toBe(true)
+    })
 })
