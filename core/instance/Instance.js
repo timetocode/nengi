@@ -108,9 +108,14 @@ class Instance extends EventEmitter {
         }
 
         if (typeof webConfig.port !== 'undefined') {
-            this.wsServer = new WebSocketServer({ port: webConfig.port })
+            this.wsServer = new WebSocketServer({ port: webConfig.port }, () => {
+                //console.log(this.wsServer)
+            })
         } else if (typeof webConfig.httpServer !== 'undefined') {
             this.wsServer = new WebSocketServer({ server: webConfig.httpServer })
+        } else if (typeof webConfig.mockWebSocketServer !== 'undefined') {
+            console.log('instance is using a mocked server')
+            this.wsServer = webConfig.mockWebSocketServer
         } else {
             throw new Error('Instance must be passed a config that contains a port or an http server.')
         }
