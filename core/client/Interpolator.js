@@ -39,6 +39,7 @@ const interpolateSnapshots = (snapshots, currTimestamp, cache, predictor, config
     let snapshotB = null
     let late = []
     if (snapshotA) {
+        console.log('len', snapshots.length)
         for (var i = 0; i < snapshots.length; i++) {
             if (snapshots[i].tick === snapshotA.tick + 1) {
                 snapshotB = snapshots[i]
@@ -337,9 +338,7 @@ class Interpolator {
         this.cache = {}
     }
 
-    interp(snapshots, timestamp, predictions) {
-
-
+    interp(snapshots, timestamp, predictions) { 
         let timeframe = interpolateSnapshots(snapshots, timestamp, this.cache, predictions, this.config)
         if (!timeframe) {
             return {

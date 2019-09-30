@@ -1,6 +1,6 @@
 require = require("esm")(module/*, options*/)
 const nengi = require('..').default
-const EventEmitter = require('events').EventEmitter
+const connectionMocker = require('./connectionMocker').default
 
 class Entity {
     constructor(x, y) {
@@ -26,79 +26,97 @@ const config = {
     }
 }
 
-class MockSocket extends EventEmitter {
-    constructor() {
-        super()
-    }
-    send(msg) {
-        console.log('mock sending', msg)
-    }
-}
+describe('end to end mock, bot', () => {
+    it('can create simple entities', () => {
+        const mock = connectionMocker()
+        const instance = new nengi.Instance(config, { mock })
 
-class MockWebSocketServer extends EventEmitter {
-    constructor() {
-        super()
-
-    }
-
-    acceptMockConnection() {
-        const mockSock = new EventEmitter()
-        //mockSock.
-        this.emit('connection', )
-    }
-
-    send(msg) {
-        console.log('mock sending', msg)
-    }
-}
-
-
-fdescribe('end2end', () => {
-    it('passes', () => {
-        console.log('hello world')
-        expect(true).toBe(true)
-    })
-
-    it('fancy', (done) => {
-
-        const mockWebSocketServer = new EventEmitter()
-
-        const instance = new nengi.Instance(config, { mockWebSocketServer })
-
-        mockWebSocketServer.emit('connection', { on: (eventName, eventBody) => {
-            console.log('yolo')
-        } })
-        
         instance.onConnect((client, data, callback) => {
-            console.log(client, data)
             callback({ accepted: true, text: 'Welcome!' })
         })
 
         const entity = new Entity(50, 50)
         instance.addEntity(entity)
 
-        /*
+        const entity2 = new Entity(60, 60)
+        instance.addEntity(entity2)
+
         const protocolMap = new nengi.ProtocolMap(config, nengi.metaConfig)
         const bot = new nengi.Bot(config, protocolMap)
 
-        bot.onConnect(response => {
-            console.log('Bot attempted connection, response:', response)
+        bot.onConnect(response => { })
+        bot.onClose(() => { })
+
+        mock.mockConnect(bot, {})
+        instance.update()
+        
+        // there first snapshot should contain a simple copy of both entities
+
+        const snapshot = bot.readNetwork()
+        const clEntity = snapshot.entities[0].createEntities[0]
+        delete clEntity.protocol
+        const clone = Object.assign({}, entity)
+
+        expect(clEntity).toEqual(clone)  
+
+        const clEntity2 = snapshot.entities[0].createEntities[1]
+        delete clEntity2.protocol
+        const clone2 = Object.assign({}, entity2)
+        expect(clEntity2).toEqual(clone2)
+    })
+})
+
+describe('end to end mock, client', () => {
+    it('can create simple entities', () => {
+        pending('using nengi.Bot instead, nengi.Client has too much Date math for automation')
+        const mock = connectionMocker()
+        const instance = new nengi.Instance(config, { mock })
+
+        instance.onConnect((client, data, callback) => {
+            callback({ accepted: true, text: 'Welcome!' })
         })
-    
-        bot.onClose(() => {
-            console.log('closed')
-        })
-    
-        setTimeout(() => {
-            console.log('trying to connect')
-            bot.connect('ws://localhost:8079', {})
 
-            instance.wsServer.close(() => { done() })
-        }, 1000)
-       */
+        const entity = new Entity(50, 50)
+        instance.addEntity(entity)
 
-        expect(true).toBe(true)
+        const entity2 = new Entity(60, 60)
+        instance.addEntity(entity2)
 
-  
+        //const protocolMap = new nengi.ProtocolMap(config, nengi.metaConfig)
+        const client = new nengi.Client(config)
+        //client.update(100)
+
+        client.onConnect(response => { })
+        client.onClose(() => { })
+
+        mock.mockConnect(client, {})
+        instance.update()
+        //client.update(1/60)
+        instance.update()
+        
+        // there first snapshot should contain a simple copy of both entities
+        //client.update()
+        //const snapshot = client.readNetwork()
+
+        //setInterval(() => {
+        //   client.update(1/60)
+            //console.log('time', client.chronus.averageTimeDifference)
+        //    client.readNetwork()
+            //console.log(client.readNetwork())
+        //}, 1/60)
+
+ 
+        /*
+        const clEntity = snapshot.entities[0].createEntities[0]
+        delete clEntity.protocol
+        const clone = Object.assign({}, entity)
+
+        expect(clEntity).toEqual(clone)  
+
+        const clEntity2 = snapshot.entities[0].createEntities[1]
+        delete clEntity2.protocol
+        const clone2 = Object.assign({}, entity2)
+        expect(clEntity2).toEqual(clone2)
+        */
     })
 })

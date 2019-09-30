@@ -100,17 +100,15 @@ class Bot {
             handshake = {}
         }
 
-        this.websocket.on('open', event => {
-            console.log('opened....')
+        this.websocket.on('open', (event) => {
             this.websocket.send(createHandshakeBuffer(handshake).byteArray)
         })
 
-        this.websocket.on('error', err => {
+        this.websocket.on('error', (err) => {
             console.log('WebSocket error', err)
         })
 
         this.websocket.on('close', () => {
-            console.log('closed')
             if (this.connectionClose) {
                 this.connectionClose()
             }
@@ -130,23 +128,21 @@ class Bot {
             handshake = {}
         }
 
-        this.websocket.on('open', event => {
-            console.log('opened....')
+        this.websocket.on('open', (event) => {
             this.websocket.send(createHandshakeBuffer(handshake).byteArray)
         })
 
-        this.websocket.on('error', err => {
+        this.websocket.on('error', (err) => {
             console.log('WebSocket error', err)
         })
 
         this.websocket.on('close', () => {
-            console.log('closed')
             if (this.connectionClose) {
                 this.connectionClose()
             }
         })
 
-        this.websocket.on('message', message => {
+        this.websocket.on('message', (message) => {
             this.handleMessage(message)
         })
     }

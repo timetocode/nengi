@@ -113,15 +113,14 @@ class Instance extends EventEmitter {
             })
         } else if (typeof webConfig.httpServer !== 'undefined') {
             this.wsServer = new WebSocketServer({ server: webConfig.httpServer })
-        } else if (typeof webConfig.mockWebSocketServer !== 'undefined') {
-            console.log('instance is using a mocked server')
-            this.wsServer = webConfig.mockWebSocketServer
+        } else if (typeof webConfig.mock !== 'undefined') {
+            // using a connectionless mock mode, see spec folder for interface
+            this.wsServer = webConfig.mock
         } else {
             throw new Error('Instance must be passed a config that contains a port or an http server.')
         }
 
         this.wsServer.on('connection', (ws, req) => {
-            //console.log('HERE?', req, ws._socket.remoteAddress)
             var client = this.connect(ws)
             ws.on('message', message => {
                 this.onMessage(message, client)
@@ -174,7 +173,6 @@ class Instance extends EventEmitter {
             }
             return
         }
-
         if (commandMessage.handshake !== -1) {
             if (typeof this.connectCallback === 'function') {
                 var clientData = {
@@ -233,7 +231,6 @@ class Instance extends EventEmitter {
 
         var bitBuffer = createConnectionResponseBuffer(true, text)
         var buffer = bitBuffer.toBuffer()
-
         if (client.connection.readyState === 1) {
             client.connection.send(buffer, { binary: true })
         }
