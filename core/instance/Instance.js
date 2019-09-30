@@ -261,9 +261,10 @@ class Instance extends EventEmitter {
 
     disconnect(client, event) {
         if (this.clients.get(client.id)) {
+            this.clients.remove(client)
             client.id = -1
             client.instance = null
-            this.clients.remove(client)
+            
             if (typeof this.disconnectCallback === 'function') {
                 this.disconnectCallback(client, event)
             }
