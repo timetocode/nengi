@@ -10,6 +10,7 @@ class Channel {
         this.config = instance.config
         this.entities = new EDictionary(this.config.ID_PROPERTY_NAME)
         this.clients = new Map()
+        this.instance.channels.add(this)
     }
 
     addEntity(entity) {
