@@ -1,5 +1,6 @@
 import EDictionary from '../../external/EDictionary'
 
+
 class Channel {
     constructor(instance, id) {
         if (!instance) {
@@ -10,7 +11,8 @@ class Channel {
         this.config = instance.config
         this.entities = new EDictionary(this.config.ID_PROPERTY_NAME)
         this.clients = new Map()
-        this.instance.channels.add(this)
+        this.instance.channelCount++
+        //this.instance.channels.add(this)
     }
 
     addEntity(entity) {
@@ -49,7 +51,8 @@ class Channel {
     destroy() {
         this.clients.forEach(client => this.unsubscribe(client))
         this.entities.forEach(entity => this.removeEntity(entity))
-        this.instance.channels.remove(this)
+        //this.instance.channels.remove(this)
+        this.instance.channelCount--
     }
 }
 
