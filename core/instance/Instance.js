@@ -72,7 +72,7 @@ class Instance extends EventEmitter {
         this._entities = new EDictionary(config.ID_PROPERTY_NAME)
         this.clients = new EDictionary()
         this.entities = new EDictionary(config.ID_PROPERTY_NAME)
-        //this.channels = new EDictionary()
+        this.channels = new EDictionary()
         this.channelCount = 0
 
         this.sources = new Map()
