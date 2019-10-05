@@ -1,4 +1,6 @@
 import proxify from '../protocol/proxify';
+import Binary from '../binary/Binary'
+import BinaryType from '../binary/BinaryType'
 
 const EPSILON = 0.0001
 
@@ -52,10 +54,10 @@ class PredictionFrame {
         this.entityPredictions = new Map()
     }
 
-    add(nid, entity, props) {
+    add(nid, entity, props, protocol) {
         let entityPrediction = this.entityPredictions.get(nid)
         if (!entityPrediction) {
-            entityPrediction = new EntityPrediction(nid, entity, props, this.config)
+            entityPrediction = new EntityPrediction(nid, entity, props, protocol, this.config)
             this.entityPredictions.set(nid, entityPrediction)
         } else {
             entityPrediction.entity = entity
@@ -65,10 +67,11 @@ class PredictionFrame {
 }
 
 class EntityPrediction {
-    constructor(nid, entity, props, config) {
+    constructor(nid, entity, props, protocol, config) {
         this[config.ID_PROPERTY_NAME] = nid
         this.proxy = entity
         this.props = props
+        this.protocol = protocol
     }
 }
 
@@ -102,7 +105,7 @@ class Predictor {
         }
         let proxy = Object.assign({}, entity)
         //console.log('custom prediction registered', proxy)
-        predictionFrame.add(entity[this.config.ID_PROPERTY_NAME], proxy, props)
+        predictionFrame.add(entity[this.config.ID_PROPERTY_NAME], proxy, props, entity.protocol)
     }
 
     add(tick, entity, props) {
@@ -113,7 +116,7 @@ class Predictor {
         }
         let proxy = proxify(entity, entity.protocol)
         //console.log('auto prediction registered', proxy)
-        predictionFrame.add(entity[this.config.ID_PROPERTY_NAME], proxy, props)
+        predictionFrame.add(entity[this.config.ID_PROPERTY_NAME], proxy, props, entity.protocol)
     }
 
     has(tick, nid, prop) {
@@ -136,29 +139,51 @@ class Predictor {
 
             if (predictionFrame) {
                 predictionFrame.entityPredictions.forEach(entityPrediction => {
+                    //console.log('ep', entityPrediction)
                     // predictions for this entity
                     let nid = entityPrediction[this.config.ID_PROPERTY_NAME]
                     let authoritative = worldState.entities.get(nid)
                     if (authoritative) {
                         entityPrediction.props.forEach(prop => {
-                            // evaluate a specific prediction
-                            let authValue = authoritative[prop]
-                            let predValue = entityPrediction.proxy[prop]
-                            let diff = authValue - predValue
-
-                            if (!closeEnough(diff)) {
-                                predictionErrorFrame.add(
-                                    nid, 
-                                    entityPrediction.proxy,
-                                    new PredictionErrorProperty(
-                                        nid,
-                                        prop,
-                                        predValue,
-                                        authValue,
-                                        diff,
-                                        this.config
+                            const type = entityPrediction.protocol.properties[prop].type
+                            if (type === BinaryType.UTF8String || type === BinaryType.ASCIIString) {
+                                // provisional, nengi STRING prediction reconiliation
+                                let authValue = authoritative[prop]
+                                let predValue = entityPrediction.proxy[prop]
+            
+                                if (authValue !== predValue) {
+                                    predictionErrorFrame.add(
+                                        nid, 
+                                        entityPrediction.proxy,
+                                        new PredictionErrorProperty(
+                                            nid,
+                                            prop,
+                                            predValue,
+                                            authValue,
+                                            null,
+                                            this.config
+                                        )
                                     )
-                                )
+                                }
+                            } else {
+                                let authValue = authoritative[prop]
+                                let predValue = entityPrediction.proxy[prop]
+                                let diff = authValue - predValue
+    
+                                if (!closeEnough(diff)) {
+                                    predictionErrorFrame.add(
+                                        nid, 
+                                        entityPrediction.proxy,
+                                        new PredictionErrorProperty(
+                                            nid,
+                                            prop,
+                                            predValue,
+                                            authValue,
+                                            diff,
+                                            this.config
+                                        )
+                                    )
+                                }
                             }
                         })
                     }
