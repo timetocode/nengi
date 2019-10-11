@@ -145,27 +145,10 @@ class Predictor {
                     let authoritative = worldState.entities.get(nid)
                     if (authoritative) {
                         entityPrediction.props.forEach(prop => {
-                            const type = entityPrediction.protocol.properties[prop].type
-                            if (type === BinaryType.UTF8String || type === BinaryType.ASCIIString) {
-                                // provisional, nengi STRING prediction reconiliation
-                                let authValue = authoritative[prop]
-                                let predValue = entityPrediction.proxy[prop]
-            
-                                if (authValue !== predValue) {
-                                    predictionErrorFrame.add(
-                                        nid, 
-                                        entityPrediction.proxy,
-                                        new PredictionErrorProperty(
-                                            nid,
-                                            prop,
-                                            predValue,
-                                            authValue,
-                                            null,
-                                            this.config
-                                        )
-                                    )
-                                }
-                            } else {
+
+                            if (!entityPrediction.protocol) {
+                                // for backwards compat, nengi 1.0 does not require protocols
+                                // on predictions
                                 let authValue = authoritative[prop]
                                 let predValue = entityPrediction.proxy[prop]
                                 let diff = authValue - predValue
@@ -184,7 +167,51 @@ class Predictor {
                                         )
                                     )
                                 }
+                            } else {
+                                // but if it does have a protocol, strings are available for reconcilation
+                                const type = entityPrediction.protocol.properties[prop].type
+                                if (type === BinaryType.UTF8String || type === BinaryType.ASCIIString) {
+                                    // provisional, nengi STRING prediction reconiliation
+                                    let authValue = authoritative[prop]
+                                    let predValue = entityPrediction.proxy[prop]
+                
+                                    if (authValue !== predValue) {
+                                        predictionErrorFrame.add(
+                                            nid, 
+                                            entityPrediction.proxy,
+                                            new PredictionErrorProperty(
+                                                nid,
+                                                prop,
+                                                predValue,
+                                                authValue,
+                                                null,
+                                                this.config
+                                            )
+                                        )
+                                    }
+                                } else {
+                                    let authValue = authoritative[prop]
+                                    let predValue = entityPrediction.proxy[prop]
+                                    let diff = authValue - predValue
+        
+                                    if (!closeEnough(diff)) {
+                                        predictionErrorFrame.add(
+                                            nid, 
+                                            entityPrediction.proxy,
+                                            new PredictionErrorProperty(
+                                                nid,
+                                                prop,
+                                                predValue,
+                                                authValue,
+                                                diff,
+                                                this.config
+                                            )
+                                        )
+                                    }
+                                }
                             }
+
+                           
                         })
                     }
                 })
