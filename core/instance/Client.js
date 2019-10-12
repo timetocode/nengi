@@ -93,6 +93,7 @@ class Client {
         const toUpdate = []
         const toDelete = []
 
+        /*
         while (this.cr.length > 0) {
             const id = this.cr.shift()
             if (!this.cache[id]) {
@@ -104,6 +105,7 @@ class Client {
                 toUpdate.push(id)
             }
         }
+        */
 
         const nearby = spatialStructure.queryArea(this.view)
         // console.log(this.view.x, this.view.y, this.entity.x, this.entity.y, nearby.entities.length)

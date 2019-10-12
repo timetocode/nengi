@@ -5,6 +5,10 @@ import LocalEventProtocol from './LocalEventProtocol';
 import CommandProtocol from './CommandProtocol';
 import ComponentProtocol from './ComponentProtocol';
 
+const debug = (configSection, name) => {
+	return ((configSection === 'messages' && name === 'Test') || configSection === 'basics')
+}
+
 function ProtocolMap(config, metaConfig) {
     this.lookupByIndex = new Map()
     this.lookupByProtocol = new Map()
@@ -54,7 +58,10 @@ ProtocolMap.prototype.processProtocols = function(config, configSection, protoco
             var name = entry[0]
             var ctor = entry[1]   
             if (entry.length === 2) {
-                //console.log('ctor mode')
+				//if (debug(configSection, name)) {
+				//	console.log('ctor mode', name)
+				//}
+          
                 // nengi beta Constructor mode       
                 var protocolConfig = ctor.protocol
                 var protocol = new protocolConstructor(protocolConfig, config)
@@ -64,7 +71,10 @@ ProtocolMap.prototype.processProtocols = function(config, configSection, protoco
                 ctor.prototype.protocol = protocol
                 // mutates protocol, adding a name
                 protocol.name = name
-                this.protocolIndex++
+				this.protocolIndex++
+				//if (debug(configSection, name)) {
+				//	console.log(protocol)
+				//}
 
                 //console.log(name, this.protocolIndex)
 

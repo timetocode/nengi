@@ -44,7 +44,6 @@ var createPropSchema = function(index, propConfig, throwOnAdvancedTypes) {
 
 		// an array of values
 		if (typeof propConfig.indexType !== 'undefined') {
-
 			if (typeof propConfig.type.prototype !== 'undefined') {
 				// array of type protocol
 				type = propConfig.type.prototype.protocol
@@ -55,6 +54,20 @@ var createPropSchema = function(index, propConfig, throwOnAdvancedTypes) {
 				//console.log('regular array', propConfig)
 				type = propConfig.type
 			}
+			
+			/*
+			if (typeof propConfig.type === 'function') {
+				// array of type protocol
+				type = propConfig.type
+				protocol = propConfig.type.prototype.protocol
+				//console.log('array of subprotocols', propConfig)
+			} else {
+				// array of basic types (uint,int,bool,string, etc)
+				//console.log('regular array', propConfig)
+				type = propConfig.type
+			}
+			*/
+			
 			//console.log('ARRAY of values', propConfig, propConfig.type.prototype.protocol)
 			isArray = true
 			arrayIndexType = propConfig.indexType
