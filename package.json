@@ -1,9 +1,12 @@
 {
     "name": "nengi",
-    "version": "1.8.0",
+    "version": "1.9.0",
     "description": "multiplayer game networking for node.js and html5",
     "main": "index.js",
     "browser": "indexBrowser.js",
+    "scripts": {
+        "start": "npx jasmine"
+    },
     "keywords": [
         "multiplayer",
         "networking",
@@ -22,5 +25,8 @@
         "@clusterws/cws": "^0.14.0",
         "esm": "^3.2.22",
         "utf8": "^3.0.0"
+    },
+    "devDependencies": {
+        "jasmine": "^3.5.0"
     }
 }

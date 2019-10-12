@@ -337,9 +337,7 @@ class Interpolator {
         this.cache = {}
     }
 
-    interp(snapshots, timestamp, predictions) {
-
-
+    interp(snapshots, timestamp, predictions) { 
         let timeframe = interpolateSnapshots(snapshots, timestamp, this.cache, predictions, this.config)
         if (!timeframe) {
             return {

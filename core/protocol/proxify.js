@@ -3,25 +3,29 @@ import setValue from './setValue';
 
 var proxify = function(obj, protocol) {
 
-	//console.log(obj, protocol)
+	//console.log('PROXIFY', obj, protocol)
 	var proxy = {}
 
 	for (var i = 0; i < protocol.keys.length; i++) {
 		//var value
 		var prop = protocol.properties[protocol.keys[i]]
 		var value = getValue(obj, prop.path)
-
+		//console.log('prop', prop, 'value', value)
 		if (prop.isArray) {
-			//console.log(prop.path, 'ARRAY_BASEd')
+			//console.log(prop.path, 'ARRAY_BASEd', prop)
 
+			//console.log('AAAA', typeof prop.type)
 			if (prop.protocol) {
 				// array of object references
+				//console.log('array of object references')
 				var temp = []
 				for (var j = 0; j < value.length; j++) {
+					//console.log('mm', value[j])
 					temp.push(proxify(value[j],  prop.protocol))
 				}
 				value = temp
 			} else {
+				//console.log('array of simple values')
 				// array of simple values
 				var temp = []
 				for (var j = 0; j < value.length; j++) {
