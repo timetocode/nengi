@@ -35,14 +35,14 @@ Join us on [nengi's Discord server](https://discord.gg/7kAa7NJ) or help support 
 
 Tutorials and demo games are in the works.
 
-* [nice-proto](https://github.com/timetocode/nice-proto) - prototype of a simpler API, this is nengi-2d-csp under the hood
-* [nengi-barebone](https://github.com/timetocode/nengi-barebone) - a a barebone nengi template
-* [nengi-2d-basic](https://github.com/timetocode/nengi-2d-basic) - a simple 2d shooter
-* [nengi-2d-csp](https://github.com/timetocode/nengi-2d-csp) - a simple 2d shooter with prediction/compensation
-* [nengi-babylon-3d-shooter](https://github.com/timetocode/nengi-babylon-3d-shooter) - a template for 3D predicted games with Babylon.js
-* [3d-top-down](https://github.com/timetocode/3d-top-down) - a top down game, in a 3d engine (Babylon.js)
+* [nice-proto](https://github.com/timetocode/nice-proto) - A prototype of a simpler API, this is nengi-2d-csp under the hood
+* [nengi-barebone](https://github.com/timetocode/nengi-barebone) - A barebone nengi template
+* [nengi-2d-basic](https://github.com/timetocode/nengi-2d-basic) - A simple 2d shooter
+* [nengi-2d-csp](https://github.com/timetocode/nengi-2d-csp) - A simple 2d shooter with prediction/compensation
+* [nengi-babylon-3d-shooter](https://github.com/timetocode/nengi-babylon-3d-shooter) - A template for 3D predicted games with Babylon.js
+* [3d-top-down](https://github.com/timetocode/3d-top-down) - A top down game, in a 3d engine (Babylon.js)
 
-* [nengi-seams-prototype](https://github.com/timetocode/nengi-seams-prototype) (unstable prototype) - prototype of multi-instance stitching
+* [nengi-seams-prototype](https://github.com/timetocode/nengi-seams-prototype) (unstable prototype) - A prototype of multi-instance stitching
 
 
 
