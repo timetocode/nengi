@@ -9,13 +9,14 @@ var boundsCheck = function(value) {
 * bytes will be the character codes.
 */
 var write = function(bitStream, byteArray) {
+    bitStream.writeUInt32(byteArray.length)
     for (var i = 0; i < byteArray.length; i++) {
         bitStream.writeUInt8(byteArray[i])
     }
 }
 
 var read = function(bitStream) {
-    var length = bitStream.readUInt8()
+    var length = bitStream.readUInt32()
     var array = [];
     for (var i = 0; i < length; i++) {
         array.push(bitStream.readUInt8())
@@ -24,9 +25,9 @@ var read = function(bitStream) {
 }
 
 var countBits = function(byteArray) {
-  var bits = 8 // will represent the string length
-  bits += byteArray.length * 8
-  return bits
+    var bits = 8 // will represent the string length
+    bits += byteArray.length * 8
+    return bits
 }
 
 /**

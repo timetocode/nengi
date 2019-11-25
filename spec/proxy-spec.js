@@ -32,12 +32,14 @@ describe('proxification', function() {
     it('of a simple object', function() {
         var obj = {
             number: 1234567890,
-            string: 'Hello world'
+            string: 'Hello world',
+            byteString: new Uint8Array([0, 10, 255])
         }
 
         var objProtocol = new Protocol({
             number: nengi.UInt32,
-            string: nengi.ASCIIString
+            string: nengi.ASCIIString,
+            byteString: nengi.ByteString
         }, config)
 
         var proxy = proxify(obj, objProtocol)
@@ -46,6 +48,7 @@ describe('proxification', function() {
         // for this test, but access should use the protocol (see next test)
         expect(proxy.number).toEqual(obj.number)
         expect(proxy.string).toEqual(obj.string)
+        expect(proxy.byteString).toEqual(obj.byteString)
 
         var recreatedObj = deproxify(proxy, objProtocol)
 
