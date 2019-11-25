@@ -1,6 +1,7 @@
 import proxify from '../protocol/proxify';
 import Binary from '../binary/Binary'
 import BinaryType from '../binary/BinaryType'
+import ByteString from '../binary/types/ByteString'
 
 const EPSILON = 0.0001
 
@@ -170,12 +171,16 @@ class Predictor {
                             } else {
                                 // but if it does have a protocol, strings are available for reconcilation
                                 const type = entityPrediction.protocol.properties[prop].type
-                                if (type === BinaryType.UTF8String || type === BinaryType.ASCIIString) {
+                                if (type === BinaryType.UTF8String || type === BinaryType.ASCIIString || type === BinaryType.ByteString) {
                                     // provisional, nengi STRING prediction reconiliation
                                     let authValue = authoritative[prop]
                                     let predValue = entityPrediction.proxy[prop]
-                
-                                    if (authValue !== predValue) {
+                                    
+                                    const isByteString = (type === BinaryType.ByteString);
+                                    if (
+                                        (isByteString && !ByteString.compareFast(authValue, predValue)) // Uint8Array/Buffer comparison
+                                        || (!isByteString && authValue !== predValue) // String comparison
+                                    ) {
                                         predictionErrorFrame.add(
                                             nid, 
                                             entityPrediction.proxy,

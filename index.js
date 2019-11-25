@@ -52,6 +52,7 @@ nengi.RotationFloat32 = BinaryType.RotationFloat32
 nengi.ASCIIString    = BinaryType.ASCIIString
 nengi.String =
 nengi.UTF8String = BinaryType.UTF8String
+nengi.ByteString = BinaryType.ByteString;
 
 nengi.Basic =
 nengi.Protocol = Protocol

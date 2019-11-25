@@ -32,7 +32,7 @@ import RotationFloat32 from './types/RotationFloat32'
 import RGB888 from './types/RGB888'
 import ASCIIString from './types/ASCIIString'
 import UTF8String from './types/UTF8String'
-
+import ByteString from './types/ByteString'
 
 
 var Binary = {}
@@ -96,6 +96,8 @@ Binary[BinaryType.RGB888] = RGB888
 Binary[BinaryType.ASCIIString] = ASCIIString
 // utf8 strings, potentially huge
 Binary[BinaryType.UTF8String] = UTF8String
+// arbitrary binary data, potentially huge
+Binary[BinaryType.ByteString] = ByteString
 
 Binary.countBits = function(propConfig, value) {
     var binaryMeta = Binary[propConfig.type]
