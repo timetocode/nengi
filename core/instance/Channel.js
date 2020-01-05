@@ -11,6 +11,7 @@ class Channel {
         this.config = instance.config
         this.entities = new EDictionary(this.config.ID_PROPERTY_NAME)
         this.clients = new Map()
+        this.destroyed = false
         //this.instance.channelCount++
         //this.instance.channels.add(this)
     }
@@ -52,6 +53,7 @@ class Channel {
         this.clients.forEach(client => this.unsubscribe(client))
         this.entities.forEach(entity => this.removeEntity(entity))
         this.instance.channels.remove(this)
+        this.destroyed = true
         //this.instance.channelCount--
     }
 }

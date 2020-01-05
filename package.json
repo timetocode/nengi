@@ -22,7 +22,7 @@
     "author": "Alex Bennett // timetocode",
     "license": "Apache 2.0",
     "dependencies": {
-        "@clusterws/cws": "^0.14.0",
+        "@clusterws/cws": "0.17.2",
         "esm": "^3.2.22",
         "utf8": "^3.0.0"
     },
