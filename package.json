@@ -2,6 +2,7 @@
     "name": "nengi",
     "version": "1.10.0",
     "description": "multiplayer game networking for node.js and html5",
+    "type": "module",
     "main": "index.js",
     "browser": "indexBrowser.js",
     "scripts": {
