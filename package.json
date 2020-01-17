@@ -1,13 +1,17 @@
 {
     "name": "nengi",
-    "version": "1.11.0",
+    "version": "1.13.0",
     "description": "multiplayer game networking for node.js and html5",
-    "type": "module",
     "main": "index.js",
     "browser": "indexBrowser.js",
     "scripts": {
         "start": "npx jasmine"
     },
+    "homepage": "https://timetocode.com/nengi",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/timetocode/nengi.git"
+      },
     "keywords": [
         "multiplayer",
         "networking",

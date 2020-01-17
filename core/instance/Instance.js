@@ -181,7 +181,7 @@ class Instance extends EventEmitter {
                     fromTransfer: null
                 }
 
-                this.connectCallback(client, clientData, response => {
+                this.connectCallback(client, clientData, (response) => {
                     if (typeof response === 'object') {
                         if (response.accepted) {
                             this.acceptConnection(client, response.text)
@@ -226,14 +226,31 @@ class Instance extends EventEmitter {
     }
 
     acceptConnection(client, text) {
-        this.pendingClients.delete(client.connection)
-        this.addClient(client)
-        client.accepted = true
-
-        var bitBuffer = createConnectionResponseBuffer(true, text)
-        var buffer = bitBuffer.toBuffer()
         if (client.connection.readyState === 1) {
-            client.connection.send(buffer, { binary: true })
+            this.pendingClients.delete(client.connection)
+            this.addClient(client)
+            client.accepted = true
+    
+            var bitBuffer = createConnectionResponseBuffer(true, text)
+            var buffer = bitBuffer.toBuffer()
+
+            if (client.connection.readyState === 1) {
+                client.connection.send(buffer, { binary: true })
+            }
+        } else {
+            // This client appears to have disconnected INBETWEEN the websocket connection forming
+            // and the game logic choosing to accept the connection, so the game logic at this very moment
+            // is probably running asynchronous code in an instance.on('connect', () => {}) block
+            // We need to tell the game to disconnect this client.
+            this.pendingClients.delete(client.connection)
+
+            client.id = -1
+            client.instance = null
+            
+            client.connection.close()
+            if (typeof this.disconnectCallback === 'function') {
+                this.disconnectCallback(client, null)
+            }
         }
     }
 
@@ -542,6 +559,7 @@ class Instance extends EventEmitter {
             'channels', this.channels.toArray().length
         )
         */
+        
 
 
         //console.log(this.entities.toArray())
