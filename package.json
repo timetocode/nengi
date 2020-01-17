@@ -7,6 +7,11 @@
     "scripts": {
         "start": "npx jasmine"
     },
+    "homepage": "https://timetocode.com/nengi",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/timetocode/nengi.git"
+      },
     "keywords": [
         "multiplayer",
         "networking",
