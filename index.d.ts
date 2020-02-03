@@ -164,6 +164,9 @@ declare namespace nengi {
 
         // TODO
         on(event: string, callback: (message: any) => void)
+
+        // TODO
+        public entity: any
     }
 
     /**
