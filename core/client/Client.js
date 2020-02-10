@@ -21,6 +21,7 @@ class Client extends EventEmitter {
         this.connectionOpen = null
         this.connectionClose = null
         this.websocket = null
+        this.snapshots = []
     }
 
     init() {
@@ -30,7 +31,6 @@ class Client extends EventEmitter {
         this.entityCache = new EntityCache(this.config)
         this.interpolator = new Interpolator(this.config)
 
-        this.snapshots = []
         this.latestWorldState = null
         this.serverTick = 0
         this.tickLength = 1000 / this.config.UPDATE_RATE
