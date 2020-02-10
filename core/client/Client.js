@@ -22,9 +22,6 @@ class Client extends EventEmitter {
         this.connectionClose = null
         this.websocket = null
         this.snapshots = []
-    }
-
-    init() {
         this.outbound = new Outbound(this.protocols, this.websocket, this.config)
         this.chronus = new Chronus()
 
@@ -140,8 +137,6 @@ class Client extends EventEmitter {
     }
 
     connect(address, handshake) {
-        this.init()
-
         this.websocket = new WebSocket(address, 'nengi-protocol')
         this.outbound.websocket = this.websocket
         this.websocket.binaryType = 'arraybuffer'
@@ -176,8 +171,6 @@ class Client extends EventEmitter {
     }
 
     mockConnect(mockSocket, handshake) {
-        this.init()
-
         this.websocket = mockSocket
         this.outbound.websocket = this.websocket
         this.websocket.binaryType = 'arraybuffer'
