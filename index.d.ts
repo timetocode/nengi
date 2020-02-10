@@ -167,6 +167,14 @@ declare namespace nengi {
 
         // TODO
         public entity: any
+
+        // TODO
+        onClose(closeCallback: any): void
+        
+        // TODO
+        onConnect(connectCallback: any): void
+
+        
     }
 
     /**
