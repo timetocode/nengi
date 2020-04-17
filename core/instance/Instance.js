@@ -58,7 +58,7 @@ class Instance extends EventEmitter {
 
         this.config = config
         this.transferPassword = webConfig.transferPassword
-        this.protocols = new ProtocolMap(config, metaConfig)
+        this.protocols = null //new ProtocolMap(config, metaConfig)
         this.sleepManager = new Sleep()
         this.tick = 0
 
