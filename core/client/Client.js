@@ -157,7 +157,7 @@ class Client extends EventEmitter {
         this.websocket.onerror = (err) => {
             console.log('WebSocket error', err)
 
-            this.emit('websocket-error')
+            this.emit('websocket-error', err)
         }
 
         this.websocket.onclose = () => {
