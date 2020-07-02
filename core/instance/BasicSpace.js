@@ -3,14 +3,15 @@
 import EDictionary from '../../external/EDictionary'
 
 function BasicSpace(ID_PROPERTY_NAME, DIMENSIONALITY) {
+    console.log('creating BasicSpace',DIMENSIONALITY)
     this.DIMENSIONALITY = DIMENSIONALITY
     this.ID_PROPERTY_NAME = ID_PROPERTY_NAME || 'id'
     this.entities = new EDictionary(ID_PROPERTY_NAME)
     this.events = new EDictionary(ID_PROPERTY_NAME)
 }
 
-BasicSpace.create = function (ID_PROPERTY_NAME) {
-    return new BasicSpace(ID_PROPERTY_NAME)
+BasicSpace.create = function (ID_PROPERTY_NAME, DIMENSIONALITY) {
+    return new BasicSpace(ID_PROPERTY_NAME, DIMENSIONALITY)
 }
 
 BasicSpace.prototype.insertEntity = function (entity) {
