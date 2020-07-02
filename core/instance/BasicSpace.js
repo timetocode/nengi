@@ -3,7 +3,6 @@
 import EDictionary from '../../external/EDictionary'
 
 function BasicSpace(ID_PROPERTY_NAME, DIMENSIONALITY) {
-    console.log('creating BasicSpace',DIMENSIONALITY)
     this.DIMENSIONALITY = DIMENSIONALITY
     this.ID_PROPERTY_NAME = ID_PROPERTY_NAME || 'id'
     this.entities = new EDictionary(ID_PROPERTY_NAME)
