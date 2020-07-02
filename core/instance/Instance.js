@@ -35,7 +35,8 @@ const defaults = {
     ID_PROPERTY_NAME: 'nid',
     ID_BINARY_TYPE: BinaryType.UInt16,
     TYPE_PROPERTY_NAME: 'ntype',
-    TYPE_BINARY_TYPE: BinaryType.UInt8
+    TYPE_BINARY_TYPE: BinaryType.UInt8,
+    DIMENSIONALITY: 2
 }
 
 class Instance extends EventEmitter {
@@ -82,9 +83,9 @@ class Instance extends EventEmitter {
 
         //this.components = new Components(this)
 
-        this.historian = new Historian(config.UPDATE_RATE, config.HISTORIAN_TICKS, config.ID_PROPERTY_NAME)
+        this.historian = new Historian(config.UPDATE_RATE, config.HISTORIAN_TICKS, config.ID_PROPERTY_NAME, config.DIMENSIONALITY)
         // if no history
-        this.basicSpace = new BasicSpace(config.ID_PROPERTY_NAME)
+        this.basicSpace = new BasicSpace(config.ID_PROPERTY_NAME, config.DIMENSIONALITY)
 
         this.commands = []
 
