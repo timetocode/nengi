@@ -1,6 +1,6 @@
 {
     "name": "nengi",
-    "version": "1.13.1",
+    "version": "1.14.0",
     "description": "multiplayer game networking for node.js and html5",
     "main": "index.js",
     "browser": "indexBrowser.js",
@@ -11,7 +11,7 @@
     "repository": {
         "type": "git",
         "url": "git://github.com/timetocode/nengi.git"
-      },
+    },
     "keywords": [
         "multiplayer",
         "networking",
