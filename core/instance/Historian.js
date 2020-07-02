@@ -1,19 +1,13 @@
-//var Grid = require('./Grid')
-import EDictionary from '../../external/EDictionary';
-
 import SpatialStructure from './BasicSpace';
 import proxify from '../protocol/proxify';
 
-var lerp = function(a, b, portion) {
-  return a + ((b - a) * portion)
-}
-
-function Historian(tickRate, ticksToSave, ID_PROPERTY_NAME) {
+function Historian(tickRate, ticksToSave, ID_PROPERTY_NAME, DIMENSIONALITY) {
     this.history = {}
     this.ticksToSave = ticksToSave
     this.tick = -1
     this.tickRate = tickRate
     this.ID_PROPERTY_NAME = ID_PROPERTY_NAME || 'id'
+    this.DIMENSIONALITY = DIMENSIONALITY
 }
 
 Historian.prototype.getSnapshot = function(tick) {
@@ -28,7 +22,7 @@ Historian.prototype.getSnapshot = function(tick) {
 
 Historian.prototype.record = function(tick, entities, events, boundary) {
     //console.log('recording...', entities)
-    var spatialStructure = SpatialStructure.create(this.ID_PROPERTY_NAME) 
+    var spatialStructure = SpatialStructure.create(this.ID_PROPERTY_NAME, this.DIMENSIONALITY) 
 
     for (var i = 0; i < entities.length; i++) {
         var entity = entities[i]
