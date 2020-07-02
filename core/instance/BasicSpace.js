@@ -2,8 +2,8 @@
 // the most basic spatial structure that will work with nengi's instance
 import EDictionary from '../../external/EDictionary'
 
-function BasicSpace(ID_PROPERTY_NAME, DIMENTIONALITY) {
-    this.DIMENTIONALITY = DIMENTIONALITY
+function BasicSpace(ID_PROPERTY_NAME, DIMENSIONALITY) {
+    this.DIMENSIONALITY = DIMENSIONALITY
     this.ID_PROPERTY_NAME = ID_PROPERTY_NAME || 'id'
     this.entities = new EDictionary(ID_PROPERTY_NAME)
     this.events = new EDictionary(ID_PROPERTY_NAME)
@@ -75,9 +75,9 @@ const queryAreaEMap3D = (aabb, entities, ID_PROPERTY_NAME) => {
 
 BasicSpace.prototype.queryAreaEMap = function (aabb) {
     const entities = this.entities.toArray()
-    if (this.DIMENTIONALITY === 2) {
+    if (this.DIMENSIONALITY === 2) {
         return queryAreaEMap2D(aabb, entities, this.ID_PROPERTY_NAME)
-    } else if (this.DIMENTIONALITY === 3) {
+    } else if (this.DIMENSIONALITY === 3) {
         return queryAreaEMap3D(aabb, entities, this.ID_PROPERTY_NAME)
     } else {
         throw new Error('nengi supports 2D and 3D only')
@@ -164,9 +164,9 @@ BasicSpace.prototype.queryArea = function (aabb) {
     const entities = this.entities.toArray()
     const events = this.events.toArray()
 
-    if (this.DIMENTIONALITY === 2) {
+    if (this.DIMENSIONALITY === 2) {
         return queryArea2D(aabb, entities, events)
-    } else if (this.DIMENTIONALITY === 3) {
+    } else if (this.DIMENSIONALITY === 3) {
         return queryArea3D(aabb, entities, events)
     } else {
         throw new Error('nengi supports 2D and 3D only')
