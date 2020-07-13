@@ -28,7 +28,7 @@
     "license": "Apache 2.0",
     "dependencies": {
         "@clusterws/cws": "^3.0.0",
-        "esm": "^3.2.22",
+        "esm": "^3.2.25",
         "utf8": "^3.0.0"
     },
     "devDependencies": {
