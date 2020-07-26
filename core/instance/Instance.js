@@ -116,6 +116,7 @@ class Instance extends EventEmitter {
         this.wsServer.on('connection', (ws, req) => {
             //console.log('HERE?', req, ws._socket.remoteAddress)
             var client = this.connect(ws)
+            client.request = req;
             ws.on('message', message => {
                 this.onMessage(message, client)
             })
