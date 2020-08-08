@@ -39,6 +39,8 @@ const defaults = {
     DIMENSIONALITY: 2
 }
 
+let protocols = null
+
 class Instance extends EventEmitter {
     constructor(config, webConfig) {
         super()
@@ -57,9 +59,12 @@ class Instance extends EventEmitter {
             throw new Error('Instance requries a webConfig')
         }
 
+        if (!protocols) {
+            protocols = new ProtocolMap(config, metaConfig)
+        }
         this.config = config
         this.transferPassword = webConfig.transferPassword
-        this.protocols = new ProtocolMap(config, metaConfig)
+        this.protocols = protocols
         this.sleepManager = new Sleep()
         this.tick = 0
 
