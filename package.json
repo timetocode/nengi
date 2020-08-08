@@ -1,6 +1,6 @@
 {
     "name": "nengi",
-    "version": "1.14.1",
+    "version": "1.15.0",
     "description": "multiplayer game networking for node.js and html5",
     "main": "index.js",
     "browser": "indexBrowser.js",
@@ -27,7 +27,7 @@
     "author": "Alex Bennett // timetocode",
     "license": "Apache 2.0",
     "dependencies": {
-        "@clusterws/cws": "0.17.2",
+        "@clusterws/cws": "^3.0.0",
         "esm": "^3.2.22",
         "utf8": "^3.0.0"
     },
