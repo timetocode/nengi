@@ -11,19 +11,19 @@ interface EDictionary {
 
     /**
      * Adds an object to the EDictionary. The object *MUST* have a nid/id property as defined in the nengiConfig
-     * @param obj 
+     * @param obj
      */
     add(obj: any): void
 
     /**
      * Removes an object from the EDictionary by reference
-     * @param obj 
+     * @param obj
      */
     remove(obj: any): void
 
     /**
      * Removes an object from the EDictionary by type
-     * @param id 
+     * @param id
      */
     removeById(id: number): void
 
@@ -49,19 +49,19 @@ declare namespace nengi {
 
         /**
          * (NOT WORKING) Disables interpolation for an entity for one frame.
-         * @param nid 
+         * @param nid
          */
         noInterp(nid: number): void
 
         /**
          * Sleeps an entity, aka stops nengi from scanning the entity for changes each fick
-         * @param entity 
+         * @param entity
          */
         sleep(entity: any): void
 
         /**
          * Returns true if entity is awake
-         * @param entity 
+         * @param entity
          */
         isAwake(entity: any): boolean
 
@@ -73,7 +73,7 @@ declare namespace nengi {
 
         /**
          * Wakes an entity, aka enables nengi scanning the entity for changes each tick
-         * @param entity 
+         * @param entity
          */
         wake(entity: any): void
 
@@ -86,13 +86,13 @@ declare namespace nengi {
         /**
          * Called when a client connects to the server
          */
-        onConnect(callback: any): void
-        
+        onConnect(callback: (client: ClientProxy, clientData: { fromClient: any, fromTransfer: null }, sendResponse: (response: { accepted: boolean, text: string }) => void) => void): void
+
         /**
          * Called when a client disconnects from the server
          */
         onDisconnect(callback: any): void
-        
+
         //none of these are intended for public consumption
         //onMessage(message: any, client: any): void
         //getNextCommand(): any
@@ -102,7 +102,7 @@ declare namespace nengi {
 
         /**
          * Adds an entity to the game instance where it will be automatically synchronized to game clients. Assigns a nid and ntype to the entity.
-         * @param entity 
+         * @param entity
          */
         addEntity(entity: any): void
 
@@ -114,13 +114,13 @@ declare namespace nengi {
 
         /**
          * Gets an entity from the instance by nid. Will scan channels and all forms of visibility.
-         * @param id 
+         * @param id
          */
         getEntity(id: number): any
 
         /**
          * Sends a message to one or more clients.
-         * 
+         *
          * @param message Message
          * @param clientOrClients A client or an array of clients
          */
@@ -138,11 +138,41 @@ declare namespace nengi {
         update(): void
     }
 
+    /**
+     * Server's client proxy.
+     */
+    export class ClientProxy {
+        latency: number
+
+        addCreate(id: any): void
+        addDelete(id: any): void
+
+        subscribe(channel: any): void
+        unsubscribe(channel: any): void
+
+        // queueMessage(message: any): void
+
+        // queueJSON(json: any): void
+
+        // createOrUpdate(id, tick, toCreate, toUpdate): void
+
+        // checkVisibility(spatialStructure: any, tick: any): {
+        //    events: any,
+        //    noLongerVisible: any,
+        //    stillVisible: any,
+        //    newlyVisible: any
+        // }
+
+        // saves snapshot state to the client's entity cache
+        // ignores events and messages which are not persistent
+        // saveSnapshot(snapshot: any, protocols: any, tick: number): void
+    }
+
     export class Client {
         constructor(config: any, interDelay: number)
         /**
          * Connect to an instance
-         * 
+         *
          * @param address Address, e.g. ws://localhost:8001
          * @param handshake (optional) Handshake object with any properties and values to pass to the server.
          */
@@ -150,7 +180,7 @@ declare namespace nengi {
 
         /**
          * Adds a command to the outbound queue
-         * @param command 
+         * @param command
          */
         addCommand(command: any): void
 
@@ -169,15 +199,15 @@ declare namespace nengi {
          * Reads any queued data from the server and emits it in the nengi hooks api format. Warning: this function is only present if a nengi hooks mixin has been used.
          */
         readNetworkAndEmit(): any
-        
+
         /**
          * Called when the client connection is closed.
          */
         onClose(callback: any): void
-        
+
         /**
          * Called when the client connects to the server.
-         */ 
+         */
         onConnect(callback: any): void
 
         // TODO
