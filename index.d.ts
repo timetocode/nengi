@@ -83,11 +83,19 @@ declare namespace nengi {
          */
         wakeOnce(entity: any): void
 
-        // none of these are intended for public consumption
+        /**
+         * Called when a client connects to the server
+         */
+        onConnect(callback: any): void
+        
+        /**
+         * Called when a client disconnects from the server
+         */
+        onDisconnect(callback: any): void
+        
+        //none of these are intended for public consumption
         //onMessage(message: any, client: any): void
         //getNextCommand(): any
-        //onConnect(callback: any): void
-        //onDisconnect(callback: any): void
         //acceptConnection(client: any, text: string): void
         //denyConnection(client: any, text: string): void
         //connect(connection: any)
@@ -161,6 +169,16 @@ declare namespace nengi {
          * Reads any queued data from the server and emits it in the nengi hooks api format. Warning: this function is only present if a nengi hooks mixin has been used.
          */
         readNetworkAndEmit(): any
+        
+        /**
+         * Called when the client connection is closed.
+         */
+        onClose(callback: any): void
+        
+        /**
+         * Called when the client connects to the server.
+         */ 
+        onConnect(callback: any): void
 
         // TODO
         on(event: string, callback: (message: any) => void): void
