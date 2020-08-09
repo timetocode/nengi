@@ -7,7 +7,7 @@ interface EDictionary {
      * Iterates through the EDictionary
      * @param fn Provides (obj: any, i: number) to your function
      */
-    forEach(fn: (obj: any, i: number) => void)
+    forEach(fn: (obj: any, i: number) => void): void
 
     /**
      * Adds an object to the EDictionary. The object *MUST* have a nid/id property as defined in the nengiConfig
@@ -42,7 +42,7 @@ declare namespace nengi {
         //on(event: 'disconnect', callback: (client: any) => {}): void
         //on(event: string, callback: (a: any, b: any, c: any) => {}): void
         //on(event: string, callback: (a: any, b: any) => {}): void
-        on(event: string, callback: (client: any) => void)
+        on(event: string, callback: (client: any) => void): void
 
         // Warning: this function is only present if a nengi hooks mixin has been used.
         emitCommands(): void
@@ -163,7 +163,7 @@ declare namespace nengi {
         readNetworkAndEmit(): any
 
         // TODO
-        on(event: string, callback: (message: any) => void)
+        on(event: string, callback: (message: any) => void): void
     }
 
     /**
