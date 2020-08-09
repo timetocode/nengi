@@ -209,12 +209,12 @@ declare namespace nengi {
         /**
          * Called when the client connection is closed.
          */
-        onClose(callback: any): void
+        onClose(callback: () => void): void
 
         /**
          * Called when the client connects to the server.
          */
-        onConnect(callback: any): void
+        onConnect(onResponse: (response: { accepted: boolean, text?: string }): void
 
         // TODO
         on(event: string, callback: (message: any) => void): void
