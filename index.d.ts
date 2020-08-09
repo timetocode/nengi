@@ -34,6 +34,12 @@ interface EDictionary {
 }
 
 declare namespace nengi {
+     export type OnConnectCallback = (
+      client: nengi.ClientProxy,
+      clientData: { fromClient: any; fromTransfer: null },
+      sendResponse: (response: { accepted: boolean; text: string }) => void
+    ) => void
+ 
     export class Instance {
         constructor(config: any, webConfig: any)
 
@@ -86,7 +92,7 @@ declare namespace nengi {
         /**
          * Called when a client connects to the server
          */
-        onConnect(callback: (client: ClientProxy, clientData: { fromClient: any, fromTransfer: null }, sendResponse: (response: { accepted: boolean, text: string }) => void) => void): void
+        onConnect(callback: OnConnectCallback): void
 
         /**
          * Called when a client disconnects from the server
