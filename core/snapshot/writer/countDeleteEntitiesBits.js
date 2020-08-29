@@ -8,10 +8,7 @@ function countDeleteEntitiesBits(ids, config) {
     if (ids.length > 0) {
         bits += Binary[BinaryType.UInt8].bits
         bits += Binary[BinaryType.UInt16].bits
-        for (var i = 0; i < ids.length; i++) {
-            var id = ids[i]
-            bits += countDeleteIdBits(config.ID_BINARY_TYPE)
-        }
+        bits += countDeleteIdBits(config.ID_BINARY_TYPE) * ids.length
     }
     return bits
 }
