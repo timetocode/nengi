@@ -12,9 +12,10 @@ function writeEngineMessages(bitStream, messages) {
         // number of messages
         bitStream[Binary[BinaryType.UInt16].write](messages.length)
 
-        messages.forEach(message => {
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i]
             writeMessage(bitStream, message, message.protocol)
-        })
+        }
     }
 }
 
