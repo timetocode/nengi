@@ -24,8 +24,10 @@ var proxify = function(obj, protocol) {
 					temp[j] = proxify(value[j],  prop.protocol)
 				}
 				value = temp
+			} else {
+				value = value.slice(0)
 			}
-			// for arrays of primitive types, don't need to do anything
+
 
 		} else {
 			//console.log(prop.path, 'sub object NOT in array')
