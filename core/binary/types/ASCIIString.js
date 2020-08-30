@@ -38,7 +38,7 @@ var convertASCIIStringToByteArray = function(string) {
 
     //console.log('convertASCIIStringToByteArray', string)
     var arr = new Array(string.length + 1)
-    ar[0] = string.length;
+    arr[0] = string.length;
     for (var i = 0; i < string.length; i++) {
         arr[i + 1] = string.charCodeAt(i)
     }
