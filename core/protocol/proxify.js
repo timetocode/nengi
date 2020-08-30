@@ -18,21 +18,14 @@ var proxify = function(obj, protocol) {
 			if (prop.protocol) {
 				// array of object references
 				//console.log('array of object references')
-				var temp = []
+				var temp = new Array(value.length)
 				for (var j = 0; j < value.length; j++) {
 					//console.log('mm', value[j])
-					temp.push(proxify(value[j],  prop.protocol))
-				}
-				value = temp
-			} else {
-				//console.log('array of simple values')
-				// array of simple values
-				var temp = []
-				for (var j = 0; j < value.length; j++) {
-					temp.push(value[j])
+					temp[j] = proxify(value[j],  prop.protocol)
 				}
 				value = temp
 			}
+			// for arrays of primitive types, don't need to do anything
 
 		} else {
 			//console.log(prop.path, 'sub object NOT in array')
