@@ -32,15 +32,15 @@ var countBits = function(string) {
 }
 
 var convertASCIIStringToByteArray = function(string) {
-    //console.log('convertASCIIStringToByteArray', string)
-    var arr = []
-    if (string.length < 256) {
-        arr.push(string.length)
-    } else {
+    if (string.length > 255) {
         throw new Error('ASCIIString exceeded 255 character limit: ' + string)
     }
+
+    //console.log('convertASCIIStringToByteArray', string)
+    var arr = new Array(string.length + 1)
+    ar[0] = string.length;
     for (var i = 0; i < string.length; i++) {
-        arr.push(string.charCodeAt(i))
+        arr[i + 1] = string.charCodeAt(i)
     }
     return arr
 }
