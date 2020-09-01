@@ -1,6 +1,6 @@
 {
     "name": "nengi",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "multiplayer game networking for node.js and html5",
     "main": "index.js",
     "browser": "indexBrowser.js",
