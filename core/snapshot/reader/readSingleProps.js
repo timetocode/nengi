@@ -8,13 +8,13 @@ function readSingleProps(bitStream, protocolResolver, config) {
     // number of singleProps
     var length = bitStream[Binary[BinaryType.UInt16].read]()
 
-    var singleProps = []
+    var singleProps = new Array(length)
     for (var i = 0; i < length; i++) {
         // TODO is config needed here?
         var singleProp = readSingle(bitStream, protocolResolver, config)
-        singleProps.push(singleProp)
+        singleProps[i] = singleProp
     }
-    return singleProps    
+    return singleProps
 }
 
-export default readSingleProps; 
+export default readSingleProps;

@@ -5,25 +5,25 @@ var readProp = function(bitStream, type, arrayIndexType) {
     if (typeof arrayIndexType === 'number') {
         var arrayIndexMeta = Binary[arrayIndexType]
         var length = bitStream[arrayIndexMeta.read]()
- 
-        var arr = []
+
+        var arr = new Array(length)
         for (var i = 0; i < length; i++) {
             if (binaryMeta.customRead) {
                 var value = binaryMeta.read(bitStream)
-                arr.push(value)
-            } else {        
-                var value = bitStream[binaryMeta.read]()               
-                arr.push(value)
-            } 
+                arr[i] = value
+            } else {
+                var value = bitStream[binaryMeta.read]()
+                arr[i] = value
+            }
         }
         return arr
-        
+
     } else {
         if (binaryMeta.customRead) {
             return binaryMeta.read(bitStream)
-        } else { 
+        } else {
             return bitStream[binaryMeta.read]()
-        } 
+        }
     }
 }
 

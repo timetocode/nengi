@@ -20,9 +20,9 @@ var readMessage = function(bitStream, protocol, initialPosition, type, typePrope
         if (propData.protocol && propData.isArray) {
             var arrayIndexBinaryMeta = Binary[propData.arrayIndexType]
             var length = bitStream[arrayIndexBinaryMeta.read]()
-            var temp = []
+            var temp = new Array(length)
             for (var j = 0; j < length; j++) {
-                temp.push(readMessage(bitStream, propData.protocol))
+                temp[j] = readMessage(bitStream, propData.protocol)
             }
             value = temp
 

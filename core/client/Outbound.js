@@ -6,14 +6,14 @@ class Outbound {
         this.protocols = protocols
         this.websocket = websocket
         this.unconfirmedCommands = new Map()
-        this.sendQueue = {}
+        this.sendQueue = new Map()
         this.clientTick = 0
         this.confirmedTick = -1
         this.lastSentTick = -1
     }
 
     update() {
-        for (var i = this.lastSentTick; i < this.clientTick; i++) {    
+        for (var i = this.lastSentTick; i < this.clientTick; i++) {
             this.sendCommands(i)
             this.lastSentTick = i
         }
@@ -26,26 +26,32 @@ class Outbound {
     addCommand(command) {
         var tick = this.clientTick
         //command.tick = tick
-        if (typeof this.sendQueue[tick] === 'undefined') {
-            this.sendQueue[tick] = []        
-        }
-        if (!this.unconfirmedCommands.has(tick)) {
-            this.unconfirmedCommands.set(tick, [])
-        }
         command[this.config.TYPE_PROPERTY_NAME] = this.protocols.getIndex(command.protocol)
-        this.sendQueue[tick].push(command)
-        this.unconfirmedCommands.get(tick).push(command)
+
+        if (this.sendQueue.has(tick)) {
+            this.sendQueue.get(tick).push(command)
+        } else {
+            this.sendQueue.set(tick, [command])
+        }
+
+        if (!this.unconfirmedCommands.has(tick)) {
+            this.unconfirmedCommands.set(tick, [command])
+        } else {
+            this.unconfirmedCommands.get(tick).push(command)
+        }
     }
 
     sendCommands(tick) {
         if (this.websocket && this.websocket.readyState === 1) {
-            
-            var commands = this.sendQueue[tick]
-            if (!commands) {
-                commands = []
+
+            if (this.sendQueue.has(tick)) {
+                this.websocket.send(createCommandBuffer(tick, this.sendQueue.get(tick)).byteArray)
+                this.sendQueue.delete(tick)
+            } else {
+                // TODO: Do we need to do this?
+                this.websocket.send(createCommandBuffer(tick, []).byteArray)
             }
-            this.websocket.send(createCommandBuffer(tick, commands).byteArray)
-            delete this.sendQueue[tick]
+
         }
     }
 
