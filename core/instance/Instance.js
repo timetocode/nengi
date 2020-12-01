@@ -39,6 +39,8 @@ const defaults = {
     DIMENSIONALITY: 2
 }
 
+let protocols = null
+
 class Instance extends EventEmitter {
     constructor(config, webConfig) {
         super()
@@ -57,9 +59,12 @@ class Instance extends EventEmitter {
             throw new Error('Instance requries a webConfig')
         }
 
+        if (!protocols) {
+            protocols = new ProtocolMap(config, metaConfig)
+        }
         this.config = config
         this.transferPassword = webConfig.transferPassword
-        this.protocols = new ProtocolMap(config, metaConfig)
+        this.protocols = protocols
         this.sleepManager = new Sleep()
         this.tick = 0
 
@@ -245,7 +250,6 @@ class Instance extends EventEmitter {
             // We need to tell the game to disconnect this client.
             this.pendingClients.delete(client.connection)
 
-            client.id = -1
             client.instance = null
             
             client.connection.close()
@@ -281,13 +285,25 @@ class Instance extends EventEmitter {
     disconnect(client, event) {
         if (this.clients.get(client.id)) {
             this.clients.remove(client)
-            client.id = -1
             client.instance = null
             
             if (typeof this.disconnectCallback === 'function') {
                 this.disconnectCallback(client, event)
             }
             client.connection.close()
+        } else {
+            // This client appears to have disconnected INBETWEEN the websocket connection forming
+            // and the game logic choosing to accept the connection, so the game logic at this very moment
+            // is probably running asynchronous code in an instance.on('connect', () => {}) block
+            // We need to tell the game to disconnect this client.
+            this.pendingClients.delete(client.connection)
+
+            client.instance = null
+            
+            client.connection.close()
+            if (typeof this.disconnectCallback === 'function') {
+                this.disconnectCallback(client, null)
+            }
         }
         return client
     }

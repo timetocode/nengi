@@ -7,24 +7,24 @@ function readMessages(bitStream, protocols, config) {
     // number of messages
     var length = bitStream[Binary[BinaryType.UInt16].read]()
 
-    var messages = []
+    var messages = new Array(length)
     for (var i = 0; i < length; i++) {
 
         var type = bitStream[Binary[config.TYPE_BINARY_TYPE].read]()
         var protocol = protocols.getProtocol(type)
         var message = readMessage(
             bitStream,
-            protocol, 
-            1, 
-            type, 
+            protocol,
+            1,
+            type,
             config.TYPE_PROPERTY_NAME
         )
         message.protocol = protocol
-        messages.push(message)
+        messages[i] = message
         //console.log('read message', message)
-        
+
     }
-    return messages  
+    return messages
 }
 
 export default readMessages;

@@ -4,10 +4,10 @@ import readJSON from '../../protocol/read/readJSON';
 
 function readJSONs(bitStream) {
     var length = bitStream[Binary[BinaryType.UInt16].read]()
-    var jsons = []
+    var jsons = new Array(length)
     for (var i = 0; i < length; i++) {
         var json = readJSON(bitStream)
-        jsons.push(json)        
+        jsons[i] = json
     }
     return jsons
 }

@@ -16,6 +16,7 @@ export default function chooseOptimization(idPropertyName, oldProxy, newProxy, p
 
     var id = oldProxy[idPropertyName]
     var idType = protocol.properties[idPropertyName].type
+    var diffs = compare(oldProxy, newProxy, protocol)
 
     var formattedUpdates = {
         batch: {
@@ -23,10 +24,10 @@ export default function chooseOptimization(idPropertyName, oldProxy, newProxy, p
             idType: idType,
             updates: []
         },
-        singleProps: []
+        singleProps: new Array(diffs.length)
     }
 
-    var diffs = compare(oldProxy, newProxy, protocol)
+
 
     if (diffs.length === 0) {
         return formattedUpdates
@@ -63,7 +64,7 @@ export default function chooseOptimization(idPropertyName, oldProxy, newProxy, p
                 path: propData.path
             })
         })
-    }    
+    }
 
     for (var i = 0; i < diffs.length; i++) {
         var diff = diffs[i]
@@ -77,8 +78,8 @@ export default function chooseOptimization(idPropertyName, oldProxy, newProxy, p
 
         } else {
             var propData = protocol.properties[diff.prop]
-            
-            formattedUpdates.singleProps.push({
+
+            formattedUpdates.singleProps[i] = {
                 id: id,
                 idType: idType,
                 key: propData.key,
@@ -87,7 +88,7 @@ export default function chooseOptimization(idPropertyName, oldProxy, newProxy, p
                 valueType: propData.type,
                 prop: diff.prop,
                 path: diff.path
-            })
+            }
         }
     }
 
