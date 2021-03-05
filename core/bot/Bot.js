@@ -8,12 +8,13 @@ import Interpolator from '../client//Interpolator';
 import createPongBuffer from '../snapshot/writer/createPongBuffer';
 import Chronus from '../client/Chronus';
 import Outbound from '../client/Outbound';
+import { EventEmitter } from 'events'
 
 //const W3CWebSocket = require('websocket').w3cwebsocket
 //const WebSocket = require('ws')
 import { WebSocket } from '@clusterws/cws';
 
-class Bot {
+class Bot extends EventEmitter {
     constructor(config, protocols) {
         this.config = config
         this.protocols = protocols
