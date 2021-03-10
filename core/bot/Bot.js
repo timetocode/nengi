@@ -16,6 +16,7 @@ import { WebSocket } from '@clusterws/cws';
 
 class Bot extends EventEmitter {
     constructor(config, protocols) {
+        super()
         this.config = config
         this.protocols = protocols
 
