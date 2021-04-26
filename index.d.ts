@@ -197,7 +197,7 @@ declare namespace nengi {
     export const Int6: number
 
     /**
-     * Holds any integer in the range 0 to 65535
+     * Holds any integer in the range 0 to 61
      */
     export const UInt6: number
 
@@ -207,7 +207,7 @@ declare namespace nengi {
     export const Int8: number
 
     /**
-     * Holds any integer in the range -512 to 511
+     * Holds any integer in the range 0 to 255
      */
     export const UInt8: number
 
