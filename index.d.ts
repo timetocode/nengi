@@ -34,7 +34,7 @@ interface EDictionary {
 }
 
 declare namespace nengi {
-    export class Instance {
+    export class Instance extends EventEmitter {
         constructor(config: any, webConfig: any)
 
         clients: EDictionary
