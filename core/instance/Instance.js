@@ -36,7 +36,8 @@ const defaults = {
     ID_BINARY_TYPE: BinaryType.UInt16,
     TYPE_PROPERTY_NAME: 'ntype',
     TYPE_BINARY_TYPE: BinaryType.UInt8,
-    DIMENSIONALITY: 2
+    DIMENSIONALITY: 2,
+    PING_PONG_TICK_INTERVAL: 1
 }
 
 let protocols = null
@@ -653,11 +654,13 @@ class Instance extends EventEmitter {
             avgLatency = 0
         }
 
+        var pingKey = (tick % this.config.PING_PONG_TICK_INTERVAL === 0) ? client.latencyRecord.generatePingKey() : -1
+
         var snapshot = {
             tick: tick,
             clientTick: client.lastProcessedClientTick,
 
-            pingKey: client.latencyRecord.generatePingKey(),
+            pingKey: pingKey, //client.latencyRecord.generatePingKey(),
             avgLatency: avgLatency,
             timestamp: timestamp,
             transferKey: client.transferKey,
