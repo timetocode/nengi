@@ -33,7 +33,7 @@ Join us on [nengi's Discord server](https://discord.gg/7kAa7NJ) or help support 
 
 ## Templates
 
-There is now a tutorial series for those learning nengi available at [https://timetocode.com/nengi/intro-1](https://timetocode.com/nengi/intro-1). The code contained in these tutorials is pretty nice -- if you're making a 2D game in nengi without csp then forking this code makes for a great template.
+There is a tutorial series for those learning nengi available at [https://timetocode.com/nengi/intro-1](https://timetocode.com/nengi/intro-1). The code contained in these tutorials is pretty nice -- if you're making a 2D game in nengi without csp then forking this code makes for a great template.
 
 Other templates:
 

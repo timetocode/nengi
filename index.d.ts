@@ -1,8 +1,6 @@
-// Type definitions for nengi.js
-// Project: https://timetocode.com/nengi
-// Definitions by: Alex // timetocode <https://github.com/timetocode>
 
-interface EDictionary {
+
+declare interface EDictionary {
     /**
      * Iterates through the EDictionary
      * @param fn Provides (obj: any, i: number) to your function
@@ -34,15 +32,122 @@ interface EDictionary {
 }
 
 declare namespace nengi {
+    import EventEmitter from 'events'
+
+    type NameAndClassTuple = any
+    // why not? [string, new (...args: any[]) => Class] ; causes typescript errors
+    export interface Config {
+        [prop: string]: any // misc config variables
+        protocols: {
+            entities: NameAndClassTuple[],
+            localMessages: NameAndClassTuple[],
+            messages: NameAndClassTuple[],
+            commands: NameAndClassTuple[],
+            basics: NameAndClassTuple[],
+        }
+    }
+    export class Channel {
+        /**
+         * Not intended for direct use, instead use instance.createChannel()
+         * @param instance 
+         * @param id 
+         */
+        constructor(instance: Instance, id: number)
+
+        /**
+         * Adds an entity to the channel. Will attach a nid/ntype to the entity.
+         * @param entity 
+         */
+        addEntity(entity: any)
+
+        /**
+         * Removes an entity from the channel
+         * @param entity 
+         */
+        removeEntity(entity: any)
+
+        /**
+         * Adds a message to the channel
+         * @param message 
+         */
+        addMessage(message: any)
+
+        /**
+         * Adds a client to the channel
+         * @param client
+         */
+        subscribe(client: any)
+
+        /**
+         * Removes a client from the channel
+         * @param client 
+         */
+        unsubscribe(client: any)
+
+        /**
+         * Destroys a channel, important for memory clean up. Will automatically unsubscribe clients, and remove contained entities.
+         */
+        destroy()
+    }
+
+    export interface View {
+        x: number
+        y: number
+        z?: number
+        halfWidth: number
+        halfHeight: number
+        halfDepth?: number
+    }
+    export interface CommandCollection {
+        tick: number
+        client: ConnectedClient
+        commands: any[]
+    }
+
+    export interface ConnectedClient {
+        // public
+        id: number
+        latency: number
+        view: View
+        connection: any
+        [prop: string]: any
+
+        // private ish
+        config: Config
+        accepted: boolean        
+        lastReceivedDataTimestamp: Date
+        lastReceivedTick: number
+        lastProcessedClientTick: number
+        latencyRecord: any               
+        entityIds: number[]
+        messageQueue: any[]
+        jsonQueue: any[]
+        entityCache: any
+        cache: any
+        cacheArr: any[]
+        channels: Channel[]
+        cr: any[]
+        de: any[]
+        addCreate(id: number)
+        addDelete(id: number)
+        subscribe(channel: Channel)
+        unsubcribe(channel: Channel)
+        queueMessage(message: any)
+        queueJSON(json: any)
+        createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[])
+        checkVisibility(spatialStructure: any, tick: number)
+        saveSnapshot(snapshot: any, protocols: any, tick: number)
+    }
     export class Instance extends EventEmitter {
-        constructor(config: any, webConfig: any)
+        constructor(config: Config, webConfig: any)
 
         clients: EDictionary
+        config: Config
 
         //on(event: 'disconnect', callback: (client: any) => {}): void
         //on(event: string, callback: (a: any, b: any, c: any) => {}): void
         //on(event: string, callback: (a: any, b: any) => {}): void
-        on(event: string, callback: (client: any) => void): void
+        //on(event: string, callback: (client: ConnectedClient) => void): void
 
         // Warning: this function is only present if a nengi hooks mixin has been used.
         emitCommands(): void
@@ -54,7 +159,7 @@ declare namespace nengi {
         noInterp(nid: number): void
 
         /**
-         * Sleeps an entity, aka stops nengi from scanning the entity for changes each fick
+         * Sleeps an entity, aka stops nengi from scanning the entity for changes each tick
          * @param entity 
          */
         sleep(entity: any): void
@@ -66,7 +171,7 @@ declare namespace nengi {
         isAwake(entity: any): boolean
 
         /**
-         * Rreturns true if entity is asleep
+         * Returns true if entity is asleep
          * @param entity
          */
         isAsleep(entity: any): boolean
@@ -83,11 +188,53 @@ declare namespace nengi {
          */
         wakeOnce(entity: any): void
 
+        /**
+         * Sets the callback that will be invoked when a client connects.
+         * @param {} connectCallback
+         * Example of accepting everyone:
+         * ```js
+         * instance.onConnect(client, data, (acceptOrDenyCallback) => {
+         *    acceptOrDenyCallback({ accepted: true, text: 'Welcome!'})
+         * })
+         * ```
+         * Advanced authentication example:
+         * ```js
+         * instance.onConnect(client, data, async (acceptOrDenyCallback) => {
+         *    const user = await authService.verify(data.token) // hypothetical token passed
+         *    if (user) {
+         *      client.user = user // could contain data from a db
+         *      acceptOrDenyCallback({ accepted: true, text: 'Welcome!'})
+         *    } else {
+         *      acceptOrDenyCallback({ accepted: false, text: 'Unauthenticated'})
+         *    } 
+         * })
+         * ```
+         */
+        onConnect(connectCallback: (client: ConnectedClient, data: any, acceptOrDenyCallback: ({ accepted, text }: { accepted: boolean, text: string }) => void) => void): void
+
+        /**
+         * Sets the callback that will be invoked when a client disonnects.
+         * Example:
+         * ```js
+         * instance.onDisconnect((client) => {
+         *    // clean up! (hypothetical)
+         *    if (client.entity) {
+         *      instance.removeEntity(client.entity)
+         *    }
+         * })
+         * ```
+         * @param client 
+         */
+        onDisconnect(callback: (client: ConnectedClient) => void)
+
+        /**
+         * Returns the next incoming command from a queue and marks it as processed. Will return undefined if no more commands are queued.
+         */
+        getNextCommand(): CommandCollection | undefined
+
+
         // none of these are intended for public consumption
         //onMessage(message: any, client: any): void
-        //getNextCommand(): any
-        //onConnect(callback: any): void
-        //onDisconnect(callback: any): void
         //acceptConnection(client: any, text: string): void
         //denyConnection(client: any, text: string): void
         //connect(connection: any)
@@ -116,7 +263,7 @@ declare namespace nengi {
          * @param message Message
          * @param clientOrClients A client or an array of clients
          */
-        message(message: any, clientOrClients: any): any
+        message(message: any, clientOrClients: ConnectedClient | ConnectedClient[]): any
 
         /**
          * Sends a message to all clients.
@@ -125,13 +272,43 @@ declare namespace nengi {
         messageAll(message: any): void
 
         /**
+         * Creates and returns a new Channel
+         */
+        createChannel(): Channel
+
+        /**
          * Sends network snapshots to all clients. To be invoked towards the end of a game tick in most cases.
          */
         update(): void
     }
 
+    export interface ClientInterpolatedViewStateSnapshot {
+        messages: any[]
+        localMessages: any[]
+        entities: EntityStateSnapshot[]
+        jsons: any[]
+        predictionErrors: any[]
+    }
+
+    export interface EntityUpdate {
+        [prop: string]: any // placeholder for configurable nid property
+        prop: string
+        value: any
+        path: string[]
+    }
+    export interface EntityStateSnapshot {
+        createEntities: any[]
+        updateEntities: EntityUpdate[]
+        deleteEntities: number[]
+    }
+
     export class Client {
-        constructor(config: any, interDelay: number)
+        constructor(config: Config, interDelay: number)
+
+        // allow any prop to be attached to Client, aka normal JavaScript
+        [prop: string]: any
+        config: Config
+
         /**
          * Connect to an instance
          * 
@@ -148,9 +325,9 @@ declare namespace nengi {
 
         /**
          * Reads any queued data from the server, and returns them in snapshot format.
-         * @returns {object}
+         * @returns {ClientInterpolatedViewStateSnapshot}
          */
-        readNetwork(): any
+        readNetwork(): ClientInterpolatedViewStateSnapshot
 
         /**
          * Flushes (sends) any outbound commands.
@@ -280,8 +457,6 @@ declare namespace nengi {
      * Holds a string of UTF8 characters, maximum 4294967295 bytes
      */
     export const UTF8String: number
-
-
 }
 
 export = nengi
