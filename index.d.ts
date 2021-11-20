@@ -282,6 +282,31 @@ declare namespace nengi {
         update(): void
     }
 
+    /**
+     * A single prediction error, in the format { nid, prop, predictedValue, actualValue, deltaValue }
+     * Using clientsideEntity[prop] = actualValue will correct the clientside state
+     */
+    export class PredictionErrorProperty {
+         nid: number
+         prop: string
+         predictedValue: any
+         actualValue: any
+         deltaValue: any
+    }
+    /**
+     * A specific entity and an array of its prediction errors
+     */
+    export class PredictionErrorEntity {
+        errors: PredictionErrorProperty[]
+    }
+
+    /**
+     * Contains a Map collection of entities that experienced a prediciton error
+     */
+    export class PredictionErrorFrame {
+        tick: number
+        entities: Map<number, PredictionErrorEntity>
+    }
     export interface ClientInterpolatedViewStateSnapshot {
         messages: any[]
         localMessages: any[]
@@ -308,6 +333,7 @@ declare namespace nengi {
         // allow any prop to be attached to Client, aka normal JavaScript
         [prop: string]: any
         config: Config
+        tick: number
 
         /**
          * Connect to an instance
@@ -338,6 +364,22 @@ declare namespace nengi {
          * Reads any queued data from the server and emits it in the nengi hooks api format. Warning: this function is only present if a nengi hooks mixin has been used.
          */
         readNetworkAndEmit(): any
+
+        /**
+         * Add a clientside prediction about an entity's state
+         * @param tick clientside tick number, usually `client.tick`
+         * @param entity the entity being predicted, or an object with the same nid and props, e.g. { nid, x, y }
+         * @param props list of predicted props as an array, e.g. ['x', 'y', 'rotation']
+         */
+        addPrediction(tick: number, entity: any, props: string[])
+
+        /**
+         * Add a clientside prediction about an entity's state, optionally attaching more properties to it than those which are networked
+         * @param tick clientside tick number, usually `client.tick`
+         * @param entity the entity being predicted, or an object with the same nid and props, e.g. { nid, x, y }
+         * @param props list of predicted props as an array, e.g. ['x', 'y', 'rotation']
+         */
+        addCustomPrediction(tick: number, entity: any, props: string[])
 
         // TODO
         on(event: string, callback: (message: any) => void): void

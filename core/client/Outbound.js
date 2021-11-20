@@ -8,8 +8,8 @@ class Outbound {
         this.unconfirmedCommands = new Map()
         this.sendQueue = new Map()
         this.clientTick = 0
-        this.confirmedTick = -1
-        this.lastSentTick = -1
+        this.confirmedTick = null
+        this.lastSentTick = null
     }
 
     update() {
