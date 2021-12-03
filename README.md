@@ -12,6 +12,9 @@ Have your players saying:
 
 Join us on [nengi's Discord server](https://discord.gg/7kAa7NJ) or help support development on [timetocode's Patreon](https://www.patreon.com/timetocode)
 
+## Currently compatible with node 14; will not work with node 15+
+Support is being added for node 15, 16, 17. The incompatible piece is the websocket dependency (cWS, a fork of uWS) which is no longer being updated and has binaries published up through node 14. The replacement for this layer is going to be the latest version of uWS, but it has had a significant api change.
+
 ## Features
 * Authoritative Server Model (anti-cheat)
 * Binary compression
