@@ -2,9 +2,8 @@ import proxify from '../protocol/proxify';
 import Binary from '../binary/Binary'
 import BinaryType from '../binary/BinaryType'
 
-const EPSILON = 0.0001
 
-const closeEnough = (value) => {
+const closeEnough = (value, EPSILON) => {
     return value < EPSILON && value > -EPSILON
 }
 
@@ -153,7 +152,7 @@ class Predictor {
                                 let predValue = entityPrediction.proxy[prop]
                                 let diff = authValue - predValue
     
-                                if (!closeEnough(diff)) {
+                                if (!closeEnough(diff, this.config.PREDICTION_EPSILON)) {
                                     predictionErrorFrame.add(
                                         nid, 
                                         entityPrediction.proxy,
@@ -194,7 +193,7 @@ class Predictor {
                                     let predValue = entityPrediction.proxy[prop]
                                     let diff = authValue - predValue
         
-                                    if (!closeEnough(diff)) {
+                                    if (!closeEnough(diff, this.config.PREDICTION_EPSILON)) {
                                         predictionErrorFrame.add(
                                             nid, 
                                             entityPrediction.proxy,

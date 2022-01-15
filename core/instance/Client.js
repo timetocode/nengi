@@ -1,7 +1,6 @@
-import EntityCache from './EntityCache';
+import EntityCache from './EntityCache'
 import FauxCache from './FauxCache'
 import LatencyRecord from './LatencyRecord'
-
 class Client {
     constructor(config) {
         this.config = config
