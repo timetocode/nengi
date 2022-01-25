@@ -29,6 +29,7 @@
     "dependencies": {
         "@clusterws/cws": "^3.0.0",
         "esm": "^3.2.22",
+        "eventemitter3": "^4.0.7",
         "utf8": "^3.0.0"
     },
     "devDependencies": {
