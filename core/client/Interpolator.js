@@ -118,17 +118,6 @@ const interpolateSnapshots = (snapshots, currTimestamp, cache, predictor, config
             const propData = entityA.protocol.properties[update.prop]
             const binaryType = Binary[propData.type]
 
-            if (predictor.has(snapshotA.clientTick, update[config.ID_PROPERTY_NAME], update.prop)) {
-                //console.log('this value was predicted, skip')
-                continue
-            }
-
-            if (predictor.has(snapshotB.clientTick, update[config.ID_PROPERTY_NAME], update.prop)) {
-                //console.log('this value was predicted, skip')
-                continue
-            }
-
-
             if (entityA && entityB) {
                 if (propData.interp && snapshotB.noInterps.indexOf(id) === -1) {
                     // CASE: entity value is marked for interp and changed in both A and B, correct value is interpolated
