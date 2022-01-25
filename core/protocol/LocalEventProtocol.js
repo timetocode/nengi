@@ -10,14 +10,6 @@ function LocalEventProtocol(schemaConfig, config) {
 		isArray: false
 	}
 
-	if (typeof schemaConfig.x === 'undefined') {
-		throw new Error('EventSchema must define x.')
-	}
-
-	if (typeof schemaConfig.y === 'undefined') {
-		throw new Error('EventSchema must define y.')
-	}
-
 	var protocol = new Protocol(schemaConfig, config)
 	protocol.type = 'LocalEvent'
 
