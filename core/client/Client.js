@@ -9,7 +9,7 @@ import Interpolator from './Interpolator'
 import createPongBuffer from '../snapshot/writer/createPongBuffer'
 import Chronus from './Chronus'
 import Predictor from './Predictor'
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'eventemitter3'
 import defaults from '../defaults'
 class Client extends EventEmitter {
     constructor(config, interpDelay) {
