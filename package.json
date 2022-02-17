@@ -27,10 +27,10 @@
     "author": "Alex Bennett // timetocode",
     "license": "Apache 2.0",
     "dependencies": {
-        "@clusterws/cws": "^3.0.0",
         "esm": "^3.2.22",
         "eventemitter3": "^4.0.7",
-        "utf8": "^3.0.0"
+        "utf8": "^3.0.0",
+        "uWebSockets.js": "github:uNetworking/uWebSockets.js#v19.2.0"
     },
     "devDependencies": {
         "jasmine": "^3.5.0"

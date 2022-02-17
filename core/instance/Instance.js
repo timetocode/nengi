@@ -1,24 +1,13 @@
-import { WebSocketServer } from '@clusterws/cws'
 import EDictionary from '../../external/EDictionary'
 import Historian from './Historian'
 import IdPool from './IdPool'
 import proxify from '../protocol/proxify'
-import compare from '../protocol/compare'
-import copyProxy from '../protocol/copyProxy'
-import Binary from '../binary/Binary'
-import BinaryType from '../binary/BinaryType'
-import formatUpdates from '../snapshot/entityUpdate/formatUpdates'
 import chooseOptimization from '../snapshot/entityUpdate/chooseOptimization'
 import ProtocolMap from '../protocol/ProtocolMap'
 import Client from './Client'
 import createSnapshotBuffer from '../snapshot/writer/createSnapshotBuffer'
 import readCommandBuffer from '../snapshot/reader/readCommandBuffer'
 import createConnectionResponseBuffer from '../snapshot/writer/createConnectionResponseBuffer'
-import createTransferClientBuffer from '../snapshot/writer/createTransferClientBuffer'
-import createTransferRequestBuffer from '../snapshot/writer/createTransferRequestBuffer'
-import createTransferResponseBuffer from '../snapshot/writer/createTransferResponseBuffer'
-import createHandshakeBuffer from '../snapshot/writer/createHandshakeBuffer'
-
 import consoleLogLogo from '../common/consoleLogLogo'
 import metaConfig from '../common/metaConfig'
 import NoInterpsMessage from '../common/NoInterpsMessage'
@@ -27,6 +16,8 @@ import Sleep from './Sleep'
 import BasicSpace from './BasicSpace'
 import { EventEmitter } from 'eventemitter3'
 import Channel from './Channel'
+
+import { App } from 'uWebSockets.js'
 
 //const Components = require('./Components')
 import defaults from '../defaults'
@@ -107,32 +98,52 @@ class Instance extends EventEmitter {
         }
 
         if (typeof webConfig.port !== 'undefined') {
-            this.wsServer = new WebSocketServer({ port: webConfig.port }, () => {
-                //console.log(this.wsServer)
+
+            // uws config, such as ssl etc
+            const uwsConfig = {}
+            if (webConfig.uwsConfig) {
+                Object.assign(uwsConfig, webConfig.uwsConfig)
+            }
+
+            const wsConfig = {
+                //idleTimeout: 30,
+                //maxBackpressure: 1024,
+                //maxPayloadLength: 512,
+                open: (ws) => {
+                    ws._nengiOpen = true
+                    var client = this.connect(ws)
+                    ws.client = client
+                },
+                message: (ws, message, isBinary) => {
+                    this.onMessage(message, ws.client)
+                },
+                drain: (ws) => {
+
+                },
+                close: (ws, code, message) => {
+                    ws._nengiOpen = false
+                    this.disconnect(ws.client, null)
+                }
+            }
+
+            // config of a single ws via uws, such as idletimeout
+            if (webConfig.wsConfg) {
+                Object.assign(wsConfig, webConfig.wsConfig)
+            }
+
+            App(uwsConfig).ws('/*', wsConfig).listen(webConfig.port, (listenSocket) => {
+                //console.log({ listenSocket })
             })
         } else if (typeof webConfig.httpServer !== 'undefined') {
-            this.wsServer = new WebSocketServer({ server: webConfig.httpServer })
+            // this.wsServer = new WebSocketServer({ server: webConfig.httpServer })
+            throw new Error('httpServer is not a passable arg in this version of nengi')
         } else if (typeof webConfig.mock !== 'undefined') {
             // using a connectionless mock mode, see spec folder for interface
-            this.wsServer = webConfig.mock
+            throw new Error('mock connection is not a passable arg in this version of nengi')
+            //this.wsServer = webConfig.mock
         } else {
             throw new Error('Instance must be passed a config that contains a port or an http server.')
         }
-
-        this.wsServer.on('connection', (ws, req) => {
-            var client = this.connect(ws)
-            ws.on('message', message => {
-                this.onMessage(message, client)
-            })
-
-            ws.on('close', (event) => {
-                this.disconnect(client, event)
-            })
-        })
-
-        this.wsServer.on('error', err => {
-            console.error(err)
-        });
     }
 
     noInterp(id) {
@@ -224,26 +235,21 @@ class Instance extends EventEmitter {
     }
 
     acceptConnection(client, text) {
-        if (client.connection.readyState === 1) {
+        if (client.connection._nengiOpen) {
             this.pendingClients.delete(client.connection)
             this.addClient(client)
             client.accepted = true
-    
+
             var bitBuffer = createConnectionResponseBuffer(true, text)
             var buffer = bitBuffer.toBuffer()
-
-            if (client.connection.readyState === 1) {
-                client.connection.send(buffer, { binary: true })
-            }
+            client.connection.send(buffer, true)
         } else {
             // This client appears to have disconnected INBETWEEN the websocket connection forming
             // and the game logic choosing to accept the connection, so the game logic at this very moment
             // is probably running asynchronous code in an instance.on('connect', () => {}) block
             // We need to tell the game to disconnect this client.
             this.pendingClients.delete(client.connection)
-
             client.instance = null
-            
             client.connection.close()
             if (typeof this.disconnectCallback === 'function') {
                 this.disconnectCallback(client, null)
@@ -257,8 +263,8 @@ class Instance extends EventEmitter {
         var bitBuffer = createConnectionResponseBuffer(false, text)
         var buffer = bitBuffer.toBuffer()
 
-        if (client.connection.readyState === 1) {
-            client.connection.send(buffer, { binary: true })
+        if (client.connection._nengiOpen) {
+            client.connection.send(buffer, true)
             client.connection.close()
         }
     }
@@ -278,11 +284,14 @@ class Instance extends EventEmitter {
         if (this.clients.get(client.id)) {
             this.clients.remove(client)
             client.instance = null
-            
+
             if (typeof this.disconnectCallback === 'function') {
                 this.disconnectCallback(client, event)
             }
-            client.connection.close()
+            if (client._nengiOpen) {
+                client.connection.close()
+            }
+
         } else {
             // This client appears to have disconnected INBETWEEN the websocket connection forming
             // and the game logic choosing to accept the connection, so the game logic at this very moment
@@ -291,7 +300,9 @@ class Instance extends EventEmitter {
             if (this.pendingClients.has(client.connection)) {
                 this.pendingClients.delete(client.connection)
                 client.instance = null
-                client.connection.close()
+                if (client._nengiOpen) {
+                    client.connection.close()
+                }
                 if (typeof this.disconnectCallback === 'function') {
                     this.disconnectCallback(client, null)
                 }
@@ -568,7 +579,7 @@ class Instance extends EventEmitter {
             'channels', this.channels.toArray().length
         )
         */
-        
+
 
 
         //console.log(this.entities.toArray())
@@ -593,7 +604,7 @@ class Instance extends EventEmitter {
             var bitBuffer = createSnapshotBuffer(snapshot, this.config)
             var buffer = bitBuffer.toBuffer()
 
-            if (client.connection.readyState === 1) {
+            if (client.connection._nengiOpen) {
                 client.connection.send(buffer, { binary: true })
                 client.saveSnapshot(snapshot, this.protocols, this.tick)
             }
@@ -748,4 +759,4 @@ class Instance extends EventEmitter {
     }
 }
 
-export default Instance;
+export default Instance

@@ -12,11 +12,13 @@ import { EventEmitter } from 'events'
 
 //const W3CWebSocket = require('websocket').w3cwebsocket
 //const WebSocket = require('ws')
-import { WebSocket } from '@clusterws/cws';
+//import { WebSocket } from '@clusterws/cws';
 
 class Bot extends EventEmitter {
     constructor(config, protocols) {
         super()
+
+        throw new Error('bots do not work on the nengi sixteen experimental branch -- they have no way to make connections')
         this.config = config
         this.protocols = protocols
 
