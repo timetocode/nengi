@@ -1,5 +1,4 @@
-import createCommandBuffer from '../snapshot/writer/createCommandBuffer';
-
+import createCommandBuffer from '../snapshot/writer/createCommandBuffer'
 class Outbound {
     constructor(protocols, websocket, config) {
         this.config = config
@@ -9,18 +8,15 @@ class Outbound {
         this.sendQueue = new Map()
         this.clientTick = 0
         this.confirmedTick = null
-        this.lastSentTick = null
+        this.lastSentTick = -1
     }
 
     update() {
-        for (var i = this.lastSentTick; i < this.clientTick; i++) {
+        for (var i = this.lastSentTick + 1; i < this.clientTick; i++) {
             this.sendCommands(i)
             this.lastSentTick = i
         }
         this.clientTick++
-
-        //console.log('sq', this.sendQueue)
-        //console.log('unconfirmed', this.unconfirmedCommands)
     }
 
     addCommand(command) {
@@ -43,7 +39,6 @@ class Outbound {
 
     sendCommands(tick) {
         if (this.websocket && this.websocket.readyState === 1) {
-
             if (this.sendQueue.has(tick)) {
                 this.websocket.send(createCommandBuffer(tick, this.sendQueue.get(tick)).byteArray)
                 this.sendQueue.delete(tick)
@@ -51,11 +46,10 @@ class Outbound {
                 // TODO: Do we need to do this?
                 this.websocket.send(createCommandBuffer(tick, []).byteArray)
             }
-
         }
     }
 
-    confirmCommands(tick){
+    confirmCommands(tick) {
         this.unconfirmedCommands.forEach((command, key) => {
             if (key <= tick) {
                 this.unconfirmedCommands.delete(key)
@@ -69,4 +63,4 @@ class Outbound {
     }
 }
 
-export default Outbound;
+export default Outbound
