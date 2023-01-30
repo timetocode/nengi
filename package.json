@@ -1,38 +1,19 @@
 {
-    "name": "nengi",
-    "version": "1.27.0",
-    "description": "multiplayer game networking for node.js and html5",
-    "main": "index.js",
-    "browser": "indexBrowser.js",
-    "scripts": {
-        "start": "npx jasmine"
-    },
-    "homepage": "https://timetocode.com/nengi",
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/timetocode/nengi.git"
-    },
-    "keywords": [
-        "multiplayer",
-        "networking",
-        "interpolation",
-        "game",
-        "mmo",
-        "lag",
-        "compensation",
-        "prediction",
-        "binary",
-        "compression"
-    ],
-    "author": "Alex Bennett // timetocode",
-    "license": "Apache 2.0",
-    "dependencies": {
-        "@clusterws/cws": "^3.0.0",
-        "esm": "^3.2.22",
-        "eventemitter3": "^4.0.7",
-        "utf8": "^3.0.0"
-    },
-    "devDependencies": {
-        "jasmine": "^3.5.0"
-    }
+  "name": "nengi",
+  "version": "2.0.0-experimental",
+  "description": "nengi2 experimental branch",
+  "main": "./build/index.js",
+  "scripts": {
+    "test": "npx jest",
+    "build": "npx tsc"
+  },
+  "author": "Alex // timetocode",
+  "license": "Apache 2.0",
+  "devDependencies": {
+    "@types/jest": "^29.4.0",
+    "@types/node": "^18.11.18",
+    "jest": "^29.4.1",
+    "ts-jest": "^29.0.5",
+    "typescript": "^4.9.4"
+  }
 }

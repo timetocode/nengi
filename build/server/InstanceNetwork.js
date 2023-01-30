@@ -1,0 +1,171 @@
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.InstanceNetwork = void 0;
+const NQueue_1 = __importDefault(require("../NQueue"));
+const NetworkEvent_1 = require("../common/binary/NetworkEvent");
+const User_1 = require("./User");
+const BinarySection_1 = require("../common/binary/BinarySection");
+const EngineMessage_1 = require("../common/EngineMessage");
+const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
+const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
+class InstanceNetwork {
+    constructor(instance) {
+        this.instance = instance;
+        this.networkAdapter = null;
+        //this.connections = new Set()
+        this.queue = new NQueue_1.default();
+        this.incrementalUserId = 0;
+    }
+    registerNetworkAdapter(networkAdapter) {
+        this.networkAdapter = networkAdapter;
+    }
+    // TODO an instance should be able to have more than one network adapter
+    // which means the send call needs to be per user
+    send(user, buffer) {
+        if (this.networkAdapter) {
+            this.networkAdapter.send(user, buffer);
+        }
+    }
+    onRequest() {
+        // TODO
+    }
+    onOpen(user) {
+        user.connectionState = User_1.UserConnectionState.OpenPreHandshake;
+    }
+    onCommand(user, command) {
+        this.queue.enqueue({
+            type: NetworkEvent_1.NetworkEvent.Command,
+            user,
+            command
+        });
+    }
+    onHandshake(user, handshake, binaryWriterCtor) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                user.connectionState = User_1.UserConnectionState.OpenAwaitingHandshake;
+                const connectionAccepted = yield this.instance.onConnect(handshake);
+                // @ts-ignore ts is wrong that this is always false; the value can change during the
+                // above await
+                if (user.connectionState === User_1.UserConnectionState.Closed) {
+                    throw new Error('Connection closed before handshake completed.');
+                }
+                user.connectionState = User_1.UserConnectionState.Open;
+                // allow
+                // @ts-ignore
+                const bw = binaryWriterCtor.create(3);
+                bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
+                bw.writeUInt8(1);
+                bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAccepted);
+                this.send(user, bw.buffer);
+                user.instance = this.instance;
+                this.onConnectionAccepted(user, connectionAccepted);
+            }
+            catch (err) {
+                console.log('Handshake catch block', { err, ws: user.socket });
+                this.onConnectionDenied(user, err);
+                if (user.connectionState === User_1.UserConnectionState.Open) {
+                    const jsonErr = JSON.stringify(err);
+                    const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
+                    // deny and send reason
+                    // @ts-ignore
+                    const bw = binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
+                    bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
+                    bw.writeUInt8(1);
+                    bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
+                    bw.writeString(jsonErr);
+                    this.send(user, bw.buffer);
+                }
+            }
+        });
+    }
+    onMessage(user, binaryReader, binaryWriterCtor) {
+        while (binaryReader.offset < binaryReader.byteLength) {
+            const section = binaryReader.readUInt8();
+            switch (section) {
+                case BinarySection_1.BinarySection.EngineMessages: {
+                    const count = binaryReader.readUInt8();
+                    for (let i = 0; i < count; i++) {
+                        const type = binaryReader.readUInt8();
+                        if (type === EngineMessage_1.EngineMessage.ConnectionAttempt) {
+                            const msg = (0, readEngineMessage_1.default)(binaryReader, this.instance.context);
+                            const handshake = JSON.parse(msg.handshake);
+                            this.onHandshake(user, handshake, binaryWriterCtor);
+                        }
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.Commands: {
+                    const count = binaryReader.readUInt8();
+                    for (let i = 0; i < count; i++) {
+                        const msg = (0, readMessage_1.default)(binaryReader, this.instance.context);
+                        this.onCommand(user, msg);
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.Requests: {
+                    const count = binaryReader.readUInt8();
+                    for (let i = 0; i < count; i++) {
+                        const requestId = binaryReader.readUInt32();
+                        const endpoint = binaryReader.readUInt32();
+                        const str = binaryReader.readString();
+                        const body = JSON.parse(str);
+                        const cb = this.instance.responseEndPoints.get(endpoint);
+                        if (cb) {
+                            cb({ user, body }, (response) => {
+                                console.log('supposed to response with', response);
+                                user.responseQueue.push({
+                                    requestId,
+                                    response: JSON.stringify(response)
+                                });
+                            });
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    console.log('network hit default case while reading');
+                    break;
+                }
+            }
+        }
+    }
+    onConnectionAccepted(user, payload) {
+        user.id = ++this.incrementalUserId;
+        this.instance.users.set(user.id, user);
+        this.queue.enqueue({
+            type: NetworkEvent_1.NetworkEvent.UserConnected,
+            user,
+            payload
+        });
+    }
+    onConnectionDenied(user, payload) {
+        this.queue.enqueue({
+            type: NetworkEvent_1.NetworkEvent.UserConnectionDenied,
+            user,
+            payload
+        });
+    }
+    onClose(user) {
+        if (user.connectionState === User_1.UserConnectionState.Open) {
+            this.queue.enqueue({
+                type: NetworkEvent_1.NetworkEvent.UserDisconnected,
+                user,
+            });
+            this.instance.users.delete(user.id);
+        }
+        user.connectionState = User_1.UserConnectionState.Closed;
+    }
+}
+exports.InstanceNetwork = InstanceNetwork;
