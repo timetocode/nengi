@@ -30,11 +30,11 @@ class Instance {
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
         //this.network.listen(config.port)
     }
-    attachEntity(parent, child) {
-        this.localState.addChild(parent, child);
+    attachEntity(parentNid, child) {
+        this.localState.addChild(parentNid, child);
     }
-    detachEntity(parent, child) {
-        this.localState.removeChild(parent, child);
+    detachEntity(parentNid, child) {
+        this.localState.removeChild(parentNid, child);
     }
     respond(endpoint, callback) {
         this.responseEndPoints.set(endpoint, callback);

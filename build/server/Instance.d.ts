@@ -30,8 +30,8 @@ declare class Instance {
      */
     onConnect: (handshake: any) => Promise<any>;
     constructor(context: Context, bufferConstructor: IBinaryWriterClass);
-    attachEntity(parent: IEntity, child: IEntity): void;
-    detachEntity(parent: IEntity, child: IEntity): void;
+    attachEntity(parentNid: number, child: IEntity): void;
+    detachEntity(parentNid: number, child: IEntity): void;
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;
     createChannel(): Channel;
     createSpatialChannel(): SpatialChannel;

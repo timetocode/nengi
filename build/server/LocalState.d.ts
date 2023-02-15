@@ -7,8 +7,8 @@ declare class LocalState {
     parents: Map<number, Set<number>>;
     _entities: EDictionary;
     constructor();
-    addChild(parent: IEntity, child: IEntity): void;
-    removeChild(parent: IEntity, child: IEntity): void;
+    addChild(parentNid: number, child: IEntity): void;
+    removeChild(parentNid: number, child: IEntity): void;
     registerEntity(entity: IEntity, sourceId: number): number;
     unregisterEntity(entity: IEntity, sourceId: number): void;
     getByNid(nid: number): IEntity;

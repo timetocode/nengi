@@ -12,17 +12,15 @@ class LocalState {
         this.parents = new Map();
         this._entities = new EDictionary_1.default();
     }
-    addChild(parent, child) {
-        const parentNid = parent.nid;
+    addChild(parentNid, child) {
         let cnid = this.registerEntity(child, parentNid);
         if (!this.parents.get(parentNid)) {
             this.parents.set(parentNid, new Set());
         }
         this.parents.get(parentNid).add(cnid);
     }
-    removeChild(parent, child) {
+    removeChild(parentNid, child) {
         var _a;
-        const parentNid = parent.nid;
         const cnid = child.nid;
         (_a = this.parents.get(parentNid)) === null || _a === void 0 ? void 0 : _a.delete(cnid);
         this.unregisterEntity(child, parentNid);
