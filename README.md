@@ -15,4 +15,4 @@ If you are attempting to emulate nengi 1.0, use uws.js on the server, and regula
 Want nengi to speak over another protocol? Well you can ask the developer to add it (i might!) or roll your own. Some things that might be interesting are WebRTC, QUIC, misc javascript websocket implementations, and if you're really ambitious a non-javascript client (probably don't do that until the api hits 1.0.0).
 
 - nengi buffers [https://github.com/timetocode/nengi-buffers](https://github.com/timetocode/nengi-buffers) - binary implemenation using node Buffers, usually what's available for a library that runs in node
-- nengi dataviews [https://github.com/timetocode/nengi-dataviews](https://github.com/timetocode/nengi-dataviews) - binary implementation using browser DataViews, usually wahts available for a library that runs in a browser
+- nengi dataviews [https://github.com/timetocode/nengi-dataviews](https://github.com/timetocode/nengi-dataviews) - binary implementation using browser DataViews, usually whats available for a library that runs in a browser

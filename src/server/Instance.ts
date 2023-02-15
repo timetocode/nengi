@@ -63,12 +63,12 @@ class Instance {
         //this.network.listen(config.port)
     }
 
-    attachEntity(parent: IEntity, child: IEntity) {
-        this.localState.addChild(parent, child)
+    attachEntity(parentNid: number, child: IEntity) {
+        this.localState.addChild(parentNid, child)
     }
 
-    detachEntity(parent: IEntity, child: IEntity) {
-        this.localState.removeChild(parent, child)
+    detachEntity(parentNid: number, child: IEntity) {
+        this.localState.removeChild(parentNid, child)
     }
 
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any) {

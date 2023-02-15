@@ -15,8 +15,7 @@ class LocalState {
         this._entities = new EDictionary()
     }
 
-    addChild(parent: IEntity, child: IEntity) {
-        const parentNid = parent.nid
+    addChild(parentNid: number, child: IEntity) {
         let cnid = this.registerEntity(child, parentNid)
 
         if (!this.parents.get(parentNid)) {
@@ -25,8 +24,7 @@ class LocalState {
         this.parents.get(parentNid)!.add(cnid)
     }
 
-    removeChild(parent: IEntity, child: IEntity) {
-        const parentNid = parent.nid
+    removeChild(parentNid: number, child: IEntity) {
         const cnid = child.nid
         this.parents.get(parentNid)?.delete(cnid)
         this.unregisterEntity(child, parentNid)
