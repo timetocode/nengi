@@ -9,7 +9,14 @@ enum Binary {
     Float64,
     Boolean,
     String,
-    UInt8Array
+    UInt8Array,
+    Int8Array,
+    UInt16Array,
+    Int16Array,
+    UInt32Array,
+    Int32Array,
+    Float32Array,
+    Float64Array,
 }
 
 export { Binary }

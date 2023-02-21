@@ -1,6 +1,5 @@
 import { Binary } from './Binary'
 
-
 function stringByteLength(str: string): number {
     if (typeof Buffer !== 'undefined') {
         return Buffer.byteLength(str, 'utf8')
@@ -9,20 +8,16 @@ function stringByteLength(str: string): number {
     }
 }
 
-function count(value: string): number {
-    // TODO need a node 16 way of reading the string length in both browser and node
-    // blob might be node17+?
-    //const length = Buffer.byteLength(value, 'utf8')
-    //const length = new Blob([value]).size
+function countString(value: string): number {
     const length = stringByteLength(value)
-    console.log('COUNT invoked', value)
     return length + 4
 }
 
-function countUInt8Array(value: Uint8Array): number {
+type TypedArray = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array
+
+function countTypedArray(value: TypedArray): number {
     return value.byteLength + 4
 }
-
 const data = {
     [Binary.UInt8]: { bytes: 1, write: 'writeUInt8', read: 'readUInt8' },
     [Binary.Int8]: { bytes: 1, write: 'writeInt8', read: 'readInt8' },
@@ -34,9 +29,15 @@ const data = {
     [Binary.Float64]: { bytes: 8, write: 'writeFloat64', read: 'readFloat64' },
     [Binary.Boolean]: { bytes: 1, write: 'writeUInt8', read: 'readUInt8' },
 
-
-    [Binary.String]: { bytes: -1, write: 'writeString', read: 'readString', count },
-    [Binary.UInt8Array]: { bytes: -1, write: 'writeUInt8Array', read: 'readUInt8Array', count: countUInt8Array },
+    [Binary.String]: { bytes: -1, write: 'writeString', read: 'readString', count: countString },
+    [Binary.UInt8Array]: { bytes: -1, write: 'writeUInt8Array', read: 'readUInt8Array', count: countTypedArray },
+    [Binary.Int8Array]: { bytes: -1, write: 'writeInt8Array', read: 'readInt8Array', count: countTypedArray },
+    [Binary.UInt16Array]: { bytes: -1, write: 'writeUInt16Array', read: 'readUInt16Array', count: countTypedArray },
+    [Binary.Int16Array]: { bytes: -1, write: 'writeInt16Array', read: 'readInt16Array', count: countTypedArray },
+    [Binary.UInt32Array]: { bytes: -1, write: 'writeUInt32Array', read: 'readUInt32Array', count: countTypedArray },
+    [Binary.Int32Array]: { bytes: -1, write: 'writeInt32Array', read: 'readInt32Array', count: countTypedArray },
+    [Binary.Float32Array]: { bytes: -1, write: 'writeFloat32Array', read: 'readFloat32Array', count: countTypedArray },
+    [Binary.Float64Array]: { bytes: -1, write: 'writeFloat64Array', read: 'readFloat64Array', count: countTypedArray },
 }
 
 export default function (binaryType: Binary) {
