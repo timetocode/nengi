@@ -11,6 +11,13 @@ interface IBinaryWriter {
     writeFloat64(value: number): void;
     writeString(value: string): void;
     writeUInt8Array(value: Uint8Array): void;
+    writeInt8Array(value: Int8Array): void;
+    writeUInt16Array(value: Uint16Array): void;
+    writeInt16Array(value: Int16Array): void;
+    writeUInt32Array(value: Uint32Array): void;
+    writeInt32Array(value: Int32Array): void;
+    writeFloat32Array(value: Float32Array): void;
+    writeFloat64Array(value: Float64Array): void;
 }
 interface IBinaryWriterClass {
     new (bufferOrArrayBuffer: any, offset?: number): IBinaryWriter;

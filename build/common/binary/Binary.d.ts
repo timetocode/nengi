@@ -9,6 +9,13 @@ declare enum Binary {
     Float64 = 8,
     Boolean = 9,
     String = 10,
-    UInt8Array = 11
+    UInt8Array = 11,
+    Int8Array = 12,
+    UInt16Array = 13,
+    Int16Array = 14,
+    UInt32Array = 15,
+    Int32Array = 16,
+    Float32Array = 17,
+    Float64Array = 18
 }
 export { Binary };
