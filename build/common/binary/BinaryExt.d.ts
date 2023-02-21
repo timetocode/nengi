@@ -1,7 +1,10 @@
 import { Binary } from './Binary';
 declare function countString(value: string): number;
-type TypedArray = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
-declare function countTypedArray(value: TypedArray): number;
+type RegularOrTypedArray = [] | Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
+declare function countByteArray(value: RegularOrTypedArray): number;
+declare function count2ByteArray(value: RegularOrTypedArray): number;
+declare function count4ByteArray(value: RegularOrTypedArray): number;
+declare function count8ByteArray(value: RegularOrTypedArray): number;
 export default function (binaryType: Binary): {
     bytes: number;
     write: string;
@@ -47,41 +50,41 @@ export default function (binaryType: Binary): {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof countByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof countByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof count2ByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof count2ByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof count4ByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof count4ByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof count8ByteArray;
 } | {
     bytes: number;
     write: string;
     read: string;
-    count: typeof countTypedArray;
+    count: typeof count8ByteArray;
 };
 export {};
