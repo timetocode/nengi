@@ -43,7 +43,7 @@ class Interpolator {
     // TODO add all the creates and deletes
     getInterpolatedState(): IEntityFrame[] {
         while (this.client.network.snapshots.length > 0) {
-            const snapshot = this.client.network.snapshots.pop()
+            const snapshot = this.client.network.snapshots.shift()
             if (snapshot) { // extra check to satisfy ts, redo
                 const frame = new Frame(snapshot, this.latestFrame)
                 this.frames.push(frame)
@@ -137,4 +137,4 @@ class Interpolator {
     }
 }
 
-export { Interpolator }
+export { Interpolator, findInitialFrame, findSubsequentFrame }

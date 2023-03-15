@@ -1,5 +1,7 @@
 import { Client } from './Client';
 import { Frame, IEntityFrame } from './Frame';
+declare const findInitialFrame: (frames: Frame[], renderTime: number) => Frame | null;
+declare const findSubsequentFrame: (frames: Frame[], previousTick: number) => Frame | null;
 declare class Interpolator {
     client: Client;
     latestFrame: Frame | null;
@@ -7,4 +9,4 @@ declare class Interpolator {
     constructor(client: Client);
     getInterpolatedState(): IEntityFrame[];
 }
-export { Interpolator };
+export { Interpolator, findInitialFrame, findSubsequentFrame };

@@ -38,7 +38,7 @@ class User {
     }
     createOrUpdate(id, tick, toCreate, toUpdate) {
         if (!this.cache[id]) {
-            console.log('create push', id);
+            //console.log('create push', id)
             toCreate.push(id);
             this.cache[id] = tick;
             this.cacheArr.push(id);

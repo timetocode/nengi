@@ -45,9 +45,10 @@ const getVisibleState = (user: User, instance: Instance) => {
             diffs.forEach(diff => {
                 updateEntities.push(diff)
             })
+
         }
     }
-
+    //console.log('getVisibleState', instance.tick, createEntities.length, updateEntities.length, deleteEntities.length)
     return {
         createEntities,
         updateEntities,

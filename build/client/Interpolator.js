@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Interpolator = void 0;
+exports.findSubsequentFrame = exports.findInitialFrame = exports.Interpolator = void 0;
 const Frame_1 = require("./Frame");
 const findInitialFrame = (frames, renderTime) => {
     for (var i = frames.length - 1; i >= 0; i--) {
@@ -11,6 +11,7 @@ const findInitialFrame = (frames, renderTime) => {
     }
     return null;
 };
+exports.findInitialFrame = findInitialFrame;
 const findSubsequentFrame = (frames, previousTick) => {
     for (var i = 0; i < frames.length; i++) {
         if (frames[i].tick === previousTick + 1) {
@@ -19,6 +20,7 @@ const findSubsequentFrame = (frames, previousTick) => {
     }
     return null;
 };
+exports.findSubsequentFrame = findSubsequentFrame;
 const lerp = function (a, b, portion) {
     return a + ((b - a) * portion);
 };
@@ -32,7 +34,7 @@ class Interpolator {
     // TODO add all the creates and deletes
     getInterpolatedState() {
         while (this.client.network.snapshots.length > 0) {
-            const snapshot = this.client.network.snapshots.pop();
+            const snapshot = this.client.network.snapshots.shift();
             if (snapshot) { // extra check to satisfy ts, redo
                 const frame = new Frame_1.Frame(snapshot, this.latestFrame);
                 this.frames.push(frame);

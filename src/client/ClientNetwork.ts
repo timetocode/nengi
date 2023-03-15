@@ -178,7 +178,6 @@ class ClientNetwork {
                 }
             }
         }
-
         this.snapshots.push(snapshot)
     }
 

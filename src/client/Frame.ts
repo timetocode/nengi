@@ -46,7 +46,6 @@ class Frame implements IEntityFrame {
         })
 
         snapshot.updateEntities.forEach(update => {
-            //console.log('a frame had an update', update)
             const entity = this.entities.get(update.nid)!
             entity[update.prop] = update.value
             const clone = Object.assign({}, update)

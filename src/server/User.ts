@@ -65,7 +65,7 @@ class User {
 
     createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[]) {
         if (!this.cache[id]) {
-            console.log('create push', id)
+            //console.log('create push', id)
             toCreate.push(id)
             this.cache[id] = tick
             this.cacheArr.push(id)

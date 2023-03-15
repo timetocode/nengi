@@ -44,6 +44,7 @@ const getVisibleState = (user, instance) => {
             });
         }
     }
+    //console.log('getVisibleState', instance.tick, createEntities.length, updateEntities.length, deleteEntities.length)
     return {
         createEntities,
         updateEntities,
