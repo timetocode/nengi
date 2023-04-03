@@ -1,6 +1,8 @@
+import IEntity from '../common/IEntity'
 import { Channel } from './Channel'
 import IChannel from './IChannel'
 import { Instance } from './Instance'
+import { ViewAABB } from './ViewAABB'
 
 enum UserConnectionState {
     NULL, // initial state
@@ -25,6 +27,9 @@ class User {
 
     subscriptions: Map<number, IChannel>
 
+    view: ViewAABB | null
+    entity: IEntity | null
+
     engineMessageQueue: any[]
     messageQueue: any[]
     responseQueue: any[]
@@ -37,6 +42,8 @@ class User {
         this.socket = socket
         this.instance = null
         this.remoteAddress = null
+        this.view = null
+        this.entity = null
         this.connectionState = UserConnectionState.NULL
         this.subscriptions = new Map()
         this.engineMessageQueue = []
@@ -76,7 +83,7 @@ class User {
 
         const children = this.instance!.localState.parents.get(id)
         if (children) {
-            children.forEach(id => this.createOrUpdate(id, tick, toCreate,  toUpdate))
+            children.forEach(id => this.createOrUpdate(id, tick, toCreate, toUpdate))
         }
     }
 
