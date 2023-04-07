@@ -7,6 +7,6 @@ declare class Interpolator {
     latestFrame: Frame | null;
     frames: Frame[];
     constructor(client: Client);
-    getInterpolatedState(): IEntityFrame[];
+    getInterpolatedState(interpDelay: number): IEntityFrame[];
 }
 export { Interpolator, findInitialFrame, findSubsequentFrame };

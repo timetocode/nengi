@@ -73,7 +73,7 @@ test('', async () => {
 
     await waitFor(300)
 
-    const iState = interpolator.getInterpolatedState()
+    const iState = interpolator.getInterpolatedState(100)
     console.log('yolo', iState)
 
 

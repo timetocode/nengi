@@ -41,7 +41,7 @@ class Interpolator {
     }
 
     // TODO add all the creates and deletes
-    getInterpolatedState(): IEntityFrame[] {
+    getInterpolatedState(interpDelay: number): IEntityFrame[] {
         while (this.client.network.snapshots.length > 0) {
             const snapshot = this.client.network.snapshots.shift()
             if (snapshot) { // extra check to satisfy ts, redo
@@ -52,7 +52,7 @@ class Interpolator {
         }
 
         const now = performance.now()
-        const renderTime = now - 100
+        const renderTime = now - interpDelay
 
         const frameA = findInitialFrame(this.frames, renderTime)
         const frames: any[] = []

@@ -73,9 +73,27 @@ class InstanceNetwork {
                 this.onConnectionAccepted(user, connectionAccepted);
             }
             catch (err) {
-                console.log('Handshake catch block', { err, ws: user.socket });
+                //console.log('Handshake catch block', { err, ws: user.socket, foo: user.connectionState })
                 this.onConnectionDenied(user, err);
+                // NOTE: we are keeping the code between these cases duplicated
+                // if these do turn out to be identical in production we will clean it up
+                // but for now I am suspicious that there will be different logic
+                // in each of these later
+                if (user.connectionState === User_1.UserConnectionState.OpenAwaitingHandshake) {
+                    // developer's code decided to reject this connection (rejected promise)
+                    const jsonErr = JSON.stringify(err);
+                    const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
+                    // deny and send reason
+                    // @ts-ignore
+                    const bw = binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
+                    bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
+                    bw.writeUInt8(1);
+                    bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
+                    bw.writeString(jsonErr);
+                    this.send(user, bw.buffer);
+                }
                 if (user.connectionState === User_1.UserConnectionState.Open) {
+                    // a loss of connection after handshake is complete
                     const jsonErr = JSON.stringify(err);
                     const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
                     // deny and send reason

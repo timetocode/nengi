@@ -68,6 +68,6 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
     client.network.snapshots.push(b);
     const interpolator = new Interpolator_1.Interpolator(client);
     yield waitFor(300);
-    const iState = interpolator.getInterpolatedState();
+    const iState = interpolator.getInterpolatedState(100);
     console.log('yolo', iState);
 }));
