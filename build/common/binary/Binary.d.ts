@@ -1,4 +1,5 @@
 declare enum Binary {
+    NULL = 0,
     UInt8 = 1,
     Int8 = 2,
     UInt16 = 3,
@@ -16,6 +17,10 @@ declare enum Binary {
     UInt32Array = 15,
     Int32Array = 16,
     Float32Array = 17,
-    Float64Array = 18
+    Float64Array = 18,
+    COMPOSITE = 32,
+    Vector2 = 33,
+    Vector3 = 34,
+    Quaternion = 35
 }
 export { Binary };

@@ -9,23 +9,24 @@ import EntityCache from './EntityCache'
 import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
 import IEntity from '../common/IEntity'
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter'
+import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
+import { BinaryWriter } from '../common/binary/BinaryWriter'
+import { BinaryReader } from '../common/binary/BinaryReader'
+import { BinaryWriterFactory } from '../common/binary/BinaryWriterFactory'
+import { BinaryReaderFactory } from '../common/binary/BinaryReaderFactory'
 
 class Instance {
     context: Context
     localState: LocalState
     channelId: number
+    incrementalUserId: number
     channels: Set<IChannel>
-    network: InstanceNetwork
-
+    networks: InstanceNetwork[]
     users: Map<number, User>
-
     cache: EntityCache
     tick: number
-
     responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>
 
-
-    bufferConstructor: IBinaryWriterClass
     /**
      *
      * @param handshake test test
@@ -43,14 +44,11 @@ class Instance {
         this.channelId = 1
         this.channels = new Set()
         this.users = new Map()
-
         this.cache = new EntityCache()
         this.tick = 1
-
+        this.incrementalUserId = 1
         this.responseEndPoints = new Map()
-
-        this.bufferConstructor = bufferConstructor
-
+    
         this.onConnect = (handshake: any) => {
             return new Promise((resolve, reject) => {
                 console.log('Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied.')
@@ -58,9 +56,14 @@ class Instance {
             })
         }
 
-
-        this.network = new InstanceNetwork(this)
+        this.networks = []
+        //this.network = new InstanceNetwork(this)
         //this.network.listen(config.port)
+    }
+
+    registerNetworkAdapter(networkAdapter: IServerNetworkAdapter, binaryWriterFactory: BinaryWriterFactory, binaryReaderFactory: BinaryReaderFactory) {
+        const network = new InstanceNetwork(this, networkAdapter, binaryWriterFactory, binaryReaderFactory)
+        this.networks.push(network)
     }
 
     attachEntity(parentNid: number, child: IEntity) {
@@ -97,12 +100,9 @@ class Instance {
 
             const buffer = createSnapshotBufferRefactor(user, this) //createSnapshotBufferBrute(user, this)//createSnapshotBuffer(user, this)
 
-
-            // TODO this current takes a buffer | arraybuffer
-            // there may be a way to not ts-ignore this
-            // @ts-ignore
-            this.network.send(user, buffer)
-
+            // TODO this current takes a buffer | arraybuffer and may be typeable (currently :any)       
+            user.network?.send(user, buffer)
+            //this.network.send(user, buffer)
         })
 
         this.cache.deleteCachesForTick(this.tick)

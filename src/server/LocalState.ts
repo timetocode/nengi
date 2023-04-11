@@ -1,7 +1,7 @@
-import { Schema } from '../common/binary/schema/Schema'
 import EDictionary from './EDictionary'
 import IdPool from './IdPool'
 import IEntity from '../common/IEntity'
+
 class LocalState {
     idPool: IdPool
     sources: Map<number, Set<number>>

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Binary = void 0;
 var Binary;
 (function (Binary) {
+    Binary[Binary["NULL"] = 0] = "NULL";
     Binary[Binary["UInt8"] = 1] = "UInt8";
     Binary[Binary["Int8"] = 2] = "Int8";
     Binary[Binary["UInt16"] = 3] = "UInt16";
@@ -21,5 +22,9 @@ var Binary;
     Binary[Binary["Int32Array"] = 16] = "Int32Array";
     Binary[Binary["Float32Array"] = 17] = "Float32Array";
     Binary[Binary["Float64Array"] = 18] = "Float64Array";
+    Binary[Binary["COMPOSITE"] = 32] = "COMPOSITE";
+    Binary[Binary["Vector2"] = 33] = "Vector2";
+    Binary[Binary["Vector3"] = 34] = "Vector3";
+    Binary[Binary["Quaternion"] = 35] = "Quaternion";
 })(Binary || (Binary = {}));
 exports.Binary = Binary;

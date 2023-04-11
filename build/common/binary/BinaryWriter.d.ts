@@ -1,7 +1,13 @@
-/// <reference types="node" />
-type IBinaryWriter = {
-    new (bufferOrArrayBuffer: any, offset?: number): IBinaryWriter;
-    buffer: Buffer | ArrayBuffer;
+import { IBinaryWriter } from './IBinaryWriter';
+/**
+ * Wraps any "native" writer (such as BufferWriter for node.js or DataViewWriter for HTML5)
+ * Abstracts from Instance/Client the actual binary implementation
+ * Adds composite types such as Vector3
+ * Allows for the defining of custom composite types
+ */
+declare class BinaryWriter {
+    nativeWriter: IBinaryWriter;
+    constructor(nativeWriter: IBinaryWriter);
     writeUInt8(value: number): void;
     writeInt8(value: number): void;
     writeUInt16(value: number): void;
@@ -20,8 +26,6 @@ type IBinaryWriter = {
     writeInt32Array(value: Int32Array): void;
     writeFloat32Array(value: Float32Array): void;
     writeFloat64Array(value: Float64Array): void;
-};
-interface IBinaryWriterClass {
-    new (bufferOrArrayBuffer: any, offset?: number): IBinaryWriter;
+    writeVector2(): void;
 }
-export { IBinaryWriter, IBinaryWriterClass };
+export { BinaryWriter };

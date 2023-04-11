@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import { Instance } from './Instance';
 import NQueue from '../NQueue';
 import { NetworkEvent } from '../common/binary/NetworkEvent';
@@ -6,6 +5,8 @@ import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
 import { User } from './User';
 import { IBinaryReader } from '../common/binary/IBinaryReader';
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter';
+import { BinaryWriterFactory } from '../common/binary/BinaryWriterFactory';
+import { BinaryReaderFactory } from '../common/binary/BinaryReaderFactory';
 interface INetworkEvent {
     type: NetworkEvent;
     user: User;
@@ -13,12 +14,12 @@ interface INetworkEvent {
 }
 declare class InstanceNetwork {
     instance: Instance;
-    networkAdapter: IServerNetworkAdapter | null;
+    networkAdapter: IServerNetworkAdapter;
+    binaryWriterFactory: BinaryWriterFactory;
+    binaryReaderFactory: BinaryReaderFactory;
     queue: NQueue<INetworkEvent>;
-    incrementalUserId: number;
-    constructor(instance: Instance);
-    registerNetworkAdapter(networkAdapter: IServerNetworkAdapter): void;
-    send(user: User, buffer: Buffer): void;
+    constructor(instance: Instance, networkAdapter: IServerNetworkAdapter, binaryWriterFactory: BinaryWriterFactory, binaryReaderFactory: BinaryReaderFactory);
+    send(user: User, buffer: any): void;
     onRequest(): void;
     onOpen(user: User): void;
     onCommand(user: User, command: any): void;

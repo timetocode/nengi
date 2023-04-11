@@ -1,6 +1,6 @@
-interface IBinaryWriter {
+type IBinaryWriter = {
     // ALSO, but hidden from typescript:
-    // new(bufferOrArrayBuffer: any, offset?: number): IBinaryWriter
+    new(bufferOrArrayBuffer: any, offset?: number): IBinaryWriter
     // static create(byteLength): IBinaryWriter
     buffer: Buffer | ArrayBuffer
     writeUInt8(value: number): void
@@ -11,6 +11,7 @@ interface IBinaryWriter {
     writeInt32(value: number): void
     writeFloat32(value: number): void
     writeFloat64(value: number): void
+    writeBoolean(value: boolean): void
     writeString(value: string): void
     writeUInt8Array(value: Uint8Array): void
     writeInt8Array(value: Int8Array): void

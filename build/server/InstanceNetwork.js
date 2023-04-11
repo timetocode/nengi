@@ -21,22 +21,17 @@ const EngineMessage_1 = require("../common/EngineMessage");
 const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
 const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
 class InstanceNetwork {
-    constructor(instance) {
+    constructor(instance, networkAdapter, binaryWriterFactory, binaryReaderFactory) {
         this.instance = instance;
-        this.networkAdapter = null;
-        //this.connections = new Set()
-        this.queue = new NQueue_1.default();
-        this.incrementalUserId = 0;
-    }
-    registerNetworkAdapter(networkAdapter) {
         this.networkAdapter = networkAdapter;
+        this.binaryWriterFactory = binaryWriterFactory;
+        this.binaryReaderFactory = binaryReaderFactory;
+        this.queue = new NQueue_1.default();
     }
     // TODO an instance should be able to have more than one network adapter
     // which means the send call needs to be per user
     send(user, buffer) {
-        if (this.networkAdapter) {
-            this.networkAdapter.send(user, buffer);
-        }
+        this.networkAdapter.send(user, buffer);
     }
     onRequest() {
         // TODO
@@ -68,6 +63,7 @@ class InstanceNetwork {
                 bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                 bw.writeUInt8(1);
                 bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAccepted);
+                //@ts-ignore
                 this.send(user, bw.buffer);
                 user.instance = this.instance;
                 this.onConnectionAccepted(user, connectionAccepted);
@@ -160,7 +156,7 @@ class InstanceNetwork {
         }
     }
     onConnectionAccepted(user, payload) {
-        user.id = ++this.incrementalUserId;
+        user.id = ++this.instance.incrementalUserId;
         this.instance.users.set(user.id, user);
         this.queue.enqueue({
             type: NetworkEvent_1.NetworkEvent.UserConnected,

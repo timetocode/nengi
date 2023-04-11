@@ -8,17 +8,20 @@ import IChannel from './IChannel';
 import EntityCache from './EntityCache';
 import IEntity from '../common/IEntity';
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter';
+import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
+import { BinaryWriterFactory } from '../common/binary/BinaryWriterFactory';
+import { BinaryReaderFactory } from '../common/binary/BinaryReaderFactory';
 declare class Instance {
     context: Context;
     localState: LocalState;
     channelId: number;
+    incrementalUserId: number;
     channels: Set<IChannel>;
-    network: InstanceNetwork;
+    networks: InstanceNetwork[];
     users: Map<number, User>;
     cache: EntityCache;
     tick: number;
     responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>;
-    bufferConstructor: IBinaryWriterClass;
     /**
      *
      * @param handshake test test
@@ -30,6 +33,7 @@ declare class Instance {
      */
     onConnect: (handshake: any) => Promise<any>;
     constructor(context: Context, bufferConstructor: IBinaryWriterClass);
+    registerNetworkAdapter(networkAdapter: IServerNetworkAdapter, binaryWriterFactory: BinaryWriterFactory, binaryReaderFactory: BinaryReaderFactory): void;
     attachEntity(parentNid: number, child: IEntity): void;
     detachEntity(parentNid: number, child: IEntity): void;
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;

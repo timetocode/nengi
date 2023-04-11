@@ -19,16 +19,21 @@ class Instance {
         this.users = new Map();
         this.cache = new EntityCache_1.default();
         this.tick = 1;
+        this.incrementalUserId = 1;
         this.responseEndPoints = new Map();
-        this.bufferConstructor = bufferConstructor;
         this.onConnect = (handshake) => {
             return new Promise((resolve, reject) => {
                 console.log('Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied.');
                 resolve(false);
             });
         };
-        this.network = new InstanceNetwork_1.InstanceNetwork(this);
+        this.networks = [];
+        //this.network = new InstanceNetwork(this)
         //this.network.listen(config.port)
+    }
+    registerNetworkAdapter(networkAdapter, binaryWriterFactory, binaryReaderFactory) {
+        const network = new InstanceNetwork_1.InstanceNetwork(this, networkAdapter, binaryWriterFactory, binaryReaderFactory);
+        this.networks.push(network);
     }
     attachEntity(parentNid, child) {
         this.localState.addChild(parentNid, child);
@@ -55,11 +60,11 @@ class Instance {
         this.users.forEach(user => {
             // TODO aggregate visible entities and messages
             // demo is instead just sending message from a channel
+            var _a;
             const buffer = (0, createSnapshotBufferRefactor_1.default)(user, this); //createSnapshotBufferBrute(user, this)//createSnapshotBuffer(user, this)
-            // TODO this current takes a buffer | arraybuffer
-            // there may be a way to not ts-ignore this
-            // @ts-ignore
-            this.network.send(user, buffer);
+            // TODO this current takes a buffer | arraybuffer and may be typeable (currently :any)       
+            (_a = user.network) === null || _a === void 0 ? void 0 : _a.send(user, buffer);
+            //this.network.send(user, buffer)
         });
         this.cache.deleteCachesForTick(this.tick);
     }

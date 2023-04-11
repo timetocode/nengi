@@ -1,4 +1,5 @@
 enum Binary {
+    NULL,
     UInt8 = 1,
     Int8,
     UInt16,
@@ -17,6 +18,12 @@ enum Binary {
     Int32Array,
     Float32Array,
     Float64Array,
+
+    COMPOSITE = 32,
+    Vector2,
+    Vector3,
+    Quaternion,
+
 }
 
 export { Binary }

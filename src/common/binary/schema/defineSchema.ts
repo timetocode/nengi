@@ -2,8 +2,6 @@ import { Binary } from '../Binary'
 import { Schema } from './Schema'
 import { SchemaDefinition } from './SchemaDefinition'
 
-
-
 function defineSchema(schema: SchemaDefinition): Schema {
     //console.log('parsing', schema)
     const compiled = new Schema()

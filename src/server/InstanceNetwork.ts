@@ -9,6 +9,10 @@ import { EngineMessage } from '../common/EngineMessage'
 import readEngineMessage from '../binary/message/readEngineMessage'
 import readMessage from '../binary/message/readMessage'
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter'
+import { BinaryWriter } from '../common/binary/BinaryWriter'
+import { BinaryReader } from '../common/binary/BinaryReader'
+import { BinaryWriterFactory } from '../common/binary/BinaryWriterFactory'
+import { BinaryReaderFactory } from '../common/binary/BinaryReaderFactory'
 
 interface INetworkEvent {
     type: NetworkEvent
@@ -17,33 +21,24 @@ interface INetworkEvent {
 }
 
 class InstanceNetwork {
-    //users: Map<number, User>
     instance: Instance
-    networkAdapter: IServerNetworkAdapter | null
-
+    networkAdapter: IServerNetworkAdapter
+    binaryWriterFactory: BinaryWriterFactory
+    binaryReaderFactory: BinaryReaderFactory
     queue: NQueue<INetworkEvent>
 
-    incrementalUserId: number
-
-    constructor(instance: Instance) {
+    constructor(instance: Instance, networkAdapter: IServerNetworkAdapter, binaryWriterFactory: BinaryWriterFactory, binaryReaderFactory: BinaryReaderFactory) {
         this.instance = instance
-        this.networkAdapter = null
-        //this.connections = new Set()
-
-        this.queue = new NQueue()
-        this.incrementalUserId = 0
-    }
-
-    registerNetworkAdapter(networkAdapter: IServerNetworkAdapter) {
         this.networkAdapter = networkAdapter
+        this.binaryWriterFactory = binaryWriterFactory
+        this.binaryReaderFactory = binaryReaderFactory
+        this.queue = new NQueue()
     }
 
     // TODO an instance should be able to have more than one network adapter
     // which means the send call needs to be per user
-    send(user: User, buffer: Buffer) {
-        if (this.networkAdapter) {
-            this.networkAdapter.send(user, buffer)
-        }
+    send(user: User, buffer: any) {
+        this.networkAdapter.send(user, buffer) 
     }
 
     onRequest() {
@@ -76,11 +71,12 @@ class InstanceNetwork {
             user.connectionState = UserConnectionState.Open
 
             // allow
-            // @ts-ignore
+   // @ts-ignore
             const bw = binaryWriterCtor.create(3)
             bw.writeUInt8(BinarySection.EngineMessages)
             bw.writeUInt8(1)
             bw.writeUInt8(EngineMessage.ConnectionAccepted)
+            //@ts-ignore
             this.send(user, bw.buffer)
 
             user.instance = this.instance
@@ -180,7 +176,7 @@ class InstanceNetwork {
     }
 
     onConnectionAccepted(user: User, payload: any) {
-        user.id = ++this.incrementalUserId
+        user.id = ++this.instance.incrementalUserId
         this.instance.users.set(user.id, user)
 
         this.queue.enqueue({

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { User } from '../../server/User'
 import { Instance } from '../../server/Instance'
 import count from '../message/count'
@@ -120,7 +122,9 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     }
 
     // TODO this buffer alloc is node-only, but instance should work in html5 too
-    const bw = new instance.bufferConstructor(Buffer.allocUnsafe(bytes), 0)
+
+    const bw = user.network?.binaryWriterFactory.create(bytes)
+    //const bw = new instance.bufferConstructor(Buffer.allocUnsafe(bytes), 0)
 
     bw.writeUInt8(BinarySection.EngineMessages)
     bw.writeUInt8(0)

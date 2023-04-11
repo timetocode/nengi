@@ -1,4 +1,5 @@
 "use strict";
+// @ts-nocheck
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -53,6 +54,7 @@ const getVisibleState = (user, instance) => {
     };
 };
 const createSnapshotBufferRefactor = (user, instance) => {
+    var _a;
     let bytes = 0;
     bytes += 1; // section BinarySection.EngineMessages
     bytes += 1; // quantity of engine messages
@@ -100,7 +102,8 @@ const createSnapshotBufferRefactor = (user, instance) => {
         bytes += 4;
     }
     // TODO this buffer alloc is node-only, but instance should work in html5 too
-    const bw = new instance.bufferConstructor(Buffer.allocUnsafe(bytes), 0);
+    const bw = (_a = user.network) === null || _a === void 0 ? void 0 : _a.binaryWriterFactory.create(bytes);
+    //const bw = new instance.bufferConstructor(Buffer.allocUnsafe(bytes), 0)
     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
     bw.writeUInt8(0);
     bw.writeUInt8(BinarySection_1.BinarySection.Messages);

@@ -95,6 +95,7 @@ class ClientNetwork {
             switch (section) {
                 case BinarySection_1.BinarySection.EngineMessages: {
                     const count = dr.readUInt8();
+                    console.log('received engine messages', count);
                     break;
                 }
                 case BinarySection_1.BinarySection.Messages: {

@@ -1,4 +1,5 @@
 interface IBinaryReader {
+    new: (bufferOrArrayBuffer: any, offset?: number) => IBinaryReader;
     offset: number;
     byteLength: number;
     readUInt8: () => number;
@@ -9,6 +10,7 @@ interface IBinaryReader {
     readInt32: () => number;
     readFloat32: () => number;
     readFloat64: () => number;
+    readBoolean: () => boolean;
     readString: () => string;
     readUInt8Array: () => Uint8Array;
     readInt8Array: () => Int8Array;
