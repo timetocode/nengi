@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-alpha.5",
+  "version": "2.0.0-alpha.6",
   "description": "nengi2 experimental branch",
   "main": "./build/index.js",
   "scripts": {

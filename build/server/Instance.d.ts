@@ -7,7 +7,6 @@ import { SpatialChannel } from './SpatialChannel';
 import IChannel from './IChannel';
 import EntityCache from './EntityCache';
 import IEntity from '../common/IEntity';
-import { IBinaryWriterClass } from '../common/binary/IBinaryWriter';
 import NQueue from '../NQueue';
 declare class Instance {
     context: Context;
@@ -21,7 +20,6 @@ declare class Instance {
     cache: EntityCache;
     tick: number;
     responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>;
-    bufferConstructor: IBinaryWriterClass;
     /**
      *
      * @param handshake test test
@@ -32,7 +30,7 @@ declare class Instance {
      * ```
      */
     onConnect: (handshake: any) => Promise<any>;
-    constructor(context: Context, bufferConstructor: IBinaryWriterClass);
+    constructor(context: Context);
     attachEntity(parentNid: number, child: IEntity): void;
     detachEntity(parentNid: number, child: IEntity): void;
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;

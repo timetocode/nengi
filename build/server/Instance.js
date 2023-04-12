@@ -12,7 +12,7 @@ const EntityCache_1 = __importDefault(require("./EntityCache"));
 const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
 const NQueue_1 = __importDefault(require("../NQueue"));
 class Instance {
-    constructor(context, bufferConstructor) {
+    constructor(context) {
         this.context = context;
         this.localState = new LocalState_1.default();
         this.channelId = 1;
@@ -23,7 +23,6 @@ class Instance {
         this.cache = new EntityCache_1.default();
         this.tick = 1;
         this.responseEndPoints = new Map();
-        this.bufferConstructor = bufferConstructor;
         this.onConnect = (handshake) => {
             return new Promise((resolve, reject) => {
                 console.log('Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied.');

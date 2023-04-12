@@ -8,7 +8,6 @@ import IChannel from './IChannel'
 import EntityCache from './EntityCache'
 import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
 import IEntity from '../common/IEntity'
-import { IBinaryWriterClass } from '../common/binary/IBinaryWriter'
 import NQueue from '../NQueue'
 
 class Instance {
@@ -23,7 +22,6 @@ class Instance {
     cache: EntityCache
     tick: number
     responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>
-    bufferConstructor: IBinaryWriterClass
     /**
      *
      * @param handshake test test
@@ -35,7 +33,7 @@ class Instance {
      */
     onConnect: (handshake: any) => Promise<any>
 
-    constructor(context: Context, bufferConstructor: IBinaryWriterClass) {
+    constructor(context: Context) {
         this.context = context
         this.localState = new LocalState()
         this.channelId = 1
@@ -46,7 +44,6 @@ class Instance {
         this.cache = new EntityCache()
         this.tick = 1
         this.responseEndPoints = new Map()
-        this.bufferConstructor = bufferConstructor
 
         this.onConnect = (handshake: any) => {
             return new Promise((resolve, reject) => {
