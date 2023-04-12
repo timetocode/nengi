@@ -1,8 +1,6 @@
 import { Instance } from './Instance'
 import { NetworkEvent } from '../common/binary/NetworkEvent'
-import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
 import { User, UserConnectionState } from './User'
-import { IBinaryReader } from '../common/binary/IBinaryReader'
 import { BinarySection } from '../common/binary/BinarySection'
 import { EngineMessage } from '../common/EngineMessage'
 import readEngineMessage from '../binary/message/readEngineMessage'
@@ -16,24 +14,9 @@ interface INetworkEvent {
 
 class InstanceNetwork {
     instance: Instance
-    networkAdapter: IServerNetworkAdapter | null
-
     constructor(instance: Instance) {
         this.instance = instance
-        this.networkAdapter = null
-    }
-
-    registerNetworkAdapter(networkAdapter: IServerNetworkAdapter) {
-        this.networkAdapter = networkAdapter
-    }
-
-    // TODO an instance should be able to have more than one network adapter
-    // which means the send call needs to be per user
-    send(user: User, buffer: Buffer) {
-        if (this.networkAdapter) {
-            this.networkAdapter.send(user, buffer)
-        }
-    }
+    } 
 
     onRequest() {
         // TODO
@@ -71,9 +54,7 @@ class InstanceNetwork {
             bw.writeUInt8(1)
             bw.writeUInt8(EngineMessage.ConnectionAccepted)
 
-            user.networkAdapter.send(user, bw.buffer)
-            //this.send(user, bw.buffer)
-
+            user.send(bw.buffer)
             user.instance = this.instance
             this.onConnectionAccepted(user, connectionAccepted)
         } catch (err: any) {
@@ -97,7 +78,7 @@ class InstanceNetwork {
                 bw.writeUInt8(1)
                 bw.writeUInt8(EngineMessage.ConnectionDenied)
                 bw.writeString(jsonErr)
-                user.networkAdapter.send(user, bw.buffer)
+                user.send(bw.buffer)
             }
             
             if (user.connectionState === UserConnectionState.Open) {
@@ -112,7 +93,7 @@ class InstanceNetwork {
                 bw.writeUInt8(1)
                 bw.writeUInt8(EngineMessage.ConnectionDenied)
                 bw.writeString(jsonErr)
-                user.networkAdapter.send(user, bw.buffer)
+                user.send(bw.buffer)
             }
         }
     }

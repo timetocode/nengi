@@ -86,6 +86,9 @@ class User {
         }
     }
 
+    send(buffer: Buffer | ArrayBuffer) {
+        this.networkAdapter.send(this, buffer)
+    }
 
     checkVisibility(tick: number) {
         const toCreate: number[] = []

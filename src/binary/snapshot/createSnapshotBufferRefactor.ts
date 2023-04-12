@@ -3,8 +3,6 @@ import { Instance } from '../../server/Instance'
 import count from '../message/count'
 import countDiff from '../entity/countDiff'
 import { BinarySection } from '../../common/binary/BinarySection'
-
-import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import writeMessage from '../message/writeMessage'
 import writeDiff from '../entity/writeDiff'
 import BinaryExt from '../../common/binary/BinaryExt'

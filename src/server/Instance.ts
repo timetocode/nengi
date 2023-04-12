@@ -87,14 +87,8 @@ class Instance {
             // TODO aggregate visible entities and messages
             // demo is instead just sending message from a channel
 
-            const buffer = createSnapshotBufferRefactor(user, this) //createSnapshotBufferBrute(user, this)//createSnapshotBuffer(user, this)
-
-
-            // TODO this current takes a buffer | arraybuffer
-            // there may be a way to not ts-ignore this
-            // @ts-ignore
-            this.network.send(user, buffer)
-
+            const buffer = createSnapshotBufferRefactor(user, this)
+            user.send(buffer)
         })
 
         this.cache.deleteCachesForTick(this.tick)
