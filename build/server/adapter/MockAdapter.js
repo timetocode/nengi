@@ -16,6 +16,7 @@ class MockAdapter {
         }
         this.bufferCtor = config.bufferCtor;
         this.binaryWriterCtor = config.binaryWriterCtor;
+        this.binaryReaderCtor = config.binaryReaderCtor;
     }
     listen(port, ready) {
         console.log('MockAdapter listen is fake! No need to invoke it.');
@@ -49,6 +50,9 @@ class MockAdapter {
     }
     createBufferWriter(lengthInBytes) {
         return new this.binaryWriterCtor(this.createBuffer(lengthInBytes));
+    }
+    createBufferReader(buffer) {
+        return new this.binaryReaderCtor(buffer);
     }
 }
 exports.MockAdapter = MockAdapter;

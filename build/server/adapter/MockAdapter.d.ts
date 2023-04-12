@@ -4,6 +4,7 @@ import { IServerNetworkAdapter } from './IServerNetworkAdapter';
 import { InstanceNetwork } from '../InstanceNetwork';
 import { User } from '../User';
 import { IBinaryWriter, IBinaryWriterClass } from '../../common/binary/IBinaryWriter';
+import { IBinaryReader, IBinaryReaderClass } from '../../common/binary/IBinaryReader';
 /**
  * Not a real network adapter, data is passed without using a real socket.
  * Used for mixing a server and client together in one application
@@ -14,6 +15,7 @@ declare class MockAdapter implements IServerNetworkAdapter {
     serverSockets: MockServerSocket[];
     bufferCtor: typeof Buffer | typeof ArrayBuffer;
     binaryWriterCtor: IBinaryWriterClass;
+    binaryReaderCtor: IBinaryReaderClass;
     constructor(network: InstanceNetwork, config: any);
     listen(port: number, ready: () => void): void;
     createMockConnect(): void;
@@ -24,6 +26,7 @@ declare class MockAdapter implements IServerNetworkAdapter {
     send(user: User, buffer: Buffer): void;
     createBuffer(lengthInBytes: number): Buffer | ArrayBuffer;
     createBufferWriter(lengthInBytes: number): IBinaryWriter;
+    createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader;
 }
 declare enum MockSocketReadyState {
     CONNECTING = 0,

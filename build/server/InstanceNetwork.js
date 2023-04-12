@@ -105,7 +105,8 @@ class InstanceNetwork {
             }
         });
     }
-    onMessage(user, binaryReader) {
+    onMessage(user, buffer) {
+        const binaryReader = user.networkAdapter.createBufferReader(buffer);
         while (binaryReader.offset < binaryReader.byteLength) {
             const section = binaryReader.readUInt8();
             switch (section) {
