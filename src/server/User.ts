@@ -1,6 +1,8 @@
 import { Channel } from './Channel'
 import IChannel from './IChannel'
 import { Instance } from './Instance'
+import { InstanceNetwork } from './InstanceNetwork'
+import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
 
 enum UserConnectionState {
     NULL, // initial state
@@ -19,6 +21,8 @@ class User {
     socket: any
 
     instance: Instance | null
+    networkAdapter: IServerNetworkAdapter | null
+    network: InstanceNetwork | null
 
     remoteAddress: string | null
     connectionState: UserConnectionState
@@ -36,6 +40,8 @@ class User {
         this.id = 0
         this.socket = socket
         this.instance = null
+        this.networkAdapter = null
+        this.network = null
         this.remoteAddress = null
         this.connectionState = UserConnectionState.NULL
         this.subscriptions = new Map()

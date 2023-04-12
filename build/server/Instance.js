@@ -10,6 +10,7 @@ const InstanceNetwork_1 = require("./InstanceNetwork");
 const SpatialChannel_1 = require("./SpatialChannel");
 const EntityCache_1 = __importDefault(require("./EntityCache"));
 const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
+const NQueue_1 = __importDefault(require("../NQueue"));
 class Instance {
     constructor(context, bufferConstructor) {
         this.context = context;
@@ -17,6 +18,8 @@ class Instance {
         this.channelId = 1;
         this.channels = new Set();
         this.users = new Map();
+        this.queue = new NQueue_1.default();
+        this.incrementalUserId = 0;
         this.cache = new EntityCache_1.default();
         this.tick = 1;
         this.responseEndPoints = new Map();
@@ -30,6 +33,7 @@ class Instance {
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
         //this.network.listen(config.port)
     }
+    //registerNetworkAdapter(networkAdapter)
     attachEntity(parentNid, child) {
         this.localState.addChild(parentNid, child);
     }

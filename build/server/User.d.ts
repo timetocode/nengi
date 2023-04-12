@@ -1,5 +1,7 @@
 import IChannel from './IChannel';
 import { Instance } from './Instance';
+import { InstanceNetwork } from './InstanceNetwork';
+import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
 declare enum UserConnectionState {
     NULL = 0,
     OpenPreHandshake = 1,
@@ -11,6 +13,8 @@ declare class User {
     id: number;
     socket: any;
     instance: Instance | null;
+    networkAdapter: IServerNetworkAdapter | null;
+    network: InstanceNetwork | null;
     remoteAddress: string | null;
     connectionState: UserConnectionState;
     subscriptions: Map<number, IChannel>;

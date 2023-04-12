@@ -1,20 +1,23 @@
 import { Channel } from './Channel';
 import { Context } from '../common/Context';
 import LocalState from './LocalState';
-import { InstanceNetwork } from './InstanceNetwork';
+import { INetworkEvent, InstanceNetwork } from './InstanceNetwork';
 import { User } from './User';
 import { SpatialChannel } from './SpatialChannel';
 import IChannel from './IChannel';
 import EntityCache from './EntityCache';
 import IEntity from '../common/IEntity';
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter';
+import NQueue from '../NQueue';
 declare class Instance {
     context: Context;
     localState: LocalState;
     channelId: number;
     channels: Set<IChannel>;
     network: InstanceNetwork;
+    queue: NQueue<INetworkEvent>;
     users: Map<number, User>;
+    incrementalUserId: number;
     cache: EntityCache;
     tick: number;
     responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>;

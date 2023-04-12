@@ -38,5 +38,3 @@ __exportStar(require("./common/EngineMessage"), exports);
 __exportStar(require("./server/adapter/IServerNetworkAdapter"), exports);
 __exportStar(require("./common/binary/IBinaryReader"), exports);
 __exportStar(require("./common/binary/IBinaryWriter"), exports);
-// these might be separate repositories later
-// ...

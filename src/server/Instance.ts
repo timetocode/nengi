@@ -1,7 +1,7 @@
 import { Channel } from './Channel'
 import { Context } from '../common/Context'
 import LocalState from './LocalState'
-import { InstanceNetwork } from './InstanceNetwork'
+import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
 import { SpatialChannel } from './SpatialChannel'
 import IChannel from './IChannel'
@@ -9,6 +9,7 @@ import EntityCache from './EntityCache'
 import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
 import IEntity from '../common/IEntity'
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter'
+import NQueue from '../NQueue'
 
 class Instance {
     context: Context
@@ -16,9 +17,9 @@ class Instance {
     channelId: number
     channels: Set<IChannel>
     network: InstanceNetwork
-
+    queue: NQueue<INetworkEvent>
     users: Map<number, User>
-
+    incrementalUserId: number
     cache: EntityCache
     tick: number
 
@@ -43,12 +44,11 @@ class Instance {
         this.channelId = 1
         this.channels = new Set()
         this.users = new Map()
-
+        this.queue = new NQueue()
+        this.incrementalUserId = 0
         this.cache = new EntityCache()
         this.tick = 1
-
         this.responseEndPoints = new Map()
-
         this.bufferConstructor = bufferConstructor
 
         this.onConnect = (handshake: any) => {
@@ -58,9 +58,7 @@ class Instance {
             })
         }
 
-
         this.network = new InstanceNetwork(this)
-        //this.network.listen(config.port)
     }
 
     attachEntity(parentNid: number, child: IEntity) {
@@ -107,8 +105,6 @@ class Instance {
 
         this.cache.deleteCachesForTick(this.tick)
     }
-
-
 }
 
 export { Instance }

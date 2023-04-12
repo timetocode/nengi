@@ -1,6 +1,5 @@
 /// <reference types="node" />
 import { Instance } from './Instance';
-import NQueue from '../NQueue';
 import { NetworkEvent } from '../common/binary/NetworkEvent';
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
 import { User } from './User';
@@ -14,8 +13,6 @@ interface INetworkEvent {
 declare class InstanceNetwork {
     instance: Instance;
     networkAdapter: IServerNetworkAdapter | null;
-    queue: NQueue<INetworkEvent>;
-    incrementalUserId: number;
     constructor(instance: Instance);
     registerNetworkAdapter(networkAdapter: IServerNetworkAdapter): void;
     send(user: User, buffer: Buffer): void;

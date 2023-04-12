@@ -25,6 +25,3 @@ export * from './common/EngineMessage'
 export * from './server/adapter/IServerNetworkAdapter'
 export * from './common/binary/IBinaryReader'
 export * from './common/binary/IBinaryWriter'
-
-// these might be separate repositories later
-// ...

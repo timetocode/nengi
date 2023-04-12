@@ -1,5 +1,4 @@
 import { Instance } from './Instance'
-import NQueue from '../NQueue'
 import { NetworkEvent } from '../common/binary/NetworkEvent'
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
 import { User, UserConnectionState } from './User'
@@ -17,21 +16,12 @@ interface INetworkEvent {
 }
 
 class InstanceNetwork {
-    //users: Map<number, User>
     instance: Instance
     networkAdapter: IServerNetworkAdapter | null
-
-    queue: NQueue<INetworkEvent>
-
-    incrementalUserId: number
 
     constructor(instance: Instance) {
         this.instance = instance
         this.networkAdapter = null
-        //this.connections = new Set()
-
-        this.queue = new NQueue()
-        this.incrementalUserId = 0
     }
 
     registerNetworkAdapter(networkAdapter: IServerNetworkAdapter) {
@@ -52,10 +42,11 @@ class InstanceNetwork {
 
     onOpen(user: User) {
         user.connectionState = UserConnectionState.OpenPreHandshake
+        user.network = this
     }
 
     onCommand(user: User, command: any) {
-        this.queue.enqueue({
+        this.instance.queue.enqueue({
             type: NetworkEvent.Command,
             user,
             command
@@ -180,10 +171,11 @@ class InstanceNetwork {
     }
 
     onConnectionAccepted(user: User, payload: any) {
-        user.id = ++this.incrementalUserId
+        user.network = this
+        user.id = ++this.instance.incrementalUserId
         this.instance.users.set(user.id, user)
 
-        this.queue.enqueue({
+        this.instance.queue.enqueue({
             type: NetworkEvent.UserConnected,
             user,
             payload
@@ -191,7 +183,7 @@ class InstanceNetwork {
     }
 
     onConnectionDenied(user: User, payload: any) {
-        this.queue.enqueue({
+        this.instance.queue.enqueue({
             type: NetworkEvent.UserConnectionDenied,
             user,
             payload
@@ -200,7 +192,7 @@ class InstanceNetwork {
 
     onClose(user: User) {
         if (user.connectionState === UserConnectionState.Open) {
-            this.queue.enqueue({
+            this.instance.queue.enqueue({
                 type: NetworkEvent.UserDisconnected,
                 user,
             })
