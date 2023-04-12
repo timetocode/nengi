@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import IChannel from './IChannel';
 import { Instance } from './Instance';
 import { InstanceNetwork } from './InstanceNetwork';
@@ -31,6 +32,7 @@ declare class User {
     queueEngineMessage(engineMessage: any): void;
     queueMessage(message: any): void;
     createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[]): void;
+    send(buffer: Buffer | ArrayBuffer): void;
     checkVisibility(tick: number): {
         noLongerVisible: number[];
         stillVisible: number[];

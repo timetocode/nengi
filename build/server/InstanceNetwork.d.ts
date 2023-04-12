@@ -1,7 +1,6 @@
 /// <reference types="node" />
 import { Instance } from './Instance';
 import { NetworkEvent } from '../common/binary/NetworkEvent';
-import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
 import { User } from './User';
 interface INetworkEvent {
     type: NetworkEvent;
@@ -10,10 +9,7 @@ interface INetworkEvent {
 }
 declare class InstanceNetwork {
     instance: Instance;
-    networkAdapter: IServerNetworkAdapter | null;
     constructor(instance: Instance);
-    registerNetworkAdapter(networkAdapter: IServerNetworkAdapter): void;
-    send(user: User, buffer: Buffer): void;
     onRequest(): void;
     onOpen(user: User): void;
     onCommand(user: User, command: any): void;

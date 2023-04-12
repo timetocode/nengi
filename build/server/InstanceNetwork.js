@@ -22,17 +22,6 @@ const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
 class InstanceNetwork {
     constructor(instance) {
         this.instance = instance;
-        this.networkAdapter = null;
-    }
-    registerNetworkAdapter(networkAdapter) {
-        this.networkAdapter = networkAdapter;
-    }
-    // TODO an instance should be able to have more than one network adapter
-    // which means the send call needs to be per user
-    send(user, buffer) {
-        if (this.networkAdapter) {
-            this.networkAdapter.send(user, buffer);
-        }
     }
     onRequest() {
         // TODO
@@ -64,8 +53,7 @@ class InstanceNetwork {
                 bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                 bw.writeUInt8(1);
                 bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAccepted);
-                user.networkAdapter.send(user, bw.buffer);
-                //this.send(user, bw.buffer)
+                user.send(bw.buffer);
                 user.instance = this.instance;
                 this.onConnectionAccepted(user, connectionAccepted);
             }
@@ -87,7 +75,7 @@ class InstanceNetwork {
                     bw.writeUInt8(1);
                     bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
                     bw.writeString(jsonErr);
-                    user.networkAdapter.send(user, bw.buffer);
+                    user.send(bw.buffer);
                 }
                 if (user.connectionState === User_1.UserConnectionState.Open) {
                     // a loss of connection after handshake is complete
@@ -100,7 +88,7 @@ class InstanceNetwork {
                     bw.writeUInt8(1);
                     bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
                     bw.writeString(jsonErr);
-                    user.networkAdapter.send(user, bw.buffer);
+                    user.send(bw.buffer);
                 }
             }
         });

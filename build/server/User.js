@@ -54,6 +54,9 @@ class User {
             children.forEach(id => this.createOrUpdate(id, tick, toCreate, toUpdate));
         }
     }
+    send(buffer) {
+        this.networkAdapter.send(this, buffer);
+    }
     checkVisibility(tick) {
         const toCreate = [];
         const toUpdate = [];
