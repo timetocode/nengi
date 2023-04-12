@@ -21,7 +21,7 @@ class User {
     socket: any
 
     instance: Instance | null
-    networkAdapter: IServerNetworkAdapter | null
+    networkAdapter: IServerNetworkAdapter
     network: InstanceNetwork | null
 
     remoteAddress: string | null
@@ -36,11 +36,11 @@ class User {
     cache: { [prop: number]: number }
     cacheArr: number[]
 
-    constructor(socket: any) {
+    constructor(socket: any, networkAdapter: IServerNetworkAdapter) {
         this.id = 0
         this.socket = socket
         this.instance = null
-        this.networkAdapter = null
+        this.networkAdapter = networkAdapter
         this.network = null
         this.remoteAddress = null
         this.connectionState = UserConnectionState.NULL

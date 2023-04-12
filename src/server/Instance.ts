@@ -22,10 +22,7 @@ class Instance {
     incrementalUserId: number
     cache: EntityCache
     tick: number
-
     responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>
-
-
     bufferConstructor: IBinaryWriterClass
     /**
      *

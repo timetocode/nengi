@@ -53,7 +53,7 @@ class InstanceNetwork {
         })
     }
 
-    async onHandshake(user: User, handshake: any, binaryWriterCtor: IBinaryWriterClass) {
+    async onHandshake(user: User, handshake: any) {
         try {
             user.connectionState = UserConnectionState.OpenAwaitingHandshake
             const connectionAccepted = await this.instance.onConnect(handshake)
@@ -67,12 +67,13 @@ class InstanceNetwork {
             user.connectionState = UserConnectionState.Open
 
             // allow
-            // @ts-ignore
-            const bw = binaryWriterCtor.create(3)
+            const bw = user.networkAdapter.createBufferWriter(3)
             bw.writeUInt8(BinarySection.EngineMessages)
             bw.writeUInt8(1)
             bw.writeUInt8(EngineMessage.ConnectionAccepted)
-            this.send(user, bw.buffer)
+
+            user.networkAdapter.send(user, bw.buffer)
+            //this.send(user, bw.buffer)
 
             user.instance = this.instance
             this.onConnectionAccepted(user, connectionAccepted)
@@ -91,13 +92,13 @@ class InstanceNetwork {
                 const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8')
 
                 // deny and send reason
-                // @ts-ignore
-                const bw = binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
+                const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
+                //binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
                 bw.writeUInt8(BinarySection.EngineMessages)
                 bw.writeUInt8(1)
                 bw.writeUInt8(EngineMessage.ConnectionDenied)
                 bw.writeString(jsonErr)
-                this.send(user, bw.buffer)
+                user.networkAdapter.send(user, bw.buffer)
             }
             
             if (user.connectionState === UserConnectionState.Open) {
@@ -107,17 +108,17 @@ class InstanceNetwork {
 
                 // deny and send reason
                 // @ts-ignore
-                const bw = binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
+                const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
                 bw.writeUInt8(BinarySection.EngineMessages)
                 bw.writeUInt8(1)
                 bw.writeUInt8(EngineMessage.ConnectionDenied)
                 bw.writeString(jsonErr)
-                this.send(user, bw.buffer)
+                user.networkAdapter.send(user, bw.buffer)
             }
         }
     }
 
-    onMessage(user: User, binaryReader: IBinaryReader, binaryWriterCtor: IBinaryWriterClass) {
+    onMessage(user: User, binaryReader: IBinaryReader) {
         while (binaryReader.offset < binaryReader.byteLength) {
             const section = binaryReader.readUInt8()
 
@@ -129,7 +130,7 @@ class InstanceNetwork {
                         if (type === EngineMessage.ConnectionAttempt) {
                             const msg:any = readEngineMessage(binaryReader, this.instance.context)
                             const handshake = JSON.parse(msg.handshake)
-                            this.onHandshake(user, handshake, binaryWriterCtor)
+                            this.onHandshake(user, handshake)
                         }
                     }
                     break
