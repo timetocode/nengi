@@ -31,9 +31,7 @@ class Instance {
             });
         };
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
-        //this.network.listen(config.port)
     }
-    //registerNetworkAdapter(networkAdapter)
     attachEntity(parentNid, child) {
         this.localState.addChild(parentNid, child);
     }

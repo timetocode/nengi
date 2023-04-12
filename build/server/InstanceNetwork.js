@@ -48,7 +48,7 @@ class InstanceNetwork {
             command
         });
     }
-    onHandshake(user, handshake, binaryWriterCtor) {
+    onHandshake(user, handshake) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 user.connectionState = User_1.UserConnectionState.OpenAwaitingHandshake;
@@ -60,12 +60,12 @@ class InstanceNetwork {
                 }
                 user.connectionState = User_1.UserConnectionState.Open;
                 // allow
-                // @ts-ignore
-                const bw = binaryWriterCtor.create(3);
+                const bw = user.networkAdapter.createBufferWriter(3);
                 bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                 bw.writeUInt8(1);
                 bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAccepted);
-                this.send(user, bw.buffer);
+                user.networkAdapter.send(user, bw.buffer);
+                //this.send(user, bw.buffer)
                 user.instance = this.instance;
                 this.onConnectionAccepted(user, connectionAccepted);
             }
@@ -81,13 +81,13 @@ class InstanceNetwork {
                     const jsonErr = JSON.stringify(err);
                     const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
                     // deny and send reason
-                    // @ts-ignore
-                    const bw = binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
+                    const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
+                    //binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
                     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                     bw.writeUInt8(1);
                     bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
                     bw.writeString(jsonErr);
-                    this.send(user, bw.buffer);
+                    user.networkAdapter.send(user, bw.buffer);
                 }
                 if (user.connectionState === User_1.UserConnectionState.Open) {
                     // a loss of connection after handshake is complete
@@ -95,17 +95,17 @@ class InstanceNetwork {
                     const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
                     // deny and send reason
                     // @ts-ignore
-                    const bw = binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
+                    const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
                     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                     bw.writeUInt8(1);
                     bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
                     bw.writeString(jsonErr);
-                    this.send(user, bw.buffer);
+                    user.networkAdapter.send(user, bw.buffer);
                 }
             }
         });
     }
-    onMessage(user, binaryReader, binaryWriterCtor) {
+    onMessage(user, binaryReader) {
         while (binaryReader.offset < binaryReader.byteLength) {
             const section = binaryReader.readUInt8();
             switch (section) {
@@ -116,7 +116,7 @@ class InstanceNetwork {
                         if (type === EngineMessage_1.EngineMessage.ConnectionAttempt) {
                             const msg = (0, readEngineMessage_1.default)(binaryReader, this.instance.context);
                             const handshake = JSON.parse(msg.handshake);
-                            this.onHandshake(user, handshake, binaryWriterCtor);
+                            this.onHandshake(user, handshake);
                         }
                     }
                     break;

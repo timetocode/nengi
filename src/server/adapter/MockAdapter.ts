@@ -2,6 +2,7 @@ import { Buffer } from 'buffer'
 import { IServerNetworkAdapter } from './IServerNetworkAdapter'
 import { InstanceNetwork } from '../InstanceNetwork'
 import { User, UserConnectionState } from '../User'
+import { IBinaryWriter, IBinaryWriterClass } from '../../common/binary/IBinaryWriter'
 
 /**
  * Not a real network adapter, data is passed without using a real socket.
@@ -12,9 +13,19 @@ class MockAdapter implements IServerNetworkAdapter {
     network: InstanceNetwork
     serverSockets: MockServerSocket[]
 
+    bufferCtor: typeof Buffer | typeof ArrayBuffer
+    binaryWriterCtor: IBinaryWriterClass
+
     constructor(network: InstanceNetwork, config: any) {
         this.network = network
         this.serverSockets = []
+
+        if (!config || !config.bufferCtor || !config.binaryWriterCtor) {
+            throw new Error('MockAdapter requires a config.bufferCtor and config.binaryWriterCtor to be created.')
+        }
+
+        this.bufferCtor = config.bufferCtor
+        this.binaryWriterCtor = config.binaryWriterCtor
     }
 
     listen(port: number, ready: () => void) {
@@ -26,7 +37,7 @@ class MockAdapter implements IServerNetworkAdapter {
     }
 
     open(socket: MockServerSocket) {
-        const user = new User(socket)
+        const user = new User(socket, this)
         socket.user = user
         this.network.onOpen(user)
     }
@@ -49,6 +60,14 @@ class MockAdapter implements IServerNetworkAdapter {
 
     send(user: User, buffer: Buffer): void {
         user.socket.send(buffer, true)
+    }
+
+    createBuffer(lengthInBytes: number): Buffer | ArrayBuffer {
+        return new this.bufferCtor(lengthInBytes)
+    }
+
+    createBufferWriter(lengthInBytes: number): IBinaryWriter {
+        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes))
     }
 }
 

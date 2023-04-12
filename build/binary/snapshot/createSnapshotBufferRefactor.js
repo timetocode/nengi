@@ -99,8 +99,7 @@ const createSnapshotBufferRefactor = (user, instance) => {
     for (let i = 0; i < deleteEntities.length; i++) {
         bytes += 4;
     }
-    // TODO this buffer alloc is node-only, but instance should work in html5 too
-    const bw = new instance.bufferConstructor(Buffer.allocUnsafe(bytes), 0);
+    const bw = user.networkAdapter.createBufferWriter(bytes);
     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
     bw.writeUInt8(0);
     bw.writeUInt8(BinarySection_1.BinarySection.Messages);

@@ -11,11 +11,11 @@ var UserConnectionState;
 })(UserConnectionState || (UserConnectionState = {}));
 exports.UserConnectionState = UserConnectionState;
 class User {
-    constructor(socket) {
+    constructor(socket, networkAdapter) {
         this.id = 0;
         this.socket = socket;
         this.instance = null;
-        this.networkAdapter = null;
+        this.networkAdapter = networkAdapter;
         this.network = null;
         this.remoteAddress = null;
         this.connectionState = UserConnectionState.NULL;

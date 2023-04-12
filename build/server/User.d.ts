@@ -13,7 +13,7 @@ declare class User {
     id: number;
     socket: any;
     instance: Instance | null;
-    networkAdapter: IServerNetworkAdapter | null;
+    networkAdapter: IServerNetworkAdapter;
     network: InstanceNetwork | null;
     remoteAddress: string | null;
     connectionState: UserConnectionState;
@@ -25,7 +25,7 @@ declare class User {
         [prop: number]: number;
     };
     cacheArr: number[];
-    constructor(socket: any);
+    constructor(socket: any, networkAdapter: IServerNetworkAdapter);
     subscribe(channel: IChannel): void;
     unsubscribe(channel: IChannel): void;
     queueEngineMessage(engineMessage: any): void;

@@ -11,6 +11,11 @@ class MockAdapter {
     constructor(network, config) {
         this.network = network;
         this.serverSockets = [];
+        if (!config || !config.bufferCtor || !config.binaryWriterCtor) {
+            throw new Error('MockAdapter requires a config.bufferCtor and config.binaryWriterCtor to be created.');
+        }
+        this.bufferCtor = config.bufferCtor;
+        this.binaryWriterCtor = config.binaryWriterCtor;
     }
     listen(port, ready) {
         console.log('MockAdapter listen is fake! No need to invoke it.');
@@ -19,7 +24,7 @@ class MockAdapter {
         /// TODO
     }
     open(socket) {
-        const user = new User_1.User(socket);
+        const user = new User_1.User(socket, this);
         socket.user = user;
         this.network.onOpen(user);
     }
@@ -38,6 +43,12 @@ class MockAdapter {
     }
     send(user, buffer) {
         user.socket.send(buffer, true);
+    }
+    createBuffer(lengthInBytes) {
+        return new this.bufferCtor(lengthInBytes);
+    }
+    createBufferWriter(lengthInBytes) {
+        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes));
     }
 }
 exports.MockAdapter = MockAdapter;
