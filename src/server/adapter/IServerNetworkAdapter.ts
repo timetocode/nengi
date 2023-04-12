@@ -1,3 +1,4 @@
+import { IBinaryReader } from '../../common/binary/IBinaryReader'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { User } from '../User'
 
@@ -7,6 +8,7 @@ interface IServerNetworkAdapter {
 	disconnect(user: User, reason: any): void
 	createBuffer(lengthInBytes: number): Buffer | ArrayBuffer
 	createBufferWriter(lengthInBytes: number): IBinaryWriter
+	createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader
 }
 
 export { IServerNetworkAdapter }

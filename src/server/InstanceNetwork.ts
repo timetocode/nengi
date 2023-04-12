@@ -7,7 +7,6 @@ import { BinarySection } from '../common/binary/BinarySection'
 import { EngineMessage } from '../common/EngineMessage'
 import readEngineMessage from '../binary/message/readEngineMessage'
 import readMessage from '../binary/message/readMessage'
-import { IBinaryWriterClass } from '../common/binary/IBinaryWriter'
 
 interface INetworkEvent {
     type: NetworkEvent
@@ -118,7 +117,8 @@ class InstanceNetwork {
         }
     }
 
-    onMessage(user: User, binaryReader: IBinaryReader) {
+    onMessage(user: User, buffer: Buffer | ArrayBuffer) {
+        const binaryReader = user.networkAdapter.createBufferReader(buffer)
         while (binaryReader.offset < binaryReader.byteLength) {
             const section = binaryReader.readUInt8()
 
