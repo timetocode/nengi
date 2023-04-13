@@ -21,6 +21,7 @@ __exportStar(require("./server/ViewAABB"), exports);
 __exportStar(require("./server/Channel"), exports);
 __exportStar(require("./server/SpatialChannel"), exports);
 __exportStar(require("./server/User"), exports);
+__exportStar(require("./server/adapter/MockAdapter"), exports);
 // client
 __exportStar(require("./client/Client"), exports);
 __exportStar(require("./client/ClientNetwork"), exports);

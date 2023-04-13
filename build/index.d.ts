@@ -4,6 +4,7 @@ export * from './server/ViewAABB';
 export * from './server/Channel';
 export * from './server/SpatialChannel';
 export * from './server/User';
+export * from './server/adapter/MockAdapter';
 export * from './client/Client';
 export * from './client/ClientNetwork';
 export * from './client/Interpolator';

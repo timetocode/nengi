@@ -1,13 +1,17 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MockAdapter = void 0;
+exports.MockServerSocket = exports.MockClientSocket = exports.MockClientAdapter = exports.MockInstanceAdapter = void 0;
 const User_1 = require("../User");
+const NQueue_1 = __importDefault(require("../../NQueue"));
 /**
  * Not a real network adapter, data is passed without using a real socket.
  * Used for mixing a server and client together in one application
  * such as for a single player mode or automated testing
  */
-class MockAdapter {
+class MockInstanceAdapter {
     constructor(network, config) {
         this.network = network;
         this.serverSockets = [];
@@ -22,7 +26,9 @@ class MockAdapter {
         console.log('MockAdapter listen is fake! No need to invoke it.');
     }
     createMockConnect() {
-        /// TODO
+        const socket = new MockServerSocket(this.network);
+        this.open(socket);
+        return socket;
     }
     open(socket) {
         const user = new User_1.User(socket, this);
@@ -55,7 +61,36 @@ class MockAdapter {
         return new this.binaryReaderCtor(buffer);
     }
 }
-exports.MockAdapter = MockAdapter;
+exports.MockInstanceAdapter = MockInstanceAdapter;
+class MockClientAdapter {
+    constructor(network, config) {
+        this.network = network;
+        this.bufferCtor = config.bufferCtor;
+        this.binaryWriterCtor = config.binaryWriterCtor;
+        this.binaryReaderCtor = config.binaryReaderCtor;
+    }
+    createBuffer(lengthInBytes) {
+        return new this.bufferCtor(lengthInBytes);
+    }
+    createBufferWriter(lengthInBytes) {
+        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes));
+    }
+    createBufferReader(buffer) {
+        return new this.binaryReaderCtor(buffer);
+    }
+    onMessage(buffer) {
+        const br = this.createBufferReader(buffer);
+        this.network.readSnapshot(br);
+    }
+    connect(wsUrl, handshake) {
+        return new Promise((resolve, reject) => {
+            resolve(true);
+        });
+    }
+    flush() {
+    }
+}
+exports.MockClientAdapter = MockClientAdapter;
 var MockSocketReadyState;
 (function (MockSocketReadyState) {
     MockSocketReadyState[MockSocketReadyState["CONNECTING"] = 0] = "CONNECTING";
@@ -64,25 +99,30 @@ var MockSocketReadyState;
     MockSocketReadyState[MockSocketReadyState["CLOSED"] = 3] = "CLOSED";
 })(MockSocketReadyState || (MockSocketReadyState = {}));
 class MockServerSocket {
-    constructor(clientSocket, user, network) {
+    constructor(network) {
+        this.inboundQueue = new NQueue_1.default();
         this.readyState = MockSocketReadyState.CONNECTING;
-        this.clientSocket = clientSocket;
-        this.user = user;
+        this.clientSocket = new MockClientSocket(this);
+        this.user = null;
         this.network = network;
         this.readyState = MockSocketReadyState.OPEN;
     }
     end() {
     }
     receive(buffer) {
-        //this.network.onBinaryMessage(this.user, buffer)
+        //this.inboundQueue.enqueue(buffer)
+        this.network.onMessage(this.user, buffer);
     }
     send(buffer) {
         if (this.clientSocket) {
+            this.clientSocket.receive(buffer);
         }
     }
 }
+exports.MockServerSocket = MockServerSocket;
 class MockClientSocket {
     constructor(serverSocket) {
+        this.inboundQueue = new NQueue_1.default();
         this.readyState = MockSocketReadyState.CONNECTING;
         this.serverSocket = serverSocket;
         this.readyState = MockSocketReadyState.OPEN;
@@ -94,5 +134,7 @@ class MockClientSocket {
         this.serverSocket.receive(buffer);
     }
     receive(buffer) {
+        this.inboundQueue.enqueue(buffer);
     }
 }
+exports.MockClientSocket = MockClientSocket;

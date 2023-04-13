@@ -4,13 +4,22 @@ import { InstanceNetwork } from '../InstanceNetwork'
 import { User, UserConnectionState } from '../User'
 import { IBinaryWriter, IBinaryWriterClass } from '../../common/binary/IBinaryWriter'
 import { IBinaryReader, IBinaryReaderClass } from '../../common/binary/IBinaryReader'
+import NQueue from '../../NQueue'
+import { ClientNetwork } from '../../client/ClientNetwork'
+import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
+
+type MockAdapterConfig = {
+    bufferCtor: typeof Buffer | typeof ArrayBuffer
+    binaryWriterCtor: IBinaryWriterClass
+    binaryReaderCtor: IBinaryReaderClass
+}
 
 /**
  * Not a real network adapter, data is passed without using a real socket.
  * Used for mixing a server and client together in one application
  * such as for a single player mode or automated testing
  */
-class MockAdapter implements IServerNetworkAdapter {
+class MockInstanceAdapter implements IServerNetworkAdapter {
     network: InstanceNetwork
     serverSockets: MockServerSocket[]
 
@@ -18,7 +27,7 @@ class MockAdapter implements IServerNetworkAdapter {
     binaryWriterCtor: IBinaryWriterClass
     binaryReaderCtor: IBinaryReaderClass
 
-    constructor(network: InstanceNetwork, config: any) {
+    constructor(network: InstanceNetwork, config: MockAdapterConfig) {
         this.network = network
         this.serverSockets = []
 
@@ -36,7 +45,9 @@ class MockAdapter implements IServerNetworkAdapter {
     }
 
     createMockConnect() {
-        /// TODO
+        const socket = new MockServerSocket(this.network)
+        this.open(socket)
+        return socket
     }
 
     open(socket: MockServerSocket) {
@@ -47,7 +58,7 @@ class MockAdapter implements IServerNetworkAdapter {
 
     message(socket: MockServerSocket, message: any) {
         if (socket.user) {
-           // this.network.onBinaryMessage(socket.user, message)
+            // this.network.onBinaryMessage(socket.user, message)
         }
     }
 
@@ -78,6 +89,48 @@ class MockAdapter implements IServerNetworkAdapter {
     }
 }
 
+class MockClientAdapter implements IClientNetworkAdapter {
+    network: ClientNetwork
+    bufferCtor: typeof Buffer | typeof ArrayBuffer
+    binaryWriterCtor: IBinaryWriterClass
+    binaryReaderCtor: IBinaryReaderClass
+
+    constructor(network: ClientNetwork, config: MockAdapterConfig) {
+        this.network = network
+        this.bufferCtor = config.bufferCtor
+        this.binaryWriterCtor = config.binaryWriterCtor
+        this.binaryReaderCtor = config.binaryReaderCtor
+    }
+
+    createBuffer(lengthInBytes: number): Buffer | ArrayBuffer {
+        return new this.bufferCtor(lengthInBytes)
+    }
+
+    createBufferWriter(lengthInBytes: number): IBinaryWriter {
+        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes))
+    }
+
+    createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader {
+        return new this.binaryReaderCtor(buffer)
+    }
+
+    onMessage(buffer: Buffer | ArrayBuffer) {
+        const br = this.createBufferReader(buffer)
+        this.network.readSnapshot(br)
+    }
+
+    connect(wsUrl: string, handshake: any) {
+        return new Promise((resolve, reject) => {
+            resolve(true)
+        })
+    }
+
+    flush() {
+
+    }
+}
+
+
 enum MockSocketReadyState {
     CONNECTING,
     OPEN,
@@ -86,15 +139,17 @@ enum MockSocketReadyState {
 }
 
 class MockServerSocket {
+    inboundQueue: NQueue<any>
     readyState: MockSocketReadyState
     clientSocket: MockClientSocket
-    user: User
+    user: User | null
     network: InstanceNetwork
 
-    constructor(clientSocket: MockClientSocket, user: User, network: InstanceNetwork) {
+    constructor(network: InstanceNetwork) {
+        this.inboundQueue = new NQueue()
         this.readyState = MockSocketReadyState.CONNECTING
-        this.clientSocket = clientSocket
-        this.user = user
+        this.clientSocket = new MockClientSocket(this)
+        this.user = null
         this.network = network
         this.readyState = MockSocketReadyState.OPEN
     }
@@ -104,21 +159,24 @@ class MockServerSocket {
     }
 
     receive(buffer: Buffer) {
-        //this.network.onBinaryMessage(this.user, buffer)
+        //this.inboundQueue.enqueue(buffer)
+        this.network.onMessage(this.user!, buffer)
     }
 
     send(buffer: Buffer) {
         if (this.clientSocket) {
-
+            this.clientSocket.receive(buffer)
         }
     }
 }
 
 class MockClientSocket {
+    inboundQueue: NQueue<any>
     readyState: MockSocketReadyState
     serverSocket: MockServerSocket
 
     constructor(serverSocket: MockServerSocket) {
+        this.inboundQueue = new NQueue()
         this.readyState = MockSocketReadyState.CONNECTING
         this.serverSocket = serverSocket
         this.readyState = MockSocketReadyState.OPEN
@@ -133,8 +191,8 @@ class MockClientSocket {
     }
 
     receive(buffer: Buffer) {
-
+        this.inboundQueue.enqueue(buffer)
     }
 }
 
-export { MockAdapter }
+export { MockInstanceAdapter, MockClientAdapter, MockClientSocket, MockServerSocket }
