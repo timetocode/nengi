@@ -71,3 +71,4 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
     const iState = interpolator.getInterpolatedState(100);
     console.log('yolo', iState);
 }));
+//# sourceMappingURL=Interpolator.test.js.map

@@ -16,6 +16,13 @@ declare enum Binary {
     UInt32Array = 15,
     Int32Array = 16,
     Float32Array = 17,
-    Float64Array = 18
+    Float64Array = 18,
+    Vector2 = 19,
+    Vector3 = 20,
+    Vector4 = 21,
+    Quaternion = 22,
+    Rotation = 23,
+    Rotation32 = 24,
+    LAST_INDEX = 25
 }
 export { Binary };

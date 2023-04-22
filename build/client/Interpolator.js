@@ -22,9 +22,6 @@ const findSubsequentFrame = (frames, previousTick) => {
     return null;
 };
 exports.findSubsequentFrame = findSubsequentFrame;
-const lerp = function (a, b, portion) {
-    return a + ((b - a) * portion);
-};
 class Interpolator {
     constructor(client) {
         this.client = client;
@@ -98,36 +95,18 @@ class Interpolator {
                     const entityB = frameB.entities.get(nid);
                     if (entityA && entityB) {
                         const nschema = this.client.context.getSchema(entityA.ntype);
-                        const binarySpec = nschema === null || nschema === void 0 ? void 0 : nschema.props[prop];
+                        const binarySpec = nschema.props[prop];
                         const binaryUtil = (0, BinaryExt_1.binaryGet)(binarySpec.type);
-                        if (binaryUtil.bytes !== -1) {
-                            // simple types!
-                            if (binarySpec.interp) {
-                                // interpolated
-                                const valueA = entityA[prop];
-                                const valueB = entityB[prop];
-                                const value = lerp(valueA, valueB, interpAmount);
-                                interpState.updateEntities.push({ nid, prop, value });
-                            }
-                            else {
-                                // not interpolatoed
-                                interpState.updateEntities.push({ nid, prop, value: entityB[prop] });
-                            }
+                        if (binarySpec.interp) {
+                            // interpolated
+                            const valueA = entityA[prop];
+                            const valueB = entityB[prop];
+                            const value = binaryUtil.interp(valueA, valueB, interpAmount);
+                            interpState.updateEntities.push({ nid, prop, value });
                         }
                         else {
-                            // custom binary types
-                            if (binarySpec.interp) {
-                                // interpolated (using custom function)
-                                const valueA = entityA[prop];
-                                const valueB = entityB[prop];
-                                // @ts-ignore
-                                const value = binaryUtil.interp(valueA, valueB, interpAmount);
-                                interpState.updateEntities.push({ nid, prop, value });
-                            }
-                            else {
-                                // not interpolated
-                                interpState.updateEntities.push({ nid, prop, value: entityB[prop] });
-                            }
+                            // not interpolated
+                            interpState.updateEntities.push({ nid, prop, value: entityB[prop] });
                         }
                     }
                 }
@@ -138,3 +117,4 @@ class Interpolator {
     }
 }
 exports.Interpolator = Interpolator;
+//# sourceMappingURL=Interpolator.js.map

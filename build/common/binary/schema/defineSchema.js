@@ -48,3 +48,4 @@ function defineSchema(schema) {
     return compiled;
 }
 exports.defineSchema = defineSchema;
+//# sourceMappingURL=defineSchema.js.map

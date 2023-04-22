@@ -8,3 +8,4 @@ const channelAddEntitySchema = (0, defineSchema_1.defineSchema)({
     eid: Binary_1.Binary.UInt16,
 });
 exports.channelAddEntitySchema = channelAddEntitySchema;
+//# sourceMappingURL=channelAddEntitySchema.js.map

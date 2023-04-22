@@ -21,3 +21,4 @@ function readEntity(reader, context) {
     return entity;
 }
 exports.default = readEntity;
+//# sourceMappingURL=readEntity.js.map

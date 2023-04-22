@@ -90,6 +90,10 @@ class User {
         this.networkAdapter.send(this, buffer)
     }
 
+    disconnect(reason: any) {
+        this.networkAdapter.disconnect(this, reason)
+    }
+
     checkVisibility(tick: number) {
         const toCreate: number[] = []
         const toUpdate: number[] = []

@@ -52,3 +52,4 @@ function serialize(obj, schema) {
     });
 }
 exports.default = serialize;
+//# sourceMappingURL=serialize.js.map

@@ -10,3 +10,4 @@ var NetworkEvent;
     NetworkEvent[NetworkEvent["UserConnectionDenied"] = 4] = "UserConnectionDenied";
 })(NetworkEvent || (NetworkEvent = {}));
 exports.NetworkEvent = NetworkEvent;
+//# sourceMappingURL=NetworkEvent.js.map

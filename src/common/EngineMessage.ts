@@ -9,7 +9,9 @@ enum EngineMessage {
     ChannelJoin,
     ChannelLeave,
     ChannelAddEntity,
-    ChannelRemoveEntity
+    ChannelRemoveEntity,
+
+    DisconnectedByServer
 
 }
 

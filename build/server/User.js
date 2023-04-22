@@ -57,6 +57,9 @@ class User {
     send(buffer) {
         this.networkAdapter.send(this, buffer);
     }
+    disconnect(reason) {
+        this.networkAdapter.disconnect(this, reason);
+    }
     checkVisibility(tick) {
         const toCreate = [];
         const toUpdate = [];
@@ -85,3 +88,4 @@ class User {
     }
 }
 exports.User = User;
+//# sourceMappingURL=User.js.map

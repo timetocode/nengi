@@ -14,3 +14,4 @@ var BinarySection;
     BinarySection[BinarySection["Responses"] = 8] = "Responses";
 })(BinarySection || (BinarySection = {}));
 exports.BinarySection = BinarySection;
+//# sourceMappingURL=BinarySection.js.map

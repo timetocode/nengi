@@ -146,3 +146,4 @@ const createSnapshotBufferRefactor = (user, instance) => {
     return bw.buffer;
 };
 exports.default = createSnapshotBufferRefactor;
+//# sourceMappingURL=createSnapshotBufferRefactor.js.map

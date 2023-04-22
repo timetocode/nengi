@@ -8,3 +8,4 @@ class Schema {
     }
 }
 exports.Schema = Schema;
+//# sourceMappingURL=Schema.js.map

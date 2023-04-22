@@ -21,5 +21,14 @@ var Binary;
     Binary[Binary["Int32Array"] = 16] = "Int32Array";
     Binary[Binary["Float32Array"] = 17] = "Float32Array";
     Binary[Binary["Float64Array"] = 18] = "Float64Array";
+    Binary[Binary["Vector2"] = 19] = "Vector2";
+    Binary[Binary["Vector3"] = 20] = "Vector3";
+    Binary[Binary["Vector4"] = 21] = "Vector4";
+    Binary[Binary["Quaternion"] = 22] = "Quaternion";
+    Binary[Binary["Rotation"] = 23] = "Rotation";
+    //Rotation8,
+    Binary[Binary["Rotation32"] = 24] = "Rotation32";
+    Binary[Binary["LAST_INDEX"] = 25] = "LAST_INDEX";
 })(Binary || (Binary = {}));
 exports.Binary = Binary;
+//# sourceMappingURL=Binary.js.map

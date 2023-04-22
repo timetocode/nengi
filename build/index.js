@@ -35,9 +35,11 @@ __exportStar(require("./common/binary/schema/Schema"), exports);
 __exportStar(require("./common/binary/schema/defineSchema"), exports);
 __exportStar(require("./common/binary/NetworkEvent"), exports);
 __exportStar(require("./common/EngineMessage"), exports);
+__exportStar(require("./common/binary/BinaryExt"), exports);
 // types for integration with adapters
 __exportStar(require("./server/adapter/IServerNetworkAdapter"), exports);
 __exportStar(require("./common/binary/IBinaryReader"), exports);
 __exportStar(require("./common/binary/IBinaryWriter"), exports);
 // benchmarks/tests
 __exportStar(require("./binary/message/writeMessage"), exports);
+//# sourceMappingURL=index.js.map

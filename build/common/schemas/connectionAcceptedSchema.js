@@ -6,3 +6,4 @@ const connectionAcceptedSchema = (0, defineSchema_1.defineSchema)({
 // handshake: Binary.String,
 });
 exports.connectionAcceptedSchema = connectionAcceptedSchema;
+//# sourceMappingURL=connectionAcceptedSchema.js.map

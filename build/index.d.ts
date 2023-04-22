@@ -16,6 +16,7 @@ export * from './common/binary/schema/Schema';
 export * from './common/binary/schema/defineSchema';
 export * from './common/binary/NetworkEvent';
 export * from './common/EngineMessage';
+export * from './common/binary/BinaryExt';
 export * from './server/adapter/IServerNetworkAdapter';
 export * from './common/binary/IBinaryReader';
 export * from './common/binary/IBinaryWriter';

@@ -21,6 +21,7 @@ export * from './common/binary/schema/Schema'
 export * from './common/binary/schema/defineSchema'
 export * from './common/binary/NetworkEvent'
 export * from './common/EngineMessage'
+export * from './common/binary/BinaryExt'
 
 // types for integration with adapters
 export * from './server/adapter/IServerNetworkAdapter'

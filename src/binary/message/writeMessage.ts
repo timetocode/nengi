@@ -7,15 +7,7 @@ function writeMessage(obj: any, nschema: Schema, bufferWriter: IBinaryWriter) {
         const propData = nschema.keys[i]
         const binaryUtil = binaryGet(propData.type)
         const value = obj[propData.prop]
-
-        //if (binaryUtil.bytes !== -1) {
-        //    const writer = binaryUtil.write           
-            // @ts-ignore
-        //    bufferWriter[writer](value)
-        //} else {
-             // @ts-ignore
-            binaryUtil.write(value, bufferWriter) //as (value: any, bw: IBinaryWriter) => void
-        //}
+        binaryUtil.write(value, bufferWriter)
     }
 }
 

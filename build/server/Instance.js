@@ -63,3 +63,4 @@ class Instance {
     }
 }
 exports.Instance = Instance;
+//# sourceMappingURL=Instance.js.map

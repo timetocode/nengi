@@ -24,3 +24,4 @@ class NQueue {
     }
 }
 exports.default = NQueue;
+//# sourceMappingURL=NQueue.js.map

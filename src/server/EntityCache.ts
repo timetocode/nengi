@@ -1,3 +1,4 @@
+import { binaryGet } from '../common/binary/BinaryExt'
 import { Schema } from '../common/binary/schema/Schema'
 import IEntity from '../common/IEntity'
 
@@ -10,58 +11,17 @@ function diff(entity: any, cache: any, nschema: Schema) {
     const diffs: any[] = []
     
     for (let i = 0; i < nschema.keys.length; i++) {
-        const propData = nschema.keys[i]
-        const oldValue = cache[propData.prop]
-        const value = entity[propData.prop]
-        // TODO use the correct diff
-        if (oldValue !== value) {
-            diffs.push({ nid: entity.nid, nschema, prop: propData.prop, value })
-            cache[propData.prop] = value
-            //diffs.push([propData.prop, value])
+        const { prop, type } = nschema.keys[i]
+        const oldValue = cache[prop]
+        const value = entity[prop]
+        const binaryUtil = binaryGet(type)
+        if (!binaryUtil.compare(oldValue, value)) {
+            diffs.push({ nid: entity.nid, nschema, prop, value })
+            cache[prop] = binaryUtil.clone(value)
         }
     }
     return diffs
 }
-
-function diff2(entity: any, cache: any, nschema: Schema) {
-    if (!cache) {
-        //console.log('no cache')
-        return []
-    }
-
-    const diffs: any[] = []
-
-
-
-    for (let i = 0; i < nschema.keys.length; i++) {
-        const propData = nschema.keys[i]
-        const oldValue = cache[propData.prop]
-        const value = entity[propData.prop]
-        if (oldValue !== value) {
-            diffs.push({ prop: propData.prop, value })
-            cache[propData.prop] = value
-            //diffs.push([propData.prop, value])
-        }
-    }
-    return diffs
-}
-
-/*
-function diffAll(entities: any, cache: any) {
-    const diffs: any[] = []
-
-    for (let i = 0; i < entities.length; i++) {
-        const entity = entities[i]
-        const eCache = cache[entity.nid]
-        const eDiffs = diff(entity, eCache)
-        if (eDiffs.length > 0) {
-            diffs.push({ nid: entity.nid, diffs: eDiffs })
-        }
-    }
-    return diffs
-}
-*/
-
 
 class EntityCache {
     cache: { [tick: number]:  { [nid: number]: any } }
@@ -72,7 +32,6 @@ class EntityCache {
     constructor() {
         this.cache = {}
         this.diffCache = {}
-
         this.binaryDiffCache = {}
     }
 
@@ -97,41 +56,33 @@ class EntityCache {
             return this.diffCache[tick][entity.nid]
         } else {
             const cacheObject = this.cache[entity.nid]
-            //console.log(cacheObject)
             const diffs = diff(entity, cacheObject, nschema)
             this.diffCache[tick][entity.nid] = diffs
-
-
             return diffs
         }
     }
 
     cacheify(tick: number, entity: IEntity, schema: Schema) {
-        //console.log('caching', entity.nid)
         const cacheObject = {}
-
         for (let i = 0; i < schema.keys.length; i++) {
             const propData = schema.keys[i]
             const value = entity[propData.prop]
+            const binaryUtil = binaryGet(propData.type)
             // @ts-ignore
-            cacheObject[propData.prop] = value
+            cacheObject[propData.prop] = binaryUtil.clone(value)
         }
-
         this.cache[entity.nid] = cacheObject
     }
 
     updateCache(tick: number, entity: IEntity, schema: Schema) {
-        //console.log('updating cache', entity.nid)
         const cacheObject = this.cache[entity.nid]
-
         for (let i = 0; i < schema.keys.length; i++) {
             const propData = schema.keys[i]
             const value = entity[propData.prop]
+            const binaryUtil = binaryGet(propData.type)
             // @ts-ignore
-            cacheObject[propData.prop] = value
+            cacheObject[propData.prop] = binaryUtil.clone(value)
         }
-
-        // console.log({ cacheObject })
     }
 
 

@@ -7,3 +7,4 @@ const connectionAttemptSchema = (0, defineSchema_1.defineSchema)({
     handshake: Binary_1.Binary.String,
 });
 exports.connectionAttemptSchema = connectionAttemptSchema;
+//# sourceMappingURL=connectAttemptSchema.js.map

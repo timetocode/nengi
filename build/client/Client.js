@@ -19,3 +19,4 @@ class Client {
     }
 }
 exports.Client = Client;
+//# sourceMappingURL=Client.js.map

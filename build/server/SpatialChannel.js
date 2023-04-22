@@ -98,3 +98,4 @@ class SpatialChannel {
     }
 }
 exports.SpatialChannel = SpatialChannel;
+//# sourceMappingURL=SpatialChannel.js.map

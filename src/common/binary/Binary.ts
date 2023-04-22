@@ -17,6 +17,17 @@ enum Binary {
     Int32Array,
     Float32Array,
     Float64Array,
+
+    Vector2,
+    Vector3,
+    Vector4,
+    Quaternion,
+
+    Rotation,
+    //Rotation8,
+    Rotation32,
+
+    LAST_INDEX
 }
 
 export { Binary }

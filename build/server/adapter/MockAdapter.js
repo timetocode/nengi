@@ -138,3 +138,4 @@ class MockClientSocket {
     }
 }
 exports.MockClientSocket = MockClientSocket;
+//# sourceMappingURL=MockAdapter.js.map

@@ -36,3 +36,4 @@ class Frame {
     }
 }
 exports.Frame = Frame;
+//# sourceMappingURL=Frame.js.map

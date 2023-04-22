@@ -174,3 +174,4 @@ class InstanceNetwork {
     }
 }
 exports.InstanceNetwork = InstanceNetwork;
+//# sourceMappingURL=InstanceNetwork.js.map

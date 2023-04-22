@@ -38,3 +38,4 @@ test('recycles ids, more complex', () => {
     idPool.returnId(1);
     expect(idPool.nextId()).toEqual(1);
 });
+//# sourceMappingURL=IdPool.test.js.map

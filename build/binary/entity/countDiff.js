@@ -7,7 +7,8 @@ function countDiff(diff, nschema) {
     bytes += 4 + 1;
     const prop = diff.prop;
     const propData = nschema.props[prop];
-    bytes += (0, BinaryExt_1.binaryGet)(propData.type).bytes;
+    bytes += (0, BinaryExt_1.binaryGet)(propData.type).byteSize(diff.value);
     return bytes;
 }
 exports.default = countDiff;
+//# sourceMappingURL=countDiff.js.map

@@ -6,3 +6,4 @@ const connectionDeniedSchema = (0, defineSchema_1.defineSchema)({
 // handshake: Binary.String,
 });
 exports.connectionDeniedSchema = connectionDeniedSchema;
+//# sourceMappingURL=connectionDeniedSchema.js.map
