@@ -1,16 +1,22 @@
 import { Schema } from '../../common/binary/schema/Schema'
-import binaryGet from '../../common/binary/BinaryExt'
+import { binaryGet } from '../../common/binary/BinaryExt'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 
 function writeMessage(obj: any, nschema: Schema, bufferWriter: IBinaryWriter) {
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
         const binaryUtil = binaryGet(propData.type)
-        const writer = binaryUtil.write
         const value = obj[propData.prop]
-        // @ts-ignore
-        bufferWriter[writer](value)
+
+        //if (binaryUtil.bytes !== -1) {
+        //    const writer = binaryUtil.write           
+            // @ts-ignore
+        //    bufferWriter[writer](value)
+        //} else {
+             // @ts-ignore
+            binaryUtil.write(value, bufferWriter) //as (value: any, bw: IBinaryWriter) => void
+        //}
     }
 }
 
-export default writeMessage
+export { writeMessage }

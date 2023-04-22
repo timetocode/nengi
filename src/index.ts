@@ -22,7 +22,11 @@ export * from './common/binary/schema/defineSchema'
 export * from './common/binary/NetworkEvent'
 export * from './common/EngineMessage'
 
-// types for other integration
+// types for integration with adapters
 export * from './server/adapter/IServerNetworkAdapter'
 export * from './common/binary/IBinaryReader'
 export * from './common/binary/IBinaryWriter'
+
+
+// benchmarks/tests
+export * from './binary/message/writeMessage'

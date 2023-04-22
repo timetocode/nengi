@@ -5,10 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientNetwork = void 0;
 const NQueue_1 = __importDefault(require("../NQueue"));
-const writeMessage_1 = __importDefault(require("../binary/message/writeMessage"));
+const writeMessage_1 = require("../binary/message/writeMessage");
 const connectAttemptSchema_1 = require("../common/schemas/connectAttemptSchema");
 const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
-const readEntity_1 = __importDefault(require("../binary/entity/readEntity"));
 const readDiff_1 = __importDefault(require("../binary/entity/readDiff"));
 const EngineMessage_1 = require("../common/EngineMessage");
 const BinarySection_1 = require("../common/binary/BinarySection");
@@ -50,7 +49,7 @@ class ClientNetwork {
         dw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
         dw.writeUInt8(1);
         dw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAttempt);
-        (0, writeMessage_1.default)(handshakeMessage, connectAttemptSchema_1.connectionAttemptSchema, dw);
+        (0, writeMessage_1.writeMessage)(handshakeMessage, connectAttemptSchema_1.connectionAttemptSchema, dw);
         return dw.buffer;
     }
     createOutboundBuffer(binaryWriterCtor) {
@@ -70,7 +69,7 @@ class ClientNetwork {
         dw.writeUInt8(BinarySection_1.BinarySection.Commands);
         dw.writeUInt8(this.outbound.arr.length);
         this.outbound.arr.forEach((command) => {
-            (0, writeMessage_1.default)(command, this.client.context.getSchema(command.ntype), dw);
+            (0, writeMessage_1.writeMessage)(command, this.client.context.getSchema(command.ntype), dw);
         });
         this.outbound.arr = [];
         dw.writeUInt8(BinarySection_1.BinarySection.Requests);
@@ -121,7 +120,8 @@ class ClientNetwork {
                 case BinarySection_1.BinarySection.CreateEntities: {
                     const count = dr.readUInt32();
                     for (let i = 0; i < count; i++) {
-                        const entity = (0, readEntity_1.default)(dr, this.client.context);
+                        //const entity = readEntity(dr, this.client.context)
+                        const entity = (0, readMessage_1.default)(dr, this.client.context);
                         this.entities.set(entity.nid, entity);
                         snapshot.createEntities.push(entity);
                     }

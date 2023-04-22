@@ -1,17 +1,20 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const BinaryExt_1 = __importDefault(require("../../common/binary/BinaryExt"));
+exports.writeMessage = void 0;
+const BinaryExt_1 = require("../../common/binary/BinaryExt");
 function writeMessage(obj, nschema, bufferWriter) {
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i];
-        const binaryUtil = (0, BinaryExt_1.default)(propData.type);
-        const writer = binaryUtil.write;
+        const binaryUtil = (0, BinaryExt_1.binaryGet)(propData.type);
         const value = obj[propData.prop];
+        //if (binaryUtil.bytes !== -1) {
+        //    const writer = binaryUtil.write           
         // @ts-ignore
-        bufferWriter[writer](value);
+        //    bufferWriter[writer](value)
+        //} else {
+        // @ts-ignore
+        binaryUtil.write(value, bufferWriter); //as (value: any, bw: IBinaryWriter) => void
+        //}
     }
 }
-exports.default = writeMessage;
+exports.writeMessage = writeMessage;

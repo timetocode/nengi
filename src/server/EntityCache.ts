@@ -8,13 +8,12 @@ function diff(entity: any, cache: any, nschema: Schema) {
     }
 
     const diffs: any[] = []
-
-
-
+    
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
         const oldValue = cache[propData.prop]
         const value = entity[propData.prop]
+        // TODO use the correct diff
         if (oldValue !== value) {
             diffs.push({ nid: entity.nid, nschema, prop: propData.prop, value })
             cache[propData.prop] = value

@@ -3,9 +3,9 @@ import { Instance } from '../../server/Instance'
 import count from '../message/count'
 import countDiff from '../entity/countDiff'
 import { BinarySection } from '../../common/binary/BinarySection'
-import writeMessage from '../message/writeMessage'
+import { writeMessage } from '../message/writeMessage'
 import writeDiff from '../entity/writeDiff'
-import BinaryExt from '../../common/binary/BinaryExt'
+import { binaryGet } from '../../common/binary/BinaryExt'
 import { Binary } from '../../common/binary/Binary'
 
 const getVisibleState = (user: User, instance: Instance) => {
@@ -85,7 +85,7 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
         for (let i = 0; i < user.responseQueue.length; i++) {
             bytes += 4 // requestId
             // @ts-ignore
-            bytes += BinaryExt(Binary.String).count(user.responseQueue[i].response)
+            bytes += binaryGet(Binary.String).byteSize(user.responseQueue[i].response)
         }
     }
 

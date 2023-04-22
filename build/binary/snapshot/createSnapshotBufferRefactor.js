@@ -6,9 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const count_1 = __importDefault(require("../message/count"));
 const countDiff_1 = __importDefault(require("../entity/countDiff"));
 const BinarySection_1 = require("../../common/binary/BinarySection");
-const writeMessage_1 = __importDefault(require("../message/writeMessage"));
+const writeMessage_1 = require("../message/writeMessage");
 const writeDiff_1 = __importDefault(require("../entity/writeDiff"));
-const BinaryExt_1 = __importDefault(require("../../common/binary/BinaryExt"));
+const BinaryExt_1 = require("../../common/binary/BinaryExt");
 const Binary_1 = require("../../common/binary/Binary");
 const getVisibleState = (user, instance) => {
     const vis = user.checkVisibility(instance.tick);
@@ -73,7 +73,7 @@ const createSnapshotBufferRefactor = (user, instance) => {
         for (let i = 0; i < user.responseQueue.length; i++) {
             bytes += 4; // requestId
             // @ts-ignore
-            bytes += (0, BinaryExt_1.default)(Binary_1.Binary.String).count(user.responseQueue[i].response);
+            bytes += (0, BinaryExt_1.binaryGet)(Binary_1.Binary.String).byteSize(user.responseQueue[i].response);
         }
     }
     if (createEntities.length > 0) {
@@ -107,7 +107,7 @@ const createSnapshotBufferRefactor = (user, instance) => {
     for (let i = 0; i < messages.length; i++) {
         const message = messages[i];
         const nschema = instance.context.getSchema(message.ntype);
-        (0, writeMessage_1.default)(message, nschema, bw);
+        (0, writeMessage_1.writeMessage)(message, nschema, bw);
     }
     if (user.responseQueue.length > 0) {
         bw.writeUInt8(BinarySection_1.BinarySection.Responses);
@@ -125,7 +125,7 @@ const createSnapshotBufferRefactor = (user, instance) => {
         for (let i = 0; i < createEntities.length; i++) {
             const entity = createEntities[i];
             const nschema = instance.context.getSchema(entity.ntype);
-            (0, writeMessage_1.default)(entity, nschema, bw);
+            (0, writeMessage_1.writeMessage)(entity, nschema, bw);
         }
     }
     if (updateEntities.length > 0) {

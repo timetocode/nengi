@@ -2,7 +2,7 @@ import IEntity from '../common/IEntity'
 import NQueue from '../NQueue'
 import { Client } from './Client'
 import { Snapshot } from './Snapshot'
-import writeMessage from '../binary/message/writeMessage'
+import { writeMessage } from '../binary/message/writeMessage'
 import { connectionAttemptSchema } from '../common/schemas/connectAttemptSchema'
 import readMessage from '../binary/message/readMessage'
 import readEntity from '../binary/entity/readEntity'
@@ -90,7 +90,7 @@ class ClientNetwork {
         dw.writeUInt8(BinarySection.Commands)
         dw.writeUInt8(this.outbound.arr.length)
 
-       this.outbound.arr.forEach((command: any) => {
+        this.outbound.arr.forEach((command: any) => {
             writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
         })
 
@@ -150,7 +150,8 @@ class ClientNetwork {
                 case BinarySection.CreateEntities: {
                     const count = dr.readUInt32()
                     for (let i = 0; i < count; i++) {
-                        const entity = readEntity(dr, this.client.context)
+                        //const entity = readEntity(dr, this.client.context)
+                        const entity = readMessage(dr, this.client.context) as IEntity
                         this.entities.set(entity.nid, entity)
                         snapshot.createEntities.push(entity)
                     }

@@ -1,5 +1,5 @@
 import { Schema } from '../../common/binary/schema/Schema'
-import binaryGet from '../../common/binary/BinaryExt'
+import { binaryGet } from '../../common/binary/BinaryExt'
 
 function countDiff(diff: any, nschema: Schema) {
     let bytes = 0
@@ -7,7 +7,7 @@ function countDiff(diff: any, nschema: Schema) {
     bytes += 4 + 1
     const prop = diff.prop
     const propData = nschema.props[prop]
-    bytes += binaryGet(propData.type).bytes
+    bytes += binaryGet(propData.type).byteSize(diff.value)
     return bytes
 }
 

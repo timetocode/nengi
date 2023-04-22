@@ -1,6 +1,7 @@
 import  { Client } from './Client'
 import IEntity from '../common/IEntity'
 import { Frame, IEntityFrame } from './Frame'
+import { binaryGet } from '../common/binary/BinaryExt'
 
 const findInitialFrame = (frames: Frame[], renderTime: number): Frame | null => {
     for (var i = frames.length - 1; i >= 0; i--) {
@@ -117,18 +118,36 @@ class Interpolator {
                     const entityB = frameB.entities.get(nid)
 
                     if (entityA && entityB) {
-                        // correct state is update.prop interped from a to b
-                        // TODO later, actual interpolation differences for diff types
-                        const valueA = entityA[prop]
-                        const valueB = entityB[prop]
-
-                        const value = lerp(valueA, valueB, interpAmount)
-                        //console.log('A & B interpolation')
-                        interpState.updateEntities.push({ nid, prop, value })
+                        const nschema = this.client.context.getSchema(entityA.ntype)
+                        const binarySpec = nschema?.props[prop]
+                        const binaryUtil = binaryGet(binarySpec.type)
+                        if (binaryUtil.bytes !== -1) {
+                            // simple types!
+                            if (binarySpec.interp) {
+                                // interpolated
+                                const valueA = entityA[prop]
+                                const valueB = entityB[prop]               
+                                const value = lerp(valueA, valueB, interpAmount)
+                                interpState.updateEntities.push({ nid, prop, value })
+                            } else {
+                                // not interpolatoed
+                                interpState.updateEntities.push({ nid, prop, value: entityB[prop] })
+                            }
+                        } else {
+                            // custom binary types
+                            if (binarySpec.interp) {
+                                // interpolated (using custom function)
+                                const valueA = entityA[prop]
+                                const valueB = entityB[prop]
+                                // @ts-ignore
+                                const value = binaryUtil.interp(valueA, valueB, interpAmount)
+                                interpState.updateEntities.push({ nid, prop, value })
+                            } else {
+                                // not interpolated
+                                interpState.updateEntities.push({ nid, prop, value: entityB[prop] })
+                            }
+                        }                 
                     }
-
-                    // TODO missing case where this prop is not supposed to be interpolated
-                    // in which case return state from frameB
                 }
                 frames.push(interpState)
             }

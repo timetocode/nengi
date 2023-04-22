@@ -1,4 +1,4 @@
-import binaryGet from '../../common/binary/BinaryExt'
+import { binaryGet } from '../../common/binary/BinaryExt'
 import { IBinaryReader } from '../../common/binary/IBinaryReader'
 import { Context } from '../../common/Context'
 

@@ -1,90 +1,21 @@
 import { Binary } from './Binary';
-declare function countString(value: string): number;
-type RegularOrTypedArray = [] | Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
-declare function countByteArray(value: RegularOrTypedArray): number;
-declare function count2ByteArray(value: RegularOrTypedArray): number;
-declare function count4ByteArray(value: RegularOrTypedArray): number;
-declare function count8ByteArray(value: RegularOrTypedArray): number;
-export default function (binaryType: Binary): {
+import { IBinaryReader } from './IBinaryReader';
+import { IBinaryWriter } from './IBinaryWriter';
+type SimpleBinarySpecification = {
     bytes: number;
     write: string;
     read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof countString;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof countByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof countByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof count2ByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof count2ByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof count4ByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof count4ByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof count8ByteArray;
-} | {
-    bytes: number;
-    write: string;
-    read: string;
-    count: typeof count8ByteArray;
 };
-export {};
+type AdvancedBinarySpecification<T> = {
+    write: (value: any, bw: IBinaryWriter) => void;
+    read: (br: IBinaryReader) => T;
+    byteSize: (value: any) => number;
+    compare: (a: T, b: T) => boolean;
+    pre?: (value: any) => T;
+    post?: (value: any) => T;
+    interp?: (a: T, b: T, t: number) => T;
+};
+type BinarySpecification = SimpleBinarySpecification | AdvancedBinarySpecification<any>;
+declare function declareCustomBinaryType<T>(binaryIndex: number, spec: AdvancedBinarySpecification<T>): void;
+declare const binaryGet: (binaryType: Binary) => BinarySpecification;
+export { binaryGet, declareCustomBinaryType };

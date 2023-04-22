@@ -19,3 +19,4 @@ export * from './common/EngineMessage';
 export * from './server/adapter/IServerNetworkAdapter';
 export * from './common/binary/IBinaryReader';
 export * from './common/binary/IBinaryWriter';
+export * from './binary/message/writeMessage';
