@@ -24,11 +24,11 @@ class ClientNetwork {
         this.requestId = 1;
         this.requestQueue = new NQueue_1.default();
         this.requests = new Map();
-        this.onDisconnect = (reason) => {
-            console.log('disconnected by server! to Handle disconnect with your own logic add a client.onDisconnect = (reason: string) => {}');
+        this.onDisconnect = (reason, event) => {
+            this.client.disconnectHandler(reason, event);
         };
         this.onSocketError = (event) => {
-            console.log('socket error', event);
+            this.client.websocketErrorHandler(event);
         };
     }
     addCommand(command) {

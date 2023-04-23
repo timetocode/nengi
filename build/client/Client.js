@@ -7,9 +7,21 @@ class Client {
         this.context = context;
         this.network = new ClientNetwork_1.ClientNetwork(this);
         this.adapter = new adapterCtor(this.network);
+        this.disconnectHandler = (reason, event) => {
+            console.log('Disconnected!', reason, event);
+        };
+        this.websocketErrorHandler = (event) => {
+            console.log('Websocket Error', event);
+        };
     }
     connect(wsUrl, handshake) {
         return this.adapter.connect(wsUrl, handshake);
+    }
+    setDisconnectHandler(handler) {
+        this.disconnectHandler = handler;
+    }
+    setWebsocketErrorHandler(handler) {
+        this.websocketErrorHandler = handler;
     }
     flush() {
         this.adapter.flush();
