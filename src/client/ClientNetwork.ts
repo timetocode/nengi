@@ -24,7 +24,7 @@ class ClientNetwork {
     requestId: number
     requestQueue: NQueue<any>
     requests: Map<number, any>
-    onDisconnect: (reason: any) => void
+    onDisconnect: (reason: any, event?: any) => void
     onSocketError: (event: any) => void
 
     constructor(client: Client) {
