@@ -3,6 +3,7 @@ import { EngineMessage } from './EngineMessage'
 import { Schema } from './binary/schema/Schema'
 import { connectionAcceptedSchema } from './schemas/connectionAcceptedSchema'
 import { connectionDeniedSchema } from './schemas/connectionDeniedSchema'
+import { connectionTerminatedSchema } from './schemas/connectionTerminatedSchema'
 
 class Context {
 	/**
@@ -23,6 +24,7 @@ class Context {
 		this.engineSchemas.set(EngineMessage.ConnectionAttempt, connectionAttemptSchema)
 		this.engineSchemas.set(EngineMessage.ConnectionAccepted, connectionAcceptedSchema)
 		this.engineSchemas.set(EngineMessage.ConnectionDenied, connectionDeniedSchema)
+		this.engineSchemas.set(EngineMessage.ConnectionTerminated, connectionTerminatedSchema)
 	}
 
 	register(ntype: number, schema: Schema) {

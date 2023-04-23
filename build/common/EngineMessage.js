@@ -12,7 +12,7 @@ var EngineMessage;
     EngineMessage[EngineMessage["ChannelLeave"] = 6] = "ChannelLeave";
     EngineMessage[EngineMessage["ChannelAddEntity"] = 7] = "ChannelAddEntity";
     EngineMessage[EngineMessage["ChannelRemoveEntity"] = 8] = "ChannelRemoveEntity";
-    EngineMessage[EngineMessage["DisconnectedByServer"] = 9] = "DisconnectedByServer";
+    EngineMessage[EngineMessage["ConnectionTerminated"] = 9] = "ConnectionTerminated";
 })(EngineMessage || (EngineMessage = {}));
 exports.EngineMessage = EngineMessage;
 //# sourceMappingURL=EngineMessage.js.map

@@ -12,6 +12,9 @@ enum UserConnectionState {
     Closed // closed, network.send would crash if invoked
 }
 
+type StringOrJSONStringifiable = string | Object
+
+
 class User {
     id: number
 
@@ -66,6 +69,7 @@ class User {
     }
 
     queueMessage(message: any) {
+        console.log('QUEUE MESSAGe')
         this.messageQueue.push(message)
     }
 
@@ -82,7 +86,7 @@ class User {
 
         const children = this.instance!.localState.parents.get(id)
         if (children) {
-            children.forEach(id => this.createOrUpdate(id, tick, toCreate,  toUpdate))
+            children.forEach(id => this.createOrUpdate(id, tick, toCreate, toUpdate))
         }
     }
 
@@ -90,8 +94,14 @@ class User {
         this.networkAdapter.send(this, buffer)
     }
 
-    disconnect(reason: any) {
-        this.networkAdapter.disconnect(this, reason)
+    terminateConnection() {
+        this.networkAdapter.disconnect(this, null)
+    }
+
+    disconnect(reason: string) {
+        if (this.network) {
+            this.network.disconnect(this, reason)
+        }
     }
 
     checkVisibility(tick: number) {

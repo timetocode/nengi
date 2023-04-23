@@ -19,6 +19,10 @@ const BinarySection_1 = require("../common/binary/BinarySection");
 const EngineMessage_1 = require("../common/EngineMessage");
 const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
 const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
+const BinaryExt_1 = require("../common/binary/BinaryExt");
+const Binary_1 = require("../common/binary/Binary");
+const writeMessage_1 = require("../binary/message/writeMessage");
+const connectionTerminatedSchema_1 = require("../common/schemas/connectionTerminatedSchema");
 class InstanceNetwork {
     constructor(instance) {
         this.instance = instance;
@@ -29,6 +33,30 @@ class InstanceNetwork {
     onOpen(user) {
         user.connectionState = User_1.UserConnectionState.OpenPreHandshake;
         user.network = this;
+    }
+    disconnect(user, reason) {
+        //const json = JSON.stringify(reason)        
+        const stringByteSize = (0, BinaryExt_1.binaryGet)(Binary_1.Binary.String).byteSize(reason);
+        const bw = user.networkAdapter.createBufferWriter(3 + stringByteSize);
+        bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
+        bw.writeUInt8(1);
+        //bw.writeUInt8(EngineMessage.ConnectionTerminated)
+        const terminationMessage = {
+            ntype: EngineMessage_1.EngineMessage.ConnectionTerminated,
+            reason
+        };
+        (0, writeMessage_1.writeMessage)(terminationMessage, connectionTerminatedSchema_1.connectionTerminatedSchema, bw);
+        // bw.writeUInt8(EngineMessage.ConnectionTerminated)
+        // bw.writeString(reason)
+        user.send(bw.buffer);
+        user.terminateConnection();
+        /*
+        user.queueEngineMessage({
+            ntype: EngineMessage.ConnectionTerminated,
+            reason: JSON.stringify(reason)
+        })
+        setTimeout(() => { user.terminateConnection() })
+        */
     }
     onCommand(user, command) {
         this.instance.queue.enqueue({

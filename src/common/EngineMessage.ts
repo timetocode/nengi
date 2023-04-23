@@ -11,7 +11,7 @@ enum EngineMessage {
     ChannelAddEntity,
     ChannelRemoveEntity,
 
-    DisconnectedByServer
+    ConnectionTerminated,
 
 }
 

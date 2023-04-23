@@ -33,7 +33,8 @@ declare class User {
     queueMessage(message: any): void;
     createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[]): void;
     send(buffer: Buffer | ArrayBuffer): void;
-    disconnect(reason: any): void;
+    terminateConnection(): void;
+    disconnect(reason: string): void;
     checkVisibility(tick: number): {
         noLongerVisible: number[];
         stillVisible: number[];

@@ -12,6 +12,7 @@ import { IBinaryReader } from '../common/binary/IBinaryReader'
 import { EngineMessage } from '../common/EngineMessage'
 import { BinarySection } from '../common/binary/BinarySection'
 import count from '../binary/message/count'
+import readEngineMessage from '../binary/message/readEngineMessage'
 
 class ClientNetwork {
     client: Client
@@ -124,6 +125,15 @@ class ClientNetwork {
             switch (section) {
                 case BinarySection.EngineMessages: {
                     const count = dr.readUInt8()
+                    for (let i = 0; i < count; i++) {
+                        const engineMessage = readEngineMessage(dr, this.client.context)
+                        //console.log(engineMessage)
+                        if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
+                            // @ts-ignore
+                            console.log('connection terminated reason!', engineMessage.reason)
+                        }
+                    
+                    }
                     break
                 }
                 case BinarySection.Messages: {

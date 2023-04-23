@@ -62,6 +62,7 @@ function stringByteLength(str: string): number {
 
 function countString(value: string): number {
     const length = stringByteLength(value)
+    console.log('str length', length, value)
     return length + 4
 }
 
@@ -192,7 +193,11 @@ declareBinaryType<number>(Binary.Rotation32, {
 
 declareBinaryType<string>(Binary.String, {
     write: (value: string, bw: IBinaryWriter) => { bw.writeString(value) },
-    read: (br: IBinaryReader) => { return br.readString() },
+    read: (br: IBinaryReader) => { 
+        const str = br.readString()
+        console.log({ str })
+        return str 
+    },
     byteSize: countString,
     compare: (a: string, b: string) => { return a === b }
 })

@@ -12,6 +12,7 @@ const readDiff_1 = __importDefault(require("../binary/entity/readDiff"));
 const EngineMessage_1 = require("../common/EngineMessage");
 const BinarySection_1 = require("../common/binary/BinarySection");
 const count_1 = __importDefault(require("../binary/message/count"));
+const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
 class ClientNetwork {
     constructor(client) {
         this.client = client;
@@ -94,6 +95,14 @@ class ClientNetwork {
             switch (section) {
                 case BinarySection_1.BinarySection.EngineMessages: {
                     const count = dr.readUInt8();
+                    for (let i = 0; i < count; i++) {
+                        const engineMessage = (0, readEngineMessage_1.default)(dr, this.client.context);
+                        console.log(engineMessage);
+                        if (engineMessage.ntype === EngineMessage_1.EngineMessage.ConnectionTerminated) {
+                            // @ts-ignore
+                            console.log('connection terminated reason!', engineMessage.reason);
+                        }
+                    }
                     break;
                 }
                 case BinarySection_1.BinarySection.Messages: {
