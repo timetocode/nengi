@@ -69,7 +69,6 @@ class User {
     }
 
     queueMessage(message: any) {
-        console.log('QUEUE MESSAGe')
         this.messageQueue.push(message)
     }
 
@@ -94,14 +93,8 @@ class User {
         this.networkAdapter.send(this, buffer)
     }
 
-    terminateConnection() {
-        this.networkAdapter.disconnect(this, null)
-    }
-
-    disconnect(reason: string) {
-        if (this.network) {
-            this.network.disconnect(this, reason)
-        }
+    disconnect(reason: StringOrJSONStringifiable) {
+        this.networkAdapter.disconnect(this, reason)
     }
 
     checkVisibility(tick: number) {

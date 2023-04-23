@@ -23,7 +23,6 @@ function defineSchema(schema: SchemaDefinition): Schema {
         compiled.keys.push(entry)
         compiled.props[prop] = entry
         index++
-
     }
 
     for (const prop in schema) {

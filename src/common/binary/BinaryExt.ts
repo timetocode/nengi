@@ -62,10 +62,8 @@ function stringByteLength(str: string): number {
 
 function countString(value: string): number {
     const length = stringByteLength(value)
-    console.log('str length', length, value)
     return length + 4
 }
-
 
 const data: Map<Binary, BinarySpecification<any>> = new Map()
 
@@ -73,7 +71,7 @@ const lerp = function (a: number, b: number, t: number) {
     return a + ((b - a) * t)
 }
 
-const lerpRot = function(a: number, b: number, t: number) {
+const lerpRot = function (a: number, b: number, t: number) {
     const s = (1 - t) * Math.sin(a) + t * Math.sin(b)
     const c = (1 - t) * Math.cos(a) + t * Math.cos(b)
     return Math.atan2(s, c)
@@ -193,11 +191,7 @@ declareBinaryType<number>(Binary.Rotation32, {
 
 declareBinaryType<string>(Binary.String, {
     write: (value: string, bw: IBinaryWriter) => { bw.writeString(value) },
-    read: (br: IBinaryReader) => { 
-        const str = br.readString()
-        console.log({ str })
-        return str 
-    },
+    read: (br: IBinaryReader) => { return br.readString() },
     byteSize: countString,
     compare: (a: string, b: string) => { return a === b }
 })

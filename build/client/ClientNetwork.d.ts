@@ -14,6 +14,8 @@ declare class ClientNetwork {
     requestId: number;
     requestQueue: NQueue<any>;
     requests: Map<number, any>;
+    onDisconnect: (reason: any) => void;
+    onSocketError: (event: any) => void;
     constructor(client: Client);
     addCommand(command: any): void;
     request(endpoint: number, payload: any, callback: (response: any) => any): void;

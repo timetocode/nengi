@@ -24,6 +24,8 @@ class ClientNetwork {
     requestId: number
     requestQueue: NQueue<any>
     requests: Map<number, any>
+    onDisconnect: (reason: any) => void
+    onSocketError: (event: any) => void
 
     constructor(client: Client) {
         this.client = client
@@ -35,6 +37,13 @@ class ClientNetwork {
         this.requestId = 1
         this.requestQueue = new NQueue()
         this.requests = new Map()
+
+        this.onDisconnect = (reason: any) => {
+            console.log('disconnected by server! to Handle disconnect with your own logic add a client.onDisconnect = (reason: string) => {}')
+        }
+        this.onSocketError = (event: any) => {
+            console.log('socket error', event)
+        }
     }
 
     addCommand(command: any) {

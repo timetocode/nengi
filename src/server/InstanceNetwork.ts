@@ -5,18 +5,12 @@ import { BinarySection } from '../common/binary/BinarySection'
 import { EngineMessage } from '../common/EngineMessage'
 import readEngineMessage from '../binary/message/readEngineMessage'
 import readMessage from '../binary/message/readMessage'
-import { binaryGet } from '../common/binary/BinaryExt'
-import { Binary } from '../common/binary/Binary'
-import { writeMessage } from '../binary/message/writeMessage'
-import { connectionTerminatedSchema } from '../common/schemas/connectionTerminatedSchema'
 
 interface INetworkEvent {
     type: NetworkEvent
     user: User
     command?: any
 }
-
-type StringOrJSONStringifiable = string | Object
 
 class InstanceNetwork {
     instance: Instance
@@ -31,31 +25,6 @@ class InstanceNetwork {
     onOpen(user: User) {
         user.connectionState = UserConnectionState.OpenPreHandshake
         user.network = this
-    }
-
-    disconnect(user: User, reason: string) {
-        //const json = JSON.stringify(reason)        
-        const stringByteSize = binaryGet(Binary.String).byteSize(reason)
-        const bw = user.networkAdapter.createBufferWriter(3 + stringByteSize)
-        bw.writeUInt8(BinarySection.EngineMessages)
-        bw.writeUInt8(1)
-        //bw.writeUInt8(EngineMessage.ConnectionTerminated)
-        const terminationMessage = {
-            ntype: EngineMessage.ConnectionTerminated,
-            reason
-        }
-        writeMessage(terminationMessage, connectionTerminatedSchema, bw)
-        // bw.writeUInt8(EngineMessage.ConnectionTerminated)
-        // bw.writeString(reason)
-        user.send(bw.buffer)
-        user.terminateConnection()
-        /*
-        user.queueEngineMessage({
-            ntype: EngineMessage.ConnectionTerminated,
-            reason: JSON.stringify(reason)
-        })
-        setTimeout(() => { user.terminateConnection() })
-        */
     }
 
     onCommand(user: User, command: any) {

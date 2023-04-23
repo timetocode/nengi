@@ -36,7 +36,6 @@ class User {
         this.engineMessageQueue.push(engineMessage);
     }
     queueMessage(message) {
-        console.log('QUEUE MESSAGe');
         this.messageQueue.push(message);
     }
     createOrUpdate(id, tick, toCreate, toUpdate) {
@@ -58,13 +57,8 @@ class User {
     send(buffer) {
         this.networkAdapter.send(this, buffer);
     }
-    terminateConnection() {
-        this.networkAdapter.disconnect(this, null);
-    }
     disconnect(reason) {
-        if (this.network) {
-            this.network.disconnect(this, reason);
-        }
+        this.networkAdapter.disconnect(this, reason);
     }
     checkVisibility(tick) {
         const toCreate = [];

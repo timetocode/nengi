@@ -24,7 +24,6 @@ function stringByteLength(str) {
 }
 function countString(value) {
     const length = stringByteLength(value);
-    console.log('str length', length, value);
     return length + 4;
 }
 const data = new Map();
@@ -137,11 +136,7 @@ declareBinaryType(Binary_1.Binary.Rotation32, {
 });
 declareBinaryType(Binary_1.Binary.String, {
     write: (value, bw) => { bw.writeString(value); },
-    read: (br) => {
-        const str = br.readString();
-        console.log({ str });
-        return str;
-    },
+    read: (br) => { return br.readString(); },
     byteSize: countString,
     compare: (a, b) => { return a === b; }
 });

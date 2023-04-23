@@ -24,6 +24,12 @@ class ClientNetwork {
         this.requestId = 1;
         this.requestQueue = new NQueue_1.default();
         this.requests = new Map();
+        this.onDisconnect = (reason) => {
+            console.log('disconnected by server! to Handle disconnect with your own logic add a client.onDisconnect = (reason: string) => {}');
+        };
+        this.onSocketError = (event) => {
+            console.log('socket error', event);
+        };
     }
     addCommand(command) {
         this.outbound.enqueue(command);
@@ -97,7 +103,7 @@ class ClientNetwork {
                     const count = dr.readUInt8();
                     for (let i = 0; i < count; i++) {
                         const engineMessage = (0, readEngineMessage_1.default)(dr, this.client.context);
-                        console.log(engineMessage);
+                        //console.log(engineMessage)
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.ConnectionTerminated) {
                             // @ts-ignore
                             console.log('connection terminated reason!', engineMessage.reason);

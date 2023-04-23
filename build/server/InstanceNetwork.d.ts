@@ -12,7 +12,6 @@ declare class InstanceNetwork {
     constructor(instance: Instance);
     onRequest(): void;
     onOpen(user: User): void;
-    disconnect(user: User, reason: string): void;
     onCommand(user: User, command: any): void;
     onHandshake(user: User, handshake: any): Promise<void>;
     onMessage(user: User, buffer: Buffer | ArrayBuffer): void;

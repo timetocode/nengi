@@ -10,6 +10,7 @@ declare enum UserConnectionState {
     Open = 3,
     Closed = 4
 }
+type StringOrJSONStringifiable = string | Object;
 declare class User {
     id: number;
     socket: any;
@@ -33,8 +34,7 @@ declare class User {
     queueMessage(message: any): void;
     createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[]): void;
     send(buffer: Buffer | ArrayBuffer): void;
-    terminateConnection(): void;
-    disconnect(reason: string): void;
+    disconnect(reason: StringOrJSONStringifiable): void;
     checkVisibility(tick: number): {
         noLongerVisible: number[];
         stillVisible: number[];
