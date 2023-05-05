@@ -1,4 +1,4 @@
-import IEntity from '../common/IEntity';
+import { IEntity } from '../common/IEntity';
 declare class EDictionary {
     object: {
         [key: string]: any;
@@ -13,4 +13,4 @@ declare class EDictionary {
     remove(obj: IEntity): any;
     removeById(id: number): any;
 }
-export default EDictionary;
+export { EDictionary };

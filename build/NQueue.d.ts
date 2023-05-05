@@ -8,4 +8,4 @@ declare class NQueue<T> {
     get length(): number;
     next(): T;
 }
-export default NQueue;
+export { NQueue };

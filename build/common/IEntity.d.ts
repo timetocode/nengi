@@ -3,4 +3,4 @@ interface IEntity {
     ntype: number;
     [prop: string]: any;
 }
-export default IEntity;
+export { IEntity };

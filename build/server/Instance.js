@@ -4,23 +4,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Instance = void 0;
-const Channel_1 = require("./Channel");
-const LocalState_1 = __importDefault(require("./LocalState"));
+const LocalState_1 = require("./LocalState");
 const InstanceNetwork_1 = require("./InstanceNetwork");
-const SpatialChannel_1 = require("./SpatialChannel");
-const EntityCache_1 = __importDefault(require("./EntityCache"));
+const EntityCache_1 = require("./EntityCache");
 const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
-const NQueue_1 = __importDefault(require("../NQueue"));
+const NQueue_1 = require("../NQueue");
+const IdPool_1 = require("./IdPool");
 class Instance {
     constructor(context) {
         this.context = context;
-        this.localState = new LocalState_1.default();
-        this.channelId = 1;
+        this.localState = new LocalState_1.LocalState();
+        this.channelIdPool = new IdPool_1.IdPool(65535);
         this.channels = new Set();
         this.users = new Map();
-        this.queue = new NQueue_1.default();
+        this.queue = new NQueue_1.NQueue();
         this.incrementalUserId = 0;
-        this.cache = new EntityCache_1.default();
+        this.cache = new EntityCache_1.EntityCache();
         this.tick = 1;
         this.responseEndPoints = new Map();
         this.onConnect = (handshake) => {
@@ -40,15 +39,11 @@ class Instance {
     respond(endpoint, callback) {
         this.responseEndPoints.set(endpoint, callback);
     }
-    createChannel() {
-        const channel = new Channel_1.Channel(this.localState, this.channelId++);
+    registerChannel(channel) {
+        const channelId = this.channelIdPool.nextId();
+        channel.id = channelId;
         this.channels.add(channel);
-        return channel;
-    }
-    createSpatialChannel() {
-        const channel = new SpatialChannel_1.SpatialChannel(this.localState, this.channelId++);
-        this.channels.add(channel);
-        return channel;
+        return channelId;
     }
     step() {
         this.tick++;

@@ -1,4 +1,4 @@
-import IEntity from '../common/IEntity';
+import { IEntity } from '../common/IEntity';
 import { Snapshot } from './Snapshot';
 interface IEntityFrame {
     createEntities: IEntity[];

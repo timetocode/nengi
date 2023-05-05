@@ -1,13 +1,29 @@
-import IEntity from '../common/IEntity';
-import { ViewAABB } from './ViewAABB';
+import { IEntity } from '../common/IEntity';
+import { User } from './User';
+type ChannelSubscriptionHandler = (user: User, channel: IChannel) => void;
+type CulledChannelSubscriptionHandler = (user: User, channel: ICulledChannel<any, any>) => void;
+type VisibilityResolver<VisibleObjectType, ViewType> = (obj: VisibleObjectType, view: ViewType) => boolean;
 interface IChannel {
     id: number;
     addEntity(entity: IEntity): void;
     removeEntity(entity: IEntity): void;
     addMessage(message: any): void;
-    getVisible(userId: number): number[];
-    subscribe(user: any, view: undefined | ViewAABB): void;
-    unsubscribe(user: any): void;
-    destroy(): void;
+    subscribe(user: User): void;
+    unsubscribe(user: User): void;
+    onSubscribe: ChannelSubscriptionHandler;
+    onUnsubscribe: ChannelSubscriptionHandler;
+    getVisibileEntities(userId: number): number[];
 }
-export default IChannel;
+interface ICulledChannel<VisibleObjectType, ViewType> {
+    id: number;
+    addEntity(entity: IEntity): void;
+    removeEntity(entity: IEntity): void;
+    addMessage(message: any): void;
+    subscribe(user: User, view: ViewType): void;
+    unsubscribe(user: User): void;
+    onSubscribe: CulledChannelSubscriptionHandler;
+    onUnsubscribe: CulledChannelSubscriptionHandler;
+    visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
+    getVisibileEntities(userId: number): number[];
+}
+export { IChannel, ICulledChannel, ChannelSubscriptionHandler, CulledChannelSubscriptionHandler, VisibilityResolver };

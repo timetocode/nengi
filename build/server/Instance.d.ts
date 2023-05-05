@@ -1,17 +1,16 @@
-import { Channel } from './Channel';
 import { Context } from '../common/Context';
-import LocalState from './LocalState';
+import { LocalState } from './LocalState';
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork';
 import { User } from './User';
-import { SpatialChannel } from './SpatialChannel';
-import IChannel from './IChannel';
-import EntityCache from './EntityCache';
-import IEntity from '../common/IEntity';
-import NQueue from '../NQueue';
+import { IChannel } from './IChannel';
+import { EntityCache } from './EntityCache';
+import { IEntity } from '../common/IEntity';
+import { NQueue } from '../NQueue';
+import { IdPool } from './IdPool';
 declare class Instance {
     context: Context;
     localState: LocalState;
-    channelId: number;
+    channelIdPool: IdPool;
     channels: Set<IChannel>;
     network: InstanceNetwork;
     queue: NQueue<INetworkEvent>;
@@ -34,8 +33,7 @@ declare class Instance {
     attachEntity(parentNid: number, child: IEntity): void;
     detachEntity(parentNid: number, child: IEntity): void;
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;
-    createChannel(): Channel;
-    createSpatialChannel(): SpatialChannel;
+    registerChannel(channel: IChannel): number;
     step(): void;
 }
 export { Instance };

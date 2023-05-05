@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.EntityCache = void 0;
 const BinaryExt_1 = require("../common/binary/BinaryExt");
 function diff(entity, cache, nschema) {
     if (!cache) {
@@ -71,5 +72,5 @@ class EntityCache {
         }
     }
 }
-exports.default = EntityCache;
+exports.EntityCache = EntityCache;
 //# sourceMappingURL=EntityCache.js.map

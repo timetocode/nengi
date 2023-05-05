@@ -17,9 +17,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // server
 __exportStar(require("./server/Instance"), exports);
 __exportStar(require("./server/InstanceNetwork"), exports);
-__exportStar(require("./server/ViewAABB"), exports);
+__exportStar(require("./server/Point2D"), exports);
+__exportStar(require("./server/Point3D"), exports);
+__exportStar(require("./server/AABB2D"), exports);
+__exportStar(require("./server/AABB3D"), exports);
 __exportStar(require("./server/Channel"), exports);
-__exportStar(require("./server/SpatialChannel"), exports);
+__exportStar(require("./server/ChannelAABB2D"), exports);
+__exportStar(require("./server/ChannelAABB3D"), exports);
 __exportStar(require("./server/User"), exports);
 __exportStar(require("./server/adapter/MockAdapter"), exports);
 // client

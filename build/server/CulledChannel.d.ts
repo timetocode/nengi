@@ -1,22 +1,24 @@
 import { EDictionary } from './EDictionary';
 import { LocalState } from './LocalState';
 import { IEntity } from '../common/IEntity';
-import { IChannel, ChannelSubscriptionHandler } from './IChannel';
+import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel';
 import { User } from './User';
-declare class Channel implements IChannel {
+declare class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
     id: number;
     localState: LocalState;
     entities: EDictionary;
     users: Map<number, User>;
-    onSubscribe: ChannelSubscriptionHandler;
-    onUnsubscribe: ChannelSubscriptionHandler;
+    views: Map<number, ViewType>;
+    onSubscribe: CulledChannelSubscriptionHandler;
+    onUnsubscribe: CulledChannelSubscriptionHandler;
+    visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
     constructor(localState: LocalState);
     addEntity(entity: IEntity): IEntity;
     removeEntity(entity: IEntity): void;
     addMessage(message: any): void;
-    subscribe(user: any): void;
+    subscribe(user: any, view: ViewType): void;
     unsubscribe(user: any): void;
     getVisibileEntities(userId: number): number[];
     destroy(): void;
 }
-export { Channel };
+export { CulledChannel };

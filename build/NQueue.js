@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.NQueue = void 0;
 class NQueue {
     constructor() {
         this.arr = [];
@@ -23,5 +24,5 @@ class NQueue {
         return this.dequeue();
     }
 }
-exports.default = NQueue;
+exports.NQueue = NQueue;
 //# sourceMappingURL=NQueue.js.map

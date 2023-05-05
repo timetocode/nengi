@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.EDictionary = void 0;
 class EDictionary {
     constructor() {
         this.object = {};
@@ -64,5 +65,5 @@ class EDictionary {
         }
     }
 }
-exports.default = EDictionary;
+exports.EDictionary = EDictionary;
 //# sourceMappingURL=EDictionary.js.map

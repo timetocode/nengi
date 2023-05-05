@@ -1,16 +1,14 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const EDictionary_1 = __importDefault(require("./EDictionary"));
-const IdPool_1 = __importDefault(require("./IdPool"));
+exports.LocalState = void 0;
+const EDictionary_1 = require("./EDictionary");
+const IdPool_1 = require("./IdPool");
 class LocalState {
     constructor() {
-        this.idPool = new IdPool_1.default(65535); // TODO pick a real pool size
+        this.entityIdPool = new IdPool_1.IdPool(65535); // TODO pick a real pool size
         this.sources = new Map();
         this.parents = new Map();
-        this._entities = new EDictionary_1.default();
+        this._entities = new EDictionary_1.EDictionary();
     }
     addChild(parentNid, child) {
         let cnid = this.registerEntity(child, parentNid);
@@ -28,7 +26,7 @@ class LocalState {
     registerEntity(entity, sourceId) {
         let nid = entity.nid;
         if (!this.sources.has(nid)) {
-            nid = this.idPool.nextId();
+            nid = this.entityIdPool.nextId();
             entity.nid = nid;
             this.sources.set(nid, new Set());
             this._entities.add(entity);
@@ -44,7 +42,7 @@ class LocalState {
         if (entitySources.size === 0) {
             this.sources.delete(nid);
             this._entities.remove(entity);
-            this.idPool.returnId(nid);
+            this.entityIdPool.returnId(nid);
             entity.nid = 0;
         }
     }
@@ -52,5 +50,5 @@ class LocalState {
         return this._entities.get(nid);
     }
 }
-exports.default = LocalState;
+exports.LocalState = LocalState;
 //# sourceMappingURL=LocalState.js.map

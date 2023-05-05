@@ -1,11 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MockServerSocket = exports.MockClientSocket = exports.MockClientAdapter = exports.MockInstanceAdapter = void 0;
 const User_1 = require("../User");
-const NQueue_1 = __importDefault(require("../../NQueue"));
+const NQueue_1 = require("../../NQueue");
 /**
  * Not a real network adapter, data is passed without using a real socket.
  * Used for mixing a server and client together in one application
@@ -100,7 +97,7 @@ var MockSocketReadyState;
 })(MockSocketReadyState || (MockSocketReadyState = {}));
 class MockServerSocket {
     constructor(network) {
-        this.inboundQueue = new NQueue_1.default();
+        this.inboundQueue = new NQueue_1.NQueue();
         this.readyState = MockSocketReadyState.CONNECTING;
         this.clientSocket = new MockClientSocket(this);
         this.user = null;
@@ -122,7 +119,7 @@ class MockServerSocket {
 exports.MockServerSocket = MockServerSocket;
 class MockClientSocket {
     constructor(serverSocket) {
-        this.inboundQueue = new NQueue_1.default();
+        this.inboundQueue = new NQueue_1.NQueue();
         this.readyState = MockSocketReadyState.CONNECTING;
         this.serverSocket = serverSocket;
         this.readyState = MockSocketReadyState.OPEN;

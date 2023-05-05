@@ -7,4 +7,4 @@ declare class IdPool {
     nextId(): number;
     returnId(id: number): void;
 }
-export default IdPool;
+export { IdPool };

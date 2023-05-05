@@ -1,5 +1,5 @@
 import { Schema } from '../common/binary/schema/Schema';
-import IEntity from '../common/IEntity';
+import { IEntity } from '../common/IEntity';
 declare class EntityCache {
     cache: {
         [tick: number]: {
@@ -24,4 +24,4 @@ declare class EntityCache {
     cacheify(tick: number, entity: IEntity, schema: Schema): void;
     updateCache(tick: number, entity: IEntity, schema: Schema): void;
 }
-export default EntityCache;
+export { EntityCache };

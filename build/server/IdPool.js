@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.IdPool = void 0;
 class IdPool {
     constructor(max) {
         this.min = 1;
@@ -27,5 +28,5 @@ class IdPool {
         this.ids.delete(id);
     }
 }
-exports.default = IdPool;
+exports.IdPool = IdPool;
 //# sourceMappingURL=IdPool.js.map

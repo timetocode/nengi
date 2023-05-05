@@ -1,11 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const IdPool_1 = __importDefault(require("./IdPool"));
+const IdPool_1 = require("./IdPool");
 test('throws when out of ids', () => {
-    const idPool = new IdPool_1.default(5);
+    const idPool = new IdPool_1.IdPool(5);
     idPool.nextId(); // 1
     idPool.nextId(); // 2
     idPool.nextId(); // 3
@@ -17,14 +14,14 @@ test('throws when out of ids', () => {
 });
 test('recycles ids', () => {
     // only two ids (1, 2)
-    const idPool = new IdPool_1.default(2);
+    const idPool = new IdPool_1.IdPool(2);
     idPool.nextId(); // 1
     idPool.nextId(); // 2
     idPool.returnId(1);
     expect(idPool.nextId()).toEqual(1);
 });
 test('recycles ids, more complex', () => {
-    const idPool = new IdPool_1.default(5);
+    const idPool = new IdPool_1.IdPool(5);
     idPool.nextId(); // 1
     idPool.nextId(); // 2
     idPool.nextId(); // 3

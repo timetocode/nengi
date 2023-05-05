@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientNetwork = void 0;
-const NQueue_1 = __importDefault(require("../NQueue"));
+const NQueue_1 = require("../NQueue");
 const writeMessage_1 = require("../binary/message/writeMessage");
 const connectAttemptSchema_1 = require("../common/schemas/connectAttemptSchema");
 const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
@@ -19,10 +19,10 @@ class ClientNetwork {
         this.entities = new Map();
         this.snapshots = [];
         this.messages = [];
-        this.outbound = new NQueue_1.default();
+        this.outbound = new NQueue_1.NQueue();
         this.socket = null;
         this.requestId = 1;
-        this.requestQueue = new NQueue_1.default();
+        this.requestQueue = new NQueue_1.NQueue();
         this.requests = new Map();
         this.onDisconnect = (reason, event) => {
             this.client.disconnectHandler(reason, event);

@@ -51,7 +51,7 @@ class User {
         }
         const children = this.instance.localState.parents.get(id);
         if (children) {
-            children.forEach(id => this.createOrUpdate(id, tick, toCreate, toUpdate));
+            children.forEach((id) => this.createOrUpdate(id, tick, toCreate, toUpdate));
         }
     }
     send(buffer) {
@@ -65,7 +65,7 @@ class User {
         const toUpdate = [];
         const toDelete = [];
         this.subscriptions.forEach(channel => {
-            channel.getVisible(this.id).forEach(nid => {
+            channel.getVisibileEntities(this.id).forEach(nid => {
                 this.createOrUpdate(nid, tick, toCreate, toUpdate);
             });
         });
