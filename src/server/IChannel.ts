@@ -10,7 +10,7 @@ interface IChannel {
     addEntity(entity: IEntity): void
     removeEntity(entity: IEntity): void
     addMessage(message: any): void
-    subscribe(user: User): void
+    subscribe(user: User, view?: any): void
     unsubscribe(user: User): void
     onSubscribe: ChannelSubscriptionHandler
     onUnsubscribe: ChannelSubscriptionHandler
