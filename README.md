@@ -41,7 +41,7 @@ The api is open to sudden change without any version changing. We will adhere to
 
 Minimal instance example:
 ```js
-import { Instance, NetworkEvent, ViewAABB, } from 'nengi'
+import { Instance, NetworkEvent, AABB2D, ChannelAABB2D, Channel } from 'nengi'
 import { ncontext } from '../common/ncontext'
 import { NType } from '../common/NType'
 import { uWebSocketsInstanceAdapter } from 'nengi-uws-instance-adapter'
@@ -71,9 +71,12 @@ instance.network.registerNetworkAdapter(uws)
 instance.onConnect = authenticateUser
 
 // a plain channel (everyone sees everything in it)
-const main = instance.createChannel()
+const main = new Channel(instance.localState)
+instance.registerChannel(main)
+
 // a spatial channel (users have a view and see positional objects within their view)
-const space = instance.createSpatialChannel()
+const space = new ChannelAABB2D(instance.localState)
+instance.registerChannel(space)
 
 const queue = instance.network.queue
 
@@ -147,19 +150,19 @@ window.addEventListener('load', async () => {
             // TODO handle message
         }
 
-        istate.forEach(snapshot => {
-            snapshot.createEntities.forEach((entity: any) => {    
-                // TODO create new entity on the client
-            })
-
-            snapshot.updateEntities.forEach((diff: any) => {
-            // TODO update existing entity
-            })
-
-            snapshot.deleteEntities.forEach((nid: number) => {
-                // TODO remove existing entity
-            })
+    istate.forEach(snapshot => {
+        snapshot.createEntities.forEach((entity: any) => {
+            // TODO create new entity on the client
         })
+
+        snapshot.updateEntities.forEach((diff: any) => {
+            // TODO update existing entity
+        })
+
+        snapshot.deleteEntities.forEach((nid: number) => {
+            // TODO remove existing entity
+        })
+    })
 
         // send command to server (hypothetical)
         const { w, a, s, d } = inputState

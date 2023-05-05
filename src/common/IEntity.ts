@@ -4,4 +4,4 @@ interface IEntity {
     [prop: string]: any
 }
 
-export default IEntity
+export { IEntity }

@@ -1,11 +1,12 @@
 {
   "name": "nengi",
-  "version": "2.0.0-alpha.26",
+  "version": "2.0.0-alpha.30",
   "description": "nengi2 experimental branch",
   "main": "./build/index.js",
   "scripts": {
     "test": "npx jest",
-    "build": "npx tsc"
+    "build": "npx tsc",
+    "typecheck": "npx tsc --project tsconfig.test.json"
   },
   "author": "Alex // timetocode",
   "license": "Apache 2.0",

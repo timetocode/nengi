@@ -1,5 +1,5 @@
-import IEntity from '../common/IEntity'
-import NQueue from '../NQueue'
+import { IEntity } from '../common/IEntity'
+import { NQueue } from '../NQueue'
 import { Client } from './Client'
 import { Snapshot } from './Snapshot'
 import { writeMessage } from '../binary/message/writeMessage'

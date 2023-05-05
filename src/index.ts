@@ -1,9 +1,13 @@
 // server
 export * from './server/Instance'
 export * from './server/InstanceNetwork'
-export * from './server/ViewAABB'
+export * from './server/Point2D'
+export * from './server/Point3D'
+export * from './server/AABB2D'
+export * from './server/AABB3D'
 export * from './server/Channel'
-export * from './server/SpatialChannel'
+export * from './server/ChannelAABB2D'
+export * from './server/ChannelAABB3D'
 export * from './server/User'
 export * from './server/adapter/MockAdapter'
 

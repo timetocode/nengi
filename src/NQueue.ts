@@ -30,4 +30,4 @@ class NQueue<T> {
     }
 }
 
-export default NQueue
+export { NQueue }

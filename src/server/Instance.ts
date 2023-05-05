@@ -1,19 +1,18 @@
-import { Channel } from './Channel'
 import { Context } from '../common/Context'
-import LocalState from './LocalState'
+import { LocalState } from './LocalState'
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
-import { SpatialChannel } from './SpatialChannel'
-import IChannel from './IChannel'
-import EntityCache from './EntityCache'
+import { IChannel } from './IChannel'
+import { EntityCache } from './EntityCache'
 import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
-import IEntity from '../common/IEntity'
-import NQueue from '../NQueue'
+import { IEntity } from '../common/IEntity'
+import { NQueue } from '../NQueue'
+import { IdPool } from './IdPool'
 
 class Instance {
     context: Context
     localState: LocalState
-    channelId: number
+    channelIdPool: IdPool
     channels: Set<IChannel>
     network: InstanceNetwork
     queue: NQueue<INetworkEvent>
@@ -36,7 +35,7 @@ class Instance {
     constructor(context: Context) {
         this.context = context
         this.localState = new LocalState()
-        this.channelId = 1
+        this.channelIdPool = new IdPool(65535)
         this.channels = new Set()
         this.users = new Map()
         this.queue = new NQueue()
@@ -67,16 +66,11 @@ class Instance {
         this.responseEndPoints.set(endpoint, callback)
     }
 
-    createChannel(): Channel {
-        const channel = new Channel(this.localState, this.channelId++)
+    registerChannel(channel: IChannel) {
+        const channelId = this.channelIdPool.nextId()
+        channel.id = channelId
         this.channels.add(channel)
-        return channel
-    }
-
-    createSpatialChannel(): SpatialChannel {
-        const channel = new SpatialChannel(this.localState, this.channelId++)
-        this.channels.add(channel)
-        return channel
+        return channelId
     }
 
     step() {

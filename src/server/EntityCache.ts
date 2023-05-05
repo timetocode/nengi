@@ -1,6 +1,6 @@
 import { binaryGet } from '../common/binary/BinaryExt'
 import { Schema } from '../common/binary/schema/Schema'
-import IEntity from '../common/IEntity'
+import { IEntity } from '../common/IEntity'
 
 function diff(entity: any, cache: any, nschema: Schema) {
     if (!cache) {
@@ -88,4 +88,4 @@ class EntityCache {
 
 }
 
-export default EntityCache
+export { EntityCache }

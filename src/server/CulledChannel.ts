@@ -1,25 +1,30 @@
 import { EDictionary } from './EDictionary'
 import { LocalState } from './LocalState'
 import { IEntity } from '../common/IEntity'
-import { IChannel, ChannelSubscriptionHandler } from './IChannel'
+import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel'
 import { User } from './User'
 
-class Channel implements IChannel {
+class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
     id: number
     localState: LocalState
     entities: EDictionary
     users: Map<number, User>
-    onSubscribe: ChannelSubscriptionHandler
-    onUnsubscribe: ChannelSubscriptionHandler
+    views: Map<number, ViewType>
+
+    onSubscribe: CulledChannelSubscriptionHandler
+    onUnsubscribe: CulledChannelSubscriptionHandler
+    visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>
 
     constructor(localState: LocalState) {
         this.id = 0
         this.localState = localState
         this.entities = new EDictionary()
         this.users = new Map()
+        this.views = new Map()
 
-        this.onSubscribe = (user: User, channel: IChannel) => { }
-        this.onUnsubscribe = (user: User, channel: IChannel) => { }
+        this.onSubscribe = (user: User, channel: ICulledChannel<VisibleObjectType, ViewType>) => { }
+        this.onUnsubscribe = (user: User, channel: ICulledChannel<VisibleObjectType, ViewType>) => { }
+        this.visibilityResolver = (object: VisibleObjectType, view: ViewType) => { return true }
     }
 
     addEntity(entity: IEntity) {
@@ -34,11 +39,16 @@ class Channel implements IChannel {
     }
 
     addMessage(message: any) {
-        this.users.forEach(user => user.queueMessage(message))
+        this.users.forEach(user => {
+            if (this.visibilityResolver(message, this.views.get(user.id)!)) {
+                user.queueMessage(message)
+            }
+        })
     }
 
-    subscribe(user: any) {
+    subscribe(user: any, view: ViewType) {
         this.users.set(user.id, user)
+        this.views.set(user.id, view)
         user.subscribe(this)
         this.onSubscribe(user, this)
     }
@@ -46,13 +56,17 @@ class Channel implements IChannel {
     unsubscribe(user: any) {
         this.onUnsubscribe(user, this)
         this.users.delete(user.id)
+        this.views.delete(user.id)
         user.unsubscribe(this)
     }
 
     getVisibileEntities(userId: number) {
+        const view = this.views.get(userId)!
         const visibleNids: number[] = []
-        this.entities.forEach((entity: IEntity) => {
-            visibleNids.push(entity.nid)
+        this.entities.forEach((entity: any) => {
+            if (this.visibilityResolver(entity, view)) {
+                visibleNids.push(entity.nid)
+            }            
         })
         return visibleNids
     }
@@ -63,4 +77,4 @@ class Channel implements IChannel {
     }
 }
 
-export { Channel }
+export { CulledChannel }

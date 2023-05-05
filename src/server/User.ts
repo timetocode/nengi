@@ -1,5 +1,5 @@
 import { Channel } from './Channel'
-import IChannel from './IChannel'
+import { IChannel } from './IChannel'
 import { Instance } from './Instance'
 import { InstanceNetwork } from './InstanceNetwork'
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
@@ -85,7 +85,7 @@ class User {
 
         const children = this.instance!.localState.parents.get(id)
         if (children) {
-            children.forEach(id => this.createOrUpdate(id, tick, toCreate, toUpdate))
+            children.forEach((id: number) => this.createOrUpdate(id, tick, toCreate, toUpdate))
         }
     }
 
@@ -103,7 +103,7 @@ class User {
         const toDelete: number[] = []
 
         this.subscriptions.forEach(channel => {
-            channel.getVisible(this.id).forEach(nid => {
+            channel.getVisibileEntities(this.id).forEach(nid => {
                 this.createOrUpdate(nid, tick, toCreate, toUpdate)
             })
         })

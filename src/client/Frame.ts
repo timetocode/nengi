@@ -1,4 +1,4 @@
-import IEntity from '../common/IEntity'
+import { IEntity } from '../common/IEntity'
 import { Snapshot } from './Snapshot'
 
 interface IEntityFrame {
@@ -7,9 +7,7 @@ interface IEntityFrame {
     deleteEntities: number[]
 }
 
-
 let tick = 0 // TODO this should be the server tick not a client based count
-
 
 class Frame implements IEntityFrame {
     tick: number

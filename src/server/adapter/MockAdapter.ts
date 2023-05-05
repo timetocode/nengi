@@ -4,7 +4,7 @@ import { InstanceNetwork } from '../InstanceNetwork'
 import { User, UserConnectionState } from '../User'
 import { IBinaryWriter, IBinaryWriterClass } from '../../common/binary/IBinaryWriter'
 import { IBinaryReader, IBinaryReaderClass } from '../../common/binary/IBinaryReader'
-import NQueue from '../../NQueue'
+import { NQueue } from '../../NQueue'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
 

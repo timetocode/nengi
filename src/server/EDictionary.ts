@@ -1,4 +1,4 @@
-import IEntity from '../common/IEntity'
+import { IEntity } from '../common/IEntity'
 
 class EDictionary {
     object: { [key: string]: any }
@@ -18,10 +18,10 @@ class EDictionary {
         if (typeof obj !== 'undefined') {
             return this.object[nid]
         }
-        return null 
+        return null
     }
 
-    forEach(fn: (entity:IEntity, index: number) => any) {
+    forEach(fn: (entity: IEntity, index: number) => any) {
         for (let i = 0; i < this.array.length; i++) {
             fn(this.array[i], i)
         }
@@ -71,4 +71,4 @@ class EDictionary {
     }
 }
 
-export default EDictionary
+export { EDictionary }

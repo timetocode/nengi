@@ -34,4 +34,4 @@ class IdPool {
     }
 }
 
-export default IdPool
+export { IdPool }

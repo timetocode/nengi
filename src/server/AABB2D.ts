@@ -1,4 +1,4 @@
-class ViewAABB {
+class AABB2D {
     x: number
     y: number
     halfWidth: number
@@ -12,4 +12,4 @@ class ViewAABB {
     }
 }
 
-export { ViewAABB }
+export { AABB2D }

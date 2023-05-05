@@ -1,4 +1,4 @@
-import IEntity from '../common/IEntity'
+import { IEntity } from '../common/IEntity'
 
 type Snapshot = {
     messages: any[],
@@ -6,6 +6,5 @@ type Snapshot = {
     updateEntities: any[],
     deleteEntities: number[]
 }
-
 
 export { Snapshot }

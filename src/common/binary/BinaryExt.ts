@@ -369,6 +369,7 @@ declareBinaryType<Vector4>(Binary.Vector4, {
         return { x, y, z, w }
     }
 })
+
 function normalizeQuat(a: Quaternion) {
     let l = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)
 

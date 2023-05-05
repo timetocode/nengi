@@ -1,15 +1,15 @@
-import { Schema } from '../common/binary/schema/Schema'
-import EDictionary from './EDictionary'
-import IdPool from './IdPool'
-import IEntity from '../common/IEntity'
+import { EDictionary } from './EDictionary'
+import { IdPool } from './IdPool'
+import { IEntity } from '../common/IEntity'
+
 class LocalState {
-    idPool: IdPool
+    entityIdPool: IdPool
     sources: Map<number, Set<number>>
     parents: Map<number, Set<number>>
     _entities: EDictionary
 
     constructor() {
-        this.idPool = new IdPool(65535) // TODO pick a real pool size
+        this.entityIdPool = new IdPool(65535) // TODO pick a real pool size
         this.sources = new Map()
         this.parents = new Map()
         this._entities = new EDictionary()
@@ -33,7 +33,7 @@ class LocalState {
     registerEntity(entity: IEntity, sourceId: number) {
         let nid = entity.nid
         if (!this.sources.has(nid)) {
-            nid = this.idPool.nextId()
+            nid = this.entityIdPool.nextId()
             entity.nid = nid
             this.sources.set(nid, new Set())
             this._entities.add(entity)
@@ -51,7 +51,7 @@ class LocalState {
         if (entitySources.size === 0) {
             this.sources.delete(nid)
             this._entities.remove(entity)
-            this.idPool.returnId(nid)
+            this.entityIdPool.returnId(nid)
             entity.nid = 0
         }
     }
@@ -61,4 +61,4 @@ class LocalState {
     }
 }
 
-export default LocalState
+export { LocalState }

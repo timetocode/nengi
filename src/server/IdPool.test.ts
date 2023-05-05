@@ -1,4 +1,4 @@
-import IdPool from './IdPool'
+import { IdPool } from './IdPool'
 
 test('throws when out of ids', () => {
     const idPool = new IdPool(5)
