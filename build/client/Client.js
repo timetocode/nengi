@@ -3,10 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Client = void 0;
 const ClientNetwork_1 = require("./ClientNetwork");
 class Client {
-    constructor(context, adapterCtor) {
+    constructor(context, adapterCtor, serverTickRate) {
         this.context = context;
         this.network = new ClientNetwork_1.ClientNetwork(this);
         this.adapter = new adapterCtor(this.network);
+        this.serverTickRate = serverTickRate;
         this.disconnectHandler = (reason, event) => {
             console.log('Disconnected!', reason, event);
         };

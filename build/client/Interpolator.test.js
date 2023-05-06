@@ -31,7 +31,7 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
         constructor(network) {
         }
     }
-    const client = new Client_1.Client(ncontext, MockAdapter);
+    const client = new Client_1.Client(ncontext, MockAdapter, 20);
     // snapshot that creates 2 entities
     const a = {
         timestamp: -1,

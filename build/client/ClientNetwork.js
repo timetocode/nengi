@@ -218,7 +218,7 @@ class ClientNetwork {
         }
         else {
             if (this.previousSnapshot) {
-                snapshot.timestamp = this.previousSnapshot.timestamp + 50;
+                snapshot.timestamp = this.previousSnapshot.timestamp + (1000 / this.client.serverTickRate);
             }
         }
         this.previousSnapshot = snapshot;

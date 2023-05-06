@@ -9,13 +9,15 @@ class Client {
     context: Context
     network: ClientNetwork
     adapter: any
+    serverTickRate: number
     disconnectHandler: DisconnectHandler
     websocketErrorHandler: WebsocketErrorHandler
 
-    constructor(context: Context, adapterCtor: any) {
+    constructor(context: Context, adapterCtor: any, serverTickRate: number) {
         this.context = context
         this.network = new ClientNetwork(this)
         this.adapter = new adapterCtor(this.network)
+        this.serverTickRate = serverTickRate
 
         this.disconnectHandler = (reason: StringOrParsedJSON, event: any) => {
             console.log('Disconnected!', reason, event)

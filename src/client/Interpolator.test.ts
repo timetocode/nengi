@@ -27,7 +27,7 @@ test('', async () => {
         }
     }
 
-    const client = new Client(ncontext, MockAdapter)
+    const client = new Client(ncontext, MockAdapter, 20)
 
     // snapshot that creates 2 entities
     const a: Snapshot = {

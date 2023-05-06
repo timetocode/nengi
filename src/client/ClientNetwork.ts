@@ -255,7 +255,7 @@ class ClientNetwork {
             this.client.network.chronus.register(snapshot.timestamp)
         } else {
             if (this.previousSnapshot) {
-                snapshot.timestamp = this.previousSnapshot.timestamp + 50
+                snapshot.timestamp = this.previousSnapshot.timestamp + (1000 / this.client.serverTickRate)
             }
         }
 

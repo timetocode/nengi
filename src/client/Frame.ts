@@ -30,7 +30,6 @@ class Frame implements IEntityFrame {
         this.deleteEntities = []
 
         if (previousFrame) {
-           // this.timestamp = previousFrame.timestamp + 50
             previousFrame.entities.forEach(entity => {
                 const clone = Object.assign({}, entity)
                 this.entities.set(clone.nid, clone)

@@ -7,9 +7,10 @@ declare class Client {
     context: Context;
     network: ClientNetwork;
     adapter: any;
+    serverTickRate: number;
     disconnectHandler: DisconnectHandler;
     websocketErrorHandler: WebsocketErrorHandler;
-    constructor(context: Context, adapterCtor: any);
+    constructor(context: Context, adapterCtor: any, serverTickRate: number);
     connect(wsUrl: string, handshake: any): Promise<any>;
     setDisconnectHandler(handler: DisconnectHandler): void;
     setWebsocketErrorHandler(handler: WebsocketErrorHandler): void;
