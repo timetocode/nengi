@@ -19,17 +19,28 @@ class ClientNetwork {
         this.entities = new Map();
         this.snapshots = [];
         this.messages = [];
+        this.outboundEngine = new NQueue_1.NQueue();
         this.outbound = new NQueue_1.NQueue();
         this.socket = null;
         this.requestId = 1;
         this.requestQueue = new NQueue_1.NQueue();
         this.requests = new Map();
+        this.clientTick = 1;
         this.onDisconnect = (reason, event) => {
             this.client.disconnectHandler(reason, event);
         };
         this.onSocketError = (event) => {
             this.client.websocketErrorHandler(event);
         };
+    }
+    incrementClientTick() {
+        this.clientTick++;
+        if (this.clientTick > 65535) {
+            this.clientTick = 1;
+        }
+    }
+    addEngineCommand(command) {
+        this.outboundEngine.enqueue(command);
     }
     addCommand(command) {
         this.outbound.enqueue(command);
@@ -55,38 +66,68 @@ class ClientNetwork {
         const dw = binaryWriterCtor.create(handshakeByteLength + 3);
         dw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
         dw.writeUInt8(1);
-        dw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAttempt);
         (0, writeMessage_1.writeMessage)(handshakeMessage, connectAttemptSchema_1.connectionAttemptSchema, dw);
         return dw.buffer;
     }
     createOutboundBuffer(binaryWriterCtor) {
+        this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.ClientTick, tick: this.clientTick });
         let bytes = 0;
-        bytes += 1; // commands!
-        bytes += 1; // number of commands
-        this.outbound.arr.forEach((command) => {
-            bytes += (0, count_1.default)(this.client.context.getSchema(command.ntype), command);
-        });
-        bytes += 1; // requests
-        bytes += 1; // number of requests
-        this.requestQueue.arr.forEach((request) => {
-            bytes += 12 + request.body.length;
-        });
+        // count ENGINE COMMANDS
+        if (this.outboundEngine.length > 0) {
+            bytes += 1; // commands!
+            bytes += 1; // number of commands
+            this.outboundEngine.arr.forEach((command) => {
+                bytes += (0, count_1.default)(this.client.context.getEngineSchema(command.ntype), command);
+            });
+        }
+        // count COMMANDS
+        if (this.outbound.length > 0) {
+            bytes += 1; // commands!
+            bytes += 1; // number of commands
+            this.outbound.arr.forEach((command) => {
+                bytes += (0, count_1.default)(this.client.context.getSchema(command.ntype), command);
+            });
+        }
+        // count REQUESTS
+        if (this.requestQueue.length > 0) {
+            bytes += 1; // requests
+            bytes += 1; // number of requests
+            this.requestQueue.arr.forEach((request) => {
+                bytes += 12 + request.body.length;
+            });
+        }
         // @ts-ignore
         const dw = binaryWriterCtor.create(bytes);
-        dw.writeUInt8(BinarySection_1.BinarySection.Commands);
-        dw.writeUInt8(this.outbound.arr.length);
-        this.outbound.arr.forEach((command) => {
-            (0, writeMessage_1.writeMessage)(command, this.client.context.getSchema(command.ntype), dw);
-        });
-        this.outbound.arr = [];
-        dw.writeUInt8(BinarySection_1.BinarySection.Requests);
-        dw.writeUInt8(this.requestQueue.arr.length);
-        this.requestQueue.arr.forEach((request) => {
-            dw.writeUInt32(request.requestId);
-            dw.writeUInt32(request.endpoint);
-            dw.writeString(request.body);
-        });
-        this.requestQueue.arr = [];
+        // write ENGINE COMMANDs
+        if (this.outboundEngine.length > 0) {
+            dw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
+            dw.writeUInt8(this.outboundEngine.arr.length);
+            this.outboundEngine.arr.forEach((command) => {
+                (0, writeMessage_1.writeMessage)(command, this.client.context.getEngineSchema(command.ntype), dw);
+            });
+            this.outboundEngine.arr = [];
+        }
+        // write COMMANDS
+        if (this.outbound.length > 0) {
+            dw.writeUInt8(BinarySection_1.BinarySection.Commands);
+            dw.writeUInt8(this.outbound.arr.length);
+            this.outbound.arr.forEach((command) => {
+                (0, writeMessage_1.writeMessage)(command, this.client.context.getSchema(command.ntype), dw);
+            });
+            this.outbound.arr = [];
+        }
+        // write REQUESTS
+        if (this.requestQueue.length > 0) {
+            dw.writeUInt8(BinarySection_1.BinarySection.Requests);
+            dw.writeUInt8(this.requestQueue.arr.length);
+            this.requestQueue.arr.forEach((request) => {
+                dw.writeUInt32(request.requestId);
+                dw.writeUInt32(request.endpoint);
+                dw.writeString(request.body);
+            });
+            this.requestQueue.arr = [];
+        }
+        this.incrementClientTick();
         return dw.buffer;
     }
     readSnapshot(dr) {

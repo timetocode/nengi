@@ -14,6 +14,7 @@ interface INetworkEvent {
 
 class InstanceNetwork {
     instance: Instance
+
     constructor(instance: Instance) {
         this.instance = instance
     }
@@ -107,13 +108,19 @@ class InstanceNetwork {
                 case BinarySection.EngineMessages: {
                     const count = binaryReader.readUInt8()
                     for (let i = 0; i < count; i++) {
-                        const type = binaryReader.readUInt8()
-                        if (type === EngineMessage.ConnectionAttempt) {
-                            const msg: any = readEngineMessage(binaryReader, this.instance.context)
+                        const msg: any = readEngineMessage(binaryReader, this.instance.context)
+
+                        if (msg.ntype === EngineMessage.ConnectionAttempt) {
                             const handshake = JSON.parse(msg.handshake)
                             this.onHandshake(user, handshake)
                         }
+
+                        if (msg.ntype === EngineMessage.ClientTick) {
+                            const clientTick = msg.tick
+                            user.lastReceivedTick = clientTick
+                        }
                     }
+
                     break
                 }
                 case BinarySection.Commands: {

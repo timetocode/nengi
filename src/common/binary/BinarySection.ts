@@ -7,7 +7,8 @@ enum BinarySection {
     Messages,
     Commands,
     Requests,
-    Responses
+    Responses,
+    ClientTick
 }
 
 export { BinarySection }

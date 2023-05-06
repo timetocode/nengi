@@ -3,11 +3,11 @@ declare enum EngineMessage {
     ConnectionAccepted = 1,
     ConnectionDenied = 2,
     ConnectionAttempt = 3,
-    Foo = 4,
-    ChannelJoin = 5,
-    ChannelLeave = 6,
-    ChannelAddEntity = 7,
-    ChannelRemoveEntity = 8,
-    ConnectionTerminated = 9
+    ChannelJoin = 4,
+    ChannelLeave = 5,
+    ChannelAddEntity = 6,
+    ChannelRemoveEntity = 7,
+    ConnectionTerminated = 8,
+    ClientTick = 9
 }
 export { EngineMessage };

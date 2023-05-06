@@ -18,12 +18,14 @@ class ClientNetwork {
     client: Client
     entities: Map<number, IEntity>
     snapshots: Snapshot[]
+    outboundEngine: NQueue<any>
     outbound: NQueue<any> // TODO a type
     messages: any[]
     socket: WebSocket | null
     requestId: number
     requestQueue: NQueue<any>
     requests: Map<number, any>
+    clientTick: number
     onDisconnect: (reason: any, event?: any) => void
     onSocketError: (event: any) => void
 
@@ -32,11 +34,13 @@ class ClientNetwork {
         this.entities = new Map()
         this.snapshots = []
         this.messages = []
+        this.outboundEngine = new NQueue()
         this.outbound = new NQueue()
         this.socket = null
         this.requestId = 1
         this.requestQueue = new NQueue()
         this.requests = new Map()
+        this.clientTick = 1
 
         this.onDisconnect = (reason: any, event?: any) => {
             this.client.disconnectHandler(reason, event)
@@ -44,6 +48,17 @@ class ClientNetwork {
         this.onSocketError = (event: any) => {
             this.client.websocketErrorHandler(event)
         }
+    }
+
+    incrementClientTick() {
+        this.clientTick++
+        if (this.clientTick > 65535) {
+            this.clientTick = 1
+        }
+    }
+
+    addEngineCommand(command: any) {
+        this.outboundEngine.enqueue(command)
     }
 
     addCommand(command: any) {
@@ -74,49 +89,78 @@ class ClientNetwork {
         const dw = binaryWriterCtor.create(handshakeByteLength + 3)
         dw.writeUInt8(BinarySection.EngineMessages)
         dw.writeUInt8(1)
-        dw.writeUInt8(EngineMessage.ConnectionAttempt)
         writeMessage(handshakeMessage, connectionAttemptSchema, dw)
         return dw.buffer
     }
 
     createOutboundBuffer(binaryWriterCtor: IBinaryWriterClass) {
+        this.addEngineCommand({ ntype: EngineMessage.ClientTick, tick: this.clientTick })
+
         let bytes = 0
-        bytes += 1 // commands!
-        bytes += 1 // number of commands
 
-        this.outbound.arr.forEach((command: any) => {
-            bytes += count(this.client.context.getSchema(command.ntype)!, command)
-        })
+        // count ENGINE COMMANDS
+        if (this.outboundEngine.length > 0) {
+            bytes += 1 // commands!
+            bytes += 1 // number of commands
+            this.outboundEngine.arr.forEach((command: any) => {
+                bytes += count(this.client.context.getEngineSchema(command.ntype)!, command)
+            })
+        }
 
-        bytes += 1 // requests
-        bytes += 1 // number of requests
-        this.requestQueue.arr.forEach((request: any) => {
-            bytes += 12 + request.body.length
-        })
+        // count COMMANDS
+        if (this.outbound.length > 0) {
+            bytes += 1 // commands!
+            bytes += 1 // number of commands
+            this.outbound.arr.forEach((command: any) => {
+                bytes += count(this.client.context.getSchema(command.ntype)!, command)
+            })
+        }
+
+        // count REQUESTS
+        if (this.requestQueue.length > 0) {
+            bytes += 1 // requests
+            bytes += 1 // number of requests
+            this.requestQueue.arr.forEach((request: any) => {
+                bytes += 12 + request.body.length
+            })
+        }
 
         // @ts-ignore
         const dw = binaryWriterCtor.create(bytes)
 
-        dw.writeUInt8(BinarySection.Commands)
-        dw.writeUInt8(this.outbound.arr.length)
+        // write ENGINE COMMANDs
+        if (this.outboundEngine.length > 0) {
+            dw.writeUInt8(BinarySection.EngineMessages)
+            dw.writeUInt8(this.outboundEngine.arr.length)
+            this.outboundEngine.arr.forEach((command: any) => {
+                writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
+            })
+            this.outboundEngine.arr = []
+        }
 
-        this.outbound.arr.forEach((command: any) => {
-            writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
-        })
+        // write COMMANDS
+        if (this.outbound.length > 0) {
+            dw.writeUInt8(BinarySection.Commands)
+            dw.writeUInt8(this.outbound.arr.length)
+            this.outbound.arr.forEach((command: any) => {
+                writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
+            })
+            this.outbound.arr = []
+        }
 
-        this.outbound.arr = []
+        // write REQUESTS
+        if (this.requestQueue.length > 0) {
+            dw.writeUInt8(BinarySection.Requests)
+            dw.writeUInt8(this.requestQueue.arr.length)
+            this.requestQueue.arr.forEach((request: any) => {
+                dw.writeUInt32(request.requestId)
+                dw.writeUInt32(request.endpoint)
+                dw.writeString(request.body)
+            })
+            this.requestQueue.arr = []
+        }
 
-        dw.writeUInt8(BinarySection.Requests)
-        dw.writeUInt8(this.requestQueue.arr.length)
-
-        this.requestQueue.arr.forEach((request: any) => {
-            dw.writeUInt32(request.requestId)
-            dw.writeUInt32(request.endpoint)
-            dw.writeString(request.body)
-        })
-
-        this.requestQueue.arr = []
-
+        this.incrementClientTick()
         return dw.buffer
     }
 
@@ -141,7 +185,6 @@ class ClientNetwork {
                             // @ts-ignore
                             console.log('connection terminated reason!', engineMessage.reason)
                         }
-                    
                     }
                     break
                 }

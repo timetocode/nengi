@@ -39,6 +39,8 @@ class User {
     cache: { [prop: number]: number }
     cacheArr: number[]
 
+    lastReceivedTick: number
+
     constructor(socket: any, networkAdapter: IServerNetworkAdapter) {
         this.id = 0
         this.socket = socket
@@ -54,6 +56,8 @@ class User {
 
         this.cache = {}
         this.cacheArr = []
+
+        this.lastReceivedTick = -1
     }
 
     subscribe(channel: IChannel) {

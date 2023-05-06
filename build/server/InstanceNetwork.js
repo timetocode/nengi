@@ -101,11 +101,14 @@ class InstanceNetwork {
                 case BinarySection_1.BinarySection.EngineMessages: {
                     const count = binaryReader.readUInt8();
                     for (let i = 0; i < count; i++) {
-                        const type = binaryReader.readUInt8();
-                        if (type === EngineMessage_1.EngineMessage.ConnectionAttempt) {
-                            const msg = (0, readEngineMessage_1.default)(binaryReader, this.instance.context);
+                        const msg = (0, readEngineMessage_1.default)(binaryReader, this.instance.context);
+                        if (msg.ntype === EngineMessage_1.EngineMessage.ConnectionAttempt) {
                             const handshake = JSON.parse(msg.handshake);
                             this.onHandshake(user, handshake);
+                        }
+                        if (msg.ntype === EngineMessage_1.EngineMessage.ClientTick) {
+                            const clientTick = msg.tick;
+                            user.lastReceivedTick = clientTick;
                         }
                     }
                     break;

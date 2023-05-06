@@ -7,6 +7,7 @@ declare enum BinarySection {
     Messages = 5,
     Commands = 6,
     Requests = 7,
-    Responses = 8
+    Responses = 8,
+    ClientTick = 9
 }
 export { BinarySection };
