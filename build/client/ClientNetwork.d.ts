@@ -4,6 +4,7 @@ import { Client } from './Client';
 import { Snapshot } from './Snapshot';
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter';
 import { IBinaryReader } from '../common/binary/IBinaryReader';
+import { Chronus } from './Chronus';
 declare class ClientNetwork {
     client: Client;
     entities: Map<number, IEntity>;
@@ -16,6 +17,8 @@ declare class ClientNetwork {
     requestQueue: NQueue<any>;
     requests: Map<number, any>;
     clientTick: number;
+    previousSnapshot: Snapshot | null;
+    chronus: Chronus;
     onDisconnect: (reason: any, event?: any) => void;
     onSocketError: (event: any) => void;
     constructor(client: Client);

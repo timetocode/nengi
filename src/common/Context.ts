@@ -5,6 +5,7 @@ import { connectionAcceptedSchema } from './schemas/connectionAcceptedSchema'
 import { connectionDeniedSchema } from './schemas/connectionDeniedSchema'
 import { connectionTerminatedSchema } from './schemas/connectionTerminatedSchema'
 import { clientTickSchema } from './schemas/clientTickSchema'
+import { timeSyncSchema } from './schemas/timeSyncSchema'
 
 class Context {
 	/**
@@ -27,6 +28,7 @@ class Context {
 		this.engineSchemas.set(EngineMessage.ConnectionDenied, connectionDeniedSchema)
 		this.engineSchemas.set(EngineMessage.ConnectionTerminated, connectionTerminatedSchema)
 		this.engineSchemas.set(EngineMessage.ClientTick, clientTickSchema)
+		this.engineSchemas.set(EngineMessage.TimeSync, timeSyncSchema)
 	}
 
 	register(ntype: number, schema: Schema) {

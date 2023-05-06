@@ -9,7 +9,6 @@ class Chronus {
 
     register(timestamp: number) {
         this.timeDifferences.push(Date.now() - timestamp)
-
         while (this.timeDifferences.length > 20) {
             this.timeDifferences.shift()
         }

@@ -7,6 +7,7 @@ const connectionAcceptedSchema_1 = require("./schemas/connectionAcceptedSchema")
 const connectionDeniedSchema_1 = require("./schemas/connectionDeniedSchema");
 const connectionTerminatedSchema_1 = require("./schemas/connectionTerminatedSchema");
 const clientTickSchema_1 = require("./schemas/clientTickSchema");
+const timeSyncSchema_1 = require("./schemas/timeSyncSchema");
 class Context {
     constructor() {
         this.schemas = new Map();
@@ -17,6 +18,7 @@ class Context {
         this.engineSchemas.set(EngineMessage_1.EngineMessage.ConnectionDenied, connectionDeniedSchema_1.connectionDeniedSchema);
         this.engineSchemas.set(EngineMessage_1.EngineMessage.ConnectionTerminated, connectionTerminatedSchema_1.connectionTerminatedSchema);
         this.engineSchemas.set(EngineMessage_1.EngineMessage.ClientTick, clientTickSchema_1.clientTickSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.TimeSync, timeSyncSchema_1.timeSyncSchema);
     }
     register(ntype, schema) {
         this.schemas.set(ntype, schema);

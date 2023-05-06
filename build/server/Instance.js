@@ -10,6 +10,7 @@ const EntityCache_1 = require("./EntityCache");
 const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
 const NQueue_1 = require("../NQueue");
 const IdPool_1 = require("./IdPool");
+const EngineMessage_1 = require("../common/EngineMessage");
 class Instance {
     constructor(context) {
         this.context = context;
@@ -46,13 +47,27 @@ class Instance {
         return channelId;
     }
     step() {
+        const timestamp = Date.now();
+        const timeSyncEngineMessage = {
+            ntype: EngineMessage_1.EngineMessage.TimeSync,
+            timestamp
+        };
         this.tick++;
         this.cache.createCachesForTick(this.tick);
         this.users.forEach(user => {
-            // TODO aggregate visible entities and messages
-            // demo is instead just sending message from a channel
+            if (user.lastSentInstanceTick === -1) {
+                // this is the first frame connected!
+                user.queueEngineMessage(timeSyncEngineMessage);
+            }
+            else {
+                // send timeSyncs every 20 ticks
+                if (user.lastSentInstanceTick % 20 === 0) {
+                    user.queueEngineMessage(timeSyncEngineMessage);
+                }
+            }
             const buffer = (0, createSnapshotBufferRefactor_1.default)(user, this);
             user.send(buffer);
+            user.lastSentInstanceTick = this.tick;
         });
         this.cache.deleteCachesForTick(this.tick);
     }

@@ -29,18 +29,15 @@ class Interpolator {
         this.frames = [];
         this.latestFrame = null;
     }
-    // TODO add all the creates and deletes
     getInterpolatedState(interpDelay) {
         while (this.client.network.snapshots.length > 0) {
             const snapshot = this.client.network.snapshots.shift();
-            if (snapshot) { // extra check to satisfy ts, redo
-                const frame = new Frame_1.Frame(snapshot, this.latestFrame);
-                this.frames.push(frame);
-                this.latestFrame = frame;
-            }
+            const frame = new Frame_1.Frame(snapshot, this.latestFrame);
+            this.frames.push(frame);
+            this.latestFrame = frame;
         }
-        const now = performance.now();
-        const renderTime = now - interpDelay;
+        const now = Date.now();
+        const renderTime = now - interpDelay - this.client.network.chronus.averageTimeDifference;
         const frameA = findInitialFrame(this.frames, renderTime);
         const frames = [];
         if (frameA) {

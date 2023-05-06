@@ -27,7 +27,8 @@ declare class User {
         [prop: number]: number;
     };
     cacheArr: number[];
-    lastReceivedTick: number;
+    lastSentInstanceTick: number;
+    lastReceivedClientTick: number;
     constructor(socket: any, networkAdapter: IServerNetworkAdapter);
     subscribe(channel: IChannel): void;
     unsubscribe(channel: IChannel): void;

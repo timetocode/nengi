@@ -23,13 +23,17 @@ const getVisibleState = (user: User, instance: Instance) => {
             }
             createEntities.push(entity)
         } else {
-            throw new Error(`Entity [nid ${ nid }] [ntype ${ entity.ntype }] is missing a network schema.`)
+            throw new Error(`Entity [nid ${nid}] [ntype ${entity.ntype}] is missing a network schema.`)
         }
     }
+
+    const engineMessages = user.engineMessageQueue
+    user.engineMessageQueue = []
 
     const messages = user.messageQueue
     // empty the queue
     user.messageQueue = []
+
     const deleteEntities: number[] = vis.noLongerVisible
 
     const updateEntities: any = []
@@ -51,31 +55,39 @@ const getVisibleState = (user: User, instance: Instance) => {
         createEntities,
         updateEntities,
         deleteEntities,
-        messages
+        messages,
+        engineMessages
     }
 }
 
 const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     let bytes = 0
 
-    bytes += 1 // section BinarySection.EngineMessages
-    bytes += 1 // quantity of engine messages
-
-    bytes += 1 // section BinarySection.Messages
-    bytes += 4 // quantity of messages
-
-    bytes += 1 // delete entities
-    bytes += 4 // quantity of entities to delete
-
     const {
-        createEntities, updateEntities, deleteEntities, messages
+        createEntities, updateEntities, deleteEntities, messages, engineMessages
     } = getVisibleState(user, instance)
 
-    for (let i = 0; i < messages.length; i++) {
-        const message = messages[i]
-        const nschema = instance.context.getSchema(message.ntype)!
-        //console.log('counting', message, nschema)
-        bytes += count(nschema, message)
+
+    if (engineMessages.length > 0) {
+        bytes += 1 // section BinarySection.EngineMessages
+        bytes += 1 // quantity of engine messages
+        for (let i = 0; i < engineMessages.length; i++) {
+            const engineMessage = engineMessages[i]
+            const nschema = instance.context.getEngineSchema(engineMessage.ntype)!
+            //console.log('counting', message, nschema)
+            bytes += count(nschema, engineMessage)
+        }
+    }
+
+    if (messages.length > 0) {
+        bytes += 1 // section BinarySection.Messages
+        bytes += 4 // quantity of messages
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i]
+            const nschema = instance.context.getSchema(message.ntype)!
+            //console.log('counting', message, nschema)
+            bytes += count(nschema, message)
+        }
     }
 
     if (user.responseQueue.length > 0) {
@@ -113,20 +125,34 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
         }
     }
 
-    for (let i = 0; i < deleteEntities.length; i++) {
-        bytes += 4
+    if (deleteEntities.length > 0) {
+        bytes += 1 // delete entities
+        bytes += 4 // quantity of entities to delete
+        for (let i = 0; i < deleteEntities.length; i++) {
+            bytes += 4
+        }
     }
 
     const bw = user.networkAdapter.createBufferWriter(bytes)
-    bw.writeUInt8(BinarySection.EngineMessages)
-    bw.writeUInt8(0)
-    bw.writeUInt8(BinarySection.Messages)
-    bw.writeUInt32(messages.length)
 
-    for (let i = 0; i < messages.length; i++) {
-        const message = messages[i]
-        const nschema = instance.context.getSchema(message.ntype)!
-        writeMessage(message, nschema, bw)
+    if (engineMessages.length > 0) {
+        bw.writeUInt8(BinarySection.EngineMessages)
+        bw.writeUInt8(engineMessages.length)
+        for (let i = 0; i < engineMessages.length; i++) {
+            const engineMessage = engineMessages[i]
+            const nschema = instance.context.getEngineSchema(engineMessage.ntype)!
+            writeMessage(engineMessage, nschema, bw)
+        }
+    }
+
+    if (messages.length > 0) {
+        bw.writeUInt8(BinarySection.Messages)
+        bw.writeUInt32(messages.length)
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i]
+            const nschema = instance.context.getSchema(message.ntype)!
+            writeMessage(message, nschema, bw)
+        }
     }
 
     if (user.responseQueue.length > 0) {
@@ -136,8 +162,6 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
         for (let i = 0; i < user.responseQueue.length; i++) {
             bw.writeUInt32(user.responseQueue[i].requestId)
             bw.writeString(user.responseQueue[i].response)
-            // @ts-ignore
-            //bw[BinaryExt(Binary.String).write](user.responseQueue[i].response)
         }
     }
 
@@ -164,11 +188,12 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
         }
     }
 
-    bw.writeUInt8(BinarySection.DeleteEntities)
-    bw.writeUInt32(deleteEntities.length)
-
-    for (let i = 0; i < deleteEntities.length; i++) {
-        bw.writeUInt32(deleteEntities[i])
+    if (deleteEntities.length > 0) {
+        bw.writeUInt8(BinarySection.DeleteEntities)
+        bw.writeUInt32(deleteEntities.length)
+        for (let i = 0; i < deleteEntities.length; i++) {
+            bw.writeUInt32(deleteEntities[i])
+        }
     }
 
     user.responseQueue = []

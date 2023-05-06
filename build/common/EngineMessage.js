@@ -12,7 +12,8 @@ var EngineMessage;
     EngineMessage[EngineMessage["ChannelAddEntity"] = 6] = "ChannelAddEntity";
     EngineMessage[EngineMessage["ChannelRemoveEntity"] = 7] = "ChannelRemoveEntity";
     EngineMessage[EngineMessage["ConnectionTerminated"] = 8] = "ConnectionTerminated";
-    EngineMessage[EngineMessage["ClientTick"] = 9] = "ClientTick";
+    EngineMessage[EngineMessage["TimeSync"] = 9] = "TimeSync";
+    EngineMessage[EngineMessage["ClientTick"] = 10] = "ClientTick";
 })(EngineMessage || (EngineMessage = {}));
 exports.EngineMessage = EngineMessage;
 //# sourceMappingURL=EngineMessage.js.map

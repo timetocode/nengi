@@ -13,6 +13,7 @@ const EngineMessage_1 = require("../common/EngineMessage");
 const BinarySection_1 = require("../common/binary/BinarySection");
 const count_1 = __importDefault(require("../binary/message/count"));
 const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
+const Chronus_1 = require("./Chronus");
 class ClientNetwork {
     constructor(client) {
         this.client = client;
@@ -26,6 +27,8 @@ class ClientNetwork {
         this.requestQueue = new NQueue_1.NQueue();
         this.requests = new Map();
         this.clientTick = 1;
+        this.previousSnapshot = null;
+        this.chronus = new Chronus_1.Chronus();
         this.onDisconnect = (reason, event) => {
             this.client.disconnectHandler(reason, event);
         };
@@ -132,6 +135,7 @@ class ClientNetwork {
     }
     readSnapshot(dr) {
         const snapshot = {
+            timestamp: -1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -148,6 +152,10 @@ class ClientNetwork {
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.ConnectionTerminated) {
                             // @ts-ignore
                             console.log('connection terminated reason!', engineMessage.reason);
+                        }
+                        if (engineMessage.ntype === EngineMessage_1.EngineMessage.TimeSync) {
+                            // @ts-ignore
+                            snapshot.timestamp = engineMessage.timestamp;
                         }
                     }
                     break;
@@ -205,6 +213,15 @@ class ClientNetwork {
                 }
             }
         }
+        if (snapshot.timestamp !== -1) {
+            this.client.network.chronus.register(snapshot.timestamp);
+        }
+        else {
+            if (this.previousSnapshot) {
+                snapshot.timestamp = this.previousSnapshot.timestamp + 50;
+            }
+        }
+        this.previousSnapshot = snapshot;
         this.snapshots.push(snapshot);
     }
 }

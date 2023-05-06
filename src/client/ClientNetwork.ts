@@ -13,6 +13,7 @@ import { EngineMessage } from '../common/EngineMessage'
 import { BinarySection } from '../common/binary/BinarySection'
 import count from '../binary/message/count'
 import readEngineMessage from '../binary/message/readEngineMessage'
+import { Chronus } from './Chronus'
 
 class ClientNetwork {
     client: Client
@@ -26,6 +27,8 @@ class ClientNetwork {
     requestQueue: NQueue<any>
     requests: Map<number, any>
     clientTick: number
+    previousSnapshot: Snapshot | null
+    chronus: Chronus
     onDisconnect: (reason: any, event?: any) => void
     onSocketError: (event: any) => void
 
@@ -41,6 +44,8 @@ class ClientNetwork {
         this.requestQueue = new NQueue()
         this.requests = new Map()
         this.clientTick = 1
+        this.previousSnapshot = null
+        this.chronus = new Chronus()
 
         this.onDisconnect = (reason: any, event?: any) => {
             this.client.disconnectHandler(reason, event)
@@ -166,6 +171,7 @@ class ClientNetwork {
 
     readSnapshot(dr: IBinaryReader) {
         const snapshot: Snapshot = {
+            timestamp: -1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -174,7 +180,6 @@ class ClientNetwork {
 
         while (dr.offset < dr.byteLength) {
             const section = dr.readUInt8()
-
             switch (section) {
                 case BinarySection.EngineMessages: {
                     const count = dr.readUInt8()
@@ -184,6 +189,10 @@ class ClientNetwork {
                         if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
                             // @ts-ignore
                             console.log('connection terminated reason!', engineMessage.reason)
+                        }
+                        if (engineMessage.ntype === EngineMessage.TimeSync) {
+                            // @ts-ignore
+                            snapshot.timestamp = engineMessage.timestamp
                         }
                     }
                     break
@@ -241,6 +250,16 @@ class ClientNetwork {
                 }
             }
         }
+
+        if (snapshot.timestamp !== -1) {
+            this.client.network.chronus.register(snapshot.timestamp)
+        } else {
+            if (this.previousSnapshot) {
+                snapshot.timestamp = this.previousSnapshot.timestamp + 50
+            }
+        }
+
+        this.previousSnapshot = snapshot
         this.snapshots.push(snapshot)
     }
 

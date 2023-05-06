@@ -8,6 +8,7 @@ declare enum EngineMessage {
     ChannelAddEntity = 6,
     ChannelRemoveEntity = 7,
     ConnectionTerminated = 8,
-    ClientTick = 9
+    TimeSync = 9,
+    ClientTick = 10
 }
 export { EngineMessage };

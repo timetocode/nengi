@@ -31,6 +31,7 @@ test('', async () => {
 
     // snapshot that creates 2 entities
     const a: Snapshot = {
+        timestamp: -1,
         messages: [],
         createEntities: [{
             nid: 1,
@@ -55,6 +56,7 @@ test('', async () => {
 
     // snapshot that has the previously created enities moving
     const b: Snapshot = {
+        timestamp: -1,
         messages: [],
         createEntities: [],
         updateEntities: [

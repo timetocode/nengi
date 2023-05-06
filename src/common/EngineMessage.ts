@@ -8,6 +8,7 @@ enum EngineMessage {
     ChannelAddEntity,
     ChannelRemoveEntity,
     ConnectionTerminated,
+    TimeSync,
 
     ClientTick,
 }

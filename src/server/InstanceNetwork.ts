@@ -117,7 +117,7 @@ class InstanceNetwork {
 
                         if (msg.ntype === EngineMessage.ClientTick) {
                             const clientTick = msg.tick
-                            user.lastReceivedTick = clientTick
+                            user.lastReceivedClientTick = clientTick
                         }
                     }
 

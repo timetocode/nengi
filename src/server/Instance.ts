@@ -8,6 +8,7 @@ import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBuffe
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
 import { IdPool } from './IdPool'
+import { EngineMessage } from '../common/EngineMessage'
 
 class Instance {
     context: Context
@@ -74,15 +75,29 @@ class Instance {
     }
 
     step() {
+        const timestamp = Date.now()
+        const timeSyncEngineMessage = {
+            ntype: EngineMessage.TimeSync,
+            timestamp
+        }
+
         this.tick++
         this.cache.createCachesForTick(this.tick)
 
         this.users.forEach(user => {
-            // TODO aggregate visible entities and messages
-            // demo is instead just sending message from a channel
+            if (user.lastSentInstanceTick === -1) {
+                // this is the first frame connected!
+                user.queueEngineMessage(timeSyncEngineMessage)
+            } else {
+                // send timeSyncs every 20 ticks
+                if (user.lastSentInstanceTick % 20 === 0) {
+                    user.queueEngineMessage(timeSyncEngineMessage)
+                }
+            }
 
             const buffer = createSnapshotBufferRefactor(user, this)
             user.send(buffer)
+            user.lastSentInstanceTick = this.tick
         })
 
         this.cache.deleteCachesForTick(this.tick)

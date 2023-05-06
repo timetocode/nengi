@@ -21,7 +21,7 @@ class Frame implements IEntityFrame {
 
     constructor(snapshot: Snapshot, previousFrame: Frame | null) {
         this.tick = tick++
-        this.timestamp = performance.now()
+        this.timestamp = snapshot.timestamp
         this.processed = false
         this.entities = new Map()
 

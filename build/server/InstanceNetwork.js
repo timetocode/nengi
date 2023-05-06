@@ -108,7 +108,7 @@ class InstanceNetwork {
                         }
                         if (msg.ntype === EngineMessage_1.EngineMessage.ClientTick) {
                             const clientTick = msg.tick;
-                            user.lastReceivedTick = clientTick;
+                            user.lastReceivedClientTick = clientTick;
                         }
                     }
                     break;
