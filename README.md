@@ -134,8 +134,9 @@ import { WebSocketClientAdapter } from 'nengi-websocket-client-adapter'
 window.addEventListener('load', async () => {
     console.log('window loaded!')
 
-   const client = new Client(ncontext, WebSocketClientAdapter)
-   const interpolator = new Interpolator(client)
+    const serverTickRate = 20 // 20 ticks per second
+    const client = new Client(ncontext, WebSocketClientAdapter, serverTickRate)
+    const interpolator = new Interpolator(client)
     try {
         const res = await client.connect('ws://localhost:9001', { token: 12345 })
     } catch (err) {
