@@ -4,13 +4,14 @@ import { Snapshot } from './Snapshot'
 interface IEntityFrame {
     createEntities: IEntity[]
     updateEntities: any[]
-    deleteEntities: number[]
+    deleteEntities: number[],
 }
 
 let tick = 0 // TODO this should be the server tick not a client based count
 
 class Frame implements IEntityFrame {
     tick: number
+    clientTick: number
     timestamp: number
     processed: boolean
     entities: Map<number, IEntity>
@@ -21,6 +22,7 @@ class Frame implements IEntityFrame {
 
     constructor(snapshot: Snapshot, previousFrame: Frame | null) {
         this.tick = tick++
+        this.clientTick = snapshot.clientTick
         this.timestamp = snapshot.timestamp
         this.processed = false
         this.entities = new Map()

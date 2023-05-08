@@ -95,6 +95,11 @@ class Instance {
                 }
             }
 
+            user.queueEngineMessage({
+                ntype: EngineMessage.ClientTick,
+                tick: user.lastReceivedClientTick
+            })
+
             const buffer = createSnapshotBufferRefactor(user, this)
             user.send(buffer)
             user.lastSentInstanceTick = this.tick

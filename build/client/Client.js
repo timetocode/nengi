@@ -2,12 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Client = void 0;
 const ClientNetwork_1 = require("./ClientNetwork");
+const Predictor_1 = require("./prediction/Predictor");
 class Client {
     constructor(context, adapterCtor, serverTickRate) {
         this.context = context;
         this.network = new ClientNetwork_1.ClientNetwork(this);
         this.adapter = new adapterCtor(this.network);
         this.serverTickRate = serverTickRate;
+        this.predictor = new Predictor_1.Predictor();
         this.disconnectHandler = (reason, event) => {
             console.log('Disconnected!', reason, event);
         };

@@ -15,6 +15,12 @@ export * from './server/adapter/MockAdapter'
 export * from './client/Client'
 export * from './client/ClientNetwork'
 export * from './client/Interpolator'
+export * from './client/prediction/Predictor'
+export * from './client/prediction/PredictionErrorFrame'
+export * from './client/prediction/PredictionErrorEntity'
+export * from './client/prediction/PredictionErrorProperty'
+export * from './client/prediction/PredictionFrame'
+export * from './client/prediction/EntityPrediction'
 
 // common
 export * from './common/binary/Binary'

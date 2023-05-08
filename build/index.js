@@ -30,6 +30,12 @@ __exportStar(require("./server/adapter/MockAdapter"), exports);
 __exportStar(require("./client/Client"), exports);
 __exportStar(require("./client/ClientNetwork"), exports);
 __exportStar(require("./client/Interpolator"), exports);
+__exportStar(require("./client/prediction/Predictor"), exports);
+__exportStar(require("./client/prediction/PredictionErrorFrame"), exports);
+__exportStar(require("./client/prediction/PredictionErrorEntity"), exports);
+__exportStar(require("./client/prediction/PredictionErrorProperty"), exports);
+__exportStar(require("./client/prediction/PredictionFrame"), exports);
+__exportStar(require("./client/prediction/EntityPrediction"), exports);
 // common
 __exportStar(require("./common/binary/Binary"), exports);
 __exportStar(require("./common/binary/BinarySection"), exports);

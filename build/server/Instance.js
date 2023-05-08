@@ -65,6 +65,10 @@ class Instance {
                     user.queueEngineMessage(timeSyncEngineMessage);
                 }
             }
+            user.queueEngineMessage({
+                ntype: EngineMessage_1.EngineMessage.ClientTick,
+                tick: user.lastReceivedClientTick
+            });
             const buffer = (0, createSnapshotBufferRefactor_1.default)(user, this);
             user.send(buffer);
             user.lastSentInstanceTick = this.tick;

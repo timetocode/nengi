@@ -1,5 +1,6 @@
 import { Context } from '../common/Context'
 import { ClientNetwork } from './ClientNetwork'
+import { Predictor } from './prediction/Predictor'
 
 type StringOrParsedJSON = string | Object
 type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
@@ -10,6 +11,7 @@ class Client {
     network: ClientNetwork
     adapter: any
     serverTickRate: number
+    predictor: Predictor
     disconnectHandler: DisconnectHandler
     websocketErrorHandler: WebsocketErrorHandler
 
@@ -18,6 +20,7 @@ class Client {
         this.network = new ClientNetwork(this)
         this.adapter = new adapterCtor(this.network)
         this.serverTickRate = serverTickRate
+        this.predictor = new Predictor()
 
         this.disconnectHandler = (reason: StringOrParsedJSON, event: any) => {
             console.log('Disconnected!', reason, event)

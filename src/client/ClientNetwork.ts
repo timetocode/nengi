@@ -22,6 +22,7 @@ class ClientNetwork {
     outboundEngine: NQueue<any>
     outbound: NQueue<any> // TODO a type
     messages: any[]
+    predictionErrorFrames: any[]
     socket: WebSocket | null
     requestId: number
     requestQueue: NQueue<any>
@@ -37,6 +38,7 @@ class ClientNetwork {
         this.entities = new Map()
         this.snapshots = []
         this.messages = []
+        this.predictionErrorFrames = []
         this.outboundEngine = new NQueue()
         this.outbound = new NQueue()
         this.socket = null
@@ -172,6 +174,7 @@ class ClientNetwork {
     readSnapshot(dr: IBinaryReader) {
         const snapshot: Snapshot = {
             timestamp: -1,
+            clientTick: -1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -193,6 +196,10 @@ class ClientNetwork {
                         if (engineMessage.ntype === EngineMessage.TimeSync) {
                             // @ts-ignore
                             snapshot.timestamp = engineMessage.timestamp
+                        }
+                        if (engineMessage.ntype === EngineMessage.ClientTick) {
+                            // @ts-ignore
+                            snapshot.clientTick = engineMessage.tick
                         }
                     }
                     break

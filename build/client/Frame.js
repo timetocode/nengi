@@ -5,6 +5,7 @@ let tick = 0; // TODO this should be the server tick not a client based count
 class Frame {
     constructor(snapshot, previousFrame) {
         this.tick = tick++;
+        this.clientTick = snapshot.clientTick;
         this.timestamp = snapshot.timestamp;
         this.processed = false;
         this.entities = new Map();

@@ -12,6 +12,7 @@ declare class ClientNetwork {
     outboundEngine: NQueue<any>;
     outbound: NQueue<any>;
     messages: any[];
+    predictionErrorFrames: any[];
     socket: WebSocket | null;
     requestId: number;
     requestQueue: NQueue<any>;

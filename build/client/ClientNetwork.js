@@ -20,6 +20,7 @@ class ClientNetwork {
         this.entities = new Map();
         this.snapshots = [];
         this.messages = [];
+        this.predictionErrorFrames = [];
         this.outboundEngine = new NQueue_1.NQueue();
         this.outbound = new NQueue_1.NQueue();
         this.socket = null;
@@ -136,6 +137,7 @@ class ClientNetwork {
     readSnapshot(dr) {
         const snapshot = {
             timestamp: -1,
+            clientTick: -1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -156,6 +158,10 @@ class ClientNetwork {
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.TimeSync) {
                             // @ts-ignore
                             snapshot.timestamp = engineMessage.timestamp;
+                        }
+                        if (engineMessage.ntype === EngineMessage_1.EngineMessage.ClientTick) {
+                            // @ts-ignore
+                            snapshot.clientTick = engineMessage.tick;
                         }
                     }
                     break;
