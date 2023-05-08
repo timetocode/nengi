@@ -35,7 +35,7 @@ __exportStar(require("./client/prediction/PredictionErrorFrame"), exports);
 __exportStar(require("./client/prediction/PredictionErrorEntity"), exports);
 __exportStar(require("./client/prediction/PredictionErrorProperty"), exports);
 __exportStar(require("./client/prediction/PredictionFrame"), exports);
-__exportStar(require("./client/prediction/EntityPrediction"), exports);
+__exportStar(require("./client/prediction/PredictionEntity"), exports);
 // common
 __exportStar(require("./common/binary/Binary"), exports);
 __exportStar(require("./common/binary/BinarySection"), exports);

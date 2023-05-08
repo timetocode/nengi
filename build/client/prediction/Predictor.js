@@ -15,7 +15,6 @@ class Predictor {
         this.latestTick = -1;
     }
     cleanUp(tick) {
-        console.log('pred stats', this.predictionFrames.size);
         this.predictionFrames.forEach(predictionFrame => {
             if (predictionFrame.tick < tick - 50) {
                 this.predictionFrames.delete(predictionFrame.tick);

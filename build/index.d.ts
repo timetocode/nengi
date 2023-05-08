@@ -17,7 +17,7 @@ export * from './client/prediction/PredictionErrorFrame';
 export * from './client/prediction/PredictionErrorEntity';
 export * from './client/prediction/PredictionErrorProperty';
 export * from './client/prediction/PredictionFrame';
-export * from './client/prediction/EntityPrediction';
+export * from './client/prediction/PredictionEntity';
 export * from './common/binary/Binary';
 export * from './common/binary/BinarySection';
 export * from './common/Context';

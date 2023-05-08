@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PredictionFrame = void 0;
-const EntityPrediction_1 = require("./EntityPrediction");
+const PredictionEntity_1 = require("./PredictionEntity");
 class PredictionFrame {
     constructor(tick) {
         this.tick = tick;
@@ -11,7 +11,7 @@ class PredictionFrame {
         //console.log('prediction created', this.tick, nid, entity, props)
         let entityPrediction = this.entityPredictions.get(nid);
         if (!entityPrediction) {
-            entityPrediction = new EntityPrediction_1.EntityPrediction(nid, entity, props, nschema);
+            entityPrediction = new PredictionEntity_1.PredictionEntity(nid, entity, props, nschema);
             this.entityPredictions.set(nid, entityPrediction);
         }
         else {
