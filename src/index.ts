@@ -20,7 +20,7 @@ export * from './client/prediction/PredictionErrorFrame'
 export * from './client/prediction/PredictionErrorEntity'
 export * from './client/prediction/PredictionErrorProperty'
 export * from './client/prediction/PredictionFrame'
-export * from './client/prediction/EntityPrediction'
+export * from './client/prediction/PredictionEntity'
 
 // common
 export * from './common/binary/Binary'

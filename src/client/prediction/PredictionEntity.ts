@@ -1,6 +1,6 @@
 import { Schema } from '../../common/binary/schema/Schema'
 
-class EntityPrediction {
+class PredictionEntity {
     nid: number
     proxy: any
     props: string[]
@@ -14,4 +14,4 @@ class EntityPrediction {
     }
 }
 
-export { EntityPrediction }
+export { PredictionEntity }

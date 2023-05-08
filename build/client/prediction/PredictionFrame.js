@@ -8,7 +8,7 @@ class PredictionFrame {
         this.entityPredictions = new Map();
     }
     add(nid, entity, props, nschema) {
-        console.log('prediction created', this.tick, nid, entity, props);
+        //console.log('prediction created', this.tick, nid, entity, props)
         let entityPrediction = this.entityPredictions.get(nid);
         if (!entityPrediction) {
             entityPrediction = new EntityPrediction_1.EntityPrediction(nid, entity, props, nschema);

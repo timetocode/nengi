@@ -38,7 +38,7 @@ class Interpolator {
             const predictionErrorFrame = this.client.predictor.getErrors(frame);
             //console.log({ predictionErrorFrame })
             if (predictionErrorFrame.entities.size > 0) {
-                console.log('yo there were some prediction errors');
+                //console.log('yo there were some prediction errors')
                 this.client.network.predictionErrorFrames.push(predictionErrorFrame);
             }
             this.client.predictor.cleanUp(frame.clientTick);
@@ -61,7 +61,7 @@ class Interpolator {
                         frame.processed = true;
                         this.frames.splice(i, 1);
                         // not sure if this is right, needs tested in lag
-                        console.log('cleaning up', frame.clientTick - 1);
+                        //console.log('cleaning up', frame.clientTick - 1)
                         this.client.predictor.cleanUp(frame.clientTick - 1);
                     }
                     else {
@@ -103,11 +103,11 @@ class Interpolator {
                     const { nid, prop } = frameB.updateEntities[i];
                     //console.log('searching for prediction', frameA.clientTick, nid, prop)
                     if (this.client.predictor.has(frameA.clientTick, nid, prop)) {
-                        console.log('this value was predicted, skip');
+                        //console.log('this value was predicted, skip')
                         continue;
                     }
                     if (this.client.predictor.has(frameB.clientTick, nid, prop)) {
-                        console.log('this value was predicted, skip');
+                        //console.log('this value was predicted, skip')
                         continue;
                     }
                     const entityA = frameA.entities.get(nid);

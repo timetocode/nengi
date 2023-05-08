@@ -1,9 +1,9 @@
 import { Schema } from '../../common/binary/schema/Schema'
-import { EntityPrediction } from './EntityPrediction'
+import { PredictionEntity } from './PredictionEntity'
 
 class PredictionFrame {
     tick: number
-    entityPredictions: Map<number, EntityPrediction>
+    entityPredictions: Map<number, PredictionEntity>
 
     constructor(tick: number) {
         this.tick = tick
@@ -11,10 +11,10 @@ class PredictionFrame {
     }
 
     add(nid: number, entity: any, props: string[], nschema: Schema) {
-        console.log('prediction created', this.tick, nid, entity, props)
+        //console.log('prediction created', this.tick, nid, entity, props)
         let entityPrediction = this.entityPredictions.get(nid)
         if (!entityPrediction) {
-            entityPrediction = new EntityPrediction(nid, entity, props, nschema)
+            entityPrediction = new PredictionEntity(nid, entity, props, nschema)
             this.entityPredictions.set(nid, entityPrediction)
         } else {
             entityPrediction.proxy = entity
