@@ -5,12 +5,15 @@ import { Snapshot } from './Snapshot';
 import { IBinaryWriterClass } from '../common/binary/IBinaryWriter';
 import { IBinaryReader } from '../common/binary/IBinaryReader';
 import { Chronus } from './Chronus';
+import { Outbound } from './Outbound';
+import { Frame } from './Frame';
 declare class ClientNetwork {
     client: Client;
     entities: Map<number, IEntity>;
     snapshots: Snapshot[];
-    outboundEngine: NQueue<any>;
-    outbound: NQueue<any>;
+    frames: Frame[];
+    latestFrame: Frame | null;
+    outbound: Outbound;
     messages: any[];
     predictionErrorFrames: any[];
     socket: WebSocket | null;

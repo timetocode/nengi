@@ -13,6 +13,7 @@ class Predictor {
     constructor() {
         this.predictionFrames = new Map();
         this.latestTick = -1;
+        this.generalPrediction = new Map();
     }
     cleanUp(tick) {
         this.predictionFrames.forEach(predictionFrame => {
@@ -29,6 +30,10 @@ class Predictor {
         }
         const proxy = Object.assign({}, entity);
         predictionFrame.add(entity.nid, proxy, props, nschema);
+        if (!this.generalPrediction.has(entity.nid)) {
+            console.log('did not have general prediction, creating one!', entity.nid, new Set(props));
+            this.generalPrediction.set(entity.nid, new Set(props));
+        }
     }
     add(tick, entity, props, nschema) {
         let predictionFrame = this.predictionFrames.get(tick);
@@ -50,10 +55,10 @@ class Predictor {
         return false;
     }
     getErrors(frame) {
-        const predictionErrorFrame = new PredictionErrorFrame_1.PredictionErrorFrame(frame.clientTick);
+        const predictionErrorFrame = new PredictionErrorFrame_1.PredictionErrorFrame(frame.confirmedClientTick);
         if (frame) {
             // predictions for this frame
-            const predictionFrame = this.predictionFrames.get(frame.clientTick);
+            const predictionFrame = this.predictionFrames.get(frame.confirmedClientTick);
             if (predictionFrame) {
                 predictionFrame.entityPredictions.forEach(entityPrediction => {
                     // predictions for this entity
@@ -72,7 +77,7 @@ class Predictor {
                 });
             }
         }
-        this.latestTick = frame.clientTick;
+        this.latestTick = frame.confirmedClientTick;
         return predictionErrorFrame;
     }
 }

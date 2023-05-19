@@ -4,8 +4,6 @@ declare const findInitialFrame: (frames: Frame[], renderTime: number) => Frame |
 declare const findSubsequentFrame: (frames: Frame[], previousTick: number) => Frame | null;
 declare class Interpolator {
     client: Client;
-    latestFrame: Frame | null;
-    frames: Frame[];
     constructor(client: Client);
     getInterpolatedState(interpDelay: number): IEntityFrame[];
 }

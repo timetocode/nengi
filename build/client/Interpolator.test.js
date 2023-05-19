@@ -35,7 +35,7 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
     // snapshot that creates 2 entities
     const a = {
         timestamp: -1,
-        clientTick: -1,
+        confirmedClientTick: -1,
         messages: [],
         createEntities: [{
                 nid: 1,
@@ -58,7 +58,7 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
     // snapshot that has the previously created enities moving
     const b = {
         timestamp: -1,
-        clientTick: -1,
+        confirmedClientTick: -1,
         messages: [],
         createEntities: [],
         updateEntities: [
@@ -73,6 +73,5 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
     const interpolator = new Interpolator_1.Interpolator(client);
     yield waitFor(300);
     const iState = interpolator.getInterpolatedState(100);
-    console.log('yolo', iState);
 }));
 //# sourceMappingURL=Interpolator.test.js.map

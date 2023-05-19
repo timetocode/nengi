@@ -14,13 +14,17 @@ import { BinarySection } from '../common/binary/BinarySection'
 import count from '../binary/message/count'
 import readEngineMessage from '../binary/message/readEngineMessage'
 import { Chronus } from './Chronus'
+import { Outbound } from './Outbound'
+import { Frame } from './Frame'
+
 
 class ClientNetwork {
     client: Client
     entities: Map<number, IEntity>
     snapshots: Snapshot[]
-    outboundEngine: NQueue<any>
-    outbound: NQueue<any> // TODO a type
+    frames: Frame[]
+    latestFrame: Frame | null
+    outbound: Outbound
     messages: any[]
     predictionErrorFrames: any[]
     socket: WebSocket | null
@@ -37,10 +41,13 @@ class ClientNetwork {
         this.client = client
         this.entities = new Map()
         this.snapshots = []
+        this.frames = []
+        this.latestFrame = null
         this.messages = []
         this.predictionErrorFrames = []
-        this.outboundEngine = new NQueue()
-        this.outbound = new NQueue()
+        this.outbound = new Outbound()
+        //this.outboundEngine = new NQueue()
+        //this.outbound = new NQueue()
         this.socket = null
         this.requestId = 1
         this.requestQueue = new NQueue()
@@ -65,11 +72,13 @@ class ClientNetwork {
     }
 
     addEngineCommand(command: any) {
-        this.outboundEngine.enqueue(command)
+        this.outbound.addEngineCommand(command)
+        //this.outboundEngine.enqueue(command)
     }
 
     addCommand(command: any) {
-        this.outbound.enqueue(command)
+        this.outbound.addCommand(command)
+        //this.outbound.enqueue(command)
     }
 
     request(endpoint: number, payload: any, callback: (response: any) => any) {
@@ -79,8 +88,6 @@ class ClientNetwork {
             body: JSON.stringify(payload),
             callback
         }
-
-        //console.log(obj)
         this.requestQueue.enqueue(obj)
         this.requests.set(obj.requestId, obj)
     }
@@ -101,24 +108,27 @@ class ClientNetwork {
     }
 
     createOutboundBuffer(binaryWriterCtor: IBinaryWriterClass) {
-        this.addEngineCommand({ ntype: EngineMessage.ClientTick, tick: this.clientTick })
+        const tick = this.clientTick
+        this.addEngineCommand({ ntype: EngineMessage.ClientTick, tick })
 
         let bytes = 0
 
+        const { outboundEngineCommands, outboundCommands } = this.outbound.getCurrentFrame()
+
         // count ENGINE COMMANDS
-        if (this.outboundEngine.length > 0) {
+        if (outboundEngineCommands.length > 0) {
             bytes += 1 // commands!
             bytes += 1 // number of commands
-            this.outboundEngine.arr.forEach((command: any) => {
+            outboundEngineCommands.forEach((command: any) => {
                 bytes += count(this.client.context.getEngineSchema(command.ntype)!, command)
             })
         }
 
         // count COMMANDS
-        if (this.outbound.length > 0) {
+        if (outboundCommands.length > 0) {
             bytes += 1 // commands!
             bytes += 1 // number of commands
-            this.outbound.arr.forEach((command: any) => {
+            outboundCommands.forEach((command: any) => {
                 bytes += count(this.client.context.getSchema(command.ntype)!, command)
             })
         }
@@ -136,23 +146,34 @@ class ClientNetwork {
         const dw = binaryWriterCtor.create(bytes)
 
         // write ENGINE COMMANDs
-        if (this.outboundEngine.length > 0) {
+        if (outboundEngineCommands.length > 0) {
             dw.writeUInt8(BinarySection.EngineMessages)
-            dw.writeUInt8(this.outboundEngine.arr.length)
-            this.outboundEngine.arr.forEach((command: any) => {
+            dw.writeUInt8(outboundEngineCommands.length)
+
+            //do {
+            //     const command = outboundEngineCommands.dequeue()
+            //    writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
+            //} while (!outboundEngineCommands.isEmpty())
+
+            outboundEngineCommands.forEach((command: any) => {
                 writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
             })
-            this.outboundEngine.arr = []
+            //this.outboundEngine.arr = []
         }
 
         // write COMMANDS
-        if (this.outbound.length > 0) {
+        if (outboundCommands.length > 0) {
             dw.writeUInt8(BinarySection.Commands)
-            dw.writeUInt8(this.outbound.arr.length)
-            this.outbound.arr.forEach((command: any) => {
+            dw.writeUInt8(outboundCommands.length)
+
+            //do {
+            //    const command = outboundCommands.dequeue()
+            //    writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
+            //} while (!outboundCommands.isEmpty())
+            outboundCommands.forEach((command: any) => {
                 writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
             })
-            this.outbound.arr = []
+            //this.outbound.arr = []
         }
 
         // write REQUESTS
@@ -167,6 +188,7 @@ class ClientNetwork {
             this.requestQueue.arr = []
         }
 
+        this.outbound.tick = tick
         this.incrementClientTick()
         return dw.buffer
     }
@@ -174,7 +196,7 @@ class ClientNetwork {
     readSnapshot(dr: IBinaryReader) {
         const snapshot: Snapshot = {
             timestamp: -1,
-            clientTick: -1,
+            confirmedClientTick: -1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -188,10 +210,9 @@ class ClientNetwork {
                     const count = dr.readUInt8()
                     for (let i = 0; i < count; i++) {
                         const engineMessage = readEngineMessage(dr, this.client.context)
-                        //console.log(engineMessage)
                         if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
                             // @ts-ignore
-                            console.log('connection terminated reason!', engineMessage.reason)
+                            this.onDisconnect(engineMessage.reason)
                         }
                         if (engineMessage.ntype === EngineMessage.TimeSync) {
                             // @ts-ignore
@@ -199,7 +220,7 @@ class ClientNetwork {
                         }
                         if (engineMessage.ntype === EngineMessage.ClientTick) {
                             // @ts-ignore
-                            snapshot.clientTick = engineMessage.tick
+                            snapshot.confirmedClientTick = engineMessage.tick
                         }
                     }
                     break
@@ -258,6 +279,9 @@ class ClientNetwork {
             }
         }
 
+        // client engine level state
+
+        // timing
         if (snapshot.timestamp !== -1) {
             this.client.network.chronus.register(snapshot.timestamp)
         } else {
@@ -265,6 +289,22 @@ class ClientNetwork {
                 snapshot.timestamp = this.previousSnapshot.timestamp + (1000 / this.client.serverTickRate)
             }
         }
+
+        // frame creation from snapshot and prediction
+        const frame = new Frame(snapshot, this.latestFrame)
+        this.frames.push(frame)
+        this.latestFrame = frame
+
+        const predictionErrorFrame = this.client.predictor.getErrors(frame)
+        if (predictionErrorFrame.entities.size > 0) {
+            this.client.network.predictionErrorFrames.push(predictionErrorFrame)
+        }
+
+        this.client.predictor.cleanUp(frame.confirmedClientTick)
+
+
+        // commands/prediction
+        this.outbound.confirmCommands(snapshot.confirmedClientTick)
 
         this.previousSnapshot = snapshot
         this.snapshots.push(snapshot)

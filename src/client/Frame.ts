@@ -7,11 +7,11 @@ interface IEntityFrame {
     deleteEntities: number[],
 }
 
-let tick = 0 // TODO this should be the server tick not a client based count
+let tick = 0  // TODO this needs to exist in a different scope incase two clients ever run in one process
 
 class Frame implements IEntityFrame {
     tick: number
-    clientTick: number
+    confirmedClientTick: number
     timestamp: number
     processed: boolean
     entities: Map<number, IEntity>
@@ -22,7 +22,7 @@ class Frame implements IEntityFrame {
 
     constructor(snapshot: Snapshot, previousFrame: Frame | null) {
         this.tick = tick++
-        this.clientTick = snapshot.clientTick
+        this.confirmedClientTick = snapshot.confirmedClientTick
         this.timestamp = snapshot.timestamp
         this.processed = false
         this.entities = new Map()

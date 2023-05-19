@@ -5,14 +5,14 @@ import { User } from './User';
 interface INetworkEvent {
     type: NetworkEvent;
     user: User;
-    command?: any;
+    commands?: any;
+    clientTick?: number;
 }
 declare class InstanceNetwork {
     instance: Instance;
     constructor(instance: Instance);
     onRequest(): void;
     onOpen(user: User): void;
-    onCommand(user: User, command: any): void;
     onHandshake(user: User, handshake: any): Promise<void>;
     onMessage(user: User, buffer: Buffer | ArrayBuffer): void;
     onConnectionAccepted(user: User, payload: any): void;

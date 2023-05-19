@@ -2,7 +2,7 @@ import { IEntity } from '../common/IEntity'
 
 type Snapshot = {
     timestamp: number
-    clientTick: number,
+    confirmedClientTick: number,
     messages: any[],
     createEntities: IEntity[],
     updateEntities: any[],

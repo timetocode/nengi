@@ -14,15 +14,20 @@ const BinarySection_1 = require("../common/binary/BinarySection");
 const count_1 = __importDefault(require("../binary/message/count"));
 const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
 const Chronus_1 = require("./Chronus");
+const Outbound_1 = require("./Outbound");
+const Frame_1 = require("./Frame");
 class ClientNetwork {
     constructor(client) {
         this.client = client;
         this.entities = new Map();
         this.snapshots = [];
+        this.frames = [];
+        this.latestFrame = null;
         this.messages = [];
         this.predictionErrorFrames = [];
-        this.outboundEngine = new NQueue_1.NQueue();
-        this.outbound = new NQueue_1.NQueue();
+        this.outbound = new Outbound_1.Outbound();
+        //this.outboundEngine = new NQueue()
+        //this.outbound = new NQueue()
         this.socket = null;
         this.requestId = 1;
         this.requestQueue = new NQueue_1.NQueue();
@@ -44,10 +49,12 @@ class ClientNetwork {
         }
     }
     addEngineCommand(command) {
-        this.outboundEngine.enqueue(command);
+        this.outbound.addEngineCommand(command);
+        //this.outboundEngine.enqueue(command)
     }
     addCommand(command) {
-        this.outbound.enqueue(command);
+        this.outbound.addCommand(command);
+        //this.outbound.enqueue(command)
     }
     request(endpoint, payload, callback) {
         const obj = {
@@ -56,7 +63,6 @@ class ClientNetwork {
             body: JSON.stringify(payload),
             callback
         };
-        //console.log(obj)
         this.requestQueue.enqueue(obj);
         this.requests.set(obj.requestId, obj);
     }
@@ -74,21 +80,23 @@ class ClientNetwork {
         return dw.buffer;
     }
     createOutboundBuffer(binaryWriterCtor) {
-        this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.ClientTick, tick: this.clientTick });
+        const tick = this.clientTick;
+        this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.ClientTick, tick });
         let bytes = 0;
+        const { outboundEngineCommands, outboundCommands } = this.outbound.getCurrentFrame();
         // count ENGINE COMMANDS
-        if (this.outboundEngine.length > 0) {
+        if (outboundEngineCommands.length > 0) {
             bytes += 1; // commands!
             bytes += 1; // number of commands
-            this.outboundEngine.arr.forEach((command) => {
+            outboundEngineCommands.forEach((command) => {
                 bytes += (0, count_1.default)(this.client.context.getEngineSchema(command.ntype), command);
             });
         }
         // count COMMANDS
-        if (this.outbound.length > 0) {
+        if (outboundCommands.length > 0) {
             bytes += 1; // commands!
             bytes += 1; // number of commands
-            this.outbound.arr.forEach((command) => {
+            outboundCommands.forEach((command) => {
                 bytes += (0, count_1.default)(this.client.context.getSchema(command.ntype), command);
             });
         }
@@ -103,22 +111,30 @@ class ClientNetwork {
         // @ts-ignore
         const dw = binaryWriterCtor.create(bytes);
         // write ENGINE COMMANDs
-        if (this.outboundEngine.length > 0) {
+        if (outboundEngineCommands.length > 0) {
             dw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
-            dw.writeUInt8(this.outboundEngine.arr.length);
-            this.outboundEngine.arr.forEach((command) => {
+            dw.writeUInt8(outboundEngineCommands.length);
+            //do {
+            //     const command = outboundEngineCommands.dequeue()
+            //    writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
+            //} while (!outboundEngineCommands.isEmpty())
+            outboundEngineCommands.forEach((command) => {
                 (0, writeMessage_1.writeMessage)(command, this.client.context.getEngineSchema(command.ntype), dw);
             });
-            this.outboundEngine.arr = [];
+            //this.outboundEngine.arr = []
         }
         // write COMMANDS
-        if (this.outbound.length > 0) {
+        if (outboundCommands.length > 0) {
             dw.writeUInt8(BinarySection_1.BinarySection.Commands);
-            dw.writeUInt8(this.outbound.arr.length);
-            this.outbound.arr.forEach((command) => {
+            dw.writeUInt8(outboundCommands.length);
+            //do {
+            //    const command = outboundCommands.dequeue()
+            //    writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
+            //} while (!outboundCommands.isEmpty())
+            outboundCommands.forEach((command) => {
                 (0, writeMessage_1.writeMessage)(command, this.client.context.getSchema(command.ntype), dw);
             });
-            this.outbound.arr = [];
+            //this.outbound.arr = []
         }
         // write REQUESTS
         if (this.requestQueue.length > 0) {
@@ -131,13 +147,14 @@ class ClientNetwork {
             });
             this.requestQueue.arr = [];
         }
+        this.outbound.tick = tick;
         this.incrementClientTick();
         return dw.buffer;
     }
     readSnapshot(dr) {
         const snapshot = {
             timestamp: -1,
-            clientTick: -1,
+            confirmedClientTick: -1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -150,10 +167,9 @@ class ClientNetwork {
                     const count = dr.readUInt8();
                     for (let i = 0; i < count; i++) {
                         const engineMessage = (0, readEngineMessage_1.default)(dr, this.client.context);
-                        //console.log(engineMessage)
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.ConnectionTerminated) {
                             // @ts-ignore
-                            console.log('connection terminated reason!', engineMessage.reason);
+                            this.onDisconnect(engineMessage.reason);
                         }
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.TimeSync) {
                             // @ts-ignore
@@ -161,7 +177,7 @@ class ClientNetwork {
                         }
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.ClientTick) {
                             // @ts-ignore
-                            snapshot.clientTick = engineMessage.tick;
+                            snapshot.confirmedClientTick = engineMessage.tick;
                         }
                     }
                     break;
@@ -219,6 +235,8 @@ class ClientNetwork {
                 }
             }
         }
+        // client engine level state
+        // timing
         if (snapshot.timestamp !== -1) {
             this.client.network.chronus.register(snapshot.timestamp);
         }
@@ -227,6 +245,17 @@ class ClientNetwork {
                 snapshot.timestamp = this.previousSnapshot.timestamp + (1000 / this.client.serverTickRate);
             }
         }
+        // frame creation from snapshot and prediction
+        const frame = new Frame_1.Frame(snapshot, this.latestFrame);
+        this.frames.push(frame);
+        this.latestFrame = frame;
+        const predictionErrorFrame = this.client.predictor.getErrors(frame);
+        if (predictionErrorFrame.entities.size > 0) {
+            this.client.network.predictionErrorFrames.push(predictionErrorFrame);
+        }
+        this.client.predictor.cleanUp(frame.confirmedClientTick);
+        // commands/prediction
+        this.outbound.confirmCommands(snapshot.confirmedClientTick);
         this.previousSnapshot = snapshot;
         this.snapshots.push(snapshot);
     }

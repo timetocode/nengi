@@ -1,11 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Frame = void 0;
-let tick = 0; // TODO this should be the server tick not a client based count
+let tick = 0; // TODO this needs to exist in a different scope incase two clients ever run in one process
 class Frame {
     constructor(snapshot, previousFrame) {
         this.tick = tick++;
-        this.clientTick = snapshot.clientTick;
+        this.confirmedClientTick = snapshot.confirmedClientTick;
         this.timestamp = snapshot.timestamp;
         this.processed = false;
         this.entities = new Map();

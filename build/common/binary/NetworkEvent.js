@@ -6,8 +6,9 @@ var NetworkEvent;
     NetworkEvent[NetworkEvent["Null"] = 0] = "Null";
     NetworkEvent[NetworkEvent["UserConnected"] = 1] = "UserConnected";
     NetworkEvent[NetworkEvent["Command"] = 2] = "Command";
-    NetworkEvent[NetworkEvent["UserDisconnected"] = 3] = "UserDisconnected";
-    NetworkEvent[NetworkEvent["UserConnectionDenied"] = 4] = "UserConnectionDenied";
+    NetworkEvent[NetworkEvent["CommandSet"] = 3] = "CommandSet";
+    NetworkEvent[NetworkEvent["UserDisconnected"] = 4] = "UserDisconnected";
+    NetworkEvent[NetworkEvent["UserConnectionDenied"] = 5] = "UserConnectionDenied";
 })(NetworkEvent || (NetworkEvent = {}));
 exports.NetworkEvent = NetworkEvent;
 //# sourceMappingURL=NetworkEvent.js.map

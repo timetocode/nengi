@@ -5,6 +5,7 @@ import { PredictionFrame } from './PredictionFrame';
 declare class Predictor {
     predictionFrames: Map<number, PredictionFrame>;
     latestTick: number;
+    generalPrediction: Map<number, Set<string>>;
     constructor();
     cleanUp(tick: number): void;
     addCustom(tick: number, entity: any, props: string[], nschema: Schema): void;

@@ -25,8 +25,8 @@ class User {
         this.responseQueue = [];
         this.cache = {};
         this.cacheArr = [];
-        this.lastSentInstanceTick = -1;
-        this.lastReceivedClientTick = -1;
+        this.lastSentInstanceTick = 0;
+        this.lastReceivedClientTick = 0;
     }
     subscribe(channel) {
         this.subscriptions.set(channel.id, channel);

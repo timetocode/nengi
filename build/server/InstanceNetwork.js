@@ -30,13 +30,6 @@ class InstanceNetwork {
         user.connectionState = User_1.UserConnectionState.OpenPreHandshake;
         user.network = this;
     }
-    onCommand(user, command) {
-        this.instance.queue.enqueue({
-            type: NetworkEvent_1.NetworkEvent.Command,
-            user,
-            command
-        });
-    }
     onHandshake(user, handshake) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -58,7 +51,6 @@ class InstanceNetwork {
                 this.onConnectionAccepted(user, connectionAccepted);
             }
             catch (err) {
-                //console.log('Handshake catch block', { err, ws: user.socket, foo: user.connectionState })
                 this.onConnectionDenied(user, err);
                 // NOTE: we are keeping the code between these cases duplicated
                 // if these do turn out to be identical in production we will clean it up
@@ -95,6 +87,13 @@ class InstanceNetwork {
     }
     onMessage(user, buffer) {
         const binaryReader = user.networkAdapter.createBufferReader(buffer);
+        const commands = [];
+        const commandSet = {
+            type: NetworkEvent_1.NetworkEvent.CommandSet,
+            user,
+            commands,
+            clientTick: -1
+        };
         while (binaryReader.offset < binaryReader.byteLength) {
             const section = binaryReader.readUInt8();
             switch (section) {
@@ -109,6 +108,7 @@ class InstanceNetwork {
                         if (msg.ntype === EngineMessage_1.EngineMessage.ClientTick) {
                             const clientTick = msg.tick;
                             user.lastReceivedClientTick = clientTick;
+                            commandSet.clientTick = clientTick;
                         }
                     }
                     break;
@@ -117,7 +117,7 @@ class InstanceNetwork {
                     const count = binaryReader.readUInt8();
                     for (let i = 0; i < count; i++) {
                         const msg = (0, readMessage_1.default)(binaryReader, this.instance.context);
-                        this.onCommand(user, msg);
+                        commands.push(msg);
                     }
                     break;
                 }
@@ -147,6 +147,7 @@ class InstanceNetwork {
                 }
             }
         }
+        this.instance.queue.enqueue(commandSet);
     }
     onConnectionAccepted(user, payload) {
         user.network = this;

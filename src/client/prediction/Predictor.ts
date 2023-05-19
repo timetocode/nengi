@@ -16,9 +16,12 @@ class Predictor {
     predictionFrames: Map<number, PredictionFrame>
     latestTick: number
 
+    generalPrediction: Map<number, Set<string>>
+
     constructor() {
         this.predictionFrames = new Map()
         this.latestTick = -1
+        this.generalPrediction = new Map()
     }
 
     cleanUp(tick: number) {
@@ -37,6 +40,11 @@ class Predictor {
         }
         const proxy = Object.assign({}, entity)
         predictionFrame.add(entity.nid, proxy, props, nschema)
+
+        if (!this.generalPrediction.has(entity.nid)) {
+            console.log('did not have general prediction, creating one!',entity.nid,  new Set(props))
+            this.generalPrediction.set(entity.nid, new Set(props))
+        }
     }
 
     add(tick: number, entity: any, props: string[], nschema: Schema) {
@@ -61,10 +69,10 @@ class Predictor {
     }
 
     getErrors(frame: Frame) {
-        const predictionErrorFrame = new PredictionErrorFrame(frame.clientTick)
+        const predictionErrorFrame = new PredictionErrorFrame(frame.confirmedClientTick)
         if (frame) {
             // predictions for this frame
-            const predictionFrame = this.predictionFrames.get(frame.clientTick)
+            const predictionFrame = this.predictionFrames.get(frame.confirmedClientTick)
 
             if (predictionFrame) {
                 predictionFrame.entityPredictions.forEach(entityPrediction => {
@@ -89,7 +97,7 @@ class Predictor {
                 })
             }
         }
-        this.latestTick = frame.clientTick
+        this.latestTick = frame.confirmedClientTick
         return predictionErrorFrame
     }
 }

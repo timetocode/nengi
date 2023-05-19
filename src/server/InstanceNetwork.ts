@@ -9,7 +9,8 @@ import readMessage from '../binary/message/readMessage'
 interface INetworkEvent {
     type: NetworkEvent
     user: User
-    command?: any
+    commands?: any
+    clientTick?: number
 }
 
 class InstanceNetwork {
@@ -26,14 +27,6 @@ class InstanceNetwork {
     onOpen(user: User) {
         user.connectionState = UserConnectionState.OpenPreHandshake
         user.network = this
-    }
-
-    onCommand(user: User, command: any) {
-        this.instance.queue.enqueue({
-            type: NetworkEvent.Command,
-            user,
-            command
-        })
     }
 
     async onHandshake(user: User, handshake: any) {
@@ -59,7 +52,6 @@ class InstanceNetwork {
             user.instance = this.instance
             this.onConnectionAccepted(user, connectionAccepted)
         } catch (err: any) {
-            //console.log('Handshake catch block', { err, ws: user.socket, foo: user.connectionState })
             this.onConnectionDenied(user, err)
 
             // NOTE: we are keeping the code between these cases duplicated
@@ -101,6 +93,15 @@ class InstanceNetwork {
 
     onMessage(user: User, buffer: Buffer | ArrayBuffer) {
         const binaryReader = user.networkAdapter.createBufferReader(buffer)
+        const commands: any[] = []
+
+        const commandSet = {
+            type: NetworkEvent.CommandSet,
+            user,
+            commands,
+            clientTick: -1
+        }
+
         while (binaryReader.offset < binaryReader.byteLength) {
             const section = binaryReader.readUInt8()
 
@@ -118,6 +119,7 @@ class InstanceNetwork {
                         if (msg.ntype === EngineMessage.ClientTick) {
                             const clientTick = msg.tick
                             user.lastReceivedClientTick = clientTick
+                            commandSet.clientTick = clientTick
                         }
                     }
 
@@ -127,7 +129,7 @@ class InstanceNetwork {
                     const count = binaryReader.readUInt8()
                     for (let i = 0; i < count; i++) {
                         const msg = readMessage(binaryReader, this.instance.context)
-                        this.onCommand(user, msg)
+                        commands.push(msg)
                     }
                     break
                 }
@@ -157,6 +159,8 @@ class InstanceNetwork {
                 }
             }
         }
+
+        this.instance.queue.enqueue(commandSet)
     }
 
     onConnectionAccepted(user: User, payload: any) {

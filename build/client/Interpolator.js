@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.findSubsequentFrame = exports.findInitialFrame = exports.Interpolator = void 0;
-const Frame_1 = require("./Frame");
 const BinaryExt_1 = require("../common/binary/BinaryExt");
 const findInitialFrame = (frames, renderTime) => {
     for (var i = frames.length - 1; i >= 0; i--) {
@@ -25,47 +24,55 @@ exports.findSubsequentFrame = findSubsequentFrame;
 class Interpolator {
     constructor(client) {
         this.client = client;
-        //this.snapshots = []
-        this.frames = [];
-        this.latestFrame = null;
     }
     getInterpolatedState(interpDelay) {
-        while (this.client.network.snapshots.length > 0) {
-            const snapshot = this.client.network.snapshots.shift();
-            const frame = new Frame_1.Frame(snapshot, this.latestFrame);
-            this.frames.push(frame);
-            this.latestFrame = frame;
-            const predictionErrorFrame = this.client.predictor.getErrors(frame);
-            //console.log({ predictionErrorFrame })
-            if (predictionErrorFrame.entities.size > 0) {
-                //console.log('yo there were some prediction errors')
-                this.client.network.predictionErrorFrames.push(predictionErrorFrame);
-            }
-            this.client.predictor.cleanUp(frame.clientTick);
-        }
         const now = Date.now();
         const renderTime = now - interpDelay - this.client.network.chronus.averageTimeDifference;
-        const frameA = findInitialFrame(this.frames, renderTime);
+        const frameA = findInitialFrame(this.client.network.frames, renderTime);
         const frames = [];
+        const tframes = this.client.network.frames;
         if (frameA) {
-            const frameB = findSubsequentFrame(this.frames, frameA.tick);
+            const frameB = findSubsequentFrame(tframes, frameA.tick);
             //console.log('this.frames.length', frameA.tick, this.frames.length, renderTime)
             // late frames (frames before frameA)
             // TODO this.frames.length keeps growing! we need to free memory
-            for (let i = this.frames.length - 1; i > -1; i--) {
-                const frame = this.frames[i];
-                if (frame.tick < frameA.tick && !frame.processed) {
-                    //console.log('late', frame)
-                    if (!frame.processed) {
-                        frames.push(frame);
-                        frame.processed = true;
-                        this.frames.splice(i, 1);
+            for (let i = tframes.length - 1; i > -1; i--) {
+                const lateFrame = tframes[i];
+                if (lateFrame.tick < frameA.tick && !lateFrame.processed) {
+                    //console.log('late', lateFrame)
+                    if (!lateFrame.processed) {
+                        const processedLateFrame = {
+                            createEntities: [],
+                            updateEntities: [],
+                            deleteEntities: [],
+                        };
+                        processedLateFrame.createEntities = lateFrame.createEntities;
+                        processedLateFrame.deleteEntities = lateFrame.deleteEntities;
+                        for (let i = 0; i < lateFrame.updateEntities.length; i++) {
+                            const { nid, prop, value } = lateFrame.updateEntities[i];
+                            //if (this.client.predictor.has(lateFrame.confirmedClientTick, nid, prop)) {
+                            //    console.log('LATE this value was predicted, skip')
+                            //    continue
+                            //}
+                            if (this.client.predictor.generalPrediction.has(nid)) {
+                                // console.log('LATE yo!!!!!!!!!!!')
+                                const propSet = this.client.predictor.generalPrediction.get(nid);
+                                if (propSet.has(prop)) {
+                                    // console.log('skip b/c being predicted')
+                                    continue;
+                                }
+                            }
+                            processedLateFrame.updateEntities.push(lateFrame.updateEntities[i]);
+                        }
+                        frames.push(processedLateFrame);
+                        lateFrame.processed = true;
+                        tframes.splice(i, 1);
                         // not sure if this is right, needs tested in lag
                         //console.log('cleaning up', frame.clientTick - 1)
-                        this.client.predictor.cleanUp(frame.clientTick - 1);
+                        this.client.predictor.cleanUp(lateFrame.confirmedClientTick - 1);
                     }
                     else {
-                        this.frames.splice(i, 1);
+                        tframes.splice(i, 1);
                     }
                 }
             }
@@ -94,6 +101,23 @@ class Interpolator {
                 }
                 for (let i = 0; i < frameA.updateEntities.length; i++) {
                     const { nid, prop, value } = frameA.updateEntities[i];
+                    if (this.client.predictor.generalPrediction.has(nid)) {
+                        //console.log('A yo!!!!!!!!!!!')
+                        const propSet = this.client.predictor.generalPrediction.get(nid);
+                        if (propSet.has(prop)) {
+                            // console.log('skip b/c being predicted')
+                            continue;
+                        }
+                    }
+                    /*
+                    if (this.client.predictor.has(frameA.confirmedClientTick, nid, prop)) {
+                        console.log('this value was predicted, skip')
+                        continue
+                    }
+                    if (this.client.predictor.has(frameB.confirmedClientTick, nid, prop)) {
+                        console.log('this value was predicted, skip')
+                        continue
+                    } */
                     // if no update in frameB, then entity's correct state is update.value
                     if (frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
                         interpState.updateEntities.push({ nid, prop, value });
@@ -102,14 +126,23 @@ class Interpolator {
                 for (let i = 0; i < frameB.updateEntities.length; i++) {
                     const { nid, prop } = frameB.updateEntities[i];
                     //console.log('searching for prediction', frameA.clientTick, nid, prop)
-                    if (this.client.predictor.has(frameA.clientTick, nid, prop)) {
-                        //console.log('this value was predicted, skip')
-                        continue;
+                    if (this.client.predictor.generalPrediction.has(nid)) {
+                        //console.log('B yo!!!!!!!!!!!')
+                        const propSet = this.client.predictor.generalPrediction.get(nid);
+                        if (propSet.has(prop)) {
+                            // console.log('skip b/c being predicted')
+                            continue;
+                        }
                     }
-                    if (this.client.predictor.has(frameB.clientTick, nid, prop)) {
-                        //console.log('this value was predicted, skip')
-                        continue;
+                    /*
+                    if (this.client.predictor.has(frameA.confirmedClientTick, nid, prop)) {
+                        console.log('this value was predicted, skip')
+                        continue
                     }
+                    if (this.client.predictor.has(frameB.confirmedClientTick, nid, prop)) {
+                        console.log('this value was predicted, skip')
+                        continue
+                    } */
                     const entityA = frameA.entities.get(nid);
                     const entityB = frameB.entities.get(nid);
                     if (entityA && entityB) {

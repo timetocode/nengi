@@ -7,7 +7,7 @@ interface IEntityFrame {
 }
 declare class Frame implements IEntityFrame {
     tick: number;
-    clientTick: number;
+    confirmedClientTick: number;
     timestamp: number;
     processed: boolean;
     entities: Map<number, IEntity>;

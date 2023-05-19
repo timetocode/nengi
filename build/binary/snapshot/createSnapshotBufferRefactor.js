@@ -34,7 +34,6 @@ const getVisibleState = (user, instance) => {
     user.messageQueue = [];
     const deleteEntities = vis.noLongerVisible;
     const updateEntities = [];
-    //console.log('stillVisible', vis.stillVisible.length)
     for (let i = 0; i < vis.stillVisible.length; i++) {
         const nid = vis.stillVisible[i];
         const entity = instance.localState.getByNid(nid);
@@ -46,7 +45,6 @@ const getVisibleState = (user, instance) => {
             });
         }
     }
-    //console.log('getVisibleState', instance.tick, createEntities.length, updateEntities.length, deleteEntities.length)
     return {
         createEntities,
         updateEntities,
@@ -64,7 +62,6 @@ const createSnapshotBufferRefactor = (user, instance) => {
         for (let i = 0; i < engineMessages.length; i++) {
             const engineMessage = engineMessages[i];
             const nschema = instance.context.getEngineSchema(engineMessage.ntype);
-            //console.log('counting', message, nschema)
             bytes += (0, count_1.default)(nschema, engineMessage);
         }
     }
@@ -74,7 +71,6 @@ const createSnapshotBufferRefactor = (user, instance) => {
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             const nschema = instance.context.getSchema(message.ntype);
-            //console.log('counting', message, nschema)
             bytes += (0, count_1.default)(nschema, message);
         }
     }
@@ -153,7 +149,6 @@ const createSnapshotBufferRefactor = (user, instance) => {
     if (updateEntities.length > 0) {
         bw.writeUInt8(BinarySection_1.BinarySection.UpdateEntities);
         bw.writeUInt32(updateEntities.length);
-        //console.log('updates', updateEntities.length)
         for (let i = 0; i < updateEntities.length; i++) {
             const diff = updateEntities[i];
             (0, writeDiff_1.default)(diff.nid, diff, diff.nschema, bw);

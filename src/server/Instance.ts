@@ -85,7 +85,7 @@ class Instance {
         this.cache.createCachesForTick(this.tick)
 
         this.users.forEach(user => {
-            if (user.lastSentInstanceTick === -1) {
+            if (user.lastSentInstanceTick === 0) {
                 // this is the first frame connected!
                 user.queueEngineMessage(timeSyncEngineMessage)
             } else {
