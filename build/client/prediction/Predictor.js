@@ -13,7 +13,6 @@ class Predictor {
     constructor() {
         this.predictionFrames = new Map();
         this.latestTick = -1;
-        this.generalPrediction = new Map();
     }
     cleanUp(tick) {
         this.predictionFrames.forEach(predictionFrame => {
@@ -30,10 +29,6 @@ class Predictor {
         }
         const proxy = Object.assign({}, entity);
         predictionFrame.add(entity.nid, proxy, props, nschema);
-        if (!this.generalPrediction.has(entity.nid)) {
-            console.log('did not have general prediction, creating one!', entity.nid, new Set(props));
-            this.generalPrediction.set(entity.nid, new Set(props));
-        }
     }
     add(tick, entity, props, nschema) {
         let predictionFrame = this.predictionFrames.get(tick);

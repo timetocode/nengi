@@ -73,7 +73,7 @@ class ClientNetwork {
         };
         const handshakeByteLength = (0, count_1.default)(connectAttemptSchema_1.connectionAttemptSchema, handshakeMessage);
         // @ts-ignore
-        const dw = binaryWriterCtor.create(handshakeByteLength + 3);
+        const dw = binaryWriterCtor.create(handshakeByteLength + 2);
         dw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
         dw.writeUInt8(1);
         (0, writeMessage_1.writeMessage)(handshakeMessage, connectAttemptSchema_1.connectionAttemptSchema, dw);
@@ -83,6 +83,8 @@ class ClientNetwork {
         const tick = this.clientTick;
         this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.ClientTick, tick });
         let bytes = 0;
+        const isDebug = false;
+        const debug = {};
         const { outboundEngineCommands, outboundCommands } = this.outbound.getCurrentFrame();
         // count ENGINE COMMANDS
         if (outboundEngineCommands.length > 0) {
@@ -114,27 +116,29 @@ class ClientNetwork {
         if (outboundEngineCommands.length > 0) {
             dw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
             dw.writeUInt8(outboundEngineCommands.length);
-            //do {
-            //     const command = outboundEngineCommands.dequeue()
-            //    writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
-            //} while (!outboundEngineCommands.isEmpty())
             outboundEngineCommands.forEach((command) => {
                 (0, writeMessage_1.writeMessage)(command, this.client.context.getEngineSchema(command.ntype), dw);
             });
-            //this.outboundEngine.arr = []
+        }
+        if (isDebug) {
+            debug.engineCommands = [];
+            outboundEngineCommands.forEach((command) => {
+                debug.engineCommands.push(command);
+            });
         }
         // write COMMANDS
         if (outboundCommands.length > 0) {
             dw.writeUInt8(BinarySection_1.BinarySection.Commands);
             dw.writeUInt8(outboundCommands.length);
-            //do {
-            //    const command = outboundCommands.dequeue()
-            //    writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
-            //} while (!outboundCommands.isEmpty())
             outboundCommands.forEach((command) => {
                 (0, writeMessage_1.writeMessage)(command, this.client.context.getSchema(command.ntype), dw);
             });
-            //this.outbound.arr = []
+        }
+        if (isDebug) {
+            debug.commands = [];
+            outboundCommands.forEach((command) => {
+                debug.commands.push(command);
+            });
         }
         // write REQUESTS
         if (this.requestQueue.length > 0) {
@@ -146,6 +150,10 @@ class ClientNetwork {
                 dw.writeString(request.body);
             });
             this.requestQueue.arr = [];
+        }
+        if (isDebug) {
+            debug.tick = tick;
+            console.log({ debug });
         }
         this.outbound.tick = tick;
         this.incrementClientTick();

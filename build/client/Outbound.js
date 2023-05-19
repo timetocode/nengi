@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Outbound = void 0;
-const NQueue_1 = require("../NQueue");
 // used for the first frames, never has anything in it
 const emptyArr = [];
 class Outbound {
@@ -9,7 +8,6 @@ class Outbound {
         this.unconfirmedCommands = new Map();
         this.outboundEngineCommands = new Map();
         this.outboundCommands = new Map();
-        this.frames = new NQueue_1.NQueue();
         this.tick = 0;
         this.currentFrame = null;
         this.confirmedTick = -1;
@@ -23,28 +21,6 @@ class Outbound {
             outboundCommands: (outboundCommands) ? outboundCommands : emptyArr,
         };
     }
-    update() {
-        for (var i = this.lastSentTick + 1; i < this.tick; i++) {
-            this.sendCommands(i);
-            this.lastSentTick = i;
-        }
-        this.tick++;
-    }
-    beginFrame(tick = this.tick) {
-        const clientFrame = {
-            tick,
-            unconfirmedCommands: new NQueue_1.NQueue(),
-            outboundEngineCommands: new NQueue_1.NQueue(),
-            outboundCommands: new NQueue_1.NQueue(),
-        };
-        this.frames.enqueue(clientFrame);
-    }
-    addEngineCommand3(command) {
-        if (!this.currentFrame) {
-            throw new Error('Could not add commands before calling beginFrame');
-        }
-        this.currentFrame.outboundEngineCommands.enqueue(command);
-    }
     addEngineCommand(command) {
         const tick = this.tick;
         if (this.outboundEngineCommands.has(tick)) {
@@ -53,13 +29,6 @@ class Outbound {
         else {
             this.outboundEngineCommands.set(tick, [command]);
         }
-    }
-    addCommand3(command) {
-        if (!this.currentFrame) {
-            throw new Error('Could not add commands before calling beginFrame');
-        }
-        this.currentFrame.outboundCommands.enqueue(command);
-        this.currentFrame.unconfirmedCommands.enqueue(command);
     }
     addCommand(command) {
         const tick = this.tick;
@@ -91,19 +60,6 @@ class Outbound {
         else {
             return emptyArr;
         }
-    }
-    sendCommands(tick) {
-        /*
-        if (this.websocket && this.websocket.readyState === 1) {
-            if (this.sendQueue.has(tick)) {
-                this.websocket.send(createCommandBuffer(tick, this.sendQueue.get(tick)).byteArray)
-                this.sendQueue.delete(tick)
-            } else {
-                // TODO: Do we need to do this?
-                this.websocket.send(createCommandBuffer(tick, []).byteArray)
-            }
-        }
-        */
     }
     confirmCommands(confirmedTick) {
         this.unconfirmedCommands.forEach((commandQueue, tick) => {

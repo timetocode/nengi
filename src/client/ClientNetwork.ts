@@ -100,7 +100,7 @@ class ClientNetwork {
 
         const handshakeByteLength = count(connectionAttemptSchema, handshakeMessage)
         // @ts-ignore
-        const dw = binaryWriterCtor.create(handshakeByteLength + 3)
+        const dw = binaryWriterCtor.create(handshakeByteLength + 2)
         dw.writeUInt8(BinarySection.EngineMessages)
         dw.writeUInt8(1)
         writeMessage(handshakeMessage, connectionAttemptSchema, dw)
@@ -112,6 +112,9 @@ class ClientNetwork {
         this.addEngineCommand({ ntype: EngineMessage.ClientTick, tick })
 
         let bytes = 0
+
+        const isDebug = false
+        const debug: any = {}
 
         const { outboundEngineCommands, outboundCommands } = this.outbound.getCurrentFrame()
 
@@ -150,15 +153,16 @@ class ClientNetwork {
             dw.writeUInt8(BinarySection.EngineMessages)
             dw.writeUInt8(outboundEngineCommands.length)
 
-            //do {
-            //     const command = outboundEngineCommands.dequeue()
-            //    writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
-            //} while (!outboundEngineCommands.isEmpty())
-
             outboundEngineCommands.forEach((command: any) => {
                 writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
             })
-            //this.outboundEngine.arr = []
+        }
+
+        if (isDebug) {
+            debug.engineCommands = []
+            outboundEngineCommands.forEach((command: any) => {
+               debug.engineCommands.push(command)
+            })
         }
 
         // write COMMANDS
@@ -166,15 +170,18 @@ class ClientNetwork {
             dw.writeUInt8(BinarySection.Commands)
             dw.writeUInt8(outboundCommands.length)
 
-            //do {
-            //    const command = outboundCommands.dequeue()
-            //    writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
-            //} while (!outboundCommands.isEmpty())
             outboundCommands.forEach((command: any) => {
                 writeMessage(command, this.client.context.getSchema(command.ntype)!, dw)
             })
-            //this.outbound.arr = []
         }
+
+        if (isDebug) {
+            debug.commands = []
+            outboundCommands.forEach((command: any) => {
+               debug.commands.push(command)
+            })
+        }
+
 
         // write REQUESTS
         if (this.requestQueue.length > 0) {
@@ -187,6 +194,12 @@ class ClientNetwork {
             })
             this.requestQueue.arr = []
         }
+
+        if (isDebug) {
+            debug.tick = tick
+            console.log({ debug })
+        }
+
 
         this.outbound.tick = tick
         this.incrementClientTick()
@@ -301,8 +314,6 @@ class ClientNetwork {
         }
 
         this.client.predictor.cleanUp(frame.confirmedClientTick)
-
-
         // commands/prediction
         this.outbound.confirmCommands(snapshot.confirmedClientTick)
 
