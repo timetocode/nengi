@@ -92,75 +92,85 @@ class InstanceNetwork {
     }
 
     onMessage(user: User, buffer: Buffer | ArrayBuffer) {
-        const binaryReader = user.networkAdapter.createBufferReader(buffer)
-        const commands: any[] = []
 
-        const commandSet = {
-            type: NetworkEvent.CommandSet,
-            user,
-            commands,
-            clientTick: -1
-        }
-
-        while (binaryReader.offset < binaryReader.byteLength) {
-            const section = binaryReader.readUInt8()
-
-            switch (section) {
-                case BinarySection.EngineMessages: {
-                    const count = binaryReader.readUInt8()
-                    for (let i = 0; i < count; i++) {
-                        const msg: any = readEngineMessage(binaryReader, this.instance.context)
-
-                        if (msg.ntype === EngineMessage.ConnectionAttempt) {
-                            const handshake = JSON.parse(msg.handshake)
-                            this.onHandshake(user, handshake)
+        try {
+            const binaryReader = user.networkAdapter.createBufferReader(buffer)
+            const commands: any[] = []
+    
+            const commandSet = {
+                type: NetworkEvent.CommandSet,
+                user,
+                commands,
+                clientTick: -1
+            }
+    
+            while (binaryReader.offset < binaryReader.byteLength) {
+                const section = binaryReader.readUInt8()
+    
+                switch (section) {
+                    case BinarySection.EngineMessages: {
+                        const count = binaryReader.readUInt8()
+                        for (let i = 0; i < count; i++) {
+                            const msg: any = readEngineMessage(binaryReader, this.instance.context)
+    
+                            if (msg.ntype === EngineMessage.ConnectionAttempt) {
+                                const handshake = JSON.parse(msg.handshake)
+                                this.onHandshake(user, handshake)
+                            }
+    
+                            if (msg.ntype === EngineMessage.ClientTick) {
+                                const clientTick = msg.tick
+                                user.lastReceivedClientTick = clientTick
+                                commandSet.clientTick = clientTick
+                            }
                         }
-
-                        if (msg.ntype === EngineMessage.ClientTick) {
-                            const clientTick = msg.tick
-                            user.lastReceivedClientTick = clientTick
-                            commandSet.clientTick = clientTick
+    
+                        break
+                    }
+                    case BinarySection.Commands: {
+                        const count = binaryReader.readUInt8()
+                        for (let i = 0; i < count; i++) {
+                            const msg = readMessage(binaryReader, this.instance.context)
+                            commands.push(msg)
                         }
+                        break
                     }
-
-                    break
-                }
-                case BinarySection.Commands: {
-                    const count = binaryReader.readUInt8()
-                    for (let i = 0; i < count; i++) {
-                        const msg = readMessage(binaryReader, this.instance.context)
-                        commands.push(msg)
-                    }
-                    break
-                }
-                case BinarySection.Requests: {
-                    const count = binaryReader.readUInt8()
-                    for (let i = 0; i < count; i++) {
-                        const requestId = binaryReader.readUInt32()
-                        const endpoint = binaryReader.readUInt32()
-                        const str = binaryReader.readString()
-                        const body = JSON.parse(str)
-                        const cb = this.instance.responseEndPoints.get(endpoint)
-                        if (cb) {
-                            cb({ user, body }, (response: any) => {
-                                console.log('supposed to response with', response)
-                                user.responseQueue.push({
-                                    requestId,
-                                    response: JSON.stringify(response)
+                    case BinarySection.Requests: {
+                        const count = binaryReader.readUInt8()
+                        for (let i = 0; i < count; i++) {
+                            const requestId = binaryReader.readUInt32()
+                            const endpoint = binaryReader.readUInt32()
+                            const str = binaryReader.readString()
+                            const body = JSON.parse(str)
+                            const cb = this.instance.responseEndPoints.get(endpoint)
+                            if (cb) {
+                                cb({ user, body }, (response: any) => {
+                                    console.log('supposed to response with', response)
+                                    user.responseQueue.push({
+                                        requestId,
+                                        response: JSON.stringify(response)
+                                    })
                                 })
-                            })
+                            }
                         }
+                        break
                     }
-                    break
-                }
-                default: {
-                    console.log('network hit default case while reading')
-                    break
+                    default: {
+                        console.log('network hit default case while reading')
+                        break
+                    }
                 }
             }
-        }
+    
+            this.instance.queue.enqueue(commandSet)
+        } catch (err) {
+            try {
+                user.networkAdapter.disconnect(user, {})
+            } catch (err2) {
 
-        this.instance.queue.enqueue(commandSet)
+            }
+        }
+        
     }
 
     onConnectionAccepted(user: User, payload: any) {
