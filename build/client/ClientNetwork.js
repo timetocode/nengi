@@ -26,8 +26,6 @@ class ClientNetwork {
         this.messages = [];
         this.predictionErrorFrames = [];
         this.outbound = new Outbound_1.Outbound();
-        //this.outboundEngine = new NQueue()
-        //this.outbound = new NQueue()
         this.socket = null;
         this.requestId = 1;
         this.requestQueue = new NQueue_1.NQueue();

@@ -1,3 +1,4 @@
+export { IEntity } from './common/IEntity'
 // server
 export * from './server/Instance'
 export * from './server/InstanceNetwork'

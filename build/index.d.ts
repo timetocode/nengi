@@ -1,3 +1,4 @@
+export { IEntity } from './common/IEntity';
 export * from './server/Instance';
 export * from './server/InstanceNetwork';
 export * from './server/Point2D';
