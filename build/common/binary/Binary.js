@@ -29,6 +29,5 @@ var Binary;
     //Rotation8,
     Binary[Binary["Rotation32"] = 24] = "Rotation32";
     Binary[Binary["LAST_INDEX"] = 25] = "LAST_INDEX";
-})(Binary || (Binary = {}));
-exports.Binary = Binary;
+})(Binary || (exports.Binary = Binary = {}));
 //# sourceMappingURL=Binary.js.map

@@ -96,35 +96,35 @@ class InstanceNetwork {
         try {
             const binaryReader = user.networkAdapter.createBufferReader(buffer)
             const commands: any[] = []
-    
+
             const commandSet = {
                 type: NetworkEvent.CommandSet,
                 user,
                 commands,
                 clientTick: -1
             }
-    
+
             while (binaryReader.offset < binaryReader.byteLength) {
                 const section = binaryReader.readUInt8()
-    
+
                 switch (section) {
                     case BinarySection.EngineMessages: {
                         const count = binaryReader.readUInt8()
                         for (let i = 0; i < count; i++) {
                             const msg: any = readEngineMessage(binaryReader, this.instance.context)
-    
+
                             if (msg.ntype === EngineMessage.ConnectionAttempt) {
                                 const handshake = JSON.parse(msg.handshake)
                                 this.onHandshake(user, handshake)
                             }
-    
+
                             if (msg.ntype === EngineMessage.ClientTick) {
                                 const clientTick = msg.tick
                                 user.lastReceivedClientTick = clientTick
                                 commandSet.clientTick = clientTick
                             }
                         }
-    
+
                         break
                     }
                     case BinarySection.Commands: {
@@ -161,7 +161,7 @@ class InstanceNetwork {
                     }
                 }
             }
-    
+
             this.instance.queue.enqueue(commandSet)
         } catch (err) {
             try {
@@ -170,7 +170,7 @@ class InstanceNetwork {
 
             }
         }
-        
+
     }
 
     onConnectionAccepted(user: User, payload: any) {

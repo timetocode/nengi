@@ -8,8 +8,7 @@ var UserConnectionState;
     UserConnectionState[UserConnectionState["OpenAwaitingHandshake"] = 2] = "OpenAwaitingHandshake";
     UserConnectionState[UserConnectionState["Open"] = 3] = "Open";
     UserConnectionState[UserConnectionState["Closed"] = 4] = "Closed"; // closed, network.send would crash if invoked
-})(UserConnectionState || (UserConnectionState = {}));
-exports.UserConnectionState = UserConnectionState;
+})(UserConnectionState || (exports.UserConnectionState = UserConnectionState = {}));
 class User {
     constructor(socket, networkAdapter) {
         this.id = 0;

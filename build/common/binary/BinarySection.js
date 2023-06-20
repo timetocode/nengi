@@ -13,6 +13,5 @@ var BinarySection;
     BinarySection[BinarySection["Requests"] = 7] = "Requests";
     BinarySection[BinarySection["Responses"] = 8] = "Responses";
     BinarySection[BinarySection["ClientTick"] = 9] = "ClientTick";
-})(BinarySection || (BinarySection = {}));
-exports.BinarySection = BinarySection;
+})(BinarySection || (exports.BinarySection = BinarySection = {}));
 //# sourceMappingURL=BinarySection.js.map

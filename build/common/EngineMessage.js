@@ -14,6 +14,5 @@ var EngineMessage;
     EngineMessage[EngineMessage["ConnectionTerminated"] = 8] = "ConnectionTerminated";
     EngineMessage[EngineMessage["TimeSync"] = 9] = "TimeSync";
     EngineMessage[EngineMessage["ClientTick"] = 10] = "ClientTick";
-})(EngineMessage || (EngineMessage = {}));
-exports.EngineMessage = EngineMessage;
+})(EngineMessage || (exports.EngineMessage = EngineMessage = {}));
 //# sourceMappingURL=EngineMessage.js.map
