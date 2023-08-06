@@ -1,7 +1,7 @@
 /// <reference types="node" />
-import { Instance } from './Instance';
-import { NetworkEvent } from '../common/binary/NetworkEvent';
-import { User } from './User';
+import { Instance } from './Instance'
+import { NetworkEvent } from '../common/binary/NetworkEvent'
+import { User } from './User'
 interface INetworkEvent {
     type: NetworkEvent;
     user: User;
@@ -9,7 +9,7 @@ interface INetworkEvent {
     clientTick?: number;
 }
 declare class InstanceNetwork {
-    instance: Instance;
+    instance: Instance
     constructor(instance: Instance);
     onRequest(): void;
     onOpen(user: User): void;
@@ -19,4 +19,4 @@ declare class InstanceNetwork {
     onConnectionDenied(user: User, payload: any): void;
     onClose(user: User): void;
 }
-export { InstanceNetwork, INetworkEvent };
+export { InstanceNetwork, INetworkEvent }

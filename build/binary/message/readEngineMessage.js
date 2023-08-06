@@ -1,18 +1,18 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const BinaryExt_1 = require("../../common/binary/BinaryExt");
+'use strict'
+Object.defineProperty(exports, '__esModule', { value: true })
+const BinaryExt_1 = require('../../common/binary/BinaryExt')
 function readEngineMessage(reader, context) {
     //console.log('entered readMEssage')
-    const ntype = reader.readUInt8();
-    const nschema = context.getEngineSchema(ntype);
-    const obj = { ntype };
+    const ntype = reader.readUInt8()
+    const nschema = context.getEngineSchema(ntype)
+    const obj = { ntype }
     for (let i = 1; i < nschema.keys.length; i++) {
-        const propData = nschema.keys[i];
-        const binaryUtil = (0, BinaryExt_1.binaryGet)(propData.type);
+        const propData = nschema.keys[i]
+        const binaryUtil = (0, BinaryExt_1.binaryGet)(propData.type)
         // @ts-ignore
-        obj[propData.prop] = binaryUtil.read(reader);
+        obj[propData.prop] = binaryUtil.read(reader)
     }
-    return obj;
+    return obj
 }
-exports.default = readEngineMessage;
+exports.default = readEngineMessage
 //# sourceMappingURL=readEngineMessage.js.map

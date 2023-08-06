@@ -3,4 +3,4 @@ type Point3D = {
     y: number;
     z: number;
 };
-export { Point3D };
+export { Point3D }

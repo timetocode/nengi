@@ -1,8 +1,8 @@
 /// <reference types="node" />
-import { IChannel } from './IChannel';
-import { Instance } from './Instance';
-import { InstanceNetwork } from './InstanceNetwork';
-import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
+import { IChannel } from './IChannel'
+import { Instance } from './Instance'
+import { InstanceNetwork } from './InstanceNetwork'
+import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
 declare enum UserConnectionState {
     NULL = 0,
     OpenPreHandshake = 1,
@@ -12,23 +12,23 @@ declare enum UserConnectionState {
 }
 type StringOrJSONStringifiable = string | Object;
 declare class User {
-    id: number;
-    socket: any;
-    instance: Instance | null;
-    networkAdapter: IServerNetworkAdapter;
-    network: InstanceNetwork | null;
-    remoteAddress: string | null;
-    connectionState: UserConnectionState;
-    subscriptions: Map<number, IChannel>;
-    engineMessageQueue: any[];
-    messageQueue: any[];
-    responseQueue: any[];
+    id: number
+    socket: any
+    instance: Instance | null
+    networkAdapter: IServerNetworkAdapter
+    network: InstanceNetwork | null
+    remoteAddress: string | null
+    connectionState: UserConnectionState
+    subscriptions: Map<number, IChannel>
+    engineMessageQueue: any[]
+    messageQueue: any[]
+    responseQueue: any[]
     cache: {
         [prop: number]: number;
-    };
-    cacheArr: number[];
-    lastSentInstanceTick: number;
-    lastReceivedClientTick: number;
+    }
+    cacheArr: number[]
+    lastSentInstanceTick: number
+    lastReceivedClientTick: number
     constructor(socket: any, networkAdapter: IServerNetworkAdapter);
     subscribe(channel: IChannel): void;
     unsubscribe(channel: IChannel): void;
@@ -43,4 +43,4 @@ declare class User {
         newlyVisible: number[];
     };
 }
-export { User, UserConnectionState };
+export { User, UserConnectionState }

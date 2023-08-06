@@ -24,10 +24,10 @@ function diff(entity: any, cache: any, nschema: Schema) {
 }
 
 class EntityCache {
-    cache: { [tick: number]:  { [nid: number]: any } }
+    cache: { [tick: number]: { [nid: number]: any } }
     // tick { nid: [diff1, diff2]}
-    diffCache: { [tick: number]:  { [nid: number]: any[] } }
-    binaryDiffCache: { [tick: number]:  { [nid: number]: any[] } }
+    diffCache: { [tick: number]: { [nid: number]: any[] } }
+    binaryDiffCache: { [tick: number]: { [nid: number]: any[] } }
 
     constructor() {
         this.cache = {}
@@ -43,7 +43,7 @@ class EntityCache {
         //this.cache[tick] = {}
         this.diffCache[tick] = {}
         this.binaryDiffCache[tick] = {}
-     }
+    }
 
     deleteCachesForTick(tick: number) {
         //delete this.cache[tick]

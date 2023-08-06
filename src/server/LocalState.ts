@@ -16,7 +16,7 @@ class LocalState {
     }
 
     addChild(parentNid: number, child: IEntity) {
-        let cnid = this.registerEntity(child, parentNid)
+        const cnid = this.registerEntity(child, parentNid)
 
         if (!this.parents.get(parentNid)) {
             this.parents.set(parentNid, new Set())

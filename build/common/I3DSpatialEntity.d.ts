@@ -6,4 +6,4 @@ interface I3DSpatialEntity {
     z: number;
     [prop: string]: any;
 }
-export default I3DSpatialEntity;
+export default I3DSpatialEntity

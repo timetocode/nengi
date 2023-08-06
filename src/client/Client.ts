@@ -2,7 +2,7 @@ import { Context } from '../common/Context'
 import { ClientNetwork } from './ClientNetwork'
 import { Predictor } from './prediction/Predictor'
 
-type StringOrParsedJSON = string | Object
+type StringOrParsedJSON = string | object
 type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
 type WebsocketErrorHandler = (event: any) => void
 

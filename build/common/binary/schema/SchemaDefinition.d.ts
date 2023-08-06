@@ -1,11 +1,11 @@
-import { Binary } from '../Binary';
+import { Binary } from '../Binary'
 type ShorthandBinarySpecification = Binary;
 type LonghandBinarySpecification = {
     type: Binary;
-    interp: Boolean;
+    interp: boolean;
     groups?: [[string]];
 };
 type SchemaDefinition = {
     [key: string]: ShorthandBinarySpecification | LonghandBinarySpecification;
 };
-export { SchemaDefinition };
+export { SchemaDefinition }

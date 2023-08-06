@@ -1,21 +1,21 @@
-import { Schema } from '../common/binary/schema/Schema';
-import { IEntity } from '../common/IEntity';
+import { Schema } from '../common/binary/schema/Schema'
+import { IEntity } from '../common/IEntity'
 declare class EntityCache {
     cache: {
         [tick: number]: {
             [nid: number]: any;
         };
-    };
+    }
     diffCache: {
         [tick: number]: {
             [nid: number]: any[];
         };
-    };
+    }
     binaryDiffCache: {
         [tick: number]: {
             [nid: number]: any[];
         };
-    };
+    }
     constructor();
     cacheContains(nid: number): boolean;
     createCachesForTick(tick: number): void;
@@ -24,4 +24,4 @@ declare class EntityCache {
     cacheify(tick: number, entity: IEntity, schema: Schema): void;
     updateCache(tick: number, entity: IEntity, schema: Schema): void;
 }
-export { EntityCache };
+export { EntityCache }

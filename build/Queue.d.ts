@@ -1,5 +1,5 @@
 declare class Queue {
-    arr: any[];
+    arr: any[]
     constructor();
     isEmpty(): boolean;
     enqueue(item: any): void;
@@ -8,4 +8,4 @@ declare class Queue {
     get length(): number;
     next(): any;
 }
-export default Queue;
+export default Queue

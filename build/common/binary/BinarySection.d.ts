@@ -10,4 +10,4 @@ declare enum BinarySection {
     Responses = 8,
     ClientTick = 9
 }
-export { BinarySection };
+export { BinarySection }

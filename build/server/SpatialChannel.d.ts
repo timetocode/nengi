@@ -1,15 +1,15 @@
-import EDictionary from './EDictionary';
-import LocalState from './LocalState';
-import IEntity from '../common/IEntity';
-import { ViewAABB } from './ViewAABB';
-import IChannel from './IChannel';
+import EDictionary from './EDictionary'
+import LocalState from './LocalState'
+import IEntity from '../common/IEntity'
+import { ViewAABB } from './ViewAABB'
+import IChannel from './IChannel'
 declare class SpatialChannel implements IChannel {
-    id: number;
-    localState: LocalState;
-    entities: EDictionary;
-    users: Map<any, any>;
-    views: Map<any, any>;
-    destroyed: boolean;
+    id: number
+    localState: LocalState
+    entities: EDictionary
+    users: Map<any, any>
+    views: Map<any, any>
+    destroyed: boolean
     constructor(localState: LocalState, id: number);
     addEntity(entity: IEntity): IEntity;
     removeEntity(entity: IEntity): void;
@@ -19,4 +19,4 @@ declare class SpatialChannel implements IChannel {
     unsubscribe(user: any): void;
     destroy(): void;
 }
-export { SpatialChannel };
+export { SpatialChannel }

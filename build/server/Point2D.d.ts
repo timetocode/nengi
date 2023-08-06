@@ -2,4 +2,4 @@ type Point2D = {
     x: number;
     y: number;
 };
-export { Point2D };
+export { Point2D }

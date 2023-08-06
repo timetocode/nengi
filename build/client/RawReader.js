@@ -1,9 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict'
+Object.defineProperty(exports, '__esModule', { value: true })
 class RawReader {
     constructor(client) {
-        this.client = client;
+        this.client = client
     }
 }
-exports.default = RawReader;
+exports.default = RawReader
 //# sourceMappingURL=RawReader.js.map

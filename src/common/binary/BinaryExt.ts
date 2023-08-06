@@ -404,7 +404,7 @@ function quatSlerp(a: Quaternion, b: Quaternion, t: number) {
     // based off three.js quat slerp which cites this:
     // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
 
-    let cosHalfTheta = w * b.w + x * b.x + y * b.y + z * b.z;
+    let cosHalfTheta = w * b.w + x * b.x + y * b.y + z * b.z
 
     if (cosHalfTheta < 0) {
         out.w = -b.w

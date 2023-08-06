@@ -1,0 +1,4 @@
+# Jest tests
+**/__tests__/**
+**/*.test.ts
+*.js

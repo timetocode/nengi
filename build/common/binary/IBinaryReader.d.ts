@@ -22,4 +22,4 @@ interface IBinaryReader {
 interface IBinaryReaderClass {
     new (bufferOrArrayBuffer: any, offset?: number): IBinaryReader;
 }
-export { IBinaryReader, IBinaryReaderClass };
+export { IBinaryReader, IBinaryReaderClass }

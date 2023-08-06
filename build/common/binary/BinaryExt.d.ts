@@ -1,6 +1,6 @@
-import { Binary } from './Binary';
-import { IBinaryReader } from './IBinaryReader';
-import { IBinaryWriter } from './IBinaryWriter';
+import { Binary } from './Binary'
+import { IBinaryReader } from './IBinaryReader'
+import { IBinaryWriter } from './IBinaryWriter'
 /**
  * User definable binary type
  */
@@ -31,5 +31,5 @@ type BinarySpecification<T> = {
     clone: (value: any) => T;
 };
 declare function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecification<T>): void;
-declare const binaryGet: (binaryType: Binary) => BinarySpecification<any>;
-export { binaryGet, declareBinaryType };
+declare const binaryGet: (binaryType: Binary) => BinarySpecification<any>
+export { binaryGet, declareBinaryType }

@@ -3,8 +3,8 @@ import { Frame, IEntityFrame } from './Frame'
 import { binaryGet } from '../common/binary/BinaryExt'
 
 const findInitialFrame = (frames: Frame[], renderTime: number): Frame | null => {
-    for (var i = frames.length - 1; i >= 0; i--) {
-        var frame = frames[i]
+    for (let i = frames.length - 1; i >= 0; i--) {
+        const frame = frames[i]
         if (frame.timestamp < renderTime) {
             return frame
         }
@@ -13,7 +13,7 @@ const findInitialFrame = (frames: Frame[], renderTime: number): Frame | null => 
 }
 
 const findSubsequentFrame = (frames: Frame[], previousTick: number): Frame | null => {
-    for (var i = 0; i < frames.length; i++) {
+    for (let i = 0; i < frames.length; i++) {
         if (frames[i].tick === previousTick + 1) {
             return frames[i]
         }

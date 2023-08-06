@@ -7,7 +7,7 @@ interface IEntityFrame {
     deleteEntities: number[],
 }
 
-let tick = 0  // TODO this needs to exist in a different scope incase two clients ever run in one process
+let tick = 0 // TODO this needs to exist in a different scope incase two clients ever run in one process
 
 class Frame implements IEntityFrame {
     tick: number

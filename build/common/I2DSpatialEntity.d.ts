@@ -5,4 +5,4 @@ interface I2DSpatialEntity {
     y: number;
     [prop: string]: any;
 }
-export default I2DSpatialEntity;
+export default I2DSpatialEntity

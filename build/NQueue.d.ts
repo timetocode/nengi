@@ -1,5 +1,5 @@
 declare class NQueue<T> {
-    arr: any[];
+    arr: any[]
     constructor();
     isEmpty(): boolean;
     enqueue(item: any): void;
@@ -8,4 +8,4 @@ declare class NQueue<T> {
     get length(): number;
     next(): T;
 }
-export { NQueue };
+export { NQueue }

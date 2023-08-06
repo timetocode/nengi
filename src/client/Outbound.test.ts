@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { Outbound } from './Outbound'
 
 test('commands are queued in order', () => {
@@ -12,9 +10,9 @@ test('commands are queued in order', () => {
     out.addCommand(secondCommand)
     out.addCommand(thirdCommand)
 
-    expect(out.outboundCommands.get(0)?.dequeue()).toBe(firstCommand)
-    expect(out.outboundCommands.get(0)?.dequeue()).toBe(secondCommand)
-    expect(out.outboundCommands.get(0)?.dequeue()).toBe(thirdCommand)
+    expect(out.outboundCommands.get(0)?.[0]).toBe(firstCommand)
+    expect(out.outboundCommands.get(0)?.[1]).toBe(secondCommand)
+    expect(out.outboundCommands.get(0)?.[2]).toBe(thirdCommand)
 })
 
 test('multiple frames of commands can be queued', () => {
@@ -28,10 +26,9 @@ test('multiple frames of commands can be queued', () => {
     out.tick = 1
     out.addCommand(thirdCommand)
 
-    expect(out.outboundCommands.get(0)?.dequeue()).toBe(firstCommand)
-    expect(out.outboundCommands.get(0)?.dequeue()).toBe(secondCommand)
-    // this next command will be associated with tick 1 instead of tick 0
-    expect(out.outboundCommands.get(1)?.dequeue()).toBe(thirdCommand)
+    expect(out.outboundCommands.get(0)?.[0]).toBe(firstCommand)
+    expect(out.outboundCommands.get(0)?.[1]).toBe(secondCommand)
+    expect(out.outboundCommands.get(1)?.[0]).toBe(thirdCommand)
 })
 
 test('command confirmation', () => {
@@ -42,19 +39,70 @@ test('command confirmation', () => {
     out.addCommand(firstCommand)
     out.addCommand(secondCommand)
 
-    // we expect the unconfirmed commands to exist
-    // these happen to be in reverse order when converted to an array b/c of the underlying data strcuture
-    // but this is an implementation detail that doesn't matter unless this datastructure changes later
-    // maybe this test could be a little more resilient
-    expect(out.unconfirmedCommands.get(0)?.arr).toStrictEqual([
-        secondCommand,
-        firstCommand
+    expect(out.unconfirmedCommands.get(0)).toStrictEqual([
+        firstCommand,
+        secondCommand
     ])
 
-    // then we confirm that tick (and all the commands in it)
-    // this is pretending that the server said that tick 0 is confirmed
     out.confirmCommands(0)
 
-    // now we expect it to be undefined
-    expect(out.unconfirmedCommands.get(0)?.arr).toBe(undefined)
+    expect(out.unconfirmedCommands.get(0)).toBe(undefined)
+})
+
+test('engine commands are added correctly', () => {
+    const engineCommand = { ntype: 2, content: 'engine command' };
+
+    const out = new Outbound()
+    out.addEngineCommand(engineCommand)
+
+    expect(out.outboundEngineCommands.get(0)?.[0]).toBe(engineCommand)
+})
+
+test('getCurrentFrame returns current frame commands', () => {
+    const command = { ntype: 1, content: 'command' }
+    const engineCommand = { ntype: 2, content: 'engine command' }
+
+    const out = new Outbound()
+    out.addCommand(command)
+    out.addEngineCommand(engineCommand)
+
+    const frame = out.getCurrentFrame()
+
+    expect(frame.outboundCommands[0]).toBe(command)
+    expect(frame.outboundEngineCommands[0]).toBe(engineCommand)
+})
+
+test('getEngineCommands returns engine commands for a given tick', () => {
+    const engineCommand = { ntype: 2, content: 'engine command' }
+
+    const out = new Outbound()
+    out.addEngineCommand(engineCommand)
+
+    expect(out.getEngineCommands(0)[0]).toBe(engineCommand)
+    expect(out.getEngineCommands(1)).toEqual([])
+})
+
+test('getCommands returns commands for a given tick', () => {
+    const command = { ntype: 1, content: 'command' }
+
+    const out = new Outbound()
+    out.addCommand(command)
+
+    expect(out.getCommands(0)[0]).toBe(command)
+    expect(out.getCommands(1)).toEqual([])
+})
+
+test('getUnconfirmedCommands returns all unconfirmed commands', () => {
+    const command1 = { ntype: 1, content: 'command 1' }
+    const command2 = { ntype: 1, content: 'command 2' }
+
+    const out = new Outbound()
+    out.addCommand(command1)
+    out.tick = 1
+    out.addCommand(command2)
+
+    const unconfirmed = out.getUnconfirmedCommands()
+
+    expect(unconfirmed.get(0)?.[0]).toBe(command1)
+    expect(unconfirmed.get(1)?.[0]).toBe(command2)
 })

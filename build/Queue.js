@@ -1,27 +1,27 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict'
+Object.defineProperty(exports, '__esModule', { value: true })
 class Queue {
     constructor() {
-        this.arr = [];
+        this.arr = []
     }
     isEmpty() {
-        return this.arr.length === 0;
+        return this.arr.length === 0
     }
     enqueue(item) {
-        this.arr.unshift(item);
+        this.arr.unshift(item)
     }
     dequeue() {
-        return this.arr.pop();
+        return this.arr.pop()
     }
     peekNext() {
-        return this.arr[this.arr.length - 1];
+        return this.arr[this.arr.length - 1]
     }
     get length() {
-        return this.arr.length;
+        return this.arr.length
     }
     next() {
-        return this.dequeue();
+        return this.dequeue()
     }
 }
-exports.default = Queue;
+exports.default = Queue
 //# sourceMappingURL=Queue.js.map

@@ -1,5 +1,5 @@
-import { IEntity } from '../common/IEntity';
-import { User } from './User';
+import { IEntity } from '../common/IEntity'
+import { User } from './User'
 type ChannelSubscriptionHandler = (user: User, channel: IChannel) => void;
 type CulledChannelSubscriptionHandler = (user: User, channel: ICulledChannel<any, any>) => void;
 type VisibilityResolver<VisibleObjectType, ViewType> = (obj: VisibleObjectType, view: ViewType) => boolean;
@@ -26,4 +26,4 @@ interface ICulledChannel<VisibleObjectType, ViewType> {
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
     getVisibileEntities(userId: number): number[];
 }
-export { IChannel, ICulledChannel, ChannelSubscriptionHandler, CulledChannelSubscriptionHandler, VisibilityResolver };
+export { IChannel, ICulledChannel, ChannelSubscriptionHandler, CulledChannelSubscriptionHandler, VisibilityResolver }

@@ -59,7 +59,7 @@ class Channel implements IChannel {
 
     destroy() {
         this.users.forEach(user => this.unsubscribe(user))
-        this.entities.forEach(entity => this.removeEntity(entity))
+        this.entities.forEachReverse(entity => this.removeEntity(entity))
     }
 }
 

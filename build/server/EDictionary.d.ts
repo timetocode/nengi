@@ -1,9 +1,9 @@
-import { IEntity } from '../common/IEntity';
+import { IEntity } from '../common/IEntity'
 declare class EDictionary {
     object: {
         [key: string]: any;
-    };
-    array: IEntity[];
+    }
+    array: IEntity[]
     constructor();
     get size(): number;
     get(nid: number): any;
@@ -13,4 +13,4 @@ declare class EDictionary {
     remove(obj: IEntity): any;
     removeById(id: number): any;
 }
-export { EDictionary };
+export { EDictionary }

@@ -13,7 +13,7 @@ class Chronus {
             this.timeDifferences.shift()
         }
         let total = 0
-        for (var i = 0; i < this.timeDifferences.length; i++) {
+        for (let i = 0; i < this.timeDifferences.length; i++) {
             total += this.timeDifferences[i]
         }
         this.averageTimeDifference = total / this.timeDifferences.length  

@@ -10,4 +10,4 @@ interface IClientNetworkAdapter {
 	createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader
 }
 
-export { IClientNetworkAdapter  }
+export { IClientNetworkAdapter }

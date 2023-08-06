@@ -108,57 +108,57 @@ class InstanceNetwork {
                 const section = binaryReader.readUInt8()
 
                 switch (section) {
-                    case BinarySection.EngineMessages: {
-                        const count = binaryReader.readUInt8()
-                        for (let i = 0; i < count; i++) {
-                            const msg: any = readEngineMessage(binaryReader, this.instance.context)
+                case BinarySection.EngineMessages: {
+                    const count = binaryReader.readUInt8()
+                    for (let i = 0; i < count; i++) {
+                        const msg: any = readEngineMessage(binaryReader, this.instance.context)
 
-                            if (msg.ntype === EngineMessage.ConnectionAttempt) {
-                                const handshake = JSON.parse(msg.handshake)
-                                this.onHandshake(user, handshake)
-                            }
-
-                            if (msg.ntype === EngineMessage.ClientTick) {
-                                const clientTick = msg.tick
-                                user.lastReceivedClientTick = clientTick
-                                commandSet.clientTick = clientTick
-                            }
+                        if (msg.ntype === EngineMessage.ConnectionAttempt) {
+                            const handshake = JSON.parse(msg.handshake)
+                            this.onHandshake(user, handshake)
                         }
 
-                        break
-                    }
-                    case BinarySection.Commands: {
-                        const count = binaryReader.readUInt8()
-                        for (let i = 0; i < count; i++) {
-                            const msg = readMessage(binaryReader, this.instance.context)
-                            commands.push(msg)
+                        if (msg.ntype === EngineMessage.ClientTick) {
+                            const clientTick = msg.tick
+                            user.lastReceivedClientTick = clientTick
+                            commandSet.clientTick = clientTick
                         }
-                        break
                     }
-                    case BinarySection.Requests: {
-                        const count = binaryReader.readUInt8()
-                        for (let i = 0; i < count; i++) {
-                            const requestId = binaryReader.readUInt32()
-                            const endpoint = binaryReader.readUInt32()
-                            const str = binaryReader.readString()
-                            const body = JSON.parse(str)
-                            const cb = this.instance.responseEndPoints.get(endpoint)
-                            if (cb) {
-                                cb({ user, body }, (response: any) => {
-                                    console.log('supposed to response with', response)
-                                    user.responseQueue.push({
-                                        requestId,
-                                        response: JSON.stringify(response)
-                                    })
+
+                    break
+                }
+                case BinarySection.Commands: {
+                    const count = binaryReader.readUInt8()
+                    for (let i = 0; i < count; i++) {
+                        const msg = readMessage(binaryReader, this.instance.context)
+                        commands.push(msg)
+                    }
+                    break
+                }
+                case BinarySection.Requests: {
+                    const count = binaryReader.readUInt8()
+                    for (let i = 0; i < count; i++) {
+                        const requestId = binaryReader.readUInt32()
+                        const endpoint = binaryReader.readUInt32()
+                        const str = binaryReader.readString()
+                        const body = JSON.parse(str)
+                        const cb = this.instance.responseEndPoints.get(endpoint)
+                        if (cb) {
+                            cb({ user, body }, (response: any) => {
+                                console.log('supposed to response with', response)
+                                user.responseQueue.push({
+                                    requestId,
+                                    response: JSON.stringify(response)
                                 })
-                            }
+                            })
                         }
-                        break
                     }
-                    default: {
-                        console.log('network hit default case while reading')
-                        break
-                    }
+                    break
+                }
+                default: {
+                    console.log('network hit default case while reading')
+                    break
+                }
                 }
             }
 

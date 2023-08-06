@@ -1,2 +1,2 @@
-declare const timeSyncSchema: import("../binary/schema/Schema").Schema;
-export { timeSyncSchema };
+declare const timeSyncSchema: import('../binary/schema/Schema').Schema
+export { timeSyncSchema }

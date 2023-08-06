@@ -159,7 +159,7 @@ class ClientNetwork {
         if (isDebug) {
             debug.engineCommands = []
             outboundEngineCommands.forEach((command: any) => {
-               debug.engineCommands.push(command)
+                debug.engineCommands.push(command)
             })
         }
 
@@ -176,7 +176,7 @@ class ClientNetwork {
         if (isDebug) {
             debug.commands = []
             outboundCommands.forEach((command: any) => {
-               debug.commands.push(command)
+                debug.commands.push(command)
             })
         }
 
@@ -217,76 +217,76 @@ class ClientNetwork {
         while (dr.offset < dr.byteLength) {
             const section = dr.readUInt8()
             switch (section) {
-                case BinarySection.EngineMessages: {
-                    const count = dr.readUInt8()
-                    for (let i = 0; i < count; i++) {
-                        const engineMessage = readEngineMessage(dr, this.client.context)
-                        if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
-                            // @ts-ignore
-                            this.onDisconnect(engineMessage.reason)
-                        }
-                        if (engineMessage.ntype === EngineMessage.TimeSync) {
-                            // @ts-ignore
-                            snapshot.timestamp = engineMessage.timestamp
-                        }
-                        if (engineMessage.ntype === EngineMessage.ClientTick) {
-                            // @ts-ignore
-                            snapshot.confirmedClientTick = engineMessage.tick
-                        }
+            case BinarySection.EngineMessages: {
+                const count = dr.readUInt8()
+                for (let i = 0; i < count; i++) {
+                    const engineMessage = readEngineMessage(dr, this.client.context)
+                    if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
+                        // @ts-ignore
+                        this.onDisconnect(engineMessage.reason)
                     }
-                    break
-                }
-                case BinarySection.Messages: {
-                    const count = dr.readUInt32()
-                    for (let i = 0; i < count; i++) {
-                        const message = readMessage(dr, this.client.context)
-                        this.messages.push(message)
+                    if (engineMessage.ntype === EngineMessage.TimeSync) {
+                        // @ts-ignore
+                        snapshot.timestamp = engineMessage.timestamp
                     }
-                    break
-                }
-                case BinarySection.Responses: {
-                    const count = dr.readUInt32()
-                    for (let i = 0; i < count; i++) {
-                        const requestId = dr.readUInt32()
-                        const response = dr.readString()
-                        const request = this.requests.get(requestId)
-                        if (request) {
-                            request.callback(response)
-                            this.requests.delete(requestId)
-                        }
+                    if (engineMessage.ntype === EngineMessage.ClientTick) {
+                        // @ts-ignore
+                        snapshot.confirmedClientTick = engineMessage.tick
                     }
-                    break
                 }
-                case BinarySection.CreateEntities: {
-                    const count = dr.readUInt32()
-                    for (let i = 0; i < count; i++) {
-                        //const entity = readEntity(dr, this.client.context)
-                        const entity = readMessage(dr, this.client.context) as IEntity
-                        this.entities.set(entity.nid, entity)
-                        snapshot.createEntities.push(entity)
+                break
+            }
+            case BinarySection.Messages: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const message = readMessage(dr, this.client.context)
+                    this.messages.push(message)
+                }
+                break
+            }
+            case BinarySection.Responses: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const requestId = dr.readUInt32()
+                    const response = dr.readString()
+                    const request = this.requests.get(requestId)
+                    if (request) {
+                        request.callback(response)
+                        this.requests.delete(requestId)
                     }
-                    break
                 }
-                case BinarySection.UpdateEntities: {
-                    const count = dr.readUInt32()
-                    for (let i = 0; i < count; i++) {
-                        const diff = readDiff(dr, this.client.context, this.entities)
-                        snapshot.updateEntities.push(diff)
-                    }
-                    break
+                break
+            }
+            case BinarySection.CreateEntities: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    //const entity = readEntity(dr, this.client.context)
+                    const entity = readMessage(dr, this.client.context) as IEntity
+                    this.entities.set(entity.nid, entity)
+                    snapshot.createEntities.push(entity)
                 }
-                case BinarySection.DeleteEntities: {
-                    const count = dr.readUInt32()
-                    for (let i = 0; i < count; i++) {
-                        const nid = dr.readUInt32()
-                        snapshot.deleteEntities.push(nid)
-                    }
-                    break
+                break
+            }
+            case BinarySection.UpdateEntities: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const diff = readDiff(dr, this.client.context, this.entities)
+                    snapshot.updateEntities.push(diff)
                 }
-                default: {
-                    console.log('hit unknown section while readding binary')
-                    break
+                break
+            }
+            case BinarySection.DeleteEntities: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const nid = dr.readUInt32()
+                    snapshot.deleteEntities.push(nid)
                 }
+                break
+            }
+            default: {
+                console.log('hit unknown section while readding binary')
+                break
+            }
             }
         }
 

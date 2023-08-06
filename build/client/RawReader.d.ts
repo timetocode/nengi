@@ -1,6 +1,6 @@
-import { Client } from './Client';
+import { Client } from './Client'
 declare class RawReader {
-    client: Client;
+    client: Client
     constructor(client: Client);
 }
-export default RawReader;
+export default RawReader
