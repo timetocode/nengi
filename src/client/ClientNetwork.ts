@@ -251,7 +251,7 @@ class ClientNetwork {
                     const response = dr.readString()
                     const request = this.requests.get(requestId)
                     if (request) {
-                        request.callback(response)
+                        request.callback(JSON.parse(response))
                         this.requests.delete(requestId)
                     }
                 }

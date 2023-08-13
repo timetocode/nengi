@@ -1,11 +1,10 @@
-'use strict'
-Object.defineProperty(exports, '__esModule', { value: true })
-exports.Schema = void 0
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Schema = void 0;
 class Schema {
     constructor() {
-        this.keys = []
-        this.props = {}
+        this.keys = [];
+        this.props = {};
     }
 }
-exports.Schema = Schema
-//# sourceMappingURL=Schema.js.map
+exports.Schema = Schema;

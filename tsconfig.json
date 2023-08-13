@@ -3,7 +3,7 @@
         "target": "es6",
         "module": "commonjs",
         "outDir": "./build",
-        "noEmit": true,
+        "noEmit": false,
         "strict": true,
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,

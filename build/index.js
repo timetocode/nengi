@@ -1,55 +1,54 @@
-'use strict'
+"use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k
-    var desc = Object.getOwnPropertyDescriptor(m, k)
-    if (!desc || ('get' in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-        desc = { enumerable: true, get: function() { return m[k] } }
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
     }
-    Object.defineProperty(o, k2, desc)
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k
-    o[k2] = m[k]
-}))
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
-    for (var p in m) if (p !== 'default' && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p)
-}
-Object.defineProperty(exports, '__esModule', { value: true })
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
 // server
-__exportStar(require('./server/Instance'), exports)
-__exportStar(require('./server/InstanceNetwork'), exports)
-__exportStar(require('./server/Point2D'), exports)
-__exportStar(require('./server/Point3D'), exports)
-__exportStar(require('./server/AABB2D'), exports)
-__exportStar(require('./server/AABB3D'), exports)
-__exportStar(require('./server/Channel'), exports)
-__exportStar(require('./server/ChannelAABB2D'), exports)
-__exportStar(require('./server/ChannelAABB3D'), exports)
-__exportStar(require('./server/User'), exports)
-__exportStar(require('./server/adapter/MockAdapter'), exports)
+__exportStar(require("./server/Instance"), exports);
+__exportStar(require("./server/InstanceNetwork"), exports);
+__exportStar(require("./server/Point2D"), exports);
+__exportStar(require("./server/Point3D"), exports);
+__exportStar(require("./server/AABB2D"), exports);
+__exportStar(require("./server/AABB3D"), exports);
+__exportStar(require("./server/Channel"), exports);
+__exportStar(require("./server/ChannelAABB2D"), exports);
+__exportStar(require("./server/ChannelAABB3D"), exports);
+__exportStar(require("./server/User"), exports);
+__exportStar(require("./server/adapter/MockAdapter"), exports);
 // client
-__exportStar(require('./client/Client'), exports)
-__exportStar(require('./client/ClientNetwork'), exports)
-__exportStar(require('./client/Interpolator'), exports)
-__exportStar(require('./client/prediction/Predictor'), exports)
-__exportStar(require('./client/prediction/PredictionErrorFrame'), exports)
-__exportStar(require('./client/prediction/PredictionErrorEntity'), exports)
-__exportStar(require('./client/prediction/PredictionErrorProperty'), exports)
-__exportStar(require('./client/prediction/PredictionFrame'), exports)
-__exportStar(require('./client/prediction/PredictionEntity'), exports)
+__exportStar(require("./client/Client"), exports);
+__exportStar(require("./client/ClientNetwork"), exports);
+__exportStar(require("./client/Interpolator"), exports);
+__exportStar(require("./client/prediction/Predictor"), exports);
+__exportStar(require("./client/prediction/PredictionErrorFrame"), exports);
+__exportStar(require("./client/prediction/PredictionErrorEntity"), exports);
+__exportStar(require("./client/prediction/PredictionErrorProperty"), exports);
+__exportStar(require("./client/prediction/PredictionFrame"), exports);
+__exportStar(require("./client/prediction/PredictionEntity"), exports);
 // common
-__exportStar(require('./common/binary/Binary'), exports)
-__exportStar(require('./common/binary/BinarySection'), exports)
-__exportStar(require('./common/Context'), exports)
-__exportStar(require('./common/binary/schema/SchemaDefinition'), exports)
-__exportStar(require('./common/binary/schema/Schema'), exports)
-__exportStar(require('./common/binary/schema/defineSchema'), exports)
-__exportStar(require('./common/binary/NetworkEvent'), exports)
-__exportStar(require('./common/EngineMessage'), exports)
-__exportStar(require('./common/binary/BinaryExt'), exports)
+__exportStar(require("./common/binary/Binary"), exports);
+__exportStar(require("./common/binary/BinarySection"), exports);
+__exportStar(require("./common/Context"), exports);
+__exportStar(require("./common/binary/schema/SchemaDefinition"), exports);
+__exportStar(require("./common/binary/schema/Schema"), exports);
+__exportStar(require("./common/binary/schema/defineSchema"), exports);
+__exportStar(require("./common/binary/NetworkEvent"), exports);
+__exportStar(require("./common/EngineMessage"), exports);
+__exportStar(require("./common/binary/BinaryExt"), exports);
 // types for integration with adapters
-__exportStar(require('./server/adapter/IServerNetworkAdapter'), exports)
-__exportStar(require('./common/binary/IBinaryReader'), exports)
-__exportStar(require('./common/binary/IBinaryWriter'), exports)
+__exportStar(require("./server/adapter/IServerNetworkAdapter"), exports);
+__exportStar(require("./common/binary/IBinaryReader"), exports);
+__exportStar(require("./common/binary/IBinaryWriter"), exports);
 // benchmarks/tests
-__exportStar(require('./binary/message/writeMessage'), exports)
-//# sourceMappingURL=index.js.map
+__exportStar(require("./binary/message/writeMessage"), exports);
