@@ -164,6 +164,7 @@ class InstanceNetwork {
 
             this.instance.queue.enqueue(commandSet)
         } catch (err) {
+            console.log('on message err triggered', err)
             try {
                 user.networkAdapter.disconnect(user, {})
             } catch (err2) {
