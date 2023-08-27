@@ -4,7 +4,7 @@ import { Instance } from './Instance'
 import { InstanceNetwork } from './InstanceNetwork'
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
 
-enum UserConnectionState {
+export enum UserConnectionState {
     NULL, // initial state
     OpenPreHandshake, // socket open, handshake not complete
     OpenAwaitingHandshake, // handshake begun
@@ -12,54 +12,51 @@ enum UserConnectionState {
     Closed // closed, network.send would crash if invoked
 }
 
-type StringOrJSONStringifiable = string | Object
+type StringOrJSONStringifiable = string | object
 
 
-class User {
-    id: number
-
-    // used by specific websocket implementations, we could have used a union
-    // here, but that would be a mistake because it would involve including
-    // *all* of the websocket dependencies
+export class User {
+    id = 0
     socket: any
-
-    instance: Instance | null
+    instance: Instance | null = null
     networkAdapter: IServerNetworkAdapter
-    network: InstanceNetwork | null
-
-    remoteAddress: string | null
-    connectionState: UserConnectionState
-
-    subscriptions: Map<number, IChannel>
-
-    engineMessageQueue: any[]
-    messageQueue: any[]
-    responseQueue: any[]
-
-    cache: { [prop: number]: number }
-    cacheArr: number[]
-
-    lastSentInstanceTick: number
-    lastReceivedClientTick: number
+    network: InstanceNetwork | null = null
+    remoteAddress: string | null = null
+    connectionState = UserConnectionState.NULL
+    subscriptions = new Map<number, IChannel>()
+    engineMessageQueue: any[] = []
+    messageQueue: any[] = []
+    responseQueue: any[] = []
+    cache: { [prop: number]: number } = {}
+    cacheArr: number[] = []
+    lastSentInstanceTick = 0
+    lastReceivedClientTick = 0
+    latency = 0
+    lastSentPingTimestamp = 0
+    recentLatencies: number[] = []
+    latencySamples = 3
 
     constructor(socket: any, networkAdapter: IServerNetworkAdapter) {
-        this.id = 0
         this.socket = socket
-        this.instance = null
         this.networkAdapter = networkAdapter
-        this.network = null
-        this.remoteAddress = null
-        this.connectionState = UserConnectionState.NULL
-        this.subscriptions = new Map()
-        this.engineMessageQueue = []
-        this.messageQueue = []
-        this.responseQueue = []
+    }
 
-        this.cache = {}
-        this.cacheArr = []
+    calculateLatency() {
+        const deltaMs = Date.now() - this.lastSentPingTimestamp
+        this.recentLatencies.push(deltaMs)
 
-        this.lastSentInstanceTick = 0
-        this.lastReceivedClientTick = 0
+        if (this.recentLatencies.length > 0) {
+            let curr = 0
+            for (let i = 0; i < this.recentLatencies.length; i++) {
+                curr += this.recentLatencies[i]
+            }
+
+            this.latency = curr / this.recentLatencies.length
+        }
+
+        while (this.recentLatencies.length > this.latencySamples) {
+            this.recentLatencies.shift()
+        }
     }
 
     subscribe(channel: IChannel) {
@@ -134,5 +131,3 @@ class User {
     }
 
 }
-
-export { User, UserConnectionState }

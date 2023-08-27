@@ -9,8 +9,12 @@ enum EngineMessage {
     ChannelRemoveEntity,
     ConnectionTerminated,
     TimeSync,
+    Ping,
 
+
+    Pong,
     ClientTick,
+
 }
 
 export { EngineMessage }

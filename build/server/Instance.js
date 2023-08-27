@@ -22,6 +22,7 @@ class Instance {
         this.incrementalUserId = 0;
         this.cache = new EntityCache_1.EntityCache();
         this.tick = 1;
+        this.pingIntervalMs = 1000;
         this.responseEndPoints = new Map();
         this.onConnect = (handshake) => {
             return new Promise((resolve, reject) => {
@@ -64,6 +65,13 @@ class Instance {
                 if (user.lastSentInstanceTick % 20 === 0) {
                     user.queueEngineMessage(timeSyncEngineMessage);
                 }
+            }
+            if (user.lastSentPingTimestamp < timestamp - this.pingIntervalMs) {
+                user.queueEngineMessage({
+                    ntype: EngineMessage_1.EngineMessage.Ping,
+                    latency: user.latency
+                });
+                user.lastSentPingTimestamp = timestamp;
             }
             user.queueEngineMessage({
                 ntype: EngineMessage_1.EngineMessage.ClientTick,

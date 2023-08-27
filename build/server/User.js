@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserConnectionState = exports.User = void 0;
+exports.User = exports.UserConnectionState = void 0;
 var UserConnectionState;
 (function (UserConnectionState) {
     UserConnectionState[UserConnectionState["NULL"] = 0] = "NULL";
@@ -12,9 +12,7 @@ var UserConnectionState;
 class User {
     constructor(socket, networkAdapter) {
         this.id = 0;
-        this.socket = socket;
         this.instance = null;
-        this.networkAdapter = networkAdapter;
         this.network = null;
         this.remoteAddress = null;
         this.connectionState = UserConnectionState.NULL;
@@ -26,6 +24,26 @@ class User {
         this.cacheArr = [];
         this.lastSentInstanceTick = 0;
         this.lastReceivedClientTick = 0;
+        this.latency = 0;
+        this.lastSentPingTimestamp = 0;
+        this.recentLatencies = [];
+        this.latencySamples = 3;
+        this.socket = socket;
+        this.networkAdapter = networkAdapter;
+    }
+    calculateLatency() {
+        const deltaMs = Date.now() - this.lastSentPingTimestamp;
+        this.recentLatencies.push(deltaMs);
+        if (this.recentLatencies.length > 0) {
+            let curr = 0;
+            for (let i = 0; i < this.recentLatencies.length; i++) {
+                curr += this.recentLatencies[i];
+            }
+            this.latency = curr / this.recentLatencies.length;
+        }
+        while (this.recentLatencies.length > this.latencySamples) {
+            this.recentLatencies.shift();
+        }
     }
     subscribe(channel) {
         this.subscriptions.set(channel.id, channel);

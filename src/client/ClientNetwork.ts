@@ -18,48 +18,32 @@ import { Outbound } from './Outbound'
 import { Frame } from './Frame'
 
 
-class ClientNetwork {
+export class ClientNetwork {
     client: Client
-    entities: Map<number, IEntity>
-    snapshots: Snapshot[]
-    frames: Frame[]
-    latestFrame: Frame | null
-    outbound: Outbound
-    messages: any[]
-    predictionErrorFrames: any[]
-    socket: WebSocket | null
-    requestId: number
-    requestQueue: NQueue<any>
-    requests: Map<number, any>
-    clientTick: number
-    previousSnapshot: Snapshot | null
-    chronus: Chronus
-    onDisconnect: (reason: any, event?: any) => void
-    onSocketError: (event: any) => void
+    entities = new Map<number, IEntity>()
+    snapshots: Snapshot[] = []
+    frames: Frame[] = []
+    latestFrame: Frame | null = null
+    messages: any[] = []
+    predictionErrorFrames: any[] = []
+    outbound = new Outbound()
+    socket: WebSocket | null = null
+    requestId = 1
+    requestQueue = new NQueue<any>()
+    requests = new Map<number, any>()
+    clientTick = 1
+    previousSnapshot: Snapshot | null = null
+    chronus = new Chronus()
+    latency = 0
+    onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
+        this.client.disconnectHandler(reason, event)
+    }
+    onSocketError: (event: any) => void = (event: any) => {
+        this.client.websocketErrorHandler(event)
+    }
 
     constructor(client: Client) {
         this.client = client
-        this.entities = new Map()
-        this.snapshots = []
-        this.frames = []
-        this.latestFrame = null
-        this.messages = []
-        this.predictionErrorFrames = []
-        this.outbound = new Outbound()
-        this.socket = null
-        this.requestId = 1
-        this.requestQueue = new NQueue()
-        this.requests = new Map()
-        this.clientTick = 1
-        this.previousSnapshot = null
-        this.chronus = new Chronus()
-
-        this.onDisconnect = (reason: any, event?: any) => {
-            this.client.disconnectHandler(reason, event)
-        }
-        this.onSocketError = (event: any) => {
-            this.client.websocketErrorHandler(event)
-        }
     }
 
     incrementClientTick() {
@@ -71,12 +55,10 @@ class ClientNetwork {
 
     addEngineCommand(command: any) {
         this.outbound.addEngineCommand(command)
-        //this.outboundEngine.enqueue(command)
     }
 
     addCommand(command: any) {
         this.outbound.addCommand(command)
-        //this.outbound.enqueue(command)
     }
 
     request(endpoint: number, payload: any, callback: (response: any) => any) {
@@ -233,6 +215,12 @@ class ClientNetwork {
                         // @ts-ignore
                         snapshot.confirmedClientTick = engineMessage.tick
                     }
+
+                    if (engineMessage.ntype === EngineMessage.Ping) {
+                        this.addEngineCommand({ ntype: EngineMessage.Pong })
+                        // @ts-ignore
+                        this.latency = engineMessage.latency
+                    }
                 }
                 break
             }
@@ -320,5 +308,3 @@ class ClientNetwork {
     }
 
 }
-
-export { ClientNetwork }

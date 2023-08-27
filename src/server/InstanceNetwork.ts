@@ -34,8 +34,7 @@ class InstanceNetwork {
             user.connectionState = UserConnectionState.OpenAwaitingHandshake
             const connectionAccepted = await this.instance.onConnect(handshake)
 
-            // @ts-ignore ts is wrong that this is always false; the value can change during the
-            // above await
+            // @ts-ignore typescript is wrong that connectionState does not change, it changes during the await
             if (user.connectionState === UserConnectionState.Closed) {
                 throw new Error('Connection closed before handshake completed.')
             }
@@ -123,6 +122,10 @@ class InstanceNetwork {
                             user.lastReceivedClientTick = clientTick
                             commandSet.clientTick = clientTick
                         }
+
+                        if (msg.ntype === EngineMessage.Pong) {
+                            user.calculateLatency()
+                        }
                     }
 
                     break
@@ -145,7 +148,6 @@ class InstanceNetwork {
                         const cb = this.instance.responseEndPoints.get(endpoint)
                         if (cb) {
                             cb({ user, body }, (response: any) => {
-                                console.log('supposed to response with', response)
                                 user.responseQueue.push({
                                     requestId,
                                     response: JSON.stringify(response)

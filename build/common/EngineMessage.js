@@ -13,5 +13,7 @@ var EngineMessage;
     EngineMessage[EngineMessage["ChannelRemoveEntity"] = 7] = "ChannelRemoveEntity";
     EngineMessage[EngineMessage["ConnectionTerminated"] = 8] = "ConnectionTerminated";
     EngineMessage[EngineMessage["TimeSync"] = 9] = "TimeSync";
-    EngineMessage[EngineMessage["ClientTick"] = 10] = "ClientTick";
+    EngineMessage[EngineMessage["Ping"] = 10] = "Ping";
+    EngineMessage[EngineMessage["Pong"] = 11] = "Pong";
+    EngineMessage[EngineMessage["ClientTick"] = 12] = "ClientTick";
 })(EngineMessage || (exports.EngineMessage = EngineMessage = {}));

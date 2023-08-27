@@ -18,7 +18,6 @@ const Outbound_1 = require("./Outbound");
 const Frame_1 = require("./Frame");
 class ClientNetwork {
     constructor(client) {
-        this.client = client;
         this.entities = new Map();
         this.snapshots = [];
         this.frames = [];
@@ -33,12 +32,14 @@ class ClientNetwork {
         this.clientTick = 1;
         this.previousSnapshot = null;
         this.chronus = new Chronus_1.Chronus();
+        this.latency = 0;
         this.onDisconnect = (reason, event) => {
             this.client.disconnectHandler(reason, event);
         };
         this.onSocketError = (event) => {
             this.client.websocketErrorHandler(event);
         };
+        this.client = client;
     }
     incrementClientTick() {
         this.clientTick++;
@@ -48,11 +49,9 @@ class ClientNetwork {
     }
     addEngineCommand(command) {
         this.outbound.addEngineCommand(command);
-        //this.outboundEngine.enqueue(command)
     }
     addCommand(command) {
         this.outbound.addCommand(command);
-        //this.outbound.enqueue(command)
     }
     request(endpoint, payload, callback) {
         const obj = {
@@ -184,6 +183,11 @@ class ClientNetwork {
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.ClientTick) {
                             // @ts-ignore
                             snapshot.confirmedClientTick = engineMessage.tick;
+                        }
+                        if (engineMessage.ntype === EngineMessage_1.EngineMessage.Ping) {
+                            this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.Pong });
+                            // @ts-ignore
+                            this.latency = engineMessage.latency;
                         }
                     }
                     break;

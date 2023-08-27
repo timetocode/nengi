@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.timeSyncSchema = void 0;
+exports.pingSchema = void 0;
 const defineSchema_1 = require("../binary/schema/defineSchema");
 const Binary_1 = require("../binary/Binary");
-exports.timeSyncSchema = (0, defineSchema_1.defineSchema)({
-    timestamp: Binary_1.Binary.Float64,
+exports.pingSchema = (0, defineSchema_1.defineSchema)({
+    latency: Binary_1.Binary.UInt16,
 });
