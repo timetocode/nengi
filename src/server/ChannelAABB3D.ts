@@ -17,7 +17,7 @@ const pointInAABB3D = (p: Point3D, view: AABB3D) => {
         p.y >= startY &&
         p.y < endY &&
         p.z >= startZ &&
-        p.z > endZ
+        p.z < endZ
     )
 }
 

@@ -14,7 +14,7 @@ const pointInAABB3D = (p, view) => {
         p.y >= startY &&
         p.y < endY &&
         p.z >= startZ &&
-        p.z > endZ);
+        p.z < endZ);
 };
 class ChannelAABB3D extends CulledChannel_1.CulledChannel {
     constructor(localState) {
