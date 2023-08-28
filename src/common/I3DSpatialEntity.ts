@@ -1,4 +1,4 @@
-interface I3DSpatialEntity {
+export interface I3DSpatialEntity {
     nid: number,
     ntype: number,
     x: number,
@@ -6,5 +6,3 @@ interface I3DSpatialEntity {
     z: number,
     [prop: string]: any
 }
-
-export default I3DSpatialEntity

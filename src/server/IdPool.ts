@@ -1,4 +1,4 @@
-class IdPool {
+export class IdPool {
     ids: Set<number>
     min: number
     max: number
@@ -33,5 +33,3 @@ class IdPool {
         this.ids.delete(id)
     }
 }
-
-export { IdPool }

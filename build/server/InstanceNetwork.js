@@ -73,7 +73,6 @@ class InstanceNetwork {
                     const jsonErr = JSON.stringify(err);
                     const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
                     // deny and send reason
-                    // @ts-ignore
                     const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
                     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                     bw.writeUInt8(1);
@@ -152,11 +151,14 @@ class InstanceNetwork {
             this.instance.queue.enqueue(commandSet);
         }
         catch (err) {
-            console.log('on message err triggered', err);
+            // TODO there should be a way for a user to capture this error, perhaps a handler
+            //console.log('on message err triggered', err)
             try {
                 user.networkAdapter.disconnect(user, {});
             }
             catch (err2) {
+                // TODO this is only in the case of an error while disconnecting
+                // can these really occur?
             }
         }
     }

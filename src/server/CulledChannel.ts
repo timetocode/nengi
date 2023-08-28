@@ -4,7 +4,7 @@ import { IEntity } from '../common/IEntity'
 import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel'
 import { User } from './User'
 
-class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
+export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
     id: number
     localState: LocalState
     entities: EDictionary
@@ -66,7 +66,7 @@ class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<Visib
         this.entities.forEach((entity: any) => {
             if (this.visibilityResolver(entity, view)) {
                 visibleNids.push(entity.nid)
-            }            
+            }
         })
         return visibleNids
     }
@@ -76,5 +76,3 @@ class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<Visib
         this.entities.forEach(entity => this.removeEntity(entity))
     }
 }
-
-export { CulledChannel }

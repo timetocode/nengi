@@ -2,7 +2,7 @@ import { Context } from '../common/Context'
 import { LocalState } from './LocalState'
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
-import { IChannel } from './IChannel'
+import { IChannel, ICulledChannel } from './IChannel'
 import { EntityCache } from './EntityCache'
 import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
 import { IEntity } from '../common/IEntity'
@@ -10,7 +10,7 @@ import { NQueue } from '../NQueue'
 import { IdPool } from './IdPool'
 import { EngineMessage } from '../common/EngineMessage'
 
-class Instance {
+export class Instance {
     context: Context
     localState: LocalState
     channelIdPool: IdPool
@@ -49,7 +49,7 @@ class Instance {
 
         this.onConnect = (handshake: any) => {
             return new Promise((resolve, reject) => {
-                console.log('Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied.')
+                console.log(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`)
                 resolve(false)
             })
         }
@@ -69,7 +69,7 @@ class Instance {
         this.responseEndPoints.set(endpoint, callback)
     }
 
-    registerChannel(channel: IChannel) {
+    registerChannel(channel: IChannel | ICulledChannel<any, any>) {
         const channelId = this.channelIdPool.nextId()
         channel.id = channelId
         this.channels.add(channel)
@@ -118,5 +118,3 @@ class Instance {
         this.cache.deleteCachesForTick(this.tick)
     }
 }
-
-export { Instance }

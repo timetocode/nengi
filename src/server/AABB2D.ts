@@ -1,4 +1,4 @@
-class AABB2D {
+export class AABB2D {
     x: number
     y: number
     halfWidth: number
@@ -11,5 +11,3 @@ class AABB2D {
         this.halfHeight = halfHeight
     }
 }
-
-export { AABB2D }

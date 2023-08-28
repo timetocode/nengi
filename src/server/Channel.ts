@@ -4,7 +4,7 @@ import { IEntity } from '../common/IEntity'
 import { IChannel, ChannelSubscriptionHandler } from './IChannel'
 import { User } from './User'
 
-class Channel implements IChannel {
+export class Channel implements IChannel {
     id: number
     localState: LocalState
     entities: EDictionary
@@ -62,5 +62,3 @@ class Channel implements IChannel {
         this.entities.forEachReverse(entity => this.removeEntity(entity))
     }
 }
-
-export { Channel }

@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.Queue = void 0;
 class Queue {
     constructor() {
         this.arr = [];
@@ -23,4 +24,4 @@ class Queue {
         return this.dequeue();
     }
 }
-exports.default = Queue;
+exports.Queue = Queue;

@@ -2,7 +2,7 @@ import { EDictionary } from './EDictionary'
 import { IdPool } from './IdPool'
 import { IEntity } from '../common/IEntity'
 
-class LocalState {
+export class LocalState {
     entityIdPool: IdPool
     sources: Map<number, Set<number>>
     parents: Map<number, Set<number>>
@@ -60,5 +60,3 @@ class LocalState {
         return this._entities.get(nid)
     }
 }
-
-export { LocalState }

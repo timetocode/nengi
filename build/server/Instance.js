@@ -22,11 +22,11 @@ class Instance {
         this.incrementalUserId = 0;
         this.cache = new EntityCache_1.EntityCache();
         this.tick = 1;
-        this.pingIntervalMs = 1000;
+        this.pingIntervalMs = 10000;
         this.responseEndPoints = new Map();
         this.onConnect = (handshake) => {
             return new Promise((resolve, reject) => {
-                console.log('Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied.');
+                console.log(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`);
                 resolve(false);
             });
         };

@@ -9,7 +9,7 @@ import { timeSyncSchema } from './schemas/timeSyncSchema'
 import { pingSchema } from './schemas/pingSchema'
 import { pongSchema } from './schemas/pongSchema'
 
-class Context {
+export class Context {
     /**
 	 * user-defined network schemas
 	 */
@@ -47,5 +47,3 @@ class Context {
         return this.engineSchemas.get(ntype)
     }
 }
-
-export { Context }

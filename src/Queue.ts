@@ -1,6 +1,4 @@
-
-
-class Queue {
+export class Queue {
     arr: any[]
 
     constructor() {
@@ -31,5 +29,3 @@ class Queue {
         return this.dequeue()
     }
 }
-
-export default Queue

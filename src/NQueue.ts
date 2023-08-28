@@ -1,4 +1,4 @@
-class NQueue<T> {
+export class NQueue<T> {
     arr: any[]
 
     constructor() {
@@ -29,5 +29,3 @@ class NQueue<T> {
         return this.dequeue()
     }
 }
-
-export { NQueue }

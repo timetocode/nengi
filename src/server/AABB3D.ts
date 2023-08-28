@@ -1,4 +1,4 @@
-class AABB3D {
+export class AABB3D {
     x: number
     y: number
     z: number
@@ -16,5 +16,3 @@ class AABB3D {
         this.halfDepth = halfDepth
     }
 }
-
-export { AABB3D }

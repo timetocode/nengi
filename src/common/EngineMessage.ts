@@ -1,4 +1,4 @@
-enum EngineMessage {
+export enum EngineMessage {
     Null = 0,
     ConnectionAccepted,
     ConnectionDenied,
@@ -16,5 +16,3 @@ enum EngineMessage {
     ClientTick,
 
 }
-
-export { EngineMessage }
