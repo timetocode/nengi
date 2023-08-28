@@ -1,0 +1,1 @@
+{"version":3,"file":"IdPool.d.ts","sourceRoot":"","sources":["../../src/server/IdPool.ts"],"names":[],"mappings":"AAAA,qBAAa,MAAM;IACf,GAAG,EAAE,GAAG,CAAC,MAAM,CAAC,CAAA;IAChB,GAAG,EAAE,MAAM,CAAA;IACX,GAAG,EAAE,MAAM,CAAA;IACX,OAAO,EAAE,MAAM,CAAA;gBAEH,GAAG,EAAE,MAAM;IAOvB,MAAM,IAAI,MAAM;IAkBhB,QAAQ,CAAC,EAAE,EAAE,MAAM;CAGtB"}

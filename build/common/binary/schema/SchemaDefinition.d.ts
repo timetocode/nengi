@@ -1,4 +1,4 @@
-import { Binary } from '../Binary'
+import { Binary } from '../Binary';
 type ShorthandBinarySpecification = Binary;
 type LonghandBinarySpecification = {
     type: Binary;
@@ -8,4 +8,5 @@ type LonghandBinarySpecification = {
 type SchemaDefinition = {
     [key: string]: ShorthandBinarySpecification | LonghandBinarySpecification;
 };
-export { SchemaDefinition }
+export { SchemaDefinition };
+//# sourceMappingURL=SchemaDefinition.d.ts.map

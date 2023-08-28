@@ -1,15 +1,15 @@
-import { EDictionary } from './EDictionary'
-import { LocalState } from './LocalState'
-import { IEntity } from '../common/IEntity'
-import { IChannel, ChannelSubscriptionHandler } from './IChannel'
-import { User } from './User'
-declare class Channel implements IChannel {
-    id: number
-    localState: LocalState
-    entities: EDictionary
-    users: Map<number, User>
-    onSubscribe: ChannelSubscriptionHandler
-    onUnsubscribe: ChannelSubscriptionHandler
+import { EDictionary } from './EDictionary';
+import { LocalState } from './LocalState';
+import { IEntity } from '../common/IEntity';
+import { IChannel, ChannelSubscriptionHandler } from './IChannel';
+import { User } from './User';
+export declare class Channel implements IChannel {
+    id: number;
+    localState: LocalState;
+    entities: EDictionary;
+    users: Map<number, User>;
+    onSubscribe: ChannelSubscriptionHandler;
+    onUnsubscribe: ChannelSubscriptionHandler;
     constructor(localState: LocalState);
     addEntity(entity: IEntity): IEntity;
     removeEntity(entity: IEntity): void;
@@ -19,4 +19,4 @@ declare class Channel implements IChannel {
     getVisibileEntities(userId: number): number[];
     destroy(): void;
 }
-export { Channel }
+//# sourceMappingURL=Channel.d.ts.map

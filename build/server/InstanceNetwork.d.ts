@@ -1,15 +1,15 @@
 /// <reference types="node" />
-import { Instance } from './Instance'
-import { NetworkEvent } from '../common/binary/NetworkEvent'
-import { User } from './User'
-interface INetworkEvent {
+import { Instance } from './Instance';
+import { NetworkEvent } from '../common/binary/NetworkEvent';
+import { User } from './User';
+export interface INetworkEvent {
     type: NetworkEvent;
     user: User;
     commands?: any;
     clientTick?: number;
 }
-declare class InstanceNetwork {
-    instance: Instance
+export declare class InstanceNetwork {
+    instance: Instance;
     constructor(instance: Instance);
     onRequest(): void;
     onOpen(user: User): void;
@@ -19,4 +19,4 @@ declare class InstanceNetwork {
     onConnectionDenied(user: User, payload: any): void;
     onClose(user: User): void;
 }
-export { InstanceNetwork, INetworkEvent }
+//# sourceMappingURL=InstanceNetwork.d.ts.map

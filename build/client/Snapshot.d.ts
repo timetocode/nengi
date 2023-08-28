@@ -1,4 +1,4 @@
-import { IEntity } from '../common/IEntity'
+import { IEntity } from '../common/IEntity';
 type Snapshot = {
     timestamp: number;
     confirmedClientTick: number;
@@ -7,4 +7,5 @@ type Snapshot = {
     updateEntities: any[];
     deleteEntities: number[];
 };
-export { Snapshot }
+export { Snapshot };
+//# sourceMappingURL=Snapshot.d.ts.map

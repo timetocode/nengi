@@ -1,0 +1,1 @@
+{"version":3,"file":"Schema.d.ts","sourceRoot":"","sources":["../../../../src/common/binary/schema/Schema.ts"],"names":[],"mappings":"AAAA,cAAM,MAAM;IACR,IAAI,EAAE,GAAG,EAAE,CAAA;IACX,KAAK,EAAE;QAAE,CAAC,GAAG,EAAE,MAAM,GAAG,GAAG,CAAA;KAAE,CAAA;;CAMhC;AAED,OAAO,EAAE,MAAM,EAAE,CAAA"}

@@ -1,3 +1,4 @@
-import { Schema } from '../../common/binary/schema/Schema'
+import { Schema } from '../../common/binary/schema/Schema';
 declare function count(schema: Schema, entity: any): number;
-export default count
+export default count;
+//# sourceMappingURL=count.d.ts.map

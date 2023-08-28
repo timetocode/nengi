@@ -1,24 +1,25 @@
-import { Context } from '../common/Context'
-import { LocalState } from './LocalState'
-import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
-import { User } from './User'
-import { IChannel } from './IChannel'
-import { EntityCache } from './EntityCache'
-import { IEntity } from '../common/IEntity'
-import { NQueue } from '../NQueue'
-import { IdPool } from './IdPool'
-declare class Instance {
-    context: Context
-    localState: LocalState
-    channelIdPool: IdPool
-    channels: Set<IChannel>
-    network: InstanceNetwork
-    queue: NQueue<INetworkEvent>
-    users: Map<number, User>
-    incrementalUserId: number
-    cache: EntityCache
-    tick: number
-    responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>
+import { Context } from '../common/Context';
+import { LocalState } from './LocalState';
+import { INetworkEvent, InstanceNetwork } from './InstanceNetwork';
+import { User } from './User';
+import { IChannel, ICulledChannel } from './IChannel';
+import { EntityCache } from './EntityCache';
+import { IEntity } from '../common/IEntity';
+import { NQueue } from '../NQueue';
+import { IdPool } from './IdPool';
+export declare class Instance {
+    context: Context;
+    localState: LocalState;
+    channelIdPool: IdPool;
+    channels: Set<IChannel>;
+    network: InstanceNetwork;
+    queue: NQueue<INetworkEvent>;
+    users: Map<number, User>;
+    incrementalUserId: number;
+    cache: EntityCache;
+    tick: number;
+    pingIntervalMs: number;
+    responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>;
     /**
      *
      * @param handshake test test
@@ -28,12 +29,12 @@ declare class Instance {
      * }
      * ```
      */
-    onConnect: (handshake: any) => Promise<any>
+    onConnect: (handshake: any) => Promise<any>;
     constructor(context: Context);
     attachEntity(parentNid: number, child: IEntity): void;
     detachEntity(parentNid: number, child: IEntity): void;
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;
-    registerChannel(channel: IChannel): number;
+    registerChannel(channel: IChannel | ICulledChannel<any, any>): number;
     step(): void;
 }
-export { Instance }
+//# sourceMappingURL=Instance.d.ts.map

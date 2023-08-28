@@ -1,0 +1,1 @@
+{"version":3,"file":"defineSchema.d.ts","sourceRoot":"","sources":["../../../../src/common/binary/schema/defineSchema.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,MAAM,EAAE,MAAM,UAAU,CAAA;AACjC,OAAO,EAAE,gBAAgB,EAAE,MAAM,oBAAoB,CAAA;AAIrD,iBAAS,YAAY,CAAC,MAAM,EAAE,gBAAgB,GAAG,MAAM,CAgDtD;AAED,OAAO,EAAE,YAAY,EAAE,CAAA"}

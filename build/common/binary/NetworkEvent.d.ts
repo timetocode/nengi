@@ -6,4 +6,5 @@ declare enum NetworkEvent {
     UserDisconnected = 4,
     UserConnectionDenied = 5
 }
-export { NetworkEvent }
+export { NetworkEvent };
+//# sourceMappingURL=NetworkEvent.d.ts.map

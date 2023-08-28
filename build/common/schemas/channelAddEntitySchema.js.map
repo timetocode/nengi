@@ -1,1 +1,0 @@
-{"version":3,"file":"channelAddEntitySchema.js","sourceRoot":"","sources":["../../../src/common/schemas/channelAddEntitySchema.ts"],"names":[],"mappings":";;;AAAA,gEAA4D;AAC5D,6CAAyC;AAEzC,MAAM,sBAAsB,GAAG,IAAA,2BAAY,EAAC;IACxC,GAAG,EAAE,eAAM,CAAC,MAAM;IAClB,GAAG,EAAE,eAAM,CAAC,MAAM;CACrB,CAAC,CAAA;AAEO,wDAAsB"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"I2DSpatialEntity.d.ts","sourceRoot":"","sources":["../../src/common/I2DSpatialEntity.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,gBAAgB;IAC7B,GAAG,EAAE,MAAM,CAAC;IACZ,KAAK,EAAE,MAAM,CAAC;IACd,CAAC,EAAE,MAAM,CAAC;IACV,CAAC,EAAE,MAAM,CAAC;IACV,CAAC,IAAI,EAAE,MAAM,GAAG,GAAG,CAAA;CACtB"}

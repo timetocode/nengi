@@ -22,4 +22,5 @@ interface IBinaryWriter {
 interface IBinaryWriterClass {
     new (bufferOrArrayBuffer: any, offset?: number): IBinaryWriter;
 }
-export { IBinaryWriter, IBinaryWriterClass }
+export { IBinaryWriter, IBinaryWriterClass };
+//# sourceMappingURL=IBinaryWriter.d.ts.map

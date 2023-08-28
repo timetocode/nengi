@@ -4,6 +4,8 @@
         "module": "commonjs",
         "outDir": "./build",
         "noEmit": false,
+        "declaration": true,
+        "declarationMap": true,
         "strict": true,
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,

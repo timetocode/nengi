@@ -1,2 +1,2 @@
-declare const connectionTerminatedSchema: import('../binary/schema/Schema').Schema
-export { connectionTerminatedSchema }
+export declare const connectionTerminatedSchema: import("../binary/schema/Schema").Schema;
+//# sourceMappingURL=connectionTerminatedSchema.d.ts.map

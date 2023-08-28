@@ -1,4 +1,4 @@
-import { NQueue } from '../NQueue'
+import { NQueue } from '../NQueue';
 type Tick = number;
 type Command = any;
 type ClientFrame = {
@@ -8,13 +8,13 @@ type ClientFrame = {
     unconfirmedCommands: NQueue<Command>;
 };
 declare class Outbound {
-    unconfirmedCommands: Map<Tick, Command[]>
-    outboundEngineCommands: Map<Tick, Command[]>
-    outboundCommands: Map<Tick, Command[]>
-    tick: number
-    confirmedTick: number
-    lastSentTick: number
-    currentFrame: null | ClientFrame
+    unconfirmedCommands: Map<Tick, Command[]>;
+    outboundEngineCommands: Map<Tick, Command[]>;
+    outboundCommands: Map<Tick, Command[]>;
+    tick: number;
+    confirmedTick: number;
+    lastSentTick: number;
+    currentFrame: null | ClientFrame;
     constructor();
     getCurrentFrame(): {
         outboundEngineCommands: any[];
@@ -27,4 +27,5 @@ declare class Outbound {
     confirmCommands(confirmedTick: Tick): void;
     getUnconfirmedCommands(): Map<number, any[]>;
 }
-export { Outbound }
+export { Outbound };
+//# sourceMappingURL=Outbound.d.ts.map

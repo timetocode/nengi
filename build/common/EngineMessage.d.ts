@@ -1,4 +1,4 @@
-declare enum EngineMessage {
+export declare enum EngineMessage {
     Null = 0,
     ConnectionAccepted = 1,
     ConnectionDenied = 2,
@@ -9,6 +9,8 @@ declare enum EngineMessage {
     ChannelRemoveEntity = 7,
     ConnectionTerminated = 8,
     TimeSync = 9,
-    ClientTick = 10
+    Ping = 10,
+    Pong = 11,
+    ClientTick = 12
 }
-export { EngineMessage }
+//# sourceMappingURL=EngineMessage.d.ts.map

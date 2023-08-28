@@ -1,8 +1,9 @@
 declare class Schema {
-    keys: any[]
+    keys: any[];
     props: {
         [key: string]: any;
-    }
+    };
     constructor();
 }
-export { Schema }
+export { Schema };
+//# sourceMappingURL=Schema.d.ts.map

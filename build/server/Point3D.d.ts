@@ -1,6 +1,6 @@
-type Point3D = {
+export type Point3D = {
     x: number;
     y: number;
     z: number;
 };
-export { Point3D }
+//# sourceMappingURL=Point3D.d.ts.map

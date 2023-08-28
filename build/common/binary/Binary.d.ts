@@ -25,4 +25,5 @@ declare enum Binary {
     Rotation32 = 24,
     LAST_INDEX = 25
 }
-export { Binary }
+export { Binary };
+//# sourceMappingURL=Binary.d.ts.map

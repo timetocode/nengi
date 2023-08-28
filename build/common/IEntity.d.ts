@@ -3,3 +3,4 @@ export interface IEntity {
     ntype: number;
     [prop: string]: any;
 }
+//# sourceMappingURL=IEntity.d.ts.map

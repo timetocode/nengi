@@ -1,0 +1,1 @@
+{"version":3,"file":"readMessage.d.ts","sourceRoot":"","sources":["../../../src/binary/message/readMessage.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,aAAa,EAAE,MAAM,mCAAmC,CAAA;AACjE,OAAO,EAAE,OAAO,EAAE,MAAM,sBAAsB,CAAA;AAE9C,iBAAS,WAAW,CAAC,MAAM,EAAE,aAAa,EAAE,OAAO,EAAE,OAAO;;EAW3D;AAED,eAAe,WAAW,CAAA"}
