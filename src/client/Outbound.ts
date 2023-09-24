@@ -13,7 +13,7 @@ type ClientFrame = {
 // used for the first frames, never has anything in it
 const emptyArr: any[] = []
 
-class Outbound {
+export class Outbound {
     unconfirmedCommands: Map<Tick, Command[]>
     outboundEngineCommands: Map<Tick, Command[]>
     outboundCommands: Map<Tick, Command[]>
@@ -94,6 +94,9 @@ class Outbound {
     getUnconfirmedCommands() {
         return this.unconfirmedCommands
     }
-}
 
-export { Outbound }
+    flush() {
+        this.outboundEngineCommands.clear()
+        this.outboundCommands.clear()
+    }
+}

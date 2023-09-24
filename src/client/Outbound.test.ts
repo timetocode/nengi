@@ -15,6 +15,24 @@ test('commands are queued in order', () => {
     expect(out.outboundCommands.get(0)?.[2]).toBe(thirdCommand)
 })
 
+test('commands are removed after flush', () => {
+    const firstCommand = { ntype: 1, content: 'first command' }
+    const secondCommand = { ntype: 1, content: 'second command' }
+    const thirdCommand = { ntype: 1, content: 'third command' }
+
+    const out = new Outbound()
+    out.addCommand(firstCommand)
+    out.addCommand(secondCommand)
+    out.addCommand(thirdCommand)
+
+    expect(out.outboundCommands.get(0)?.[0]).toBe(firstCommand)
+    expect(out.outboundCommands.get(0)?.[1]).toBe(secondCommand)
+    expect(out.outboundCommands.get(0)?.[2]).toBe(thirdCommand)
+
+    out.flush()
+    expect(out.outboundCommands.size).toBe(0)
+})
+
 test('multiple frames of commands can be queued', () => {
     const firstCommand = { ntype: 1, content: 'first command' }
     const secondCommand = { ntype: 1, content: 'second command' }
@@ -106,3 +124,5 @@ test('getUnconfirmedCommands returns all unconfirmed commands', () => {
     expect(unconfirmed.get(0)?.[0]).toBe(command1)
     expect(unconfirmed.get(1)?.[0]).toBe(command2)
 })
+
+

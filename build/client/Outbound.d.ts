@@ -7,7 +7,7 @@ type ClientFrame = {
     outboundEngineCommands: NQueue<Command>;
     unconfirmedCommands: NQueue<Command>;
 };
-declare class Outbound {
+export declare class Outbound {
     unconfirmedCommands: Map<Tick, Command[]>;
     outboundEngineCommands: Map<Tick, Command[]>;
     outboundCommands: Map<Tick, Command[]>;
@@ -26,6 +26,7 @@ declare class Outbound {
     getCommands(tick: Tick): any[];
     confirmCommands(confirmedTick: Tick): void;
     getUnconfirmedCommands(): Map<number, any[]>;
+    flush(): void;
 }
-export { Outbound };
+export {};
 //# sourceMappingURL=Outbound.d.ts.map

@@ -72,5 +72,9 @@ class Outbound {
     getUnconfirmedCommands() {
         return this.unconfirmedCommands;
     }
+    flush() {
+        this.outboundEngineCommands.clear();
+        this.outboundCommands.clear();
+    }
 }
 exports.Outbound = Outbound;

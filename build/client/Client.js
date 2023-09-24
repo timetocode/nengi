@@ -28,6 +28,7 @@ class Client {
     }
     flush() {
         this.adapter.flush();
+        this.network.flush();
     }
     addCommand(command) {
         this.network.addCommand(command);

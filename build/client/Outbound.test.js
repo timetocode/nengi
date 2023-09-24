@@ -14,6 +14,21 @@ test('commands are queued in order', () => {
     expect((_b = out.outboundCommands.get(0)) === null || _b === void 0 ? void 0 : _b[1]).toBe(secondCommand);
     expect((_c = out.outboundCommands.get(0)) === null || _c === void 0 ? void 0 : _c[2]).toBe(thirdCommand);
 });
+test('commands are removed after flush', () => {
+    var _a, _b, _c;
+    const firstCommand = { ntype: 1, content: 'first command' };
+    const secondCommand = { ntype: 1, content: 'second command' };
+    const thirdCommand = { ntype: 1, content: 'third command' };
+    const out = new Outbound_1.Outbound();
+    out.addCommand(firstCommand);
+    out.addCommand(secondCommand);
+    out.addCommand(thirdCommand);
+    expect((_a = out.outboundCommands.get(0)) === null || _a === void 0 ? void 0 : _a[0]).toBe(firstCommand);
+    expect((_b = out.outboundCommands.get(0)) === null || _b === void 0 ? void 0 : _b[1]).toBe(secondCommand);
+    expect((_c = out.outboundCommands.get(0)) === null || _c === void 0 ? void 0 : _c[2]).toBe(thirdCommand);
+    out.flush();
+    expect(out.outboundCommands.size).toBe(0);
+});
 test('multiple frames of commands can be queued', () => {
     var _a, _b, _c;
     const firstCommand = { ntype: 1, content: 'first command' };

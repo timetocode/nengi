@@ -53,6 +53,9 @@ class ClientNetwork {
     addCommand(command) {
         this.outbound.addCommand(command);
     }
+    flush() {
+        this.outbound.flush();
+    }
     request(endpoint, payload, callback) {
         const obj = {
             endpoint,

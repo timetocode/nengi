@@ -30,6 +30,7 @@ export declare class ClientNetwork {
     incrementClientTick(): void;
     addEngineCommand(command: any): void;
     addCommand(command: any): void;
+    flush(): void;
     request(endpoint: number, payload: any, callback: (response: any) => any): void;
     createHandshakeBuffer(handshake: any, binaryWriterCtor: IBinaryWriterClass): any;
     createOutboundBuffer(binaryWriterCtor: IBinaryWriterClass): any;
