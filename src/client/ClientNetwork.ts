@@ -31,9 +31,10 @@ export class ClientNetwork {
     requestId = 1
     requestQueue = new NQueue<any>()
     requests = new Map<number, any>()
-    clientTick = 1
+    clientTick = 1 // incremented each flush to the server
     previousSnapshot: Snapshot | null = null
     chronus = new Chronus()
+    frameTick = 1 // incremented each frame that comes from server
     latency = 0
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
         this.client.disconnectHandler(reason, event)
@@ -294,7 +295,8 @@ export class ClientNetwork {
         }
 
         // frame creation from snapshot and prediction
-        const frame = new Frame(snapshot, this.latestFrame)
+        const frame = new Frame(this.frameTick, snapshot, this.latestFrame)
+        this.frameTick++
         this.frames.push(frame)
         this.latestFrame = frame
 

@@ -1,35 +1,28 @@
 import { IEntity } from '../common/IEntity'
 import { Snapshot } from './Snapshot'
 
-interface IEntityFrame {
+export interface IEntityFrame {
     createEntities: IEntity[]
     updateEntities: any[]
     deleteEntities: number[],
 }
 
-let tick = 0 // TODO this needs to exist in a different scope incase two clients ever run in one process
-
-class Frame implements IEntityFrame {
+export class Frame implements IEntityFrame {
     tick: number
     confirmedClientTick: number
     timestamp: number
-    processed: boolean
-    entities: Map<number, IEntity>
+    processed: boolean = false // whether create/deletes have been processed
+    once: boolean = false // whether this frame has been used for interpolation once
+    entities: Map<number, IEntity> = new Map()
 
-    createEntities: IEntity[]
-    updateEntities: any[]
-    deleteEntities: number[]
+    createEntities: IEntity[] = []
+    updateEntities: any[] = []
+    deleteEntities: number[] = []
 
-    constructor(snapshot: Snapshot, previousFrame: Frame | null) {
-        this.tick = tick++
+    constructor(tick: number, snapshot: Snapshot, previousFrame: Frame | null) {
+        this.tick = tick
         this.confirmedClientTick = snapshot.confirmedClientTick
         this.timestamp = snapshot.timestamp
-        this.processed = false
-        this.entities = new Map()
-
-        this.createEntities = []
-        this.updateEntities = []
-        this.deleteEntities = []
 
         if (previousFrame) {
             previousFrame.entities.forEach(entity => {
@@ -57,5 +50,3 @@ class Frame implements IEntityFrame {
         })
     }
 }
-
-export { Frame, IEntityFrame}

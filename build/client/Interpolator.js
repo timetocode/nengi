@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.findSubsequentFrame = exports.findInitialFrame = exports.Interpolator = void 0;
+exports.Interpolator = exports.findSubsequentFrame = exports.findInitialFrame = void 0;
 const BinaryExt_1 = require("../common/binary/BinaryExt");
 const findInitialFrame = (frames, renderTime) => {
     for (let i = frames.length - 1; i >= 0; i--) {
@@ -28,11 +28,11 @@ class Interpolator {
     getInterpolatedState(interpDelay) {
         const now = Date.now();
         const renderTime = now - interpDelay - this.client.network.chronus.averageTimeDifference;
-        const frameA = findInitialFrame(this.client.network.frames, renderTime);
+        const frameA = (0, exports.findInitialFrame)(this.client.network.frames, renderTime);
         const frames = [];
         const tframes = this.client.network.frames;
         if (frameA) {
-            const frameB = findSubsequentFrame(tframes, frameA.tick);
+            const frameB = (0, exports.findSubsequentFrame)(tframes, frameA.tick);
             for (let i = tframes.length - 1; i > -1; i--) {
                 const lateFrame = tframes[i];
                 if (lateFrame.tick < frameA.tick) {
@@ -66,8 +66,23 @@ class Interpolator {
                 for (let i = 0; i < frameA.updateEntities.length; i++) {
                     const { nid, prop, value } = frameA.updateEntities[i];
                     // if no update in frameB, then entity's correct state is update.value
+                    // this represents the final state of interpolation, the frame after there is no longer a change
+                    // and is how state arrives at the exact correct value
                     if (frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
-                        interpState.updateEntities.push({ nid, prop, value });
+                        const entityA = frameA.entities.get(nid);
+                        const nschema = this.client.context.getSchema(entityA.ntype);
+                        const binarySpec = nschema.props[prop];
+                        if (binarySpec.interp) {
+                            interpState.updateEntities.push({ nid, prop, value });
+                        }
+                        else {
+                            // we skip this final state of interpolation for non-interpolated values if they have
+                            // already been emitted
+                            if (!frameA.once) {
+                                // does this ever actually happen...?
+                                interpState.updateEntities.push({ nid, prop, value });
+                            }
+                        }
                     }
                 }
                 for (let i = 0; i < frameB.updateEntities.length; i++) {
@@ -86,11 +101,15 @@ class Interpolator {
                             interpState.updateEntities.push({ nid, prop, value });
                         }
                         else {
-                            // not interpolated
-                            interpState.updateEntities.push({ nid, prop, value: entityB[prop] });
+                            if (!frameB.once) {
+                                // not interpolated, !once prevents redundantly emission of the value which isn't going to change
+                                // more than once between frameA to frameB
+                                interpState.updateEntities.push({ nid, prop, value: entityB[prop] });
+                            }
                         }
                     }
                 }
+                frameB.once = true;
                 frames.push(interpState);
             }
         }

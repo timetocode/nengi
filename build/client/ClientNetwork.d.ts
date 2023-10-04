@@ -23,6 +23,7 @@ export declare class ClientNetwork {
     clientTick: number;
     previousSnapshot: Snapshot | null;
     chronus: Chronus;
+    frameTick: number;
     latency: number;
     onDisconnect: (reason: any, event?: any) => void;
     onSocketError: (event: any) => void;

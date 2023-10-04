@@ -29,9 +29,10 @@ class ClientNetwork {
         this.requestId = 1;
         this.requestQueue = new NQueue_1.NQueue();
         this.requests = new Map();
-        this.clientTick = 1;
+        this.clientTick = 1; // incremented each flush to the server
         this.previousSnapshot = null;
         this.chronus = new Chronus_1.Chronus();
+        this.frameTick = 1; // incremented each frame that comes from server
         this.latency = 0;
         this.onDisconnect = (reason, event) => {
             this.client.disconnectHandler(reason, event);
@@ -259,7 +260,8 @@ class ClientNetwork {
             }
         }
         // frame creation from snapshot and prediction
-        const frame = new Frame_1.Frame(snapshot, this.latestFrame);
+        const frame = new Frame_1.Frame(this.frameTick, snapshot, this.latestFrame);
+        this.frameTick++;
         this.frames.push(frame);
         this.latestFrame = frame;
         const predictionErrorFrame = this.client.predictor.getErrors(frame);

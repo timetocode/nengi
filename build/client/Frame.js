@@ -1,17 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Frame = void 0;
-let tick = 0; // TODO this needs to exist in a different scope incase two clients ever run in one process
 class Frame {
-    constructor(snapshot, previousFrame) {
-        this.tick = tick++;
-        this.confirmedClientTick = snapshot.confirmedClientTick;
-        this.timestamp = snapshot.timestamp;
-        this.processed = false;
+    constructor(tick, snapshot, previousFrame) {
+        this.processed = false; // whether create/deletes have been processed
+        this.once = false; // whether this frame has been used for interpolation once
         this.entities = new Map();
         this.createEntities = [];
         this.updateEntities = [];
         this.deleteEntities = [];
+        this.tick = tick;
+        this.confirmedClientTick = snapshot.confirmedClientTick;
+        this.timestamp = snapshot.timestamp;
         if (previousFrame) {
             previousFrame.entities.forEach(entity => {
                 const clone = Object.assign({}, entity);
