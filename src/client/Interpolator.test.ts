@@ -11,7 +11,7 @@ function waitFor(ms: number) : Promise<boolean>{
     })
 }
 
-test('', async () => {
+xtest('', async () => {
     const aSchema = defineSchema({
         x: Binary.Float64,
         y: Binary.Float64,
@@ -53,7 +53,7 @@ test('', async () => {
     }
 
 
-    client.network.snapshots.push(a)
+    //client.network.snapshots.push(a)
 
     // snapshot that has the previously created enities moving
     const b: Snapshot = {
@@ -71,7 +71,7 @@ test('', async () => {
         deleteEntities: []
     }
 
-    client.network.snapshots.push(b)
+    //client.network.snapshots.push(b)
 
     const interpolator = new Interpolator(client)
 

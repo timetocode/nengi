@@ -1,4 +1,3 @@
-import { IEntity } from '../common/IEntity';
 import { NQueue } from '../NQueue';
 import { Client } from './Client';
 import { Snapshot } from './Snapshot';
@@ -9,8 +8,7 @@ import { Outbound } from './Outbound';
 import { Frame } from './Frame';
 export declare class ClientNetwork {
     client: Client;
-    entities: Map<number, IEntity>;
-    snapshots: Snapshot[];
+    entityNTypes: Map<number, number>;
     frames: Frame[];
     latestFrame: Frame | null;
     messages: any[];

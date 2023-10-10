@@ -1,6 +1,6 @@
 import { IEntity } from '../common/IEntity'
 
-type Snapshot = {
+export type Snapshot = {
     timestamp: number
     confirmedClientTick: number,
     messages: any[],
@@ -8,5 +8,3 @@ type Snapshot = {
     updateEntities: any[],
     deleteEntities: number[]
 }
-
-export { Snapshot }

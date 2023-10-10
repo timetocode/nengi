@@ -3,10 +3,10 @@ import { IBinaryReader } from '../../common/binary/IBinaryReader'
 import { Context } from '../../common/Context'
 import { IEntity } from '../../common/IEntity'
 
-function readDiff(reader: IBinaryReader, context: Context, entities: Map<number, IEntity>) {
+function readDiff(reader: IBinaryReader, context: Context, ntypes: Map<number, number> /* <nid, ntype> */) {
     const nid = reader.readUInt32()
     const propKey = reader.readUInt8()
-    const ntype = entities.get(nid)!.ntype
+    const ntype = ntypes.get(nid)!
     const nschema = context.getSchema(ntype)!
     const propData = nschema.keys[propKey]
     const binaryUtil = binaryGet(propData.type)

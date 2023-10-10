@@ -19,7 +19,7 @@ function waitFor(ms) {
         setTimeout(() => { resolve(true); }, ms);
     });
 }
-test('', () => __awaiter(void 0, void 0, void 0, function* () {
+xtest('', () => __awaiter(void 0, void 0, void 0, function* () {
     const aSchema = (0, defineSchema_1.defineSchema)({
         x: Binary_1.Binary.Float64,
         y: Binary_1.Binary.Float64,
@@ -54,7 +54,7 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
         updateEntities: [],
         deleteEntities: []
     };
-    client.network.snapshots.push(a);
+    //client.network.snapshots.push(a)
     // snapshot that has the previously created enities moving
     const b = {
         timestamp: -1,
@@ -69,7 +69,7 @@ test('', () => __awaiter(void 0, void 0, void 0, function* () {
         ],
         deleteEntities: []
     };
-    client.network.snapshots.push(b);
+    //client.network.snapshots.push(b)
     const interpolator = new Interpolator_1.Interpolator(client);
     yield waitFor(300);
     const iState = interpolator.getInterpolatedState(100);

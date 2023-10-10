@@ -18,8 +18,7 @@ const Outbound_1 = require("./Outbound");
 const Frame_1 = require("./Frame");
 class ClientNetwork {
     constructor(client) {
-        this.entities = new Map();
-        this.snapshots = [];
+        this.entityNTypes = new Map();
         this.frames = [];
         this.latestFrame = null;
         this.messages = [];
@@ -222,7 +221,7 @@ class ClientNetwork {
                     for (let i = 0; i < count; i++) {
                         //const entity = readEntity(dr, this.client.context)
                         const entity = (0, readMessage_1.default)(dr, this.client.context);
-                        this.entities.set(entity.nid, entity);
+                        this.entityNTypes.set(entity.nid, entity.ntype);
                         snapshot.createEntities.push(entity);
                     }
                     break;
@@ -230,7 +229,7 @@ class ClientNetwork {
                 case BinarySection_1.BinarySection.UpdateEntities: {
                     const count = dr.readUInt32();
                     for (let i = 0; i < count; i++) {
-                        const diff = (0, readDiff_1.default)(dr, this.client.context, this.entities);
+                        const diff = (0, readDiff_1.default)(dr, this.client.context, this.entityNTypes);
                         snapshot.updateEntities.push(diff);
                     }
                     break;
@@ -240,6 +239,7 @@ class ClientNetwork {
                     for (let i = 0; i < count; i++) {
                         const nid = dr.readUInt32();
                         snapshot.deleteEntities.push(nid);
+                        this.entityNTypes.delete(nid);
                     }
                     break;
                 }
@@ -272,7 +272,6 @@ class ClientNetwork {
         // commands/prediction
         this.outbound.confirmCommands(snapshot.confirmedClientTick);
         this.previousSnapshot = snapshot;
-        this.snapshots.push(snapshot);
     }
 }
 exports.ClientNetwork = ClientNetwork;

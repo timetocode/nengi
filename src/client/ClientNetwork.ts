@@ -20,8 +20,7 @@ import { Frame } from './Frame'
 
 export class ClientNetwork {
     client: Client
-    entities = new Map<number, IEntity>()
-    snapshots: Snapshot[] = []
+    entityNTypes = new Map<number, number>()
     frames: Frame[] = []
     latestFrame: Frame | null = null
     messages: any[] = []
@@ -36,6 +35,7 @@ export class ClientNetwork {
     chronus = new Chronus()
     frameTick = 1 // incremented each frame that comes from server
     latency = 0
+
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
         this.client.disconnectHandler(reason, event)
     }
@@ -255,7 +255,7 @@ export class ClientNetwork {
                 for (let i = 0; i < count; i++) {
                     //const entity = readEntity(dr, this.client.context)
                     const entity = readMessage(dr, this.client.context) as IEntity
-                    this.entities.set(entity.nid, entity)
+                    this.entityNTypes.set(entity.nid, entity.ntype)
                     snapshot.createEntities.push(entity)
                 }
                 break
@@ -263,7 +263,7 @@ export class ClientNetwork {
             case BinarySection.UpdateEntities: {
                 const count = dr.readUInt32()
                 for (let i = 0; i < count; i++) {
-                    const diff = readDiff(dr, this.client.context, this.entities)
+                    const diff = readDiff(dr, this.client.context, this.entityNTypes)
                     snapshot.updateEntities.push(diff)
                 }
                 break
@@ -273,6 +273,7 @@ export class ClientNetwork {
                 for (let i = 0; i < count; i++) {
                     const nid = dr.readUInt32()
                     snapshot.deleteEntities.push(nid)
+                    this.entityNTypes.delete(nid)
                 }
                 break
             }
@@ -308,9 +309,6 @@ export class ClientNetwork {
         this.client.predictor.cleanUp(frame.confirmedClientTick)
         // commands/prediction
         this.outbound.confirmCommands(snapshot.confirmedClientTick)
-
         this.previousSnapshot = snapshot
-        this.snapshots.push(snapshot)
     }
-
 }
