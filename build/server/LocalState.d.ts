@@ -2,9 +2,9 @@ import { EDictionary } from './EDictionary';
 import { IdPool } from './IdPool';
 import { IEntity } from '../common/IEntity';
 export declare class LocalState {
-    entityIdPool: IdPool;
+    nidPool: IdPool;
     sources: Map<number, Set<number>>;
-    parents: Map<number, Set<number>>;
+    children: Map<number, Set<number>>;
     _entities: EDictionary;
     constructor();
     addChild(parentNid: number, child: IEntity): void;

@@ -6,11 +6,9 @@ import { IChannel, ICulledChannel } from './IChannel';
 import { EntityCache } from './EntityCache';
 import { IEntity } from '../common/IEntity';
 import { NQueue } from '../NQueue';
-import { IdPool } from './IdPool';
 export declare class Instance {
     context: Context;
     localState: LocalState;
-    channelIdPool: IdPool;
     channels: Set<IChannel>;
     network: InstanceNetwork;
     queue: NQueue<INetworkEvent>;

@@ -59,11 +59,11 @@ export class User {
     }
 
     subscribe(channel: IChannel) {
-        this.subscriptions.set(channel.id, channel)
+        this.subscriptions.set(channel.nid, channel)
     }
 
     unsubscribe(channel: IChannel) {
-        this.subscriptions.delete(channel.id)
+        this.subscriptions.delete(channel.nid)
     }
 
     queueEngineMessage(engineMessage: any) {
@@ -74,20 +74,20 @@ export class User {
         this.messageQueue.push(message)
     }
 
-    createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[]) {
-        if (!this.cache[id]) {
+    createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]) {
+        if (!this.cache[nid]) {
             //console.log('create push', id)
-            toCreate.push(id)
-            this.cache[id] = tick
-            this.cacheArr.push(id)
+            toCreate.push(nid)
+            this.cache[nid] = tick
+            this.cacheArr.push(nid)
         } else {
-            this.cache[id] = tick
-            toUpdate.push(id)
+            this.cache[nid] = tick
+            toUpdate.push(nid)
         }
 
-        const children = this.instance!.localState.parents.get(id)
+        const children = this.instance!.localState.children.get(nid)
         if (children) {
-            children.forEach((id: number) => this.createOrUpdate(id, tick, toCreate, toUpdate))
+            children.forEach((cid: number) => this.createOrUpdate(cid, tick, toCreate, toUpdate))
         }
     }
 

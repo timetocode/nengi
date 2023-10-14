@@ -9,13 +9,11 @@ const InstanceNetwork_1 = require("./InstanceNetwork");
 const EntityCache_1 = require("./EntityCache");
 const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
 const NQueue_1 = require("../NQueue");
-const IdPool_1 = require("./IdPool");
 const EngineMessage_1 = require("../common/EngineMessage");
 class Instance {
     constructor(context) {
         this.context = context;
         this.localState = new LocalState_1.LocalState();
-        this.channelIdPool = new IdPool_1.IdPool(65535);
         this.channels = new Set();
         this.users = new Map();
         this.queue = new NQueue_1.NQueue();
@@ -42,8 +40,8 @@ class Instance {
         this.responseEndPoints.set(endpoint, callback);
     }
     registerChannel(channel) {
-        const channelId = this.channelIdPool.nextId();
-        channel.id = channelId;
+        const channelId = this.localState.nidPool.nextId();
+        channel.nid = channelId;
         this.channels.add(channel);
         return channelId;
     }

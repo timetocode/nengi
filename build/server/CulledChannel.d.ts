@@ -4,7 +4,7 @@ import { IEntity } from '../common/IEntity';
 import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel';
 import { User } from './User';
 export declare class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
-    id: number;
+    nid: number;
     localState: LocalState;
     entities: EDictionary;
     users: Map<number, User>;

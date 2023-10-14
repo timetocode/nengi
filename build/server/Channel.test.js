@@ -5,12 +5,19 @@ const User_1 = require("./User");
 const LocalState_1 = require("./LocalState");
 var NType;
 (function (NType) {
-    NType[NType["PlayerEntity"] = 1] = "PlayerEntity"; // You may have other types here
+    NType[NType["PlayerEntity"] = 1] = "PlayerEntity";
+    NType[NType["ComponentTest"] = 2] = "ComponentTest";
 })(NType || (NType = {}));
 class TestEntity {
     constructor() {
-        this.nid = -1;
+        this.nid = 0;
         this.ntype = NType.PlayerEntity;
+    }
+}
+class ComponentTest {
+    constructor() {
+        this.nid = 0;
+        this.ntype = NType.ComponentTest;
     }
 }
 describe('Channel', () => {
@@ -19,10 +26,10 @@ describe('Channel', () => {
     let user;
     let entity;
     beforeEach(() => {
-        localState = new LocalState_1.LocalState(); // Adjust if LocalState requires initial data
+        localState = new LocalState_1.LocalState();
         channel = new Channel_1.Channel(localState);
-        // @ts-ignore
-        user = new User_1.User(undefined, undefined); // Assuming User class has a default constructor
+        // @ts-ignore b/c we don't need real sockets/networking for user tests
+        user = new User_1.User(undefined, undefined);
         entity = new TestEntity();
     });
     it('should add 10 entities', () => {
@@ -65,6 +72,13 @@ describe('Channel', () => {
     it('should add 10 entities and have no entities after being destroyed', () => {
         const addedEntities = [];
         for (let i = 0; i < 10; i++) {
+            const entity = new TestEntity();
+            channel.addEntity(entity);
+            addedEntities.push(entity);
+        }
+        channel.removeEntity({ nid: 2, ntype: NType.PlayerEntity });
+        channel.removeEntity({ nid: 6, ntype: NType.PlayerEntity });
+        {
             const entity = new TestEntity();
             channel.addEntity(entity);
             addedEntities.push(entity);
@@ -112,5 +126,14 @@ describe('Channel', () => {
         channel.destroy();
         expect(channel.entities.size).toBe(0);
         expect(channel.users.size).toBe(0);
+    });
+    it('component test', () => {
+        const c = new ComponentTest();
+        const e = new TestEntity();
+        channel.addEntity(e);
+        // attach a component to the entity
+        localState.addChild(e.nid, c);
+        channel.destroy();
+        expect(channel.entities.size).toBe(0);
     });
 });

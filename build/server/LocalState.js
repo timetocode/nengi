@@ -5,28 +5,28 @@ const EDictionary_1 = require("./EDictionary");
 const IdPool_1 = require("./IdPool");
 class LocalState {
     constructor() {
-        this.entityIdPool = new IdPool_1.IdPool(65535); // TODO pick a real pool size
+        this.nidPool = new IdPool_1.IdPool(65535);
         this.sources = new Map();
-        this.parents = new Map();
+        this.children = new Map();
         this._entities = new EDictionary_1.EDictionary();
     }
     addChild(parentNid, child) {
         const cnid = this.registerEntity(child, parentNid);
-        if (!this.parents.get(parentNid)) {
-            this.parents.set(parentNid, new Set());
+        if (!this.children.get(parentNid)) {
+            this.children.set(parentNid, new Set());
         }
-        this.parents.get(parentNid).add(cnid);
+        this.children.get(parentNid).add(cnid);
     }
     removeChild(parentNid, child) {
         var _a;
         const cnid = child.nid;
-        (_a = this.parents.get(parentNid)) === null || _a === void 0 ? void 0 : _a.delete(cnid);
+        (_a = this.children.get(parentNid)) === null || _a === void 0 ? void 0 : _a.delete(cnid);
         this.unregisterEntity(child, parentNid);
     }
     registerEntity(entity, sourceId) {
         let nid = entity.nid;
         if (!this.sources.has(nid)) {
-            nid = this.entityIdPool.nextId();
+            nid = this.nidPool.nextId();
             entity.nid = nid;
             this.sources.set(nid, new Set());
             this._entities.add(entity);
@@ -42,7 +42,7 @@ class LocalState {
         if (entitySources.size === 0) {
             this.sources.delete(nid);
             this._entities.remove(entity);
-            this.entityIdPool.returnId(nid);
+            this.nidPool.returnId(nid);
             entity.nid = 0;
         }
     }

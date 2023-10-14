@@ -39,7 +39,7 @@ export declare class User {
     unsubscribe(channel: IChannel): void;
     queueEngineMessage(engineMessage: any): void;
     queueMessage(message: any): void;
-    createOrUpdate(id: number, tick: number, toCreate: number[], toUpdate: number[]): void;
+    createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]): void;
     send(buffer: Buffer | ArrayBuffer): void;
     disconnect(reason: StringOrJSONStringifiable): void;
     checkVisibility(tick: number): {

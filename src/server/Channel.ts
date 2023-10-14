@@ -5,7 +5,7 @@ import { IChannel, ChannelSubscriptionHandler } from './IChannel'
 import { User } from './User'
 
 export class Channel implements IChannel {
-    id: number
+    nid: number
     localState: LocalState
     entities: EDictionary
     users: Map<number, User>
@@ -13,7 +13,7 @@ export class Channel implements IChannel {
     onUnsubscribe: ChannelSubscriptionHandler
 
     constructor(localState: LocalState) {
-        this.id = 0
+        this.nid = 0
         this.localState = localState
         this.entities = new EDictionary()
         this.users = new Map()
@@ -23,14 +23,14 @@ export class Channel implements IChannel {
     }
 
     addEntity(entity: IEntity) {
-        this.localState.registerEntity(entity, this.id)
+        this.localState.registerEntity(entity, this.nid)
         this.entities.add(entity)
         return entity
     }
 
     removeEntity(entity: IEntity) {
         this.entities.remove(entity)
-        this.localState.unregisterEntity(entity, this.id)
+        this.localState.unregisterEntity(entity, this.nid)
     }
 
     addMessage(message: any) {
@@ -60,5 +60,6 @@ export class Channel implements IChannel {
     destroy() {
         this.users.forEach(user => this.unsubscribe(user))
         this.entities.forEachReverse(entity => this.removeEntity(entity))
+        this.localState.nidPool.returnId(this.nid)
     }
 }

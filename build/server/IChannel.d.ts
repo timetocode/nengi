@@ -4,7 +4,7 @@ export type ChannelSubscriptionHandler = (user: User, channel: IChannel) => void
 export type CulledChannelSubscriptionHandler = (user: User, channel: ICulledChannel<any, any>) => void;
 export type VisibilityResolver<VisibleObjectType, ViewType> = (obj: VisibleObjectType, view: ViewType) => boolean;
 export interface IChannel {
-    id: number;
+    nid: number;
     addEntity(entity: IEntity): void;
     removeEntity(entity: IEntity): void;
     addMessage(message: any): void;
@@ -13,7 +13,7 @@ export interface IChannel {
     getVisibileEntities(userId: number): number[];
 }
 export interface ICulledChannel<VisibleObjectType, ViewType> {
-    id: number;
+    nid: number;
     addEntity(entity: IEntity): void;
     removeEntity(entity: IEntity): void;
     addMessage(message: any): void;

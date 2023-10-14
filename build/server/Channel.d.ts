@@ -4,7 +4,7 @@ import { IEntity } from '../common/IEntity';
 import { IChannel, ChannelSubscriptionHandler } from './IChannel';
 import { User } from './User';
 export declare class Channel implements IChannel {
-    id: number;
+    nid: number;
     localState: LocalState;
     entities: EDictionary;
     users: Map<number, User>;

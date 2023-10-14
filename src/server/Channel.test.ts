@@ -4,12 +4,18 @@ import { IEntity } from '../common/IEntity'
 import { LocalState } from './LocalState'
 
 enum NType {
-    PlayerEntity = 1 // You may have other types here
+    PlayerEntity = 1, // You may have other types here
+    ComponentTest = 2
 }
 
 class TestEntity implements IEntity {
-    nid: number = -1
+    nid: number = 0
     ntype: number = NType.PlayerEntity
+}
+
+class ComponentTest {
+    nid: number = 0
+    ntype: number = NType.ComponentTest
 }
 
 describe('Channel', () => {
@@ -19,10 +25,10 @@ describe('Channel', () => {
     let entity: TestEntity
 
     beforeEach(() => {
-        localState = new LocalState() // Adjust if LocalState requires initial data
+        localState = new LocalState()
         channel = new Channel(localState)
-        // @ts-ignore
-        user = new User(undefined, undefined) // Assuming User class has a default constructor
+        // @ts-ignore b/c we don't need real sockets/networking for user tests
+        user = new User(undefined, undefined) 
         entity = new TestEntity()
     })
 
@@ -69,6 +75,14 @@ describe('Channel', () => {
     it('should add 10 entities and have no entities after being destroyed', () => {
         const addedEntities: TestEntity[] = []
         for (let i = 0; i < 10; i++) {
+            const entity = new TestEntity()
+            channel.addEntity(entity)
+            addedEntities.push(entity)
+        }
+        channel.removeEntity({ nid: 2, ntype: NType.PlayerEntity })
+        channel.removeEntity({ nid: 6, ntype: NType.PlayerEntity })
+
+        {
             const entity = new TestEntity()
             channel.addEntity(entity)
             addedEntities.push(entity)
@@ -122,5 +136,17 @@ describe('Channel', () => {
         channel.destroy()
         expect(channel.entities.size).toBe(0)
         expect(channel.users.size).toBe(0)
+    })
+
+    it('component test', () =>  {
+        const c = new ComponentTest()
+        const e = new TestEntity()
+
+        channel.addEntity(e)
+        // attach a component to the entity
+        localState.addChild(e.nid, c)
+
+        channel.destroy()
+        expect(channel.entities.size).toBe(0)
     })
 })

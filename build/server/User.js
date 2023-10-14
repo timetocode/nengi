@@ -46,10 +46,10 @@ class User {
         }
     }
     subscribe(channel) {
-        this.subscriptions.set(channel.id, channel);
+        this.subscriptions.set(channel.nid, channel);
     }
     unsubscribe(channel) {
-        this.subscriptions.delete(channel.id);
+        this.subscriptions.delete(channel.nid);
     }
     queueEngineMessage(engineMessage) {
         this.engineMessageQueue.push(engineMessage);
@@ -57,20 +57,20 @@ class User {
     queueMessage(message) {
         this.messageQueue.push(message);
     }
-    createOrUpdate(id, tick, toCreate, toUpdate) {
-        if (!this.cache[id]) {
+    createOrUpdate(nid, tick, toCreate, toUpdate) {
+        if (!this.cache[nid]) {
             //console.log('create push', id)
-            toCreate.push(id);
-            this.cache[id] = tick;
-            this.cacheArr.push(id);
+            toCreate.push(nid);
+            this.cache[nid] = tick;
+            this.cacheArr.push(nid);
         }
         else {
-            this.cache[id] = tick;
-            toUpdate.push(id);
+            this.cache[nid] = tick;
+            toUpdate.push(nid);
         }
-        const children = this.instance.localState.parents.get(id);
+        const children = this.instance.localState.children.get(nid);
         if (children) {
-            children.forEach((id) => this.createOrUpdate(id, tick, toCreate, toUpdate));
+            children.forEach((cid) => this.createOrUpdate(cid, tick, toCreate, toUpdate));
         }
     }
     send(buffer) {

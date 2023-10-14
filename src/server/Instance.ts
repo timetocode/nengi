@@ -13,7 +13,6 @@ import { EngineMessage } from '../common/EngineMessage'
 export class Instance {
     context: Context
     localState: LocalState
-    channelIdPool: IdPool
     channels: Set<IChannel>
     network: InstanceNetwork
     queue: NQueue<INetworkEvent>
@@ -37,7 +36,6 @@ export class Instance {
     constructor(context: Context) {
         this.context = context
         this.localState = new LocalState()
-        this.channelIdPool = new IdPool(65535)
         this.channels = new Set()
         this.users = new Map()
         this.queue = new NQueue()
@@ -70,8 +68,8 @@ export class Instance {
     }
 
     registerChannel(channel: IChannel | ICulledChannel<any, any>) {
-        const channelId = this.channelIdPool.nextId()
-        channel.id = channelId
+        const channelId = this.localState.nidPool.nextId()
+        channel.nid = channelId
         this.channels.add(channel)
         return channelId
     }

@@ -4,7 +4,7 @@ exports.CulledChannel = void 0;
 const EDictionary_1 = require("./EDictionary");
 class CulledChannel {
     constructor(localState) {
-        this.id = 0;
+        this.nid = 0;
         this.localState = localState;
         this.entities = new EDictionary_1.EDictionary();
         this.users = new Map();
@@ -14,13 +14,13 @@ class CulledChannel {
         this.visibilityResolver = (object, view) => { return true; };
     }
     addEntity(entity) {
-        this.localState.registerEntity(entity, this.id);
+        this.localState.registerEntity(entity, this.nid);
         this.entities.add(entity);
         return entity;
     }
     removeEntity(entity) {
         this.entities.remove(entity);
-        this.localState.unregisterEntity(entity, this.id);
+        this.localState.unregisterEntity(entity, this.nid);
     }
     addMessage(message) {
         this.users.forEach(user => {
