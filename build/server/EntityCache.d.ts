@@ -1,6 +1,12 @@
 import { Schema } from '../common/binary/schema/Schema';
 import { IEntity } from '../common/IEntity';
-declare class EntityCache {
+type EntityPropertyChanges = {
+    nid: number;
+    nschema: Schema;
+    prop: string;
+    value: any;
+}[];
+export declare class EntityCache {
     cache: {
         [tick: number]: {
             [nid: number]: any;
@@ -8,21 +14,15 @@ declare class EntityCache {
     };
     diffCache: {
         [tick: number]: {
-            [nid: number]: any[];
+            [nid: number]: EntityPropertyChanges;
         };
     };
-    binaryDiffCache: {
-        [tick: number]: {
-            [nid: number]: any[];
-        };
-    };
-    constructor();
     cacheContains(nid: number): boolean;
     createCachesForTick(tick: number): void;
     deleteCachesForTick(tick: number): void;
-    getAndDiff(tick: number, entity: IEntity, nschema: Schema): any[];
+    getChangedProperties(tick: number, entity: IEntity, nschema: Schema): EntityPropertyChanges;
     cacheify(tick: number, entity: IEntity, schema: Schema): void;
     updateCache(tick: number, entity: IEntity, schema: Schema): void;
 }
-export { EntityCache };
+export {};
 //# sourceMappingURL=EntityCache.d.ts.map

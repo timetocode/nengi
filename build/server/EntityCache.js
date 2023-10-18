@@ -2,19 +2,21 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EntityCache = void 0;
 const BinaryExt_1 = require("../common/binary/BinaryExt");
-function diff(entity, cache, nschema) {
+function compareEntityAndCache(entity, cache, nschema) {
     if (!cache) {
         console.log('no cache');
         return [];
     }
+    const { nid } = entity;
     const diffs = [];
-    for (let i = 0; i < nschema.keys.length; i++) {
+    // start at 2, because key 0 = ntype, and key 1 = nid; both are static
+    for (let i = 2; i < nschema.keys.length; i++) {
         const { prop, type } = nschema.keys[i];
         const oldValue = cache[prop];
         const value = entity[prop];
         const binaryUtil = (0, BinaryExt_1.binaryGet)(type);
         if (!binaryUtil.compare(oldValue, value)) {
-            diffs.push({ nid: entity.nid, nschema, prop, value });
+            diffs.push({ nid, nschema, prop, value });
             cache[prop] = binaryUtil.clone(value);
         }
     }
@@ -24,30 +26,25 @@ class EntityCache {
     constructor() {
         this.cache = {};
         this.diffCache = {};
-        this.binaryDiffCache = {};
     }
     cacheContains(nid) {
         return !!this.cache[nid];
     }
     createCachesForTick(tick) {
-        //this.cache[tick] = {}
         this.diffCache[tick] = {};
-        this.binaryDiffCache[tick] = {};
     }
     deleteCachesForTick(tick) {
-        //delete this.cache[tick]
         delete this.diffCache[tick];
-        delete this.binaryDiffCache[tick];
     }
-    getAndDiff(tick, entity, nschema) {
+    getChangedProperties(tick, entity, nschema) {
         if (this.diffCache[tick][entity.nid]) {
             return this.diffCache[tick][entity.nid];
         }
         else {
             const cacheObject = this.cache[entity.nid];
-            const diffs = diff(entity, cacheObject, nschema);
-            this.diffCache[tick][entity.nid] = diffs;
-            return diffs;
+            const changedProperties = compareEntityAndCache(entity, cacheObject, nschema);
+            this.diffCache[tick][entity.nid] = changedProperties;
+            return changedProperties;
         }
     }
     cacheify(tick, entity, schema) {

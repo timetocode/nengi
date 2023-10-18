@@ -2,10 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Channel = void 0;
 class Channel {
-    constructor(localState) {
+    constructor(localState, ntype) {
         this.nid = 0;
+        this.ntype = 0;
         this.users = new Map();
-        this.channelEntity = { nid: 0, ntype: 0 };
+        this.channelEntity = { nid: 0, ntype };
         localState.addEntity(this.channelEntity);
         this.nid = this.channelEntity.nid;
         this.localState = localState;
@@ -29,7 +30,7 @@ class Channel {
         user.unsubscribe(this);
     }
     getVisibileEntities(userId) {
-        return [...this.localState.children.get(this.channelEntity.nid)];
+        return [this.channelEntity.nid, ...this.localState.children.get(this.channelEntity.nid)];
     }
     destroy() {
         this.users.forEach(user => user.unsubscribe(this));

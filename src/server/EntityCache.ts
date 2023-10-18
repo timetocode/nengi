@@ -2,63 +2,55 @@ import { binaryGet } from '../common/binary/BinaryExt'
 import { Schema } from '../common/binary/schema/Schema'
 import { IEntity } from '../common/IEntity'
 
-function diff(entity: any, cache: any, nschema: Schema) {
+type EntityPropertyChanges = { nid: number, nschema: Schema, prop: string, value: any }[]
+
+function compareEntityAndCache(entity: IEntity, cache: any, nschema: Schema): EntityPropertyChanges {
     if (!cache) {
         console.log('no cache')
         return []
     }
 
-    const diffs: any[] = []
-    
-    for (let i = 0; i < nschema.keys.length; i++) {
+    const { nid } = entity
+    const diffs: EntityPropertyChanges = []
+    // start at 2, because key 0 = ntype, and key 1 = nid; both are static
+    for (let i = 2; i < nschema.keys.length; i++) {
         const { prop, type } = nschema.keys[i]
         const oldValue = cache[prop]
-        const value = entity[prop]
+        const value = entity[prop]        
         const binaryUtil = binaryGet(type)
         if (!binaryUtil.compare(oldValue, value)) {
-            diffs.push({ nid: entity.nid, nschema, prop, value })
+            diffs.push({ nid, nschema, prop, value })
             cache[prop] = binaryUtil.clone(value)
         }
+        
     }
     return diffs
 }
 
-class EntityCache {
-    cache: { [tick: number]: { [nid: number]: any } }
-    // tick { nid: [diff1, diff2]}
-    diffCache: { [tick: number]: { [nid: number]: any[] } }
-    binaryDiffCache: { [tick: number]: { [nid: number]: any[] } }
-
-    constructor() {
-        this.cache = {}
-        this.diffCache = {}
-        this.binaryDiffCache = {}
-    }
+export class EntityCache {
+    cache: { [tick: number]: { [nid: number]: any } } = {}
+    diffCache: { [tick: number]: { [nid: number]: EntityPropertyChanges } } = {}
 
     cacheContains(nid: number): boolean {
         return !!this.cache[nid]
     }
 
     createCachesForTick(tick: number) {
-        //this.cache[tick] = {}
         this.diffCache[tick] = {}
-        this.binaryDiffCache[tick] = {}
     }
 
     deleteCachesForTick(tick: number) {
-        //delete this.cache[tick]
         delete this.diffCache[tick]
-        delete this.binaryDiffCache[tick]
     }
 
-    getAndDiff(tick: number, entity: IEntity, nschema: Schema) {
+    getChangedProperties(tick: number, entity: IEntity, nschema: Schema): EntityPropertyChanges {
         if (this.diffCache[tick][entity.nid]){
             return this.diffCache[tick][entity.nid]
         } else {
             const cacheObject = this.cache[entity.nid]
-            const diffs = diff(entity, cacheObject, nschema)
-            this.diffCache[tick][entity.nid] = diffs
-            return diffs
+            const changedProperties = compareEntityAndCache(entity, cacheObject, nschema)
+            this.diffCache[tick][entity.nid] = changedProperties
+            return changedProperties
         }
     }
 
@@ -84,8 +76,4 @@ class EntityCache {
             cacheObject[propData.prop] = binaryUtil.clone(value)
         }
     }
-
-
 }
-
-export { EntityCache }

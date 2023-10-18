@@ -1,20 +1,16 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Instance = void 0;
 const LocalState_1 = require("./LocalState");
 const InstanceNetwork_1 = require("./InstanceNetwork");
 const EntityCache_1 = require("./EntityCache");
-const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
+const createSnapshotBuffer_1 = require("../binary/snapshot/createSnapshotBuffer");
 const NQueue_1 = require("../NQueue");
 const EngineMessage_1 = require("../common/EngineMessage");
 class Instance {
     constructor(context) {
         this.context = context;
         this.localState = new LocalState_1.LocalState();
-        this.channels = new Set();
         this.users = new Map();
         this.queue = new NQueue_1.NQueue();
         this.incrementalUserId = 0;
@@ -39,12 +35,6 @@ class Instance {
     }
     respond(endpoint, callback) {
         this.responseEndPoints.set(endpoint, callback);
-    }
-    registerChannel(channel) {
-        const channelId = this.localState.nidPool.nextId();
-        channel.nid = channelId;
-        this.channels.add(channel);
-        return channelId;
     }
     step() {
         const timestamp = Date.now();
@@ -76,7 +66,7 @@ class Instance {
                 ntype: EngineMessage_1.EngineMessage.ClientTick,
                 tick: user.lastReceivedClientTick
             });
-            const buffer = (0, createSnapshotBufferRefactor_1.default)(user, this);
+            const buffer = (0, createSnapshotBuffer_1.createSnapshotBuffer)(user, this);
             user.send(buffer);
             user.lastSentInstanceTick = this.tick;
         });

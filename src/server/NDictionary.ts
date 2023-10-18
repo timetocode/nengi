@@ -43,4 +43,8 @@ export class NDictionary {
             fn(this.array[i], i)
         }
     }
+
+    get size() {
+        return this.array.length
+    }
 }

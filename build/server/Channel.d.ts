@@ -4,10 +4,11 @@ import { IChannel } from './IChannel';
 import { User } from './User';
 export declare class Channel implements IChannel {
     nid: number;
+    ntype: number;
     localState: LocalState;
     channelEntity: IEntity;
     users: Map<number, User>;
-    constructor(localState: LocalState);
+    constructor(localState: LocalState, ntype: number);
     addEntity(entity: IEntity): IEntity;
     removeEntity(entity: IEntity): void;
     addMessage(message: any): void;

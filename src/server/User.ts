@@ -87,7 +87,10 @@ export class User {
 
         const children = this.instance!.localState.children.get(nid)
         if (children) {
-            children.forEach((cid: number) => this.createOrUpdate(cid, tick, toCreate, toUpdate))
+            for (const cid of children) {
+                this.createOrUpdate(cid, tick, toCreate, toUpdate)
+            }
+            //children.forEach((cid: number) => this.createOrUpdate(cid, tick, toCreate, toUpdate))
         }
     }
 
@@ -104,29 +107,30 @@ export class User {
         const toUpdate: number[] = []
         const toDelete: number[] = []
 
+        for (const [channelId, channel] of this.subscriptions.entries()) {
+            const visibleNids = channel.getVisibileEntities(this.id)
+            for (let i = 0; i < visibleNids.length; i++) {
+                this.createOrUpdate(visibleNids[i], tick, toCreate, toUpdate)
+            }
+        }
+
+        /*
         this.subscriptions.forEach(channel => {
             channel.getVisibileEntities(this.id).forEach(nid => {
                 this.createOrUpdate(nid, tick, toCreate, toUpdate)
             })
         })
+        */
 
         for (let i = this.cacheArr.length - 1; i > -1; i--) {
             const id = this.cacheArr[i]
             if (this.cache[id] !== tick) {
-                //console.log('delete', id)
                 toDelete.push(id)
                 this.cache[id] = 0
-                //delete this.cache[id]
                 this.cacheArr.splice(i, 1)
             }
         }
 
-        return {
-            //events: nearby.events,
-            noLongerVisible: toDelete, //diffs.aOnly,
-            stillVisible: toUpdate,//diffs.both,
-            newlyVisible: toCreate//diffs.bOnly
-        }
+        return { toDelete, toUpdate, toCreate }
     }
-
 }

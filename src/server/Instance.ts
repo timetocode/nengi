@@ -4,7 +4,7 @@ import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
 import { IChannel, ICulledChannel } from './IChannel'
 import { EntityCache } from './EntityCache'
-import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
+import { createSnapshotBuffer } from '../binary/snapshot/createSnapshotBuffer'
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
 import { IdPool } from './IdPool'
@@ -13,7 +13,6 @@ import { EngineMessage } from '../common/EngineMessage'
 export class Instance {
     context: Context
     localState: LocalState
-    channels: Set<IChannel>
     network: InstanceNetwork
     queue: NQueue<INetworkEvent>
     users: Map<number, User>
@@ -36,7 +35,6 @@ export class Instance {
     constructor(context: Context) {
         this.context = context
         this.localState = new LocalState()
-        this.channels = new Set()
         this.users = new Map()
         this.queue = new NQueue()
         this.incrementalUserId = 0
@@ -66,13 +64,6 @@ export class Instance {
 
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any) {
         this.responseEndPoints.set(endpoint, callback)
-    }
-
-    registerChannel(channel: IChannel | ICulledChannel<any, any>) {
-        const channelId = this.localState.nidPool.nextId()
-        channel.nid = channelId
-        this.channels.add(channel)
-        return channelId
     }
 
     step() {
@@ -109,7 +100,7 @@ export class Instance {
                 tick: user.lastReceivedClientTick
             })
 
-            const buffer = createSnapshotBufferRefactor(user, this)
+            const buffer = createSnapshotBuffer(user, this)
             user.send(buffer)
             user.lastSentInstanceTick = this.tick
         })

@@ -5,12 +5,13 @@ import { User } from './User'
 
 export class Channel implements IChannel {
     nid: number = 0
+    ntype: number = 0
     localState: LocalState
     channelEntity: IEntity
     users: Map<number, User> = new Map()
 
-    constructor(localState: LocalState) {
-        this.channelEntity = { nid: 0, ntype: 0}
+    constructor(localState: LocalState, ntype: number) {
+        this.channelEntity = { nid: 0, ntype }
         localState.addEntity(this.channelEntity)
 
         this.nid = this.channelEntity.nid
@@ -41,7 +42,7 @@ export class Channel implements IChannel {
     }
 
     getVisibileEntities(userId: number) {
-        return [...this.localState.children.get(this.channelEntity.nid)!]
+        return [this.channelEntity.nid, ...this.localState.children.get(this.channelEntity.nid)!]
     }
 
     destroy() {

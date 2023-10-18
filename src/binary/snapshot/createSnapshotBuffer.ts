@@ -9,12 +9,12 @@ import { binaryGet } from '../../common/binary/BinaryExt'
 import { Binary } from '../../common/binary/Binary'
 
 const getVisibleState = (user: User, instance: Instance) => {
-    const vis = user.checkVisibility(instance.tick)
+    const { toCreate, toUpdate, toDelete } = user.checkVisibility(instance.tick)
 
     const createEntities: any = []
 
-    for (let i = 0; i < vis.newlyVisible.length; i++) {
-        const nid = vis.newlyVisible[i]
+    for (let i = 0; i < toCreate.length; i++) {
+        const nid = toCreate[i]
         const entity = instance.localState.getByNid(nid)
         const nschema = instance.context.getSchema(entity.ntype)!
         if (nschema) {
@@ -34,20 +34,17 @@ const getVisibleState = (user: User, instance: Instance) => {
     // empty the queue
     user.messageQueue = []
 
-    const deleteEntities: number[] = vis.noLongerVisible
+    const deleteEntities: number[] = toDelete
 
     const updateEntities: any = []
-    for (let i = 0; i < vis.stillVisible.length; i++) {
-        const nid = vis.stillVisible[i]
+    for (let i = 0; i < toUpdate.length; i++) {
+        const nid = toUpdate[i]
         const entity = instance.localState.getByNid(nid)
-        const nschema = instance.context.getSchema(entity.ntype)
-        if (nschema) {
-            const diffs = instance.cache.getAndDiff(instance.tick, entity, nschema)
-            diffs.forEach(diff => {
-                updateEntities.push(diff)
-            })
-
-        }
+        const nschema = instance.context.getSchema(entity.ntype)!        
+        const diffs = instance.cache.getChangedProperties(instance.tick, entity, nschema)
+        for (let j = 0; j < diffs.length; j++) {
+            updateEntities.push(diffs[j])
+        }       
     }
 
     return {
@@ -59,7 +56,7 @@ const getVisibleState = (user: User, instance: Instance) => {
     }
 }
 
-const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
+export const createSnapshotBuffer = (user: User, instance: Instance) => {
     let bytes = 0
 
     const {
@@ -194,5 +191,3 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     user.responseQueue = []
     return bw.buffer
 }
-
-export default createSnapshotBufferRefactor

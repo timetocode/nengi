@@ -8,6 +8,7 @@ export declare class NDictionary {
     add(entity: IEntity): void;
     remove(entity: IEntity): void;
     forEach(fn: (entity: IEntity, index: number) => any): void;
+    get size(): number;
 }
 export {};
 //# sourceMappingURL=NDictionary.d.ts.map

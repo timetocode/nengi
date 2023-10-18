@@ -43,9 +43,9 @@ export declare class User {
     send(buffer: Buffer | ArrayBuffer): void;
     disconnect(reason: StringOrJSONStringifiable): void;
     checkVisibility(tick: number): {
-        noLongerVisible: number[];
-        stillVisible: number[];
-        newlyVisible: number[];
+        toDelete: number[];
+        toUpdate: number[];
+        toCreate: number[];
     };
 }
 export {};

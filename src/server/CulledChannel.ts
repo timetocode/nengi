@@ -1,41 +1,15 @@
-import { EDictionary } from './EDictionary'
 import { LocalState } from './LocalState'
-import { IEntity } from '../common/IEntity'
 import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel'
-import { User } from './User'
+import { Channel } from './Channel'
 
-export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
-    nid: number
-    localState: LocalState
-    entities: EDictionary
-    users: Map<number, User>
+export class CulledChannel<VisibleObjectType, ViewType> extends Channel implements ICulledChannel<VisibleObjectType, ViewType>  {
     views: Map<number, ViewType>
-
-    onSubscribe: CulledChannelSubscriptionHandler
-    onUnsubscribe: CulledChannelSubscriptionHandler
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>
 
-    constructor(localState: LocalState) {
-        this.nid = 0
-        this.localState = localState
-        this.entities = new EDictionary()
-        this.users = new Map()
+    constructor(localState: LocalState, ntype: number) {
+        super(localState, ntype)
         this.views = new Map()
-
-        this.onSubscribe = (user: User, channel: ICulledChannel<VisibleObjectType, ViewType>) => { }
-        this.onUnsubscribe = (user: User, channel: ICulledChannel<VisibleObjectType, ViewType>) => { }
         this.visibilityResolver = (object: VisibleObjectType, view: ViewType) => { return true }
-    }
-
-    addEntity(entity: IEntity) {
-        this.localState.registerEntity(entity, this.nid)
-        this.entities.add(entity)
-        return entity
-    }
-
-    removeEntity(entity: IEntity) {
-        this.entities.remove(entity)
-        this.localState.unregisterEntity(entity, this.nid)
     }
 
     addMessage(message: any) {
@@ -46,33 +20,14 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
         })
     }
 
-    subscribe(user: any, view: ViewType) {
-        this.users.set(user.id, user)
-        this.views.set(user.id, view)
-        user.subscribe(this)
-        this.onSubscribe(user, this)
-    }
-
-    unsubscribe(user: any) {
-        this.onUnsubscribe(user, this)
-        this.users.delete(user.id)
-        this.views.delete(user.id)
-        user.unsubscribe(this)
-    }
-
     getVisibileEntities(userId: number) {
         const view = this.views.get(userId)!
         const visibleNids: number[] = []
-        this.entities.forEach((entity: any) => {
+        this.localState.children.get(this.channelEntity.nid)!.forEach((entity: any) => {
             if (this.visibilityResolver(entity, view)) {
                 visibleNids.push(entity.nid)
             }
         })
         return visibleNids
-    }
-
-    destroy() {
-        this.users.forEach(user => this.unsubscribe(user))
-        this.entities.forEach(entity => this.removeEntity(entity))
     }
 }
