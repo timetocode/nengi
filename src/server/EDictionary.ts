@@ -1,6 +1,6 @@
 import { IEntity } from '../common/IEntity'
 
-class EDictionary {
+export class EDictionary {
     object: { [key: string]: any }
     array: IEntity[]
 
@@ -106,5 +106,3 @@ class EDictionary {
         }
     }
 }
-
-export { EDictionary }

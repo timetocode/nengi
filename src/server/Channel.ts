@@ -1,36 +1,29 @@
-import { EDictionary } from './EDictionary'
 import { LocalState } from './LocalState'
 import { IEntity } from '../common/IEntity'
-import { IChannel, ChannelSubscriptionHandler } from './IChannel'
+import { IChannel } from './IChannel'
 import { User } from './User'
 
 export class Channel implements IChannel {
-    nid: number
+    nid: number = 0
     localState: LocalState
-    entities: EDictionary
-    users: Map<number, User>
-    onSubscribe: ChannelSubscriptionHandler
-    onUnsubscribe: ChannelSubscriptionHandler
+    channelEntity: IEntity
+    users: Map<number, User> = new Map()
 
     constructor(localState: LocalState) {
-        this.nid = 0
-        this.localState = localState
-        this.entities = new EDictionary()
-        this.users = new Map()
+        this.channelEntity = { nid: 0, ntype: 0}
+        localState.addEntity(this.channelEntity)
 
-        this.onSubscribe = (user: User, channel: IChannel) => { }
-        this.onUnsubscribe = (user: User, channel: IChannel) => { }
+        this.nid = this.channelEntity.nid
+        this.localState = localState  
     }
 
     addEntity(entity: IEntity) {
-        this.localState.registerEntity(entity, this.nid)
-        this.entities.add(entity)
+        this.localState.addChild(entity, this.channelEntity)
         return entity
     }
 
     removeEntity(entity: IEntity) {
-        this.entities.remove(entity)
-        this.localState.unregisterEntity(entity, this.nid)
+        this.localState.removeEntity(entity)
     }
 
     addMessage(message: any) {
@@ -40,26 +33,19 @@ export class Channel implements IChannel {
     subscribe(user: any) {
         this.users.set(user.id, user)
         user.subscribe(this)
-        this.onSubscribe(user, this)
     }
 
     unsubscribe(user: any) {
-        this.onUnsubscribe(user, this)
         this.users.delete(user.id)
         user.unsubscribe(this)
     }
 
     getVisibileEntities(userId: number) {
-        const visibleNids: number[] = []
-        this.entities.forEach((entity: IEntity) => {
-            visibleNids.push(entity.nid)
-        })
-        return visibleNids
+        return [...this.localState.children.get(this.channelEntity.nid)!]
     }
 
     destroy() {
-        this.users.forEach(user => this.unsubscribe(user))
-        this.entities.forEachReverse(entity => this.removeEntity(entity))
-        this.localState.nidPool.returnId(this.nid)
+        this.users.forEach(user => user.unsubscribe(this))
+        this.localState.removeEntity(this.channelEntity)
     }
 }

@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// @ts-nocheck
 const Channel_1 = require("./Channel");
 const User_1 = require("./User");
-const LocalState_1 = require("./LocalState");
+const LocalState_old_1 = require("./LocalState-old");
 var NType;
 (function (NType) {
     NType[NType["PlayerEntity"] = 1] = "PlayerEntity";
@@ -26,7 +27,7 @@ describe('Channel', () => {
     let user;
     let entity;
     beforeEach(() => {
-        localState = new LocalState_1.LocalState();
+        localState = new LocalState_old_1.LocalState();
         channel = new Channel_1.Channel(localState);
         // @ts-ignore b/c we don't need real sockets/networking for user tests
         user = new User_1.User(undefined, undefined);

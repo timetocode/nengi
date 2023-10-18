@@ -1,8 +1,16 @@
 import { IdPool } from './IdPool';
-import { NDictionary } from './NDictionary';
+export declare class NDictionary {
+    array: IEntity[];
+    nidIndex: Map<nid, arrayIndex>;
+    get(nid: nid): IEntity;
+    add(entity: IEntity): void;
+    remove(entity: IEntity): void;
+    forEach(fn: (entity: IEntity, index: number) => any): void;
+}
 type nid = number;
 type parentNid = nid;
 type childNid = nid;
+type arrayIndex = number;
 interface IEntity {
     nid: nid;
     ntype: number;
@@ -18,4 +26,4 @@ export declare class LocalState {
     getByNid(nid: number): IEntity;
 }
 export {};
-//# sourceMappingURL=LocalState.d.ts.map
+//# sourceMappingURL=Relations.test.d.ts.map

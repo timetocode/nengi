@@ -31,10 +31,11 @@ class Instance {
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
     }
     attachEntity(parentNid, child) {
-        this.localState.addChild(parentNid, child);
+        this.localState.addChild(child, { nid: parentNid, ntype: 0 });
     }
     detachEntity(parentNid, child) {
-        this.localState.removeChild(parentNid, child);
+        this.localState.removeEntity(child);
+        //this.localState.removeChild(parentNid, child)
     }
     respond(endpoint, callback) {
         this.responseEndPoints.set(endpoint, callback);

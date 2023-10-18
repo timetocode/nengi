@@ -2,34 +2,78 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const LocalState_1 = require("./LocalState");
 describe('LocalState', () => {
-    it('assigns a nid of 1 to the first freshly added entity', () => {
+    // Test for flat game structures
+    it('correctly adds and removes flat entities', () => {
         const localState = new LocalState_1.LocalState();
-        const entity = { nid: 0, ntype: 1 };
-        localState.registerEntity(entity, 1);
-        expect(entity.nid).toEqual(1);
+        const entity1 = { nid: 0, ntype: 1 };
+        const entity2 = { nid: 0, ntype: 2 };
+        localState.addEntity(entity1);
+        localState.addEntity(entity2);
+        expect(localState.getByNid(1).ntype).toBe(1);
+        expect(localState.getByNid(2).ntype).toBe(2);
+        localState.removeEntity(entity1);
+        expect(localState.getByNid(1)).toBeUndefined();
+        expect(localState.getByNid(2).ntype).toBe(2);
     });
-    it('correctly associates an entity with a source', () => {
-        const source = 123; // this is how channels work, they are just a source
-        const localState = new LocalState_1.LocalState();
-        const entity = { nid: 0, ntype: 1 };
-        localState.registerEntity(entity, source);
-        expect(entity.nid).toEqual(1);
-        expect(localState.sources.get(1)).toEqual(new Set([123]));
-        expect(localState.sources.get(1)).not.toEqual(new Set([321]));
-    });
-    it('correctly associates parents and children', () => {
-        const source = 123; // this is how channels work, they are just a source
+    // Test for small scene graph structures
+    it('adds and removes entities in a scene graph', () => {
         const localState = new LocalState_1.LocalState();
         const parent = { nid: 0, ntype: 1 };
-        const child = { nid: 0, ntype: 2 };
-        localState.registerEntity(parent, source);
-        expect(parent.nid).toEqual(1);
-        localState.addChild(parent.nid, child);
-        expect(child.nid).toEqual(2); // will be 2, now the second networked object
-        expect(localState.sources.get(1)).toEqual(new Set([123]));
-        expect(localState.children.get(1)).toEqual(new Set([2])); // entity 1 is now a parent, and it contains entity 2 in its Set
-        //expect(localState.channelSources.get(2)).toEqual(new Set([]))
-        localState.removeChild(parent.nid, child); // remove the child
-        expect(localState.children.get(1)).toEqual(new Set([])); // the set is empty now
+        const child1 = { nid: 0, ntype: 2 };
+        const child2 = { nid: 0, ntype: 3 };
+        localState.addEntity(parent);
+        localState.addChild(child1, parent);
+        localState.addChild(child2, parent);
+        expect(localState.children.get(parent.nid).size).toBe(2);
+        localState.removeEntity(child1);
+        expect(localState.children.get(parent.nid).size).toBe(1);
+        expect(localState.children.get(parent.nid).has(child2.nid)).toBe(true);
+    });
+    // Test for ECS structures
+    it('adds and removes entities in an ECS', () => {
+        const localState = new LocalState_1.LocalState();
+        const entity = { nid: 0, ntype: 1 };
+        const component1 = { nid: 0, ntype: 2 };
+        const component2 = { nid: 0, ntype: 3 };
+        localState.addEntity(entity);
+        localState.addChild(component1, entity);
+        localState.addChild(component2, entity);
+        expect(localState.children.get(entity.nid).size).toBe(2);
+        localState.removeEntity(component1);
+        expect(localState.children.get(entity.nid).size).toBe(1);
+        expect(localState.children.get(entity.nid).has(component2.nid)).toBe(true);
+    });
+    // Test for recursive removal of orphaned children
+    it('recursively removes orphaned children', () => {
+        const localState = new LocalState_1.LocalState();
+        const grandParent = { nid: 0, ntype: 1 };
+        const parent = { nid: 0, ntype: 2 };
+        const child = { nid: 0, ntype: 3 };
+        localState.addEntity(grandParent);
+        localState.addChild(parent, grandParent);
+        localState.addChild(child, parent);
+        expect(localState.children.get(grandParent.nid).has(parent.nid)).toBe(true);
+        expect(localState.children.get(parent.nid).has(child.nid)).toBe(true);
+        localState.removeEntity(grandParent);
+        expect(localState.getByNid(grandParent.nid)).toBeUndefined();
+        expect(localState.getByNid(parent.nid)).toBeUndefined();
+        expect(localState.getByNid(child.nid)).toBeUndefined();
+    });
+    // Test for entities with multiple parents
+    it('keeps child with multiple parents after one parent is removed', () => {
+        const localState = new LocalState_1.LocalState();
+        const parent1 = { nid: 0, ntype: 1 };
+        const parent2 = { nid: 0, ntype: 2 };
+        const child = { nid: 0, ntype: 3 };
+        localState.addEntity(parent1);
+        localState.addEntity(parent2);
+        localState.addChild(child, parent1);
+        localState.addChild(child, parent2);
+        expect(localState.children.get(parent1.nid).has(child.nid)).toBe(true);
+        expect(localState.children.get(parent2.nid).has(child.nid)).toBe(true);
+        localState.removeEntity(parent1);
+        expect(localState.getByNid(parent1.nid)).toBeUndefined();
+        expect(localState.getByNid(parent2.nid).ntype).toBe(2);
+        expect(localState.getByNid(child.nid).ntype).toBe(3);
     });
 });

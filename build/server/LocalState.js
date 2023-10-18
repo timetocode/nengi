@@ -1,50 +1,76 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LocalState = void 0;
-const EDictionary_1 = require("./EDictionary");
 const IdPool_1 = require("./IdPool");
+const NDictionary_1 = require("./NDictionary");
 class LocalState {
     constructor() {
         this.nidPool = new IdPool_1.IdPool(65535);
-        this.sources = new Map();
         this.children = new Map();
-        this._entities = new EDictionary_1.EDictionary();
+        this.parents = new Map();
+        this._entities = new NDictionary_1.NDictionary();
     }
-    addChild(parentNid, child) {
-        const cnid = this.registerEntity(child, parentNid);
-        if (!this.children.get(parentNid)) {
-            this.children.set(parentNid, new Set());
+    addEntity(entity) {
+        if (entity.nid === 0) {
+            entity.nid = this.nidPool.nextId();
         }
-        this.children.get(parentNid).add(cnid);
+        this._entities.add(entity);
     }
-    removeChild(parentNid, child) {
-        var _a;
+    addChild(child, parent) {
+        const pnid = parent.nid;
+        this.addEntity(child); // assigns a nid to the child
         const cnid = child.nid;
-        (_a = this.children.get(parentNid)) === null || _a === void 0 ? void 0 : _a.delete(cnid);
-        this.unregisterEntity(child, parentNid);
-    }
-    registerEntity(entity, sourceId) {
-        let nid = entity.nid;
-        if (!this.sources.has(nid)) {
-            nid = this.nidPool.nextId();
-            entity.nid = nid;
-            this.sources.set(nid, new Set());
-            this._entities.add(entity);
+        if (!this.children.has(pnid)) {
+            this.children.set(pnid, new Set());
         }
-        const entitySources = this.sources.get(nid);
-        entitySources.add(sourceId);
-        return nid;
+        this.children.get(pnid).add(cnid);
+        if (!this.parents.has(cnid)) {
+            this.parents.set(cnid, new Set());
+        }
+        this.parents.get(cnid).add(pnid);
     }
-    unregisterEntity(entity, sourceId) {
+    removeEntity(entity) {
         const nid = entity.nid;
-        const entitySources = this.sources.get(nid);
-        entitySources.delete(sourceId);
-        if (entitySources.size === 0) {
-            this.sources.delete(nid);
-            this._entities.remove(entity);
-            this.nidPool.returnId(nid);
-            entity.nid = 0;
+        if (nid === 0) {
+            return;
         }
+        // Remove from children
+        const childNids = this.children.get(nid);
+        if (childNids) {
+            for (const cnid of childNids) {
+                const childEntity = this._entities.get(cnid);
+                if (childEntity) {
+                    this.removeEntity(childEntity);
+                }
+            }
+            this.children.delete(nid);
+        }
+        // Remove as a child from parents and check for orphaned children
+        if (this.parents.has(nid)) {
+            const parentNids = this.parents.get(nid);
+            for (const pnid of parentNids) {
+                if (this.children.has(pnid)) {
+                    this.children.get(pnid).delete(nid);
+                }
+            }
+            this.parents.delete(nid);
+        }
+        // Remove as a parent from children
+        for (const [pnid, childSet] of this.children.entries()) {
+            if (childSet.has(nid)) {
+                childSet.delete(nid);
+                if (childSet.size === 0) {
+                    const parentEntity = this._entities.get(pnid);
+                    if (parentEntity) {
+                        this.removeEntity(parentEntity);
+                    }
+                }
+            }
+        }
+        // Remove entity from _entities
+        this._entities.remove(entity);
+        // Return nid to the pool
+        this.nidPool.returnId(nid);
     }
     getByNid(nid) {
         return this._entities.get(nid);

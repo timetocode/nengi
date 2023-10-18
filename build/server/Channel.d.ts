@@ -1,15 +1,12 @@
-import { EDictionary } from './EDictionary';
 import { LocalState } from './LocalState';
 import { IEntity } from '../common/IEntity';
-import { IChannel, ChannelSubscriptionHandler } from './IChannel';
+import { IChannel } from './IChannel';
 import { User } from './User';
 export declare class Channel implements IChannel {
     nid: number;
     localState: LocalState;
-    entities: EDictionary;
+    channelEntity: IEntity;
     users: Map<number, User>;
-    onSubscribe: ChannelSubscriptionHandler;
-    onUnsubscribe: ChannelSubscriptionHandler;
     constructor(localState: LocalState);
     addEntity(entity: IEntity): IEntity;
     removeEntity(entity: IEntity): void;

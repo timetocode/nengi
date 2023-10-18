@@ -1,5 +1,5 @@
 import { EDictionary } from './EDictionary';
-import { LocalState } from './LocalState';
+import { LocalState } from './LocalState-old';
 import { IEntity } from '../common/IEntity';
 import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel';
 import { User } from './User';

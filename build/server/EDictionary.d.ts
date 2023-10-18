@@ -1,5 +1,5 @@
 import { IEntity } from '../common/IEntity';
-declare class EDictionary {
+export declare class EDictionary {
     object: {
         [key: string]: any;
     };
@@ -25,5 +25,4 @@ declare class EDictionary {
     removeById(id: number): any;
     bulkRemove(entitiesOrIds: Array<IEntity | number>): void;
 }
-export { EDictionary };
 //# sourceMappingURL=EDictionary.d.ts.map

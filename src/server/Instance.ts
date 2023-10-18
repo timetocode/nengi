@@ -56,11 +56,12 @@ export class Instance {
     }
 
     attachEntity(parentNid: number, child: IEntity) {
-        this.localState.addChild(parentNid, child)
+        this.localState.addChild(child, { nid: parentNid, ntype: 0 })
     }
 
     detachEntity(parentNid: number, child: IEntity) {
-        this.localState.removeChild(parentNid, child)
+        this.localState.removeEntity(child)
+        //this.localState.removeChild(parentNid, child)
     }
 
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any) {

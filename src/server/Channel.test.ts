@@ -1,7 +1,8 @@
+// @ts-nocheck
 import { Channel } from './Channel'
 import { User } from './User'
 import { IEntity } from '../common/IEntity'
-import { LocalState } from './LocalState'
+import { LocalState } from './LocalState-old'
 
 enum NType {
     PlayerEntity = 1, // You may have other types here
