@@ -1,12 +1,14 @@
 import { IChannel } from '../server/IChannel';
 import { LocalState } from '../server/LocalState';
+type nid = number;
+type tick = number;
 export declare class User {
     id: number;
     subscriptions: Map<number, IChannel>;
-    cache: {
-        [prop: number]: number;
+    tickLastSeen: {
+        [prop: nid]: tick;
     };
-    cacheArr: number[];
+    currentlyVisible: nid[];
     localState: LocalState;
     constructor(localState: LocalState);
     subscribe(channel: IChannel): void;
@@ -17,5 +19,13 @@ export declare class User {
         toUpdate: number[];
         toCreate: number[];
     };
+    createOrUpdate2(nid: number, tick: number, toCreate: number[], toUpdate: number[]): void;
+    populateDeletions(tick: number, toDelete: number[]): void;
+    checkVisibility2(tick: number): {
+        toDelete: number[];
+        toUpdate: number[];
+        toCreate: number[];
+    };
 }
+export {};
 //# sourceMappingURL=HotPath.performance.d.ts.map

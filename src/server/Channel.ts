@@ -2,6 +2,7 @@ import { LocalState } from './LocalState'
 import { IEntity } from '../common/IEntity'
 import { IChannel } from './IChannel'
 import { User } from './User'
+import { NDictionary } from './NDictionary'
 
 export class Channel implements IChannel {
     nid: number = 0
@@ -9,6 +10,9 @@ export class Channel implements IChannel {
     localState: LocalState
     channelEntity: IEntity
     users: Map<number, User> = new Map()
+
+
+    _entities = new NDictionary()
 
     constructor(localState: LocalState, ntype: number) {
         this.channelEntity = { nid: 0, ntype }
@@ -20,11 +24,13 @@ export class Channel implements IChannel {
 
     addEntity(entity: IEntity) {
         this.localState.addChild(entity, this.channelEntity)
+        this._entities.add(entity)
         return entity
     }
 
     removeEntity(entity: IEntity) {
         this.localState.removeEntity(entity)
+        this._entities.remove(entity)
     }
 
     addMessage(message: any) {
@@ -42,7 +48,8 @@ export class Channel implements IChannel {
     }
 
     getVisibileEntities(userId: number) {
-        return [this.channelEntity.nid, ...this.localState.children.get(this.channelEntity.nid)!]
+        return this._entities.array.map(e => { return e.nid })
+        //return [this.channelEntity.nid, ...this.localState.children.get(this.channelEntity.nid)!]
     }
 
     destroy() {

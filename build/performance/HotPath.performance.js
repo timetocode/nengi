@@ -10,8 +10,8 @@ class User {
     constructor(localState) {
         this.id = 0;
         this.subscriptions = new Map();
-        this.cache = {};
-        this.cacheArr = [];
+        this.tickLastSeen = {};
+        this.currentlyVisible = [];
         this.localState = localState;
     }
     subscribe(channel) {
@@ -21,22 +21,22 @@ class User {
         this.subscriptions.delete(channel.nid);
     }
     createOrUpdate(nid, tick, toCreate, toUpdate) {
-        if (!this.cache[nid]) {
+        if (!this.tickLastSeen[nid]) {
+            //console.log('create push', id)
             toCreate.push(nid);
-            this.cache[nid] = tick;
-            this.cacheArr.push(nid);
+            this.tickLastSeen[nid] = tick;
+            this.currentlyVisible.push(nid);
         }
         else {
-            this.cache[nid] = tick;
+            this.tickLastSeen[nid] = tick;
             toUpdate.push(nid);
         }
         const children = this.localState.children.get(nid);
         if (children) {
-            //const cb = (cid: number) => this.createOrUpdate(cid, tick, toCreate, toUpdate)
             for (const cid of children) {
                 this.createOrUpdate(cid, tick, toCreate, toUpdate);
             }
-            //children.forEach(cb)
+            //children.forEach((cid: number) => this.createOrUpdate(cid, tick, toCreate, toUpdate))
         }
     }
     checkVisibility(tick) {
@@ -56,20 +56,69 @@ class User {
             })
         })
         */
-        for (let i = this.cacheArr.length - 1; i > -1; i--) {
-            const id = this.cacheArr[i];
-            if (this.cache[id] !== tick) {
+        for (let i = this.currentlyVisible.length - 1; i > -1; i--) {
+            const id = this.currentlyVisible[i];
+            if (this.currentlyVisible[id] !== tick) {
                 toDelete.push(id);
-                this.cache[id] = 0;
-                this.cacheArr.splice(i, 1);
+                this.currentlyVisible[id] = 0;
+                this.currentlyVisible.splice(i, 1);
             }
         }
+        return { toDelete, toUpdate, toCreate };
+    }
+    createOrUpdate2(nid, tick, toCreate, toUpdate) {
+        // was this entity visible last frame?
+        if (!this.tickLastSeen[nid]) {
+            // no? well then this user needs to create it fully
+            toCreate.push(nid);
+            this.currentlyVisible.push(nid);
+        }
+        else {
+            // yes? well then we just need any changes that have occurred            
+            toUpdate.push(nid);
+        }
+        this.tickLastSeen[nid] = tick;
+        if (this.localState.children.has(nid)) {
+            for (const cid of this.localState.children.get(nid)) {
+                this.createOrUpdate2(cid, tick, toCreate, toUpdate);
+            }
+        }
+        /*
+        const children = this.localState.children.get(nid)
+        if (children) {
+            for (const cid of children) {
+                this.createOrUpdate(cid, tick, toCreate, toUpdate)
+            }
+        }
+        */
+    }
+    populateDeletions(tick, toDelete) {
+        for (let i = this.currentlyVisible.length - 1; i > -1; i--) {
+            const nid = this.currentlyVisible[i];
+            if (this.tickLastSeen[nid] !== tick) {
+                toDelete.push(nid);
+                delete this.tickLastSeen[nid]; //= 0
+                this.currentlyVisible.splice(i, 1);
+            }
+        }
+    }
+    checkVisibility2(tick) {
+        const toCreate = [];
+        const toUpdate = [];
+        const toDelete = [];
+        for (const [channelId, channel] of this.subscriptions.entries()) {
+            const visibleNids = channel.getVisibileEntities(this.id);
+            for (let i = 0; i < visibleNids.length; i++) {
+                this.createOrUpdate2(visibleNids[i], tick, toCreate, toUpdate);
+            }
+        }
+        this.populateDeletions(tick, toDelete);
         return { toDelete, toUpdate, toCreate };
     }
 }
 exports.User = User;
 const getVisibleState = (user, instance) => {
-    const { toCreate, toUpdate, toDelete } = user.checkVisibility(instance.tick);
+    const { toCreate, toUpdate, toDelete } = user.checkVisibility2(instance.tick);
     const createEntities = [];
     for (let i = 0; i < toCreate.length; i++) {
         const nid = toCreate[i];
@@ -124,23 +173,52 @@ const users = new Map();
 const entities = new Map();
 const instance = new Instance_1.Instance(ncontext);
 const main = new Channel_1.Channel(instance.localState, NType.Channel);
-for (let i = 0; i < 500; i++) {
-    const entity = { nid: 0, ntype: NType.TestEntity, x: 500, y: 500 };
+function spawnNewNPC() {
+    const entity = {
+        nid: 0,
+        ntype: NType.TestEntity,
+        x: 500,
+        y: 500,
+        age: 0,
+        maxAge: 1 + (Math.random() * 3)
+    };
     main.addEntity(entity);
     entities.set(entity.nid, entity);
 }
-for (let i = 0; i < 500; i++) {
+function removeNPC(entity) {
+    entities.delete(entity.nid);
+    main.removeEntity(entity);
+}
+for (let i = 0; i < 400; i++) {
+    spawnNewNPC();
+}
+for (let i = 0; i < 200; i++) {
     const user = new User(instance.localState);
     user.id = i + 1;
     main.subscribe(user);
     users.set(user.id, user);
 }
-function hot() {
+function simpleConstantMutationScenario(delta) {
     // mutation of game state to create work
     entities.forEach(entity => {
-        entity.x += 0.001;
-        entity.y += 0.001;
+        entity.x += delta;
+        entity.y += delta;
     });
+}
+function lotsOfRespawningScenario(delta) {
+    entities.forEach(entity => {
+        entity.age += delta;
+        entity.x += delta;
+        entity.y += delta;
+        if (entity.age > entity.maxAge) {
+            removeNPC(entity);
+            spawnNewNPC();
+        }
+    });
+}
+function hot(delta) {
+    //simpleConstantMutationScenario(delta)
+    lotsOfRespawningScenario(delta);
     // instance tick logic, subset
     instance.tick++;
     instance.cache.createCachesForTick(instance.tick);
@@ -149,9 +227,10 @@ function hot() {
         getVisibleState(user, instance);
     });
     const stop = performance.now();
-    console.log(`hot finished in ${stop - start} ms`);
+    const firstUser = users.get(1);
+    console.log(`hot finished in ${stop - start} ms; ${instance.localState._entities.size} :: ${firstUser.currentlyVisible.length}`);
     instance.cache.deleteCachesForTick(instance.tick);
 }
 setInterval(() => {
-    hot();
-}, 500);
+    hot(1 / 20);
+}, 50);

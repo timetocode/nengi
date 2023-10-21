@@ -20,8 +20,8 @@ class User {
         this.engineMessageQueue = [];
         this.messageQueue = [];
         this.responseQueue = [];
-        this.cache = {};
-        this.cacheArr = [];
+        this.tickLastSeen = {};
+        this.currentlyVisible = [];
         this.lastSentInstanceTick = 0;
         this.lastReceivedClientTick = 0;
         this.latency = 0;
@@ -57,30 +57,39 @@ class User {
     queueMessage(message) {
         this.messageQueue.push(message);
     }
-    createOrUpdate(nid, tick, toCreate, toUpdate) {
-        if (!this.cache[nid]) {
-            //console.log('create push', id)
-            toCreate.push(nid);
-            this.cache[nid] = tick;
-            this.cacheArr.push(nid);
-        }
-        else {
-            this.cache[nid] = tick;
-            toUpdate.push(nid);
-        }
-        const children = this.instance.localState.children.get(nid);
-        if (children) {
-            for (const cid of children) {
-                this.createOrUpdate(cid, tick, toCreate, toUpdate);
-            }
-            //children.forEach((cid: number) => this.createOrUpdate(cid, tick, toCreate, toUpdate))
-        }
-    }
     send(buffer) {
         this.networkAdapter.send(this, buffer);
     }
     disconnect(reason) {
         this.networkAdapter.disconnect(this, reason);
+    }
+    populateDeletions(tick, toDelete) {
+        for (let i = this.currentlyVisible.length - 1; i > -1; i--) {
+            const nid = this.currentlyVisible[i];
+            if (this.tickLastSeen[nid] !== tick) {
+                toDelete.push(nid);
+                delete this.tickLastSeen[nid]; //= 0
+                this.currentlyVisible.splice(i, 1);
+            }
+        }
+    }
+    createOrUpdate(nid, tick, toCreate, toUpdate) {
+        // was this entity visible last frame?
+        if (!this.tickLastSeen[nid]) {
+            // no? well then this user needs to create it fully
+            toCreate.push(nid);
+            this.currentlyVisible.push(nid);
+        }
+        else {
+            // yes? well then we just need any changes that have occurred            
+            toUpdate.push(nid);
+        }
+        this.tickLastSeen[nid] = tick;
+        if (this.instance.localState.children.has(nid)) {
+            for (const cid of this.instance.localState.children.get(nid)) {
+                this.createOrUpdate(cid, tick, toCreate, toUpdate);
+            }
+        }
     }
     checkVisibility(tick) {
         const toCreate = [];
@@ -92,21 +101,7 @@ class User {
                 this.createOrUpdate(visibleNids[i], tick, toCreate, toUpdate);
             }
         }
-        /*
-        this.subscriptions.forEach(channel => {
-            channel.getVisibileEntities(this.id).forEach(nid => {
-                this.createOrUpdate(nid, tick, toCreate, toUpdate)
-            })
-        })
-        */
-        for (let i = this.cacheArr.length - 1; i > -1; i--) {
-            const id = this.cacheArr[i];
-            if (this.cache[id] !== tick) {
-                toDelete.push(id);
-                this.cache[id] = 0;
-                this.cacheArr.splice(i, 1);
-            }
-        }
+        this.populateDeletions(tick, toDelete);
         return { toDelete, toUpdate, toCreate };
     }
 }

@@ -16,11 +16,15 @@ export class LocalState {
         if (entity.nid === 0) {
             entity.nid = this.nidPool.nextId()
         }
+        // @ts-ignore
+        entity.hasChildren = false
         this._entities.add(entity)
     }
 
     addChild(child: IEntity, parent: IEntity) {
         const pnid = parent.nid
+        // @ts-ignore
+        parent.hasChildren = true
         this.addEntity(child) // assigns a nid to the child
         const cnid = child.nid
         if (!this.children.has(pnid)) {
