@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-alpha.151",
+  "version": "2.0.0-alpha.160",
   "description": "nengi2 alpha branch",
   "main": "./build/index.js",
   "scripts": {
@@ -8,8 +8,7 @@
     "build": "npx tsc",
     "typecheck": "npx tsc --project tsconfig.test.json",
     "lint": "npx eslint . --config .eslintrc.js",
-    "lintfix": "npx eslint . --fix --config .eslintrc.js",
-    "adhoc": "npx ts-node-dev --inspect -- ./src/performance/HotPath.performance.ts"
+    "lintfix": "npx eslint . --fix --config .eslintrc.js"
   },
   "author": "Alex // timetocode",
   "license": "Apache 2.0",
@@ -22,8 +21,5 @@
     "jest": "^29.6.2",
     "ts-jest": "^29.1.1",
     "typescript": "^5.1.6"
-  },
-  "dependencies": {
-    "ts-node-dev": "^2.0.0"
   }
 }

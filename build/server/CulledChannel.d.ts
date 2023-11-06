@@ -1,11 +1,18 @@
 import { LocalState } from './LocalState';
 import { ICulledChannel, VisibilityResolver } from './IChannel';
-import { Channel } from './Channel';
-export declare class CulledChannel<VisibleObjectType, ViewType> extends Channel implements ICulledChannel<VisibleObjectType, ViewType> {
-    views: Map<number, ViewType>;
+import { User } from './User';
+import { IEntity } from '../common/IEntity';
+export declare class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
+    private channel;
+    private views;
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
-    constructor(localState: LocalState, ntype: number);
+    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>);
+    get nid(): number;
+    addEntity(entity: IEntity & VisibleObjectType): IEntity;
+    removeEntity(entity: IEntity & VisibleObjectType): void;
     addMessage(message: any): void;
-    getVisibileEntities(userId: number): number[];
+    subscribe(user: User, view: ViewType): void;
+    unsubscribe(user: User): void;
+    getVisibleEntities(userId: number): number[];
 }
 //# sourceMappingURL=CulledChannel.d.ts.map

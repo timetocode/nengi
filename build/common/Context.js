@@ -12,35 +12,26 @@ const pingSchema_1 = require("./schemas/pingSchema");
 const pongSchema_1 = require("./schemas/pongSchema");
 class Context {
     constructor() {
-        /**
-         * user-defined network schemas
-         */
-        this.schemas = {};
-        /**
-         * schemas internal to nengi
-         */
-        this.engineSchemas = {};
+        this.schemas = new Map();
+        this.engineSchemas = new Map();
         // setup the engine schemas
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.ConnectionAttempt, connectAttemptSchema_1.connectionAttemptSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.ConnectionAccepted, connectionAcceptedSchema_1.connectionAcceptedSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.ConnectionDenied, connectionDeniedSchema_1.connectionDeniedSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.ConnectionTerminated, connectionTerminatedSchema_1.connectionTerminatedSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.ClientTick, clientTickSchema_1.clientTickSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.TimeSync, timeSyncSchema_1.timeSyncSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.Ping, pingSchema_1.pingSchema);
-        this.registerEngineSchema(EngineMessage_1.EngineMessage.Pong, pongSchema_1.pongSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.ConnectionAttempt, connectAttemptSchema_1.connectionAttemptSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.ConnectionAccepted, connectionAcceptedSchema_1.connectionAcceptedSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.ConnectionDenied, connectionDeniedSchema_1.connectionDeniedSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.ConnectionTerminated, connectionTerminatedSchema_1.connectionTerminatedSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.ClientTick, clientTickSchema_1.clientTickSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.TimeSync, timeSyncSchema_1.timeSyncSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.Ping, pingSchema_1.pingSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.Pong, pongSchema_1.pongSchema);
     }
     register(ntype, schema) {
-        this.schemas[ntype] = schema;
-    }
-    registerEngineSchema(engineMessageType, schema) {
-        this.engineSchemas[engineMessageType] = schema;
+        this.schemas.set(ntype, schema);
     }
     getSchema(ntype) {
-        return this.schemas[ntype];
+        return this.schemas.get(ntype);
     }
     getEngineSchema(ntype) {
-        return this.engineSchemas[ntype];
+        return this.engineSchemas.get(ntype);
     }
 }
 exports.Context = Context;

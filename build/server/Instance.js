@@ -1,16 +1,20 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Instance = void 0;
 const LocalState_1 = require("./LocalState");
 const InstanceNetwork_1 = require("./InstanceNetwork");
 const EntityCache_1 = require("./EntityCache");
-const createSnapshotBuffer_1 = require("../binary/snapshot/createSnapshotBuffer");
+const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
 const NQueue_1 = require("../NQueue");
 const EngineMessage_1 = require("../common/EngineMessage");
 class Instance {
     constructor(context) {
         this.context = context;
         this.localState = new LocalState_1.LocalState();
+        this.channels = new Set();
         this.users = new Map();
         this.queue = new NQueue_1.NQueue();
         this.incrementalUserId = 0;
@@ -27,11 +31,10 @@ class Instance {
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
     }
     attachEntity(parentNid, child) {
-        this.localState.addChild(child, { nid: parentNid, ntype: 0 });
+        this.localState.addChild(parentNid, child);
     }
     detachEntity(parentNid, child) {
-        this.localState.removeEntity(child);
-        //this.localState.removeChild(parentNid, child)
+        this.localState.removeChild(parentNid, child);
     }
     respond(endpoint, callback) {
         this.responseEndPoints.set(endpoint, callback);
@@ -66,7 +69,7 @@ class Instance {
                 ntype: EngineMessage_1.EngineMessage.ClientTick,
                 tick: user.lastReceivedClientTick
             });
-            const buffer = (0, createSnapshotBuffer_1.createSnapshotBuffer)(user, this);
+            const buffer = (0, createSnapshotBufferRefactor_1.default)(user, this);
             user.send(buffer);
             user.lastSentInstanceTick = this.tick;
         });

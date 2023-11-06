@@ -4,7 +4,7 @@ import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
 import { IChannel, ICulledChannel } from './IChannel'
 import { EntityCache } from './EntityCache'
-import { createSnapshotBuffer } from '../binary/snapshot/createSnapshotBuffer'
+import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
 import { IdPool } from './IdPool'
@@ -13,6 +13,7 @@ import { EngineMessage } from '../common/EngineMessage'
 export class Instance {
     context: Context
     localState: LocalState
+    channels: Set<IChannel>
     network: InstanceNetwork
     queue: NQueue<INetworkEvent>
     users: Map<number, User>
@@ -35,6 +36,7 @@ export class Instance {
     constructor(context: Context) {
         this.context = context
         this.localState = new LocalState()
+        this.channels = new Set()
         this.users = new Map()
         this.queue = new NQueue()
         this.incrementalUserId = 0
@@ -54,12 +56,11 @@ export class Instance {
     }
 
     attachEntity(parentNid: number, child: IEntity) {
-        this.localState.addChild(child, { nid: parentNid, ntype: 0 })
+        this.localState.addChild(parentNid, child)
     }
 
     detachEntity(parentNid: number, child: IEntity) {
-        this.localState.removeEntity(child)
-        //this.localState.removeChild(parentNid, child)
+        this.localState.removeChild(parentNid, child)
     }
 
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any) {
@@ -100,7 +101,7 @@ export class Instance {
                 tick: user.lastReceivedClientTick
             })
 
-            const buffer = createSnapshotBuffer(user, this)
+            const buffer = createSnapshotBufferRefactor(user, this)
             user.send(buffer)
             user.lastSentInstanceTick = this.tick
         })

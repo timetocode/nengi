@@ -3,24 +3,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Channel = void 0;
 const NDictionary_1 = require("./NDictionary");
 class Channel {
-    constructor(localState, ntype) {
-        this.nid = 0;
-        this.ntype = 0;
+    constructor(localState) {
+        this.entities = new NDictionary_1.NDictionary();
         this.users = new Map();
-        this._entities = new NDictionary_1.NDictionary();
-        this.channelEntity = { nid: 0, ntype };
-        localState.addEntity(this.channelEntity);
-        this.nid = this.channelEntity.nid;
         this.localState = localState;
+        this.nid = localState.nidPool.nextId();
     }
     addEntity(entity) {
-        this.localState.addChild(entity, this.channelEntity);
-        this._entities.add(entity);
+        this.localState.registerEntity(entity, this.nid);
+        this.entities.add(entity);
         return entity;
     }
     removeEntity(entity) {
-        this.localState.removeEntity(entity);
-        this._entities.remove(entity);
+        this.entities.remove(entity);
+        this.localState.unregisterEntity(entity, this.nid);
     }
     addMessage(message) {
         this.users.forEach(user => user.queueMessage(message));
@@ -33,13 +29,20 @@ class Channel {
         this.users.delete(user.id);
         user.unsubscribe(this);
     }
-    getVisibileEntities(userId) {
-        return this._entities.array.map(e => { return e.nid; });
-        //return [this.channelEntity.nid, ...this.localState.children.get(this.channelEntity.nid)!]
+    getVisibleEntities(userId) {
+        const visibleNids = [];
+        this.entities.forEach((entity) => {
+            visibleNids.push(entity.nid);
+        });
+        return visibleNids;
     }
     destroy() {
-        this.users.forEach(user => user.unsubscribe(this));
-        this.localState.removeEntity(this.channelEntity);
+        this.users.forEach(user => this.unsubscribe(user));
+        for (let i = 0; i < this.entities.array.length; i++) {
+            this.removeEntity(this.entities.array[i]);
+        }
+        this.entities.removeAll();
+        this.localState.nidPool.returnId(this.nid);
     }
 }
 exports.Channel = Channel;

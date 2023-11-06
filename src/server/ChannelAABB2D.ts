@@ -18,8 +18,7 @@ const pointInAABB2D = (p: Point2D, view: AABB2D) => {
 }
 
 export class ChannelAABB2D extends CulledChannel<Point2D, AABB2D> {
-    constructor(localState: LocalState, ntype: number) {
-        super(localState, ntype)
-        this.visibilityResolver = pointInAABB2D
+    constructor(localState: LocalState) {
+        super(localState, pointInAABB2D)
     }
 }

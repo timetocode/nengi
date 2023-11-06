@@ -1,89 +1,51 @@
 import { IdPool } from './IdPool'
+import { IEntity } from '../common/IEntity'
 import { NDictionary } from './NDictionary'
-
-type nid = number
-type parentNid = nid
-type childNid = nid
-interface IEntity { nid: nid, ntype: number }
 
 export class LocalState {
     nidPool: IdPool = new IdPool(65535)
-    children: Map<parentNid, Set<childNid>> = new Map()
-    parents: Map<childNid, Set<parentNid>> = new Map()
+    sources: Map<number, Set<number>> = new Map()
+    children: Map<number, Set<number>>= new Map()
     _entities: NDictionary = new NDictionary()
 
-    addEntity(entity: IEntity) {
-        if (entity.nid === 0) {
-            entity.nid = this.nidPool.nextId()
+    addChild(parentNid: number, child: IEntity) {
+        const cnid = this.registerEntity(child, parentNid)
+        if (!this.children.get(parentNid)) {
+            this.children.set(parentNid, new Set())
         }
-        // @ts-ignore
-        entity.hasChildren = false
-        this._entities.add(entity)
+        this.children.get(parentNid)!.add(cnid)
     }
 
-    addChild(child: IEntity, parent: IEntity) {
-        const pnid = parent.nid
-        // @ts-ignore
-        parent.hasChildren = true
-        this.addEntity(child) // assigns a nid to the child
+    removeChild(parentNid: number, child: IEntity) {
         const cnid = child.nid
-        if (!this.children.has(pnid)) {
-            this.children.set(pnid, new Set())
-        }
-        this.children.get(pnid)!.add(cnid)
-        if (!this.parents.has(cnid)) {
-            this.parents.set(cnid, new Set())
-        }
-        this.parents.get(cnid)!.add(pnid)
+        this.children.get(parentNid)?.delete(cnid)
+        this.unregisterEntity(child, parentNid)
     }
 
-    removeEntity(entity: IEntity) {
+    registerEntity(entity: IEntity, sourceId: number) {
+        let nid = entity.nid
+        if (!this.sources.has(nid)) {
+            nid = this.nidPool.nextId()
+            entity.nid = nid
+            this.sources.set(nid, new Set())
+            this._entities.add(entity)
+        }
+        const entitySources = this.sources.get(nid)!
+        entitySources.add(sourceId)
+        return nid
+    }
+
+    unregisterEntity(entity: IEntity, sourceId: number) {
         const nid = entity.nid
-        if (nid === 0) {
-            return
+        const entitySources = this.sources.get(nid)!
+        entitySources.delete(sourceId)
+
+        if (entitySources.size === 0) {
+            this.sources.delete(nid)
+            this._entities.remove(entity)
+            this.nidPool.returnId(nid)
+            entity.nid = 0
         }
-    
-        // Remove from children
-        const childNids = this.children.get(nid)
-        if (childNids) {
-            for (const cnid of childNids) {
-                const childEntity = this._entities.get(cnid)
-                if (childEntity) {
-                    this.removeEntity(childEntity)
-                }
-            }
-            this.children.delete(nid)
-        }
-    
-        // Remove as a child from parents and check for orphaned children
-        if (this.parents.has(nid)) {
-            const parentNids = this.parents.get(nid)!
-            for (const pnid of parentNids) {
-                if (this.children.has(pnid)) {
-                    this.children.get(pnid)!.delete(nid)
-                }
-            }
-            this.parents.delete(nid)
-        }
-    
-        // Remove as a parent from children
-        for (const [pnid, childSet] of this.children.entries()) {
-            if (childSet.has(nid)) {
-                childSet.delete(nid)
-                if (childSet.size === 0) {
-                    const parentEntity = this._entities.get(pnid)
-                    if (parentEntity) {
-                        this.removeEntity(parentEntity)
-                    }
-                }
-            }
-        }
-    
-        // Remove entity from _entities
-        this._entities.remove(entity)
-    
-        // Return nid to the pool
-        this.nidPool.returnId(nid)
     }
 
     getByNid(nid: number): IEntity {

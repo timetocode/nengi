@@ -7,6 +7,7 @@ export declare class NDictionary {
     get(nid: nid): IEntity;
     add(entity: IEntity): void;
     remove(entity: IEntity): void;
+    removeAll(): void;
     forEach(fn: (entity: IEntity, index: number) => any): void;
     get size(): number;
 }

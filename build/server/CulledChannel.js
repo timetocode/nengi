@@ -2,28 +2,48 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CulledChannel = void 0;
 const Channel_1 = require("./Channel");
-class CulledChannel extends Channel_1.Channel {
-    constructor(localState, ntype) {
-        super(localState, ntype);
+class CulledChannel {
+    constructor(localState, visibilityResolver) {
         this.views = new Map();
-        this.visibilityResolver = (object, view) => { return true; };
+        this.channel = new Channel_1.Channel(localState);
+        this.visibilityResolver = visibilityResolver;
+    }
+    get nid() {
+        return this.channel.nid;
+    }
+    addEntity(entity) {
+        return this.channel.addEntity(entity);
+    }
+    removeEntity(entity) {
+        return this.channel.removeEntity(entity);
     }
     addMessage(message) {
-        this.users.forEach(user => {
-            if (this.visibilityResolver(message, this.views.get(user.id))) {
+        this.channel.users.forEach((user, userId) => {
+            const view = this.views.get(userId);
+            if (view && this.visibilityResolver(message, view)) {
                 user.queueMessage(message);
             }
         });
     }
-    getVisibileEntities(userId) {
+    subscribe(user, view) {
+        this.channel.subscribe(user);
+        this.views.set(user.id, view);
+    }
+    unsubscribe(user) {
+        this.channel.unsubscribe(user);
+        this.views.delete(user.id);
+    }
+    getVisibleEntities(userId) {
         const view = this.views.get(userId);
-        const visibleNids = [];
-        this.localState.children.get(this.channelEntity.nid).forEach((entity) => {
-            if (this.visibilityResolver(entity, view)) {
-                visibleNids.push(entity.nid);
-            }
-        });
-        return visibleNids;
+        const visibleEntities = [];
+        if (view) {
+            this.channel.entities.forEach((entity) => {
+                if (this.visibilityResolver(entity, view)) {
+                    visibleEntities.push(entity.nid);
+                }
+            });
+        }
+        return visibleEntities;
     }
 }
 exports.CulledChannel = CulledChannel;

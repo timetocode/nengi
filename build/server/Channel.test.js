@@ -1,9 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-// @ts-nocheck
 const Channel_1 = require("./Channel");
 const User_1 = require("./User");
-const LocalState_old_1 = require("./LocalState-old");
+const LocalState_1 = require("./LocalState");
 var NType;
 (function (NType) {
     NType[NType["PlayerEntity"] = 1] = "PlayerEntity";
@@ -27,7 +26,7 @@ describe('Channel', () => {
     let user;
     let entity;
     beforeEach(() => {
-        localState = new LocalState_old_1.LocalState();
+        localState = new LocalState_1.LocalState();
         channel = new Channel_1.Channel(localState);
         // @ts-ignore b/c we don't need real sockets/networking for user tests
         user = new User_1.User(undefined, undefined);
@@ -94,7 +93,7 @@ describe('Channel', () => {
     it('should remove an entity', () => {
         channel.addEntity(entity);
         channel.removeEntity(entity);
-        expect(channel.entities.get(entity.nid)).toBeNull();
+        expect(channel.entities.get(entity.nid)).toBeUndefined();
     });
     /*
     it('should add a message to all users', () => {
@@ -118,7 +117,7 @@ describe('Channel', () => {
     */
     it('should return all visible entities for a user', () => {
         channel.addEntity(entity);
-        const visibleEntities = channel.getVisibileEntities(user.id);
+        const visibleEntities = channel.getVisibleEntities(user.id);
         expect(visibleEntities).toContain(entity.nid);
     });
     it('should destroy all users and entities', () => {

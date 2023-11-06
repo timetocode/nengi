@@ -11,40 +11,39 @@ import { pongSchema } from './schemas/pongSchema'
 
 export class Context {
     /**
-     * user-defined network schemas
-     */
-    schemas: { [prop: number]: Schema } = {}
+	 * user-defined network schemas
+	 */
+    schemas: Map<number, Schema>
 
     /**
-     * schemas internal to nengi
-     */
-    engineSchemas: { [prop: number]: Schema } = {}
+	 * schemas internal to nengi
+	 */
+    engineSchemas: Map<number, Schema>
 
     constructor() {
+        this.schemas = new Map()
+        this.engineSchemas = new Map()
+
         // setup the engine schemas
-        this.registerEngineSchema(EngineMessage.ConnectionAttempt, connectionAttemptSchema)
-        this.registerEngineSchema(EngineMessage.ConnectionAccepted, connectionAcceptedSchema)
-        this.registerEngineSchema(EngineMessage.ConnectionDenied, connectionDeniedSchema)
-        this.registerEngineSchema(EngineMessage.ConnectionTerminated, connectionTerminatedSchema)
-        this.registerEngineSchema(EngineMessage.ClientTick, clientTickSchema)
-        this.registerEngineSchema(EngineMessage.TimeSync, timeSyncSchema)
-        this.registerEngineSchema(EngineMessage.Ping, pingSchema)
-        this.registerEngineSchema(EngineMessage.Pong, pongSchema)
+        this.engineSchemas.set(EngineMessage.ConnectionAttempt, connectionAttemptSchema)
+        this.engineSchemas.set(EngineMessage.ConnectionAccepted, connectionAcceptedSchema)
+        this.engineSchemas.set(EngineMessage.ConnectionDenied, connectionDeniedSchema)
+        this.engineSchemas.set(EngineMessage.ConnectionTerminated, connectionTerminatedSchema)
+        this.engineSchemas.set(EngineMessage.ClientTick, clientTickSchema)
+        this.engineSchemas.set(EngineMessage.TimeSync, timeSyncSchema)
+        this.engineSchemas.set(EngineMessage.Ping, pingSchema)
+        this.engineSchemas.set(EngineMessage.Pong, pongSchema)
     }
 
     register(ntype: number, schema: Schema) {
-        this.schemas[ntype] = schema
-    }
-
-    registerEngineSchema(engineMessageType: number, schema: Schema) {
-        this.engineSchemas[engineMessageType] = schema
+        this.schemas.set(ntype, schema)
     }
 
     getSchema(ntype: number) {
-        return this.schemas[ntype]
+        return this.schemas.get(ntype)
     }
 
     getEngineSchema(ntype: number) {
-        return this.engineSchemas[ntype]
+        return this.engineSchemas.get(ntype)
     }
 }

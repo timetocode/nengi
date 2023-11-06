@@ -12,7 +12,6 @@ export enum UserConnectionState {
 }
 
 type StringOrJSONStringifiable = string | object
-
 type nid = number
 type tick = number
 
@@ -28,7 +27,8 @@ export class User {
     engineMessageQueue: any[] = []
     messageQueue: any[] = []
     responseQueue: any[] = []
-    tickLastSeen: { [prop: nid]: tick } = {}
+    tickLastSeen: Map<nid, tick> = new Map()
+    //tickLastSeen: { [prop: nid]: tick } = {}
     currentlyVisible: nid[] = []
     lastSentInstanceTick = 0
     lastReceivedClientTick = 0
@@ -74,7 +74,7 @@ export class User {
 
     queueMessage(message: any) {
         this.messageQueue.push(message)
-    }  
+    }
 
     send(buffer: Buffer | ArrayBuffer) {
         this.networkAdapter.send(this, buffer)
@@ -83,19 +83,40 @@ export class User {
     disconnect(reason: StringOrJSONStringifiable) {
         this.networkAdapter.disconnect(this, reason)
     }
-
+    populateDeletions(tick: number, toDelete: number[]) {
+        for (const [nid, lastSeenTick] of this.tickLastSeen.entries()) {
+            if (lastSeenTick !== tick) {
+                toDelete.push(nid)
+                this.tickLastSeen.delete(nid)
+                const index = this.currentlyVisible.indexOf(nid)
+                if (index > -1) {
+                    this.currentlyVisible.splice(index, 1)
+                }
+            }
+        }
+    }
+    /*
     populateDeletions(tick: number, toDelete: number[]) {
         for (let i = this.currentlyVisible.length - 1; i > -1; i--) {
             const nid = this.currentlyVisible[i]
             if (this.tickLastSeen[nid] !== tick) {
                 toDelete.push(nid)
-                delete this.tickLastSeen[nid] //= 0
+                this.tickLastSeen[nid] = 0
                 this.currentlyVisible.splice(i, 1)
             }
         }
     }
+    */
     createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]) {
         // was this entity visible last frame?
+        if (!this.tickLastSeen.has(nid)) {
+            toCreate.push(nid)
+            this.currentlyVisible.push(nid)
+        } else {
+            toUpdate.push(nid)
+        }
+        this.tickLastSeen.set(nid, tick)
+        /*
         if (!this.tickLastSeen[nid]) {
             // no? well then this user needs to create it fully
             toCreate.push(nid)
@@ -105,6 +126,7 @@ export class User {
             toUpdate.push(nid)
         }
         this.tickLastSeen[nid] = tick
+        */
 
         if (this.instance!.localState.children.has(nid)) {
             for (const cid of this.instance!.localState.children.get(nid)!) {
@@ -119,7 +141,7 @@ export class User {
         const toDelete: number[] = []
 
         for (const [channelId, channel] of this.subscriptions.entries()) {
-            const visibleNids = channel.getVisibileEntities(this.id)
+            const visibleNids = channel.getVisibleEntities(this.id)
             for (let i = 0; i < visibleNids.length; i++) {
                 this.createOrUpdate(visibleNids[i], tick, toCreate, toUpdate)
             }
@@ -129,4 +151,5 @@ export class User {
 
         return { toDelete, toUpdate, toCreate }
     }
+
 }

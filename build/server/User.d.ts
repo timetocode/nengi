@@ -25,9 +25,7 @@ export declare class User {
     engineMessageQueue: any[];
     messageQueue: any[];
     responseQueue: any[];
-    tickLastSeen: {
-        [prop: nid]: tick;
-    };
+    tickLastSeen: Map<nid, tick>;
     currentlyVisible: nid[];
     lastSentInstanceTick: number;
     lastReceivedClientTick: number;

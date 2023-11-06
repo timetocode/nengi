@@ -5,32 +5,25 @@ import { User } from './User'
 import { NDictionary } from './NDictionary'
 
 export class Channel implements IChannel {
-    nid: number = 0
-    ntype: number = 0
+    nid: number
     localState: LocalState
-    channelEntity: IEntity
+    entities = new NDictionary()
     users: Map<number, User> = new Map()
 
-
-    _entities = new NDictionary()
-
-    constructor(localState: LocalState, ntype: number) {
-        this.channelEntity = { nid: 0, ntype }
-        localState.addEntity(this.channelEntity)
-
-        this.nid = this.channelEntity.nid
-        this.localState = localState  
+    constructor(localState: LocalState) {      
+        this.localState = localState
+        this.nid = localState.nidPool.nextId()
     }
 
     addEntity(entity: IEntity) {
-        this.localState.addChild(entity, this.channelEntity)
-        this._entities.add(entity)
+        this.localState.registerEntity(entity, this.nid)
+        this.entities.add(entity)
         return entity
     }
 
     removeEntity(entity: IEntity) {
-        this.localState.removeEntity(entity)
-        this._entities.remove(entity)
+        this.entities.remove(entity)
+        this.localState.unregisterEntity(entity, this.nid)
     }
 
     addMessage(message: any) {
@@ -47,13 +40,20 @@ export class Channel implements IChannel {
         user.unsubscribe(this)
     }
 
-    getVisibileEntities(userId: number) {
-        return this._entities.array.map(e => { return e.nid })
-        //return [this.channelEntity.nid, ...this.localState.children.get(this.channelEntity.nid)!]
+    getVisibleEntities(userId: number) {
+        const visibleNids: number[] = []
+        this.entities.forEach((entity: IEntity) => {
+            visibleNids.push(entity.nid)
+        })
+        return visibleNids        
     }
 
     destroy() {
-        this.users.forEach(user => user.unsubscribe(this))
-        this.localState.removeEntity(this.channelEntity)
+        this.users.forEach(user => this.unsubscribe(user))
+        for (let i = 0; i < this.entities.array.length; i++) {
+            this.removeEntity(this.entities.array[i])
+        }
+        this.entities.removeAll()
+        this.localState.nidPool.returnId(this.nid)
     }
 }

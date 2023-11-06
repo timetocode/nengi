@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { Channel } from './Channel'
 import { User } from './User'
 import { IEntity } from '../common/IEntity'
-import { LocalState } from './LocalState-old'
+import { LocalState } from './LocalState'
 
 enum NType {
     PlayerEntity = 1, // You may have other types here
@@ -101,7 +100,7 @@ describe('Channel', () => {
     it('should remove an entity', () => {
         channel.addEntity(entity)
         channel.removeEntity(entity)
-        expect(channel.entities.get(entity.nid)).toBeNull()
+        expect(channel.entities.get(entity.nid)).toBeUndefined()
     })
 
     /*
@@ -127,7 +126,7 @@ describe('Channel', () => {
 
     it('should return all visible entities for a user', () => {
         channel.addEntity(entity)
-        const visibleEntities = channel.getVisibileEntities(user.id)
+        const visibleEntities = channel.getVisibleEntities(user.id)
         expect(visibleEntities).toContain(entity.nid)
     })
 

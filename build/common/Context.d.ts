@@ -3,19 +3,14 @@ export declare class Context {
     /**
      * user-defined network schemas
      */
-    schemas: {
-        [prop: number]: Schema;
-    };
+    schemas: Map<number, Schema>;
     /**
      * schemas internal to nengi
      */
-    engineSchemas: {
-        [prop: number]: Schema;
-    };
+    engineSchemas: Map<number, Schema>;
     constructor();
     register(ntype: number, schema: Schema): void;
-    registerEngineSchema(engineMessageType: number, schema: Schema): void;
-    getSchema(ntype: number): Schema;
-    getEngineSchema(ntype: number): Schema;
+    getSchema(ntype: number): Schema | undefined;
+    getEngineSchema(ntype: number): Schema | undefined;
 }
 //# sourceMappingURL=Context.d.ts.map

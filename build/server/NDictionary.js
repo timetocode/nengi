@@ -29,6 +29,10 @@ class NDictionary {
         this.array.pop();
         this.nidIndex.delete(nid);
     }
+    removeAll() {
+        this.array.length = 0;
+        this.nidIndex.clear();
+    }
     forEach(fn) {
         for (let i = 0; i < this.array.length; i++) {
             fn(this.array[i], i);
