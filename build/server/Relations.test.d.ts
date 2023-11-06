@@ -1,7 +1,7 @@
-import { IdPool } from './IdPool';
+import { IdPool } from './IdPool'
 export declare class NDictionary {
-    array: IEntity[];
-    nidIndex: Map<nid, arrayIndex>;
+    array: IEntity[]
+    nidIndex: Map<nid, arrayIndex>
     get(nid: nid): IEntity;
     add(entity: IEntity): void;
     remove(entity: IEntity): void;
@@ -16,14 +16,14 @@ interface IEntity {
     ntype: number;
 }
 export declare class LocalState {
-    nidPool: IdPool;
-    children: Map<parentNid, Set<childNid>>;
-    parents: Map<childNid, Set<parentNid>>;
-    _entities: NDictionary;
+    nidPool: IdPool
+    children: Map<parentNid, Set<childNid>>
+    parents: Map<childNid, Set<parentNid>>
+    _entities: NDictionary
     addEntity(entity: IEntity): void;
     addChild(child: IEntity, parent: IEntity): void;
     removeEntity(entity: IEntity): void;
     getByNid(nid: number): IEntity;
 }
-export {};
+export {}
 //# sourceMappingURL=Relations.test.d.ts.map

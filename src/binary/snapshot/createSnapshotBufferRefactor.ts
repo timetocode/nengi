@@ -40,14 +40,11 @@ const getVisibleState = (user: User, instance: Instance) => {
     for (let i = 0; i < toUpdate.length; i++) {
         const nid = toUpdate[i]
         const entity = instance.localState.getByNid(nid)
-        const nschema = instance.context.getSchema(entity.ntype)
-        if (nschema) {
-            const diffs = instance.cache.getAndDiff(instance.tick, entity, nschema)
-            diffs.forEach(diff => {
-                updateEntities.push(diff)
-            })
-
-        }
+        const nschema = instance.context.getSchema(entity.ntype)!   
+        const diffs = instance.cache.getAndDiff(instance.tick, entity, nschema)
+        for (let j = 0; j < diffs.length; j++) {
+            updateEntities.push(diffs[j])
+        }        
     }
 
     return {

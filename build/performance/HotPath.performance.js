@@ -44,7 +44,7 @@ class User {
         const toUpdate = [];
         const toDelete = [];
         for (const [channelId, channel] of this.subscriptions.entries()) {
-            const visibleNids = channel.getVisibileEntities(this.id);
+            const visibleNids = channel.getVisibleEntities(this.id);
             for (let i = 0; i < visibleNids.length; i++) {
                 this.createOrUpdate(visibleNids[i], tick, toCreate, toUpdate);
             }
@@ -107,7 +107,7 @@ class User {
         const toUpdate = [];
         const toDelete = [];
         for (const [channelId, channel] of this.subscriptions.entries()) {
-            const visibleNids = channel.getVisibileEntities(this.id);
+            const visibleNids = channel.getVisibleEntities(this.id);
             for (let i = 0; i < visibleNids.length; i++) {
                 this.createOrUpdate2(visibleNids[i], tick, toCreate, toUpdate);
             }

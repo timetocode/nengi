@@ -1,11 +1,11 @@
-import { EDictionary } from './EDictionary';
-import { IdPool } from './IdPool';
-import { IEntity } from '../common/IEntity';
+import { EDictionary } from './EDictionary'
+import { IdPool } from './IdPool'
+import { IEntity } from '../common/IEntity'
 export declare class LocalState {
-    nidPool: IdPool;
-    sources: Map<number, Set<number>>;
-    children: Map<number, Set<number>>;
-    _entities: EDictionary;
+    nidPool: IdPool
+    sources: Map<number, Set<number>>
+    children: Map<number, Set<number>>
+    _entities: EDictionary
     constructor();
     addChild(parentNid: number, child: IEntity): void;
     removeChild(parentNid: number, child: IEntity): void;

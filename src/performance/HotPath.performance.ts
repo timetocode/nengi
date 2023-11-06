@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { IChannel } from '../server/IChannel'
 import { Channel } from '../server/Channel'
 import { LocalState } from '../server/LocalState'
@@ -56,7 +57,7 @@ export class User {
         const toDelete: number[] = []
 
         for (const [channelId, channel] of this.subscriptions.entries()) {
-            const visibleNids = channel.getVisibileEntities(this.id)
+            const visibleNids = channel.getVisibleEntities(this.id)
             for (let i = 0; i < visibleNids.length; i++) {
                 this.createOrUpdate(visibleNids[i], tick, toCreate, toUpdate)
             }
@@ -127,7 +128,7 @@ export class User {
         const toDelete: number[] = []
 
         for (const [channelId, channel] of this.subscriptions.entries()) {
-            const visibleNids = channel.getVisibileEntities(this.id)
+            const visibleNids = channel.getVisibleEntities(this.id)
             for (let i = 0; i < visibleNids.length; i++) {
                 this.createOrUpdate2(visibleNids[i], tick, toCreate, toUpdate)
             }
