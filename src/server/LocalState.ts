@@ -1,19 +1,12 @@
-import { EDictionary } from './EDictionary'
 import { IdPool } from './IdPool'
 import { IEntity } from '../common/IEntity'
+import { NDictionary } from './NDictionary'
 
 export class LocalState {
-    nidPool: IdPool
-    sources: Map<number, Set<number>>
-    children: Map<number, Set<number>>
-    _entities: EDictionary
-
-    constructor() {
-        this.nidPool = new IdPool(65535)
-        this.sources = new Map()
-        this.children = new Map()
-        this._entities = new EDictionary()
-    }
+    nidPool: IdPool = new IdPool(65535)
+    sources: Map<number, Set<number>> = new Map()
+    children: Map<number, Set<number>>= new Map()
+    _entities: NDictionary = new NDictionary()
 
     addChild(parentNid: number, child: IEntity) {
         const cnid = this.registerEntity(child, parentNid)

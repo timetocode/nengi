@@ -9,12 +9,12 @@ import { binaryGet } from '../../common/binary/BinaryExt'
 import { Binary } from '../../common/binary/Binary'
 
 const getVisibleState = (user: User, instance: Instance) => {
-    const vis = user.checkVisibility(instance.tick)
+    const { toCreate, toUpdate, toDelete } = user.checkVisibility(instance.tick)
 
     const createEntities: any = []
 
-    for (let i = 0; i < vis.newlyVisible.length; i++) {
-        const nid = vis.newlyVisible[i]
+    for (let i = 0; i < toCreate.length; i++) {
+        const nid = toCreate[i]
         const entity = instance.localState.getByNid(nid)
         const nschema = instance.context.getSchema(entity.ntype)!
         if (nschema) {
@@ -34,11 +34,11 @@ const getVisibleState = (user: User, instance: Instance) => {
     // empty the queue
     user.messageQueue = []
 
-    const deleteEntities: number[] = vis.noLongerVisible
+    const deleteEntities: number[] = toDelete
 
     const updateEntities: any = []
-    for (let i = 0; i < vis.stillVisible.length; i++) {
-        const nid = vis.stillVisible[i]
+    for (let i = 0; i < toUpdate.length; i++) {
+        const nid = toUpdate[i]
         const entity = instance.localState.getByNid(nid)
         const nschema = instance.context.getSchema(entity.ntype)
         if (nschema) {

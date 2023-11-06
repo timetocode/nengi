@@ -2,7 +2,7 @@ import { Context } from '../common/Context';
 import { LocalState } from './LocalState';
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork';
 import { User } from './User';
-import { IChannel, ICulledChannel } from './IChannel';
+import { IChannel } from './IChannel';
 import { EntityCache } from './EntityCache';
 import { IEntity } from '../common/IEntity';
 import { NQueue } from '../NQueue';
@@ -32,7 +32,6 @@ export declare class Instance {
     attachEntity(parentNid: number, child: IEntity): void;
     detachEntity(parentNid: number, child: IEntity): void;
     respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;
-    registerChannel(channel: IChannel | ICulledChannel<any, any>): number;
     step(): void;
 }
 //# sourceMappingURL=Instance.d.ts.map

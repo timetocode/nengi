@@ -93,7 +93,7 @@ describe('Channel', () => {
     it('should remove an entity', () => {
         channel.addEntity(entity);
         channel.removeEntity(entity);
-        expect(channel.entities.get(entity.nid)).toBeNull();
+        expect(channel.entities.get(entity.nid)).toBeUndefined();
     });
     /*
     it('should add a message to all users', () => {
@@ -117,7 +117,7 @@ describe('Channel', () => {
     */
     it('should return all visible entities for a user', () => {
         channel.addEntity(entity);
-        const visibleEntities = channel.getVisibileEntities(user.id);
+        const visibleEntities = channel.getVisibleEntities(user.id);
         expect(visibleEntities).toContain(entity.nid);
     });
     it('should destroy all users and entities', () => {

@@ -1,25 +1,18 @@
-import { EDictionary } from './EDictionary'
 import { LocalState } from './LocalState'
 import { IEntity } from '../common/IEntity'
-import { IChannel, ChannelSubscriptionHandler } from './IChannel'
+import { IChannel } from './IChannel'
 import { User } from './User'
+import { NDictionary } from './NDictionary'
 
 export class Channel implements IChannel {
     nid: number
     localState: LocalState
-    entities: EDictionary
-    users: Map<number, User>
-    onSubscribe: ChannelSubscriptionHandler
-    onUnsubscribe: ChannelSubscriptionHandler
+    entities = new NDictionary()
+    users: Map<number, User> = new Map()
 
-    constructor(localState: LocalState) {
-        this.nid = 0
+    constructor(localState: LocalState) {      
         this.localState = localState
-        this.entities = new EDictionary()
-        this.users = new Map()
-
-        this.onSubscribe = (user: User, channel: IChannel) => { }
-        this.onUnsubscribe = (user: User, channel: IChannel) => { }
+        this.nid = localState.nidPool.nextId()
     }
 
     addEntity(entity: IEntity) {
@@ -40,26 +33,27 @@ export class Channel implements IChannel {
     subscribe(user: any) {
         this.users.set(user.id, user)
         user.subscribe(this)
-        this.onSubscribe(user, this)
     }
 
     unsubscribe(user: any) {
-        this.onUnsubscribe(user, this)
         this.users.delete(user.id)
         user.unsubscribe(this)
     }
 
-    getVisibileEntities(userId: number) {
+    getVisibleEntities(userId: number) {
         const visibleNids: number[] = []
         this.entities.forEach((entity: IEntity) => {
             visibleNids.push(entity.nid)
         })
-        return visibleNids
+        return visibleNids        
     }
 
     destroy() {
         this.users.forEach(user => this.unsubscribe(user))
-        this.entities.forEachReverse(entity => this.removeEntity(entity))
+        for (let i = 0; i < this.entities.array.length; i++) {
+            this.removeEntity(this.entities.array[i])
+        }
+        this.entities.removeAll()
         this.localState.nidPool.returnId(this.nid)
     }
 }

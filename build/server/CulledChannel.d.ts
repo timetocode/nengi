@@ -1,24 +1,18 @@
-import { EDictionary } from './EDictionary';
 import { LocalState } from './LocalState';
-import { IEntity } from '../common/IEntity';
-import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel';
+import { ICulledChannel, VisibilityResolver } from './IChannel';
 import { User } from './User';
+import { IEntity } from '../common/IEntity';
 export declare class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
-    nid: number;
-    localState: LocalState;
-    entities: EDictionary;
-    users: Map<number, User>;
-    views: Map<number, ViewType>;
-    onSubscribe: CulledChannelSubscriptionHandler;
-    onUnsubscribe: CulledChannelSubscriptionHandler;
+    private channel;
+    private views;
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
-    constructor(localState: LocalState);
-    addEntity(entity: IEntity): IEntity;
-    removeEntity(entity: IEntity): void;
+    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>);
+    get nid(): number;
+    addEntity(entity: IEntity & VisibleObjectType): IEntity;
+    removeEntity(entity: IEntity & VisibleObjectType): void;
     addMessage(message: any): void;
-    subscribe(user: any, view: ViewType): void;
-    unsubscribe(user: any): void;
-    getVisibileEntities(userId: number): number[];
-    destroy(): void;
+    subscribe(user: User, view: ViewType): void;
+    unsubscribe(user: User): void;
+    getVisibleEntities(userId: number): number[];
 }
 //# sourceMappingURL=CulledChannel.d.ts.map

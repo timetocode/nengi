@@ -100,7 +100,7 @@ describe('Channel', () => {
     it('should remove an entity', () => {
         channel.addEntity(entity)
         channel.removeEntity(entity)
-        expect(channel.entities.get(entity.nid)).toBeNull()
+        expect(channel.entities.get(entity.nid)).toBeUndefined()
     })
 
     /*
@@ -126,7 +126,7 @@ describe('Channel', () => {
 
     it('should return all visible entities for a user', () => {
         channel.addEntity(entity)
-        const visibleEntities = channel.getVisibileEntities(user.id)
+        const visibleEntities = channel.getVisibleEntities(user.id)
         expect(visibleEntities).toContain(entity.nid)
     })
 

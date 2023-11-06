@@ -1,15 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Channel = void 0;
-const EDictionary_1 = require("./EDictionary");
+const NDictionary_1 = require("./NDictionary");
 class Channel {
     constructor(localState) {
-        this.nid = 0;
-        this.localState = localState;
-        this.entities = new EDictionary_1.EDictionary();
+        this.entities = new NDictionary_1.NDictionary();
         this.users = new Map();
-        this.onSubscribe = (user, channel) => { };
-        this.onUnsubscribe = (user, channel) => { };
+        this.localState = localState;
+        this.nid = localState.nidPool.nextId();
     }
     addEntity(entity) {
         this.localState.registerEntity(entity, this.nid);
@@ -26,14 +24,12 @@ class Channel {
     subscribe(user) {
         this.users.set(user.id, user);
         user.subscribe(this);
-        this.onSubscribe(user, this);
     }
     unsubscribe(user) {
-        this.onUnsubscribe(user, this);
         this.users.delete(user.id);
         user.unsubscribe(this);
     }
-    getVisibileEntities(userId) {
+    getVisibleEntities(userId) {
         const visibleNids = [];
         this.entities.forEach((entity) => {
             visibleNids.push(entity.nid);
@@ -42,7 +38,10 @@ class Channel {
     }
     destroy() {
         this.users.forEach(user => this.unsubscribe(user));
-        this.entities.forEachReverse(entity => this.removeEntity(entity));
+        for (let i = 0; i < this.entities.array.length; i++) {
+            this.removeEntity(this.entities.array[i]);
+        }
+        this.entities.removeAll();
         this.localState.nidPool.returnId(this.nid);
     }
 }

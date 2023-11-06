@@ -39,12 +39,6 @@ class Instance {
     respond(endpoint, callback) {
         this.responseEndPoints.set(endpoint, callback);
     }
-    registerChannel(channel) {
-        const channelId = this.localState.nidPool.nextId();
-        channel.nid = channelId;
-        this.channels.add(channel);
-        return channelId;
-    }
     step() {
         const timestamp = Date.now();
         const timeSyncEngineMessage = {

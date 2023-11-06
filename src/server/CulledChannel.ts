@@ -1,78 +1,60 @@
-import { EDictionary } from './EDictionary'
 import { LocalState } from './LocalState'
-import { IEntity } from '../common/IEntity'
-import { ICulledChannel, CulledChannelSubscriptionHandler, VisibilityResolver } from './IChannel'
+import { ICulledChannel, VisibilityResolver } from './IChannel'
 import { User } from './User'
+import { Channel } from './Channel'
+import { IEntity } from '../common/IEntity'
 
 export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
-    nid: number
-    localState: LocalState
-    entities: EDictionary
-    users: Map<number, User>
-    views: Map<number, ViewType>
-
-    onSubscribe: CulledChannelSubscriptionHandler
-    onUnsubscribe: CulledChannelSubscriptionHandler
+    private channel: Channel
+    private views: Map<number, ViewType> = new Map()
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>
 
-    constructor(localState: LocalState) {
-        this.nid = 0
-        this.localState = localState
-        this.entities = new EDictionary()
-        this.users = new Map()
-        this.views = new Map()
-
-        this.onSubscribe = (user: User, channel: ICulledChannel<VisibleObjectType, ViewType>) => { }
-        this.onUnsubscribe = (user: User, channel: ICulledChannel<VisibleObjectType, ViewType>) => { }
-        this.visibilityResolver = (object: VisibleObjectType, view: ViewType) => { return true }
+    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>) {
+        this.channel = new Channel(localState)
+        this.visibilityResolver = visibilityResolver
     }
 
-    addEntity(entity: IEntity) {
-        this.localState.registerEntity(entity, this.nid)
-        this.entities.add(entity)
-        return entity
+    get nid() {
+        return this.channel.nid
     }
 
-    removeEntity(entity: IEntity) {
-        this.entities.remove(entity)
-        this.localState.unregisterEntity(entity, this.nid)
+    addEntity(entity: IEntity & VisibleObjectType) {
+        return this.channel.addEntity(entity)
+    }
+
+    removeEntity(entity: IEntity & VisibleObjectType) {
+        return this.channel.removeEntity(entity)
     }
 
     addMessage(message: any) {
-        this.users.forEach(user => {
-            if (this.visibilityResolver(message, this.views.get(user.id)!)) {
+        this.channel.users.forEach((user, userId) => {
+            const view = this.views.get(userId)
+            if (view && this.visibilityResolver(message, view)) {
                 user.queueMessage(message)
             }
         })
     }
 
-    subscribe(user: any, view: ViewType) {
-        this.users.set(user.id, user)
+    subscribe(user: User, view: ViewType) {
+        this.channel.subscribe(user)
         this.views.set(user.id, view)
-        user.subscribe(this)
-        this.onSubscribe(user, this)
     }
 
-    unsubscribe(user: any) {
-        this.onUnsubscribe(user, this)
-        this.users.delete(user.id)
+    unsubscribe(user: User) {
+        this.channel.unsubscribe(user)
         this.views.delete(user.id)
-        user.unsubscribe(this)
     }
 
-    getVisibileEntities(userId: number) {
-        const view = this.views.get(userId)!
-        const visibleNids: number[] = []
-        this.entities.forEach((entity: any) => {
-            if (this.visibilityResolver(entity, view)) {
-                visibleNids.push(entity.nid)
-            }
-        })
-        return visibleNids
-    }
-
-    destroy() {
-        this.users.forEach(user => this.unsubscribe(user))
-        this.entities.forEach(entity => this.removeEntity(entity))
+    getVisibleEntities(userId: number): number[] {
+        const view = this.views.get(userId)
+        const visibleEntities: number[] = []
+        if (view) {
+            this.channel.entities.forEach((entity: IEntity) => {
+                if (this.visibilityResolver(entity as VisibleObjectType, view)) {
+                    visibleEntities.push(entity.nid)
+                }
+            })
+        }
+        return visibleEntities
     }
 }

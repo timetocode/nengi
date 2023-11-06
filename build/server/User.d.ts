@@ -11,6 +11,8 @@ export declare enum UserConnectionState {
     Closed = 4
 }
 type StringOrJSONStringifiable = string | object;
+type nid = number;
+type tick = number;
 export declare class User {
     id: number;
     socket: any;
@@ -23,10 +25,8 @@ export declare class User {
     engineMessageQueue: any[];
     messageQueue: any[];
     responseQueue: any[];
-    cache: {
-        [prop: number]: number;
-    };
-    cacheArr: number[];
+    tickLastSeen: Map<nid, tick>;
+    currentlyVisible: nid[];
     lastSentInstanceTick: number;
     lastReceivedClientTick: number;
     latency: number;
@@ -39,13 +39,14 @@ export declare class User {
     unsubscribe(channel: IChannel): void;
     queueEngineMessage(engineMessage: any): void;
     queueMessage(message: any): void;
-    createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]): void;
     send(buffer: Buffer | ArrayBuffer): void;
     disconnect(reason: StringOrJSONStringifiable): void;
+    populateDeletions(tick: number, toDelete: number[]): void;
+    createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]): void;
     checkVisibility(tick: number): {
-        noLongerVisible: number[];
-        stillVisible: number[];
-        newlyVisible: number[];
+        toDelete: number[];
+        toUpdate: number[];
+        toCreate: number[];
     };
 }
 export {};

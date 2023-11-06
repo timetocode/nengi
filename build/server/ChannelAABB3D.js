@@ -18,8 +18,7 @@ const pointInAABB3D = (p, view) => {
 };
 class ChannelAABB3D extends CulledChannel_1.CulledChannel {
     constructor(localState) {
-        super(localState);
-        this.visibilityResolver = pointInAABB3D;
+        super(localState, pointInAABB3D);
     }
 }
 exports.ChannelAABB3D = ChannelAABB3D;

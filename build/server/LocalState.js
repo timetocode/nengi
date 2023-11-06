@@ -1,14 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LocalState = void 0;
-const EDictionary_1 = require("./EDictionary");
 const IdPool_1 = require("./IdPool");
+const NDictionary_1 = require("./NDictionary");
 class LocalState {
     constructor() {
         this.nidPool = new IdPool_1.IdPool(65535);
         this.sources = new Map();
         this.children = new Map();
-        this._entities = new EDictionary_1.EDictionary();
+        this._entities = new NDictionary_1.NDictionary();
     }
     addChild(parentNid, child) {
         const cnid = this.registerEntity(child, parentNid);

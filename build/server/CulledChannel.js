@@ -1,59 +1,49 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CulledChannel = void 0;
-const EDictionary_1 = require("./EDictionary");
+const Channel_1 = require("./Channel");
 class CulledChannel {
-    constructor(localState) {
-        this.nid = 0;
-        this.localState = localState;
-        this.entities = new EDictionary_1.EDictionary();
-        this.users = new Map();
+    constructor(localState, visibilityResolver) {
         this.views = new Map();
-        this.onSubscribe = (user, channel) => { };
-        this.onUnsubscribe = (user, channel) => { };
-        this.visibilityResolver = (object, view) => { return true; };
+        this.channel = new Channel_1.Channel(localState);
+        this.visibilityResolver = visibilityResolver;
+    }
+    get nid() {
+        return this.channel.nid;
     }
     addEntity(entity) {
-        this.localState.registerEntity(entity, this.nid);
-        this.entities.add(entity);
-        return entity;
+        return this.channel.addEntity(entity);
     }
     removeEntity(entity) {
-        this.entities.remove(entity);
-        this.localState.unregisterEntity(entity, this.nid);
+        return this.channel.removeEntity(entity);
     }
     addMessage(message) {
-        this.users.forEach(user => {
-            if (this.visibilityResolver(message, this.views.get(user.id))) {
+        this.channel.users.forEach((user, userId) => {
+            const view = this.views.get(userId);
+            if (view && this.visibilityResolver(message, view)) {
                 user.queueMessage(message);
             }
         });
     }
     subscribe(user, view) {
-        this.users.set(user.id, user);
+        this.channel.subscribe(user);
         this.views.set(user.id, view);
-        user.subscribe(this);
-        this.onSubscribe(user, this);
     }
     unsubscribe(user) {
-        this.onUnsubscribe(user, this);
-        this.users.delete(user.id);
+        this.channel.unsubscribe(user);
         this.views.delete(user.id);
-        user.unsubscribe(this);
     }
-    getVisibileEntities(userId) {
+    getVisibleEntities(userId) {
         const view = this.views.get(userId);
-        const visibleNids = [];
-        this.entities.forEach((entity) => {
-            if (this.visibilityResolver(entity, view)) {
-                visibleNids.push(entity.nid);
-            }
-        });
-        return visibleNids;
-    }
-    destroy() {
-        this.users.forEach(user => this.unsubscribe(user));
-        this.entities.forEach(entity => this.removeEntity(entity));
+        const visibleEntities = [];
+        if (view) {
+            this.channel.entities.forEach((entity) => {
+                if (this.visibilityResolver(entity, view)) {
+                    visibleEntities.push(entity.nid);
+                }
+            });
+        }
+        return visibleEntities;
     }
 }
 exports.CulledChannel = CulledChannel;
