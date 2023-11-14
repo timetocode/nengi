@@ -18,6 +18,10 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
         return this.channel.nid
     }
 
+    get entities() {
+        return this.channel.entities
+    }
+
     addEntity(entity: IEntity & VisibleObjectType) {
         return this.channel.addEntity(entity)
     }
@@ -56,5 +60,11 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
             })
         }
         return visibleEntities
+    }
+
+    destroy() {
+        this.channel.destroy()
+        this.views = new Map()
+        this.visibilityResolver = (obj: any, view: any) => { return true }
     }
 }

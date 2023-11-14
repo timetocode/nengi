@@ -11,6 +11,9 @@ class CulledChannel {
     get nid() {
         return this.channel.nid;
     }
+    get entities() {
+        return this.channel.entities;
+    }
     addEntity(entity) {
         return this.channel.addEntity(entity);
     }
@@ -44,6 +47,11 @@ class CulledChannel {
             });
         }
         return visibleEntities;
+    }
+    destroy() {
+        this.channel.destroy();
+        this.views = new Map();
+        this.visibilityResolver = (obj, view) => { return true; };
     }
 }
 exports.CulledChannel = CulledChannel;
