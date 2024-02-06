@@ -2,18 +2,15 @@ import { Context } from '../common/Context'
 import { LocalState } from './LocalState'
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
-import { IChannel, ICulledChannel } from './IChannel'
 import { EntityCache } from './EntityCache'
 import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
-import { IdPool } from './IdPool'
 import { EngineMessage } from '../common/EngineMessage'
 
 export class Instance {
     context: Context
     localState: LocalState
-    channels: Set<IChannel>
     network: InstanceNetwork
     queue: NQueue<INetworkEvent>
     users: Map<number, User>
@@ -36,7 +33,6 @@ export class Instance {
     constructor(context: Context) {
         this.context = context
         this.localState = new LocalState()
-        this.channels = new Set()
         this.users = new Map()
         this.queue = new NQueue()
         this.incrementalUserId = 0
@@ -75,6 +71,7 @@ export class Instance {
         }
 
         this.tick++
+        this.localState.tick(this.tick)
         this.cache.createCachesForTick(this.tick)
 
         this.users.forEach(user => {

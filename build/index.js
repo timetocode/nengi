@@ -25,6 +25,7 @@ __exportStar(require("./server/Channel"), exports);
 __exportStar(require("./server/ChannelAABB2D"), exports);
 __exportStar(require("./server/ChannelAABB3D"), exports);
 __exportStar(require("./server/User"), exports);
+__exportStar(require("./server/Historian"), exports);
 __exportStar(require("./server/adapter/MockAdapter"), exports);
 // client
 __exportStar(require("./client/Client"), exports);

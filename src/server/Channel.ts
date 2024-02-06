@@ -3,16 +3,28 @@ import { IEntity } from '../common/IEntity'
 import { IChannel } from './IChannel'
 import { User } from './User'
 import { NDictionary } from './NDictionary'
+import { Historian } from './Historian'
 
 export class Channel implements IChannel {
     nid: number
     localState: LocalState
     entities = new NDictionary()
     users: Map<number, User> = new Map()
+    historian: Historian | null = null
 
-    constructor(localState: LocalState) {      
+    constructor(localState: LocalState, historian?: Historian) {
         this.localState = localState
         this.nid = localState.nidPool.nextId()
+        if (historian) {
+            this.historian = historian
+        }
+        this.localState.channels.add(this)
+    }
+
+    tick(tick: number) {
+        if (this.historian !== null) {
+            this.historian.record(tick, this.entities)
+        }
     }
 
     addEntity(entity: IEntity) {
@@ -45,7 +57,7 @@ export class Channel implements IChannel {
         this.entities.forEach((entity: IEntity) => {
             visibleNids.push(entity.nid)
         })
-        return visibleNids        
+        return visibleNids
     }
 
     destroy() {
@@ -55,5 +67,6 @@ export class Channel implements IChannel {
         }
         this.entities.removeAll()
         this.localState.nidPool.returnId(this.nid)
+        this.localState.channels.delete(this)
     }
 }

@@ -3,16 +3,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CulledChannel = void 0;
 const Channel_1 = require("./Channel");
 class CulledChannel {
-    constructor(localState, visibilityResolver) {
+    constructor(localState, visibilityResolver, historian) {
         this.views = new Map();
-        this.channel = new Channel_1.Channel(localState);
+        this.historian = null;
+        this.channel = new Channel_1.Channel(localState, historian);
         this.visibilityResolver = visibilityResolver;
+        if (historian) {
+            this.historian = historian;
+        }
     }
     get nid() {
         return this.channel.nid;
     }
     get entities() {
         return this.channel.entities;
+    }
+    tick(tick) {
+        if (this.historian !== null) {
+            this.historian.record(tick, this.channel.entities);
+        }
     }
     addEntity(entity) {
         return this.channel.addEntity(entity);

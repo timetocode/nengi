@@ -3,15 +3,20 @@ import { ICulledChannel, VisibilityResolver } from './IChannel'
 import { User } from './User'
 import { Channel } from './Channel'
 import { IEntity } from '../common/IEntity'
+import { Historian } from './Historian'
 
 export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
     private channel: Channel
     private views: Map<number, ViewType> = new Map()
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>
+    historian: Historian | null = null
 
-    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>) {
-        this.channel = new Channel(localState)
+    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, historian?: Historian) {
+        this.channel = new Channel(localState, historian)
         this.visibilityResolver = visibilityResolver
+        if (historian) {
+            this.historian = historian
+        }
     }
 
     get nid() {
@@ -20,6 +25,12 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
 
     get entities() {
         return this.channel.entities
+    }
+
+    tick(tick: number) {
+        if (this.historian !== null) {
+            this.historian.record(tick, this.channel.entities)
+        }
     }
 
     addEntity(entity: IEntity & VisibleObjectType) {

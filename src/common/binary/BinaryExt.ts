@@ -105,7 +105,6 @@ function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecificati
         // use the interp function or create a function that returns the most recent value uninterpolated
         interp: (interp) ? interp : (a: any, b: any, t: number) => { return b },
         clone: (clone) ? clone : (value: any) => { return value }
-
     })
 }
 

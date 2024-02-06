@@ -9,6 +9,10 @@ class LocalState {
         this.sources = new Map();
         this.children = new Map();
         this._entities = new NDictionary_1.NDictionary();
+        this.channels = new Set();
+    }
+    tick(tick) {
+        this.channels.forEach(channel => channel.tick(tick));
     }
     addChild(parentNid, child) {
         const cnid = this.registerEntity(child, parentNid);

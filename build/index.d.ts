@@ -9,6 +9,7 @@ export * from './server/Channel';
 export * from './server/ChannelAABB2D';
 export * from './server/ChannelAABB3D';
 export * from './server/User';
+export * from './server/Historian';
 export * from './server/adapter/MockAdapter';
 export * from './client/Client';
 export * from './client/ClientNetwork';

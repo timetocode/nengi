@@ -1,43 +1,31 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EntityCache = void 0;
-const BinaryExt_1 = require("../common/binary/BinaryExt");
+const util_1 = require("../common/binary/schema/util");
 function diff(entity, cache, nschema) {
     if (!cache) {
         console.log('no cache');
         return [];
     }
-    const diffs = [];
-    for (let i = 0; i < nschema.keys.length; i++) {
-        const { prop, type } = nschema.keys[i];
-        const oldValue = cache[prop];
-        const value = entity[prop];
-        const binaryUtil = (0, BinaryExt_1.binaryGet)(type);
-        if (!binaryUtil.compare(oldValue, value)) {
-            diffs.push({ nid: entity.nid, nschema, prop, value });
-            cache[prop] = binaryUtil.clone(value);
-        }
-    }
-    return diffs;
+    return (0, util_1.compareAndUpdateNObject)(entity, cache, nschema);
 }
 class EntityCache {
+    //binaryDiffCache: { [tick: number]: { [nid: number]: any[] } }
     constructor() {
         this.cache = {};
         this.diffCache = {};
-        this.binaryDiffCache = {};
+        //this.binaryDiffCache = {}
     }
     cacheContains(nid) {
         return !!this.cache[nid];
     }
     createCachesForTick(tick) {
-        //this.cache[tick] = {}
         this.diffCache[tick] = {};
-        this.binaryDiffCache[tick] = {};
+        //this.binaryDiffCache[tick] = {}
     }
     deleteCachesForTick(tick) {
-        //delete this.cache[tick]
         delete this.diffCache[tick];
-        delete this.binaryDiffCache[tick];
+        //delete this.binaryDiffCache[tick]
     }
     getAndDiff(tick, entity, nschema) {
         if (this.diffCache[tick][entity.nid]) {
@@ -50,26 +38,12 @@ class EntityCache {
             return diffs;
         }
     }
-    cacheify(tick, entity, schema) {
-        const cacheObject = {};
-        for (let i = 0; i < schema.keys.length; i++) {
-            const propData = schema.keys[i];
-            const value = entity[propData.prop];
-            const binaryUtil = (0, BinaryExt_1.binaryGet)(propData.type);
-            // @ts-ignore
-            cacheObject[propData.prop] = binaryUtil.clone(value);
-        }
-        this.cache[entity.nid] = cacheObject;
+    cacheify(tick, entity, nschema) {
+        this.cache[entity.nid] = (0, util_1.copyNObject)(entity, nschema);
     }
-    updateCache(tick, entity, schema) {
+    updateCache(tick, entity, nschema) {
         const cacheObject = this.cache[entity.nid];
-        for (let i = 0; i < schema.keys.length; i++) {
-            const propData = schema.keys[i];
-            const value = entity[propData.prop];
-            const binaryUtil = (0, BinaryExt_1.binaryGet)(propData.type);
-            // @ts-ignore
-            cacheObject[propData.prop] = binaryUtil.clone(value);
-        }
+        (0, util_1.updateNObject)(entity, cacheObject, nschema);
     }
 }
 exports.EntityCache = EntityCache;

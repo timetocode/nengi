@@ -2,14 +2,12 @@ import { Context } from '../common/Context';
 import { LocalState } from './LocalState';
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork';
 import { User } from './User';
-import { IChannel } from './IChannel';
 import { EntityCache } from './EntityCache';
 import { IEntity } from '../common/IEntity';
 import { NQueue } from '../NQueue';
 export declare class Instance {
     context: Context;
     localState: LocalState;
-    channels: Set<IChannel>;
     network: InstanceNetwork;
     queue: NQueue<INetworkEvent>;
     users: Map<number, User>;

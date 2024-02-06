@@ -40,10 +40,10 @@ export class Context {
     }
 
     getSchema(ntype: number) {
-        return this.schemas.get(ntype)
+        return this.schemas.get(ntype)!
     }
 
     getEngineSchema(ntype: number) {
-        return this.engineSchemas.get(ntype)
+        return this.engineSchemas.get(ntype)!
     }
 }

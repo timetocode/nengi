@@ -9,6 +9,7 @@ export interface IChannel {
     subscribe(user: User): void;
     unsubscribe(user: User): void;
     getVisibleEntities(userId: number): number[];
+    tick(tick: number): void;
 }
 export interface ICulledChannel<VisibleObjectType, ViewType> {
     nid: number;
@@ -19,5 +20,6 @@ export interface ICulledChannel<VisibleObjectType, ViewType> {
     unsubscribe(user: User): void;
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
     getVisibleEntities(userId: number): number[];
+    tick(tick: number): void;
 }
 //# sourceMappingURL=IChannel.d.ts.map

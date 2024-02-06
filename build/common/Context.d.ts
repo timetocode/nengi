@@ -10,7 +10,7 @@ export declare class Context {
     engineSchemas: Map<number, Schema>;
     constructor();
     register(ntype: number, schema: Schema): void;
-    getSchema(ntype: number): Schema | undefined;
-    getEngineSchema(ntype: number): Schema | undefined;
+    getSchema(ntype: number): Schema;
+    getEngineSchema(ntype: number): Schema;
 }
 //# sourceMappingURL=Context.d.ts.map

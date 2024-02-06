@@ -1,12 +1,18 @@
 import { IdPool } from './IdPool'
 import { IEntity } from '../common/IEntity'
 import { NDictionary } from './NDictionary'
+import { IChannel } from './IChannel'
 
 export class LocalState {
     nidPool: IdPool = new IdPool(65535)
     sources: Map<number, Set<number>> = new Map()
     children: Map<number, Set<number>>= new Map()
     _entities: NDictionary = new NDictionary()
+    channels: Set<IChannel> = new Set()
+
+    tick(tick: number) {
+        this.channels.forEach(channel => channel.tick(tick))
+    }
 
     addChild(parentNid: number, child: IEntity) {
         const cnid = this.registerEntity(child, parentNid)

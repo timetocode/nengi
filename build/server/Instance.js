@@ -14,7 +14,6 @@ class Instance {
     constructor(context) {
         this.context = context;
         this.localState = new LocalState_1.LocalState();
-        this.channels = new Set();
         this.users = new Map();
         this.queue = new NQueue_1.NQueue();
         this.incrementalUserId = 0;
@@ -46,6 +45,7 @@ class Instance {
             timestamp
         };
         this.tick++;
+        this.localState.tick(this.tick);
         this.cache.createCachesForTick(this.tick);
         this.users.forEach(user => {
             if (user.lastSentInstanceTick === 0) {

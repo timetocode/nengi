@@ -3,11 +3,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Channel = void 0;
 const NDictionary_1 = require("./NDictionary");
 class Channel {
-    constructor(localState) {
+    constructor(localState, historian) {
         this.entities = new NDictionary_1.NDictionary();
         this.users = new Map();
+        this.historian = null;
         this.localState = localState;
         this.nid = localState.nidPool.nextId();
+        if (historian) {
+            this.historian = historian;
+        }
+        this.localState.channels.add(this);
+    }
+    tick(tick) {
+        if (this.historian !== null) {
+            this.historian.record(tick, this.entities);
+        }
     }
     addEntity(entity) {
         this.localState.registerEntity(entity, this.nid);
@@ -43,6 +53,7 @@ class Channel {
         }
         this.entities.removeAll();
         this.localState.nidPool.returnId(this.nid);
+        this.localState.channels.delete(this);
     }
 }
 exports.Channel = Channel;

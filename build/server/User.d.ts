@@ -4,10 +4,10 @@ import { Instance } from './Instance';
 import { InstanceNetwork } from './InstanceNetwork';
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
 export declare enum UserConnectionState {
-    NULL = 0,
-    OpenPreHandshake = 1,
-    OpenAwaitingHandshake = 2,
-    Open = 3,
+    NULL = 0,// initial state
+    OpenPreHandshake = 1,// socket open, handshake not complete
+    OpenAwaitingHandshake = 2,// handshake begun
+    Open = 3,// handshake accepted and network.send is safe to use
     Closed = 4
 }
 type StringOrJSONStringifiable = string | object;
