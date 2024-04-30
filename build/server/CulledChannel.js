@@ -6,6 +6,7 @@ class CulledChannel {
     constructor(localState, visibilityResolver, historian) {
         this.views = new Map();
         this.historian = null;
+        this.users = new Map();
         this.channel = new Channel_1.Channel(localState, historian);
         this.visibilityResolver = visibilityResolver;
         if (historian) {
@@ -38,12 +39,14 @@ class CulledChannel {
         });
     }
     subscribe(user, view) {
-        this.channel.subscribe(user);
         this.views.set(user.id, view);
+        this.users.set(user.id, user);
+        user.subscribe(this);
     }
     unsubscribe(user) {
-        this.channel.unsubscribe(user);
         this.views.delete(user.id);
+        this.users.delete(user.id);
+        user.unsubscribe(this);
     }
     getVisibleEntities(userId) {
         const view = this.views.get(userId);
@@ -58,6 +61,7 @@ class CulledChannel {
         return visibleEntities;
     }
     destroy() {
+        this.users.forEach(user => this.unsubscribe(user));
         this.channel.destroy();
         this.views = new Map();
         this.visibilityResolver = (obj, view) => { return true; };

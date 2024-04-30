@@ -2,6 +2,7 @@ import { CulledChannel } from './CulledChannel'
 import { LocalState } from './LocalState'
 import { AABB3D } from './AABB3D'
 import { Point3D } from './Point3D'
+import { Historian } from './Historian'
 
 const pointInAABB3D = (p: Point3D, view: AABB3D) => {
     const startX = view.x - view.halfWidth
@@ -20,9 +21,8 @@ const pointInAABB3D = (p: Point3D, view: AABB3D) => {
         p.z < endZ
     )
 }
-
 export class ChannelAABB3D extends CulledChannel<Point3D, AABB3D> {
-    constructor(localState: LocalState) {
-        super(localState, pointInAABB3D)
+    constructor(localState: LocalState, historian?: Historian) {
+        super(localState, pointInAABB3D, historian)
     }
 }

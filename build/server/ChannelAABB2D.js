@@ -13,8 +13,8 @@ const pointInAABB2D = (p, view) => {
         p.y < endY);
 };
 class ChannelAABB2D extends CulledChannel_1.CulledChannel {
-    constructor(localState) {
-        super(localState, pointInAABB2D);
+    constructor(localState, historian) {
+        super(localState, pointInAABB2D, historian);
     }
 }
 exports.ChannelAABB2D = ChannelAABB2D;

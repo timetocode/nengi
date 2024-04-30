@@ -10,6 +10,7 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
     private views: Map<number, ViewType> = new Map()
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>
     historian: Historian | null = null
+    users: Map<number, User> = new Map()
 
     constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, historian?: Historian) {
         this.channel = new Channel(localState, historian)
@@ -50,19 +51,23 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
         })
     }
 
-    subscribe(user: User, view: ViewType) {
-        this.channel.subscribe(user)
+    subscribe(user: any, view: ViewType) {
         this.views.set(user.id, view)
+        this.users.set(user.id, user)
+        user.subscribe(this)
+
     }
 
-    unsubscribe(user: User) {
-        this.channel.unsubscribe(user)
+    unsubscribe(user: any) {
         this.views.delete(user.id)
+        this.users.delete(user.id)
+        user.unsubscribe(this)
     }
 
     getVisibleEntities(userId: number): number[] {
         const view = this.views.get(userId)
         const visibleEntities: number[] = []
+
         if (view) {
             this.channel.entities.forEach((entity: IEntity) => {
                 if (this.visibilityResolver(entity as VisibleObjectType, view)) {
@@ -74,6 +79,7 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
     }
 
     destroy() {
+        this.users.forEach(user => this.unsubscribe(user))
         this.channel.destroy()
         this.views = new Map()
         this.visibilityResolver = (obj: any, view: any) => { return true }

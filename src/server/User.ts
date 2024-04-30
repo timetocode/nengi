@@ -122,7 +122,7 @@ export class User {
             toCreate.push(nid)
             this.currentlyVisible.push(nid)
         } else {
-            // yes? well then we just need any changes that have occurred            
+            // yes? well then we just need any changes that have occurred
             toUpdate.push(nid)
         }
         this.tickLastSeen[nid] = tick

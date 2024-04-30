@@ -8,6 +8,7 @@ export declare class CulledChannel<VisibleObjectType, ViewType> implements ICull
     private views;
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
     historian: Historian | null;
+    users: Map<number, User>;
     constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, historian?: Historian);
     get nid(): number;
     get entities(): import("./NDictionary").NDictionary;
@@ -15,8 +16,8 @@ export declare class CulledChannel<VisibleObjectType, ViewType> implements ICull
     addEntity(entity: IEntity & VisibleObjectType): IEntity;
     removeEntity(entity: IEntity & VisibleObjectType): void;
     addMessage(message: any): void;
-    subscribe(user: User, view: ViewType): void;
-    unsubscribe(user: User): void;
+    subscribe(user: any, view: ViewType): void;
+    unsubscribe(user: any): void;
     getVisibleEntities(userId: number): number[];
     destroy(): void;
 }
