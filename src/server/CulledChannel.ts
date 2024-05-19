@@ -43,7 +43,7 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
     }
 
     addMessage(message: any) {
-        this.channel.users.forEach((user, userId) => {
+        this.users.forEach((user, userId) => {
             const view = this.views.get(userId)
             if (view && this.visibilityResolver(message, view)) {
                 user.queueMessage(message)

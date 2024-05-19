@@ -31,7 +31,7 @@ class CulledChannel {
         return this.channel.removeEntity(entity);
     }
     addMessage(message) {
-        this.channel.users.forEach((user, userId) => {
+        this.users.forEach((user, userId) => {
             const view = this.views.get(userId);
             if (view && this.visibilityResolver(message, view)) {
                 user.queueMessage(message);
