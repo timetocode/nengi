@@ -21,6 +21,7 @@ export const findSubsequentFrame = (frames: Frame[], previousTick: number): Fram
     return null
 }
 
+
 export class Interpolator {
     client: Client
 
@@ -79,6 +80,13 @@ export class Interpolator {
                     // this represents the final state of interpolation, the frame after there is no longer a change
                     // and is how state arrives at the exact correct value
                     if (frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
+
+                        // todo actually make sure we are working on a specific PROPERTY
+                        // not all of the entity state
+                        if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                            continue
+                            //console.log('entity has prediction in frameB')
+                        }
                         const entityA = frameA.entities.get(nid)!
                         const nschema = this.client.context.getSchema(entityA.ntype)!
                         const binarySpec = nschema.props[prop]
@@ -105,6 +113,15 @@ export class Interpolator {
                         const nschema = this.client.context.getSchema(entityA.ntype)!
                         const binarySpec = nschema.props[prop]
                         const binaryUtil = binaryGet(binarySpec.type)
+
+                 
+                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
+                            //console.log('entity has prediction in frameA')
+                            continue
+                        }
+                        if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                            //console.log('entity has prediction in frameB')
+                        }
 
                         if (binarySpec.interp) {
                             // interpolated

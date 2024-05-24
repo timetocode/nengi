@@ -6,27 +6,48 @@ import { PredictionErrorProperty } from './PredictionErrorProperty'
 import { PredictionFrame } from './PredictionFrame'
 import { clone } from './clone'
 
-const EPS = 0.0001
+const EPS = 0.001
+
+const buffer = new ArrayBuffer(8)
+const floatView = new Float64Array(buffer)
+const intView = new Uint32Array(buffer)
+
+function floatToIntBits(value: number): number {
+    floatView[0] = value
+    return intView[0]
+}
+
+function areCloseBits(value1: number, value2: number, bits: number): boolean {
+    const epsilon = Math.pow(2, -bits)
+    const diff = Math.abs(value1 - value2)
+    const maxAbsValue = Math.max(Math.abs(value1), Math.abs(value2))
+    return diff <= epsilon * maxAbsValue
+}
+
+function areCloseBits_NOTWORKING(value1: number, value2: number, bits: number): boolean {
+    const int1 = floatToIntBits(value1)
+    const int2 = floatToIntBits(value2)
+    const diff = Math.abs(int1 - int2)
+    return diff <= (1 << bits)
+}
 
 const closeEnough = (value: number, EPSILON: number) => {
     return value < EPSILON && value > -EPSILON
 }
 
 class Predictor {
-    predictionFrames: Map<number, PredictionFrame>
-    latestTick: number
+    predictionFrames: Map<number, PredictionFrame> = new Map()
+    latestTick: number = -1
+    predictionRange: Map<number, { start: number, end: number }> = new Map()
 
-    constructor() {
-        this.predictionFrames = new Map()
-        this.latestTick = -1
-    }
-
-    cleanUp(tick: number) {
-        this.predictionFrames.forEach(predictionFrame => {
-            if (predictionFrame.tick < tick - 50) {
-                this.predictionFrames.delete(predictionFrame.tick)
+    isTickPredictedForEntity(nid: number, tick: number) {
+        if (this.predictionRange.has(nid)) {
+            const range = this.predictionRange.get(nid)!
+            if (tick >= range.start && tick <= range.end) {
+                return true
             }
-        })
+        }
+        return false
     }
 
     addCustom(tick: number, entity: any, props: string[], nschema: Schema) {
@@ -37,6 +58,12 @@ class Predictor {
         }
         const proxy = Object.assign({}, entity)
         predictionFrame.add(entity.nid, proxy, props, nschema)
+
+        if (!this.predictionRange.has(entity.nid)) {
+            this.predictionRange.set(entity.nid, { start: tick, end: tick })
+        } else {
+            this.predictionRange.get(entity.nid)!.end = tick
+        }
     }
 
     add(tick: number, entity: any, props: string[], nschema: Schema) {
@@ -75,9 +102,9 @@ class Predictor {
                         entityPrediction.props.forEach(prop => {
                             const authValue = authoritative![prop]
                             const predValue = entityPrediction.proxy[prop]
-                            const diff = authValue - predValue
+                            //const diff = authValue - predValue
 
-                            if (!closeEnough(diff, EPS)) {
+                            if (!areCloseBits(authValue, predValue, 12)) {
                                 predictionErrorFrame.add(
                                     nid,
                                     entityPrediction.proxy,
@@ -91,6 +118,14 @@ class Predictor {
         }
         this.latestTick = frame.confirmedClientTick
         return predictionErrorFrame
+    }
+
+    cleanUp(tick: number) {
+        this.predictionFrames.forEach(predictionFrame => {
+            if (predictionFrame.tick < tick - 50) {
+                this.predictionFrames.delete(predictionFrame.tick)
+            }
+        })
     }
 }
 
