@@ -41,7 +41,7 @@ export class Interpolator {
         if (frameA) {
             const frameB = findSubsequentFrame(tframes, frameA.tick)
             for (let i = tframes.length - 1; i > -1; i--) {
-                const lateFrame = tframes[i]            
+                const lateFrame = tframes[i]
                 if (lateFrame.tick < frameA.tick) {
                     if (!lateFrame.processed) {
                         frames.push(lateFrame)
@@ -83,7 +83,7 @@ export class Interpolator {
 
                         // todo actually make sure we are working on a specific PROPERTY
                         // not all of the entity state
-                        if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
                             continue
                             //console.log('entity has prediction in frameB')
                         }
@@ -114,12 +114,17 @@ export class Interpolator {
                         const binarySpec = nschema.props[prop]
                         const binaryUtil = binaryGet(binarySpec.type)
 
-                 
+
+                        // TODO if either the frame before or after our current point in interpolation is predicted we
+                        // just skip everything for the entity... but what we should really do are
+                        // 1) operate on specific properties, not a whole entitiy
+                        // 2) lerp from predicted state to interpolated state...? consider this
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
                             //console.log('entity has prediction in frameA')
                             continue
                         }
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                            continue
                             //console.log('entity has prediction in frameB')
                         }
 

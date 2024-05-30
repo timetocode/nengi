@@ -71,7 +71,7 @@ class Interpolator {
                     if (frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
                         // todo actually make sure we are working on a specific PROPERTY
                         // not all of the entity state
-                        if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
                             continue;
                             //console.log('entity has prediction in frameB')
                         }
@@ -104,6 +104,7 @@ class Interpolator {
                             continue;
                         }
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                            continue;
                             //console.log('entity has prediction in frameB')
                         }
                         if (binarySpec.interp) {
