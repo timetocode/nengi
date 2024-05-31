@@ -5,6 +5,8 @@ export interface IEntityFrame {
     createEntities: IEntity[]
     updateEntities: any[]
     deleteEntities: number[],
+    from: number,
+    to: number
 }
 
 export class Frame implements IEntityFrame {
@@ -14,6 +16,9 @@ export class Frame implements IEntityFrame {
     processed: boolean = false // whether create/deletes have been processed
     once: boolean = false // whether this frame has been used for interpolation once
     entities: Map<number, IEntity> = new Map()
+
+    from = -1
+    to = -1
 
     createEntities: IEntity[] = []
     updateEntities: any[] = []

@@ -62,6 +62,8 @@ export class Interpolator {
                 const interpAmount = portion / total
 
                 const interpState: IEntityFrame = {
+                    from: frameA.tick,
+                    to: frameB.tick,
                     createEntities: [],
                     updateEntities: [],
                     deleteEntities: [],

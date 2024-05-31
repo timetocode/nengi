@@ -4,6 +4,8 @@ export interface IEntityFrame {
     createEntities: IEntity[];
     updateEntities: any[];
     deleteEntities: number[];
+    from: number;
+    to: number;
 }
 export declare class Frame implements IEntityFrame {
     tick: number;
@@ -12,6 +14,8 @@ export declare class Frame implements IEntityFrame {
     processed: boolean;
     once: boolean;
     entities: Map<number, IEntity>;
+    from: number;
+    to: number;
     createEntities: IEntity[];
     updateEntities: any[];
     deleteEntities: number[];

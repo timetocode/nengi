@@ -6,6 +6,8 @@ class Frame {
         this.processed = false; // whether create/deletes have been processed
         this.once = false; // whether this frame has been used for interpolation once
         this.entities = new Map();
+        this.from = -1;
+        this.to = -1;
         this.createEntities = [];
         this.updateEntities = [];
         this.deleteEntities = [];

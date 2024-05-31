@@ -53,6 +53,8 @@ class Interpolator {
                 const portion = renderTime - frameA.timestamp;
                 const interpAmount = portion / total;
                 const interpState = {
+                    from: frameA.tick,
+                    to: frameB.tick,
                     createEntities: [],
                     updateEntities: [],
                     deleteEntities: [],
@@ -99,6 +101,10 @@ class Interpolator {
                         const nschema = this.client.context.getSchema(entityA.ntype);
                         const binarySpec = nschema.props[prop];
                         const binaryUtil = (0, BinaryExt_1.binaryGet)(binarySpec.type);
+                        // TODO if either the frame before or after our current point in interpolation is predicted we
+                        // just skip everything for the entity... but what we should really do are
+                        // 1) operate on specific properties, not a whole entitiy
+                        // 2) lerp from predicted state to interpolated state...? consider this
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
                             //console.log('entity has prediction in frameA')
                             continue;
