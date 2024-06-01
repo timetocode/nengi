@@ -1,10 +1,10 @@
-import { Schema } from '../../common/binary/schema/Schema';
 declare class PredictionEntity {
     nid: number;
-    proxy: any;
+    state: {
+        [prop: string]: any;
+    };
     props: string[];
-    nschema: Schema;
-    constructor(nid: number, entity: any, props: string[], nschema: Schema);
+    constructor(nid: number, entity: any, props: string[]);
 }
 export { PredictionEntity };
 //# sourceMappingURL=PredictionEntity.d.ts.map

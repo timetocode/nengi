@@ -1,4 +1,3 @@
-import { Schema } from '../../common/binary/schema/Schema'
 import { PredictionEntity } from './PredictionEntity'
 
 class PredictionFrame {
@@ -10,14 +9,13 @@ class PredictionFrame {
         this.entityPredictions = new Map()
     }
 
-    add(nid: number, entity: any, props: string[], nschema: Schema) {
-        //console.log('prediction created', this.tick, nid, entity, props)
+    add(nid: number, entity: any, props: string[]) {
         let entityPrediction = this.entityPredictions.get(nid)
         if (!entityPrediction) {
-            entityPrediction = new PredictionEntity(nid, entity, props, nschema)
+            entityPrediction = new PredictionEntity(nid, entity, props)
             this.entityPredictions.set(nid, entityPrediction)
         } else {
-            entityPrediction.proxy = entity
+            entityPrediction.state = entity
             entityPrediction.props = props
         }
     }

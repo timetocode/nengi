@@ -1,4 +1,4 @@
-
+import { IEntity } from '../../common/IEntity'
 import { Schema } from '../../common/binary/schema/Schema'
 import { Frame } from '../Frame'
 import { PredictionErrorFrame } from './PredictionErrorFrame'
@@ -35,10 +35,18 @@ const closeEnough = (value: number, EPSILON: number) => {
     return value < EPSILON && value > -EPSILON
 }
 
+type clientTick = number
+type nid = number
+
 class Predictor {
-    predictionFrames: Map<number, PredictionFrame> = new Map()
+    continuousPredictions: Map<number, PredictionFrame> = new Map()
     latestTick: number = -1
+
+
+    // newish
     predictionRange: Map<number, { start: number, end: number }> = new Map()
+    discretePredictions: Map<clientTick, PredictionFrame> = new Map()
+    obliviousPredictions: Map<clientTick, PredictionFrame> = new Map()
 
     isTickPredictedForEntity(nid: number, tick: number) {
         if (this.predictionRange.has(nid)) {
@@ -50,14 +58,49 @@ class Predictor {
         return false
     }
 
-    addCustom(tick: number, entity: any, props: string[], nschema: Schema) {
-        let predictionFrame = this.predictionFrames.get(tick)
+    addOblivious(tick: number, entity: IEntity, props: string[]) {
+        let predictionFrame = this.obliviousPredictions.get(tick)
         if (!predictionFrame) {
             predictionFrame = new PredictionFrame(tick)
-            this.predictionFrames.set(tick, predictionFrame)
+            this.obliviousPredictions.set(tick, predictionFrame)
         }
         const proxy = Object.assign({}, entity)
-        predictionFrame.add(entity.nid, proxy, props, nschema)
+        predictionFrame.add(entity.nid, proxy, props)
+
+        if (!this.predictionRange.has(entity.nid)) {
+            this.predictionRange.set(entity.nid, { start: tick, end: tick })
+        } else {
+            console.log('oblvious prediction extended to tick', tick)
+            this.predictionRange.get(entity.nid)!.end = tick
+        }
+    }
+
+    addDiscrete(tick: number, entity: IEntity, props: string[]) {
+        let predictionFrame = this.discretePredictions.get(tick)
+        if (!predictionFrame) {
+            predictionFrame = new PredictionFrame(tick)
+            this.discretePredictions.set(tick, predictionFrame)
+        }
+        const proxy = Object.assign({}, entity)
+        predictionFrame.add(entity.nid, proxy, props)
+
+        if (!this.predictionRange.has(entity.nid)) {
+            this.predictionRange.set(entity.nid, { start: tick, end: tick })
+        } else {
+            this.predictionRange.get(entity.nid)!.end = tick
+        }
+    }
+
+    //addContinuous(tick: number, )
+
+    addCustom(tick: number, entity: any, props: string[]) {
+        let predictionFrame = this.continuousPredictions.get(tick)
+        if (!predictionFrame) {
+            predictionFrame = new PredictionFrame(tick)
+            this.continuousPredictions.set(tick, predictionFrame)
+        }
+        const proxy = Object.assign({}, entity)
+        predictionFrame.add(entity.nid, proxy, props)
 
         if (!this.predictionRange.has(entity.nid)) {
             this.predictionRange.set(entity.nid, { start: tick, end: tick })
@@ -67,17 +110,17 @@ class Predictor {
     }
 
     add(tick: number, entity: any, props: string[], nschema: Schema) {
-        let predictionFrame = this.predictionFrames.get(tick)
+        let predictionFrame = this.continuousPredictions.get(tick)
         if (!predictionFrame) {
             predictionFrame = new PredictionFrame(tick)
-            this.predictionFrames.set(tick, predictionFrame)
+            this.continuousPredictions.set(tick, predictionFrame)
         }
         const proxy = clone(entity, nschema)
-        predictionFrame.add(entity.nid, proxy, props, entity.protocol)
+        predictionFrame.add(entity.nid, proxy, props)
     }
 
     has(tick: number, nid: number, prop: string) {
-        const predictionFrame = this.predictionFrames.get(tick)
+        const predictionFrame = this.continuousPredictions.get(tick)
         if (predictionFrame) {
             const entityPrediction = predictionFrame.entityPredictions.get(nid)
             if (entityPrediction) {
@@ -88,42 +131,80 @@ class Predictor {
     }
 
     getErrors(frame: Frame) {
-        const predictionErrorFrame = new PredictionErrorFrame(frame.confirmedClientTick)
+        const confirmedTick = frame.confirmedClientTick
+        const predictionErrorFrame = new PredictionErrorFrame(confirmedTick)
         if (frame) {
-            // predictions for this frame
-            const predictionFrame = this.predictionFrames.get(frame.confirmedClientTick)
-
-            if (predictionFrame) {
-                predictionFrame.entityPredictions.forEach(entityPrediction => {
-                    // predictions for this entity
-                    const nid = entityPrediction.nid
-                    const authoritative = frame.entities.get(nid)
-                    if (authoritative) {
-                        entityPrediction.props.forEach(prop => {
-                            const authValue = authoritative![prop]
-                            const predValue = entityPrediction.proxy[prop]
-                            //const diff = authValue - predValue
-
-                            if (!areCloseBits(authValue, predValue, 12)) {
-                                predictionErrorFrame.add(
-                                    nid,
-                                    entityPrediction.proxy,
-                                    new PredictionErrorProperty(nid, prop, predValue, authValue)
-                                )
-                            }
-                        })
+            {
+                this.obliviousPredictions.forEach((predictionFrame: PredictionFrame, clientTick: number) => {
+                    if (clientTick <= confirmedTick) {
+                        this.obliviousPredictions.delete(clientTick)
                     }
                 })
             }
+            {
+                this.discretePredictions.forEach((predictionFrame: PredictionFrame, clientTick: number) => {
+                    if (clientTick <= confirmedTick) {
+                        predictionFrame.entityPredictions.forEach(entityPrediction => {
+                            // predictions for this entity
+                            const nid = entityPrediction.nid
+                            const authoritative = frame.entities.get(nid)
+                            if (authoritative) {
+                                entityPrediction.props.forEach(prop => {
+                                    const authValue = authoritative![prop]
+                                    const predValue = entityPrediction.state[prop]
+    
+                                    if (!areCloseBits(authValue, predValue, 12)) {
+                                        predictionErrorFrame.add(
+                                            nid,
+                                            entityPrediction.state,
+                                            new PredictionErrorProperty(nid, prop, predValue, authValue)
+                                        )
+                                    }
+                                })
+                            }
+                        })
+                        this.discretePredictions.delete(clientTick)
+                    }
+                })
+            }
+
+            {
+                    // predictions for this frame
+                const predictionFrame = this.continuousPredictions.get(confirmedTick)
+
+                if (predictionFrame) {
+                    predictionFrame.entityPredictions.forEach(entityPrediction => {
+                        // predictions for this entity
+                        const nid = entityPrediction.nid
+                        const authoritative = frame.entities.get(nid)
+                        if (authoritative) {
+                            entityPrediction.props.forEach(prop => {
+                                const authValue = authoritative![prop]
+                                const predValue = entityPrediction.state[prop]
+
+                                if (!areCloseBits(authValue, predValue, 12)) {
+                                    predictionErrorFrame.add(
+                                        nid,
+                                        entityPrediction.state,
+                                        new PredictionErrorProperty(nid, prop, predValue, authValue)
+                                    )
+                                }
+                            })
+                        }
+                    })
+                }
+            }
+            
         }
         this.latestTick = frame.confirmedClientTick
         return predictionErrorFrame
     }
 
     cleanUp(tick: number) {
-        this.predictionFrames.forEach(predictionFrame => {
+        // does this make sense? do we do this here or at the time we have finished reading the data 
+        this.continuousPredictions.forEach(predictionFrame => {
             if (predictionFrame.tick < tick - 50) {
-                this.predictionFrames.delete(predictionFrame.tick)
+                this.continuousPredictions.delete(predictionFrame.tick)
             }
         })
     }

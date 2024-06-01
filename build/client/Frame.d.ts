@@ -6,6 +6,8 @@ export interface IEntityFrame {
     deleteEntities: number[];
     from: number;
     to: number;
+    fromConfirmed: number;
+    toConfirmed: number;
 }
 export declare class Frame implements IEntityFrame {
     tick: number;
@@ -16,6 +18,8 @@ export declare class Frame implements IEntityFrame {
     entities: Map<number, IEntity>;
     from: number;
     to: number;
+    fromConfirmed: number;
+    toConfirmed: number;
     createEntities: IEntity[];
     updateEntities: any[];
     deleteEntities: number[];

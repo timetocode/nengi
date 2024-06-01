@@ -7,6 +7,8 @@ export interface IEntityFrame {
     deleteEntities: number[],
     from: number,
     to: number
+    fromConfirmed: number,
+    toConfirmed: number,
 }
 
 export class Frame implements IEntityFrame {
@@ -19,6 +21,8 @@ export class Frame implements IEntityFrame {
 
     from = -1
     to = -1
+    fromConfirmed = -1
+    toConfirmed = -1
 
     createEntities: IEntity[] = []
     updateEntities: any[] = []

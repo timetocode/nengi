@@ -55,6 +55,8 @@ class Interpolator {
                 const interpState = {
                     from: frameA.tick,
                     to: frameB.tick,
+                    fromConfirmed: frameA.confirmedClientTick,
+                    toConfirmed: frameB.confirmedClientTick,
                     createEntities: [],
                     updateEntities: [],
                     deleteEntities: [],
@@ -74,12 +76,21 @@ class Interpolator {
                         // todo actually make sure we are working on a specific PROPERTY
                         // not all of the entity state
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
+                            if (this.client.predictor.predictionRange.has(nid)) {
+                                if (this.client.predictor.predictionRange.get(nid).end === frameA.confirmedClientTick) {
+                                    console.log('yo prediction end right here', frameA.confirmedClientTick);
+                                }
+                            }
+                            //if (this.client.predictor.obliviousPredictions.has(frameA.confirmedClientTick)) {
+                            //   this.client.predictor.obliviousPredictions.get(frameA.confirmedClientTick)!.entityPredictions.has(nid)
+                            //}
                             continue;
                             //console.log('entity has prediction in frameB')
                         }
                         const entityA = frameA.entities.get(nid);
                         const nschema = this.client.context.getSchema(entityA.ntype);
                         const binarySpec = nschema.props[prop];
+                        console.log('state change ends', { nid, prop, value });
                         if (binarySpec.interp) {
                             interpState.updateEntities.push({ nid, prop, value });
                         }
@@ -109,7 +120,13 @@ class Interpolator {
                             //console.log('entity has prediction in frameA')
                             continue;
                         }
-                        if (this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                        if (!this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick) && this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
+                            //continue
+                            //console.log('entity has prediction in frameB')
+                            console.log('prediction ends this frame');
+                        }
+                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick) &&
+                            this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
                             continue;
                             //console.log('entity has prediction in frameB')
                         }

@@ -8,6 +8,8 @@ class Frame {
         this.entities = new Map();
         this.from = -1;
         this.to = -1;
+        this.fromConfirmed = -1;
+        this.toConfirmed = -1;
         this.createEntities = [];
         this.updateEntities = [];
         this.deleteEntities = [];

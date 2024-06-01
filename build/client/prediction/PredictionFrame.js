@@ -7,15 +7,14 @@ class PredictionFrame {
         this.tick = tick;
         this.entityPredictions = new Map();
     }
-    add(nid, entity, props, nschema) {
-        //console.log('prediction created', this.tick, nid, entity, props)
+    add(nid, entity, props) {
         let entityPrediction = this.entityPredictions.get(nid);
         if (!entityPrediction) {
-            entityPrediction = new PredictionEntity_1.PredictionEntity(nid, entity, props, nschema);
+            entityPrediction = new PredictionEntity_1.PredictionEntity(nid, entity, props);
             this.entityPredictions.set(nid, entityPrediction);
         }
         else {
-            entityPrediction.proxy = entity;
+            entityPrediction.state = entity;
             entityPrediction.props = props;
         }
     }
