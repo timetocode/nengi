@@ -110,8 +110,8 @@ export class Interpolator {
                         const nschema = this.client.context.getSchema(entityA.ntype)!
                         const binarySpec = nschema.props[prop]
                         
-                        console.log('state change ends', { nid, prop, value }, frameA.confirmedClientTick, frameB.confirmedClientTick)
-                        console.log('range', this.client.predictor.predictionRange.get(nid))
+                        //console.log('state change ends', { nid, prop, value }, frameA.confirmedClientTick, frameB.confirmedClientTick)
+                        //console.log('range', this.client.predictor.predictionRange.get(nid))
 
                         if (this.client.predictor.predictionRange.get(nid)) {
                             const propRange = this.client.predictor.predictionRange.get(nid)!
@@ -120,7 +120,7 @@ export class Interpolator {
                                if (this.client.predictor.detached.has(range.end)) {
                                     const entityPrediction = this.client.predictor.detached.get(range.end)!.entityPredictions.get(nid)!
                             
-                                    console.log('last prediction...', entityPrediction.state[prop], 'vs', entityA[prop])
+                                    //console.log('last prediction...', entityPrediction.state[prop], 'vs', entityA[prop])
                                     continue
                                 }
                             }                           
@@ -175,20 +175,20 @@ export class Interpolator {
 
                         if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
                             this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
-                                console.log('predicted in A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                                //console.log('predicted in A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
                                 continue
                         }
 
                         if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
                             !this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
-                                console.log('predicted in A and NOT B', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                                //console.log('predicted in A and NOT B', frameA.confirmedClientTick, frameB.confirmedClientTick)
                                 continue
                         }
 
         
                         if (!this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
                             this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
-                                console.log('predicted in NOT A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                                //console.log('predicted in NOT A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
                                 continue
                         }
 

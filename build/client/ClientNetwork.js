@@ -264,6 +264,7 @@ class ClientNetwork {
         this.frameTick++;
         this.frames.push(frame);
         this.latestFrame = frame;
+        this.client.predictor.process(frame);
         const predictionErrorFrame = this.client.predictor.getErrors(frame);
         if (predictionErrorFrame.entities.size > 0) {
             this.client.network.predictionErrorFrames.push(predictionErrorFrame);
