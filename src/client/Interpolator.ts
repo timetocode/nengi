@@ -83,12 +83,18 @@ export class Interpolator {
                     // if no update in frameB, then entity's correct state is update.value
                     // this represents the final state of interpolation, the frame after there is no longer a change
                     // and is how state arrives at the exact correct value
-                    if (frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
+                    // this only occurs once, otherwise it would be emit the same value repeatedly
+                    if (!frameB.once && frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
 
                         // todo actually make sure we are working on a specific PROPERTY
                         // not all of the entity state
+                        //if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick)) {
+//
+                        //}
+                        /*
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
                             if (this.client.predictor.predictionRange.has(nid)) {
+                                console.log('state change ending for something under prediction', nid, 'on tick', frameA.confirmedClientTick, 'range was', this.client.predictor.predictionRange.get(nid))
                                 if (this.client.predictor.predictionRange.get(nid)!.end === frameA.confirmedClientTick) {
                                     console.log('yo prediction end right here', frameA.confirmedClientTick)
                                 }
@@ -99,11 +105,27 @@ export class Interpolator {
                             continue
                             //console.log('entity has prediction in frameB')
                         }
+                        */
                         const entityA = frameA.entities.get(nid)!
                         const nschema = this.client.context.getSchema(entityA.ntype)!
                         const binarySpec = nschema.props[prop]
                         
-                        console.log('state change ends', { nid, prop, value })
+                        console.log('state change ends', { nid, prop, value }, frameA.confirmedClientTick, frameB.confirmedClientTick)
+                        console.log('range', this.client.predictor.predictionRange.get(nid))
+
+                        if (this.client.predictor.predictionRange.get(nid)) {
+                            const propRange = this.client.predictor.predictionRange.get(nid)!
+                            if (propRange.has(prop)) {
+                               const range = propRange.get(prop)!
+                               if (this.client.predictor.detached.has(range.end)) {
+                                    const entityPrediction = this.client.predictor.detached.get(range.end)!.entityPredictions.get(nid)!
+                            
+                                    console.log('last prediction...', entityPrediction.state[prop], 'vs', entityA[prop])
+                                    continue
+                                }
+                            }                           
+                        }
+                      
                         if (binarySpec.interp) {
                             interpState.updateEntities.push({ nid, prop, value })
                         } else {
@@ -133,6 +155,7 @@ export class Interpolator {
                         // just skip everything for the entity... but what we should really do are
                         // 1) operate on specific properties, not a whole entitiy
                         // 2) lerp from predicted state to interpolated state...? consider this
+                        /*
                         if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
                             //console.log('entity has prediction in frameA')
                             continue
@@ -147,6 +170,26 @@ export class Interpolator {
                             this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
                             continue
                             //console.log('entity has prediction in frameB')
+                        }
+                        */
+
+                        if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
+                            this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
+                                console.log('predicted in A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                                continue
+                        }
+
+                        if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
+                            !this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
+                                console.log('predicted in A and NOT B', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                                continue
+                        }
+
+        
+                        if (!this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
+                            this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
+                                console.log('predicted in NOT A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                                continue
                         }
 
                         if (binarySpec.interp) {
