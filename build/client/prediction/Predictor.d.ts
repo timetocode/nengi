@@ -43,6 +43,7 @@ declare class Predictor {
     register(tick: tick, nid: nid, prop: prop, value: any): void;
     process(frame: Frame): void;
     isPredicted(nid: number, prop: string, tick: number): boolean;
+    isPredictedOld(nid: number, prop: string, tick: number): boolean;
     addDetached(tick: number, entity: IEntity, props: string[]): void;
     createOrUpdatePredictionRange(tick: number, entity: IEntity, props: string[]): void;
     addDiscrete(tick: number, entity: IEntity, props: string[]): void;

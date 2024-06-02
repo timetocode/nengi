@@ -37,6 +37,7 @@ class Interpolator {
                 const lateFrame = tframes[i];
                 if (lateFrame.tick < frameA.tick) {
                     if (!lateFrame.processed) {
+                        console.log('LATEFRAME');
                         frames.push(lateFrame);
                         lateFrame.processed = true;
                         tframes.splice(i, 1);

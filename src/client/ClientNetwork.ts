@@ -35,6 +35,7 @@ export class ClientNetwork {
     chronus = new Chronus()
     frameTick = 1 // incremented each frame that comes from server
     latency = 0
+    pulses = 0
 
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
         this.client.disconnectHandler(reason, event)
@@ -64,6 +65,7 @@ export class ClientNetwork {
 
     flush() {
         this.outbound.flush()
+        this.incrementClientTick()
     }
 
     request(endpoint: number, payload: any, callback: (response: any) => any) {
@@ -187,11 +189,12 @@ export class ClientNetwork {
 
 
         this.outbound.tick = tick
-        this.incrementClientTick()
+      
         return dw.buffer
     }
 
     readSnapshot(dr: IBinaryReader) {
+        this.pulses++
         const snapshot: Snapshot = {
             timestamp: -1,
             confirmedClientTick: -1,

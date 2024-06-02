@@ -33,6 +33,7 @@ class ClientNetwork {
         this.chronus = new Chronus_1.Chronus();
         this.frameTick = 1; // incremented each frame that comes from server
         this.latency = 0;
+        this.pulses = 0;
         this.onDisconnect = (reason, event) => {
             this.client.disconnectHandler(reason, event);
         };
@@ -55,6 +56,7 @@ class ClientNetwork {
     }
     flush() {
         this.outbound.flush();
+        this.incrementClientTick();
     }
     request(endpoint, payload, callback) {
         const obj = {
@@ -156,10 +158,10 @@ class ClientNetwork {
             console.log({ debug });
         }
         this.outbound.tick = tick;
-        this.incrementClientTick();
         return dw.buffer;
     }
     readSnapshot(dr) {
+        this.pulses++;
         const snapshot = {
             timestamp: -1,
             confirmedClientTick: -1,

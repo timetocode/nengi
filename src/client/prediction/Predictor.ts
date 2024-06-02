@@ -242,8 +242,21 @@ class Predictor {
             }
         })
     }
-
+    
     isPredicted(nid: number, prop: string, tick: number) {
+        if (this.predictionFrames.has(tick)) {
+            const predictionFrame = this.predictionFrames.get(tick)!
+            if (predictionFrame.entities.has(nid)) {
+                const predictionEntity = predictionFrame.entities.get(nid)!
+                if (predictionEntity.state.has(prop)) {
+                    return true
+                }
+            }            
+        }
+        return false
+    }
+
+    isPredictedOld(nid: number, prop: string, tick: number) {
         if (this.predictionRange.has(nid)) {
             const propertyPredictionRanges = this.predictionRange.get(nid)!
             if (propertyPredictionRanges.has(prop)) {
