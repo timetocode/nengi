@@ -125,6 +125,53 @@ class Predictor {
         this.detached = new Map();
         // used for detatched predictions, stores the authoritative and predicted states of an entity
         this.multiState = new Map();
+        this.predictionFrames = new Map();
+    }
+    register(tick, nid, prop, value) {
+        // compute a delta if the previous frame has a value for this prop of this entity
+        let deltaValue = 0;
+        if (this.predictionFrames.has(tick - 1)) {
+            const previousFrame = this.predictionFrames.get(tick - 1);
+            if (previousFrame.entities.has(nid)) {
+                const previousEntityState = previousFrame.entities.get(nid);
+                if (previousEntityState.state.has(prop)) {
+                    const previousValue = previousEntityState.state.get(prop);
+                    deltaValue = value - previousValue;
+                }
+            }
+        }
+        if (!this.predictionFrames.has(tick)) {
+            this.predictionFrames.set(tick, { processed: false, entities: new Map() });
+        }
+        const frame = this.predictionFrames.get(tick);
+        if (!frame.entities.has(nid)) {
+            frame.entities.set(nid, { state: new Map(), changes: new Map(), multi: new Map() });
+        }
+        const entityRecord = frame.entities.get(nid);
+        entityRecord.state.set(prop, value);
+        entityRecord.changes.set(prop, deltaValue);
+    }
+    process(frame) {
+        const confirmedTick = frame.confirmedClientTick;
+        console.log(`frame ${frame.tick} with clientConfirmedTick ${frame.confirmedClientTick}`);
+        this.predictionFrames.forEach((predictionFrame, tick) => {
+            if (tick <= confirmedTick && !predictionFrame.processed) {
+                console.log(`processing predictionFrame ${tick}`);
+                predictionFrame.entities.forEach((predictionEntity, nid) => {
+                    const authEntity = frame.entities.get(nid);
+                    if (authEntity) {
+                        predictionEntity.state.forEach((value, prop) => {
+                            const authValue = authEntity[prop];
+                            const predValue = value;
+                            const deltaValue = authValue - predValue;
+                            console.log(`verifying prediction for ${prop} p:${predValue} a: ${authValue}, dv: ${deltaValue}`);
+                            predictionEntity.multi.set(prop, { authValue, predValue, deltaValue });
+                        });
+                    }
+                });
+                predictionFrame.processed = true;
+            }
+        });
     }
     isPredicted(nid, prop, tick) {
         if (this.predictionRange.has(nid)) {

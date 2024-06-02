@@ -155,6 +155,26 @@ type PropTickRanges = Map<prop, TickRange>
 type PropDualStates = Map<prop, DualState>
 type prop = string
 
+type PredictedEntity = {
+    nid: nid,
+
+}
+
+type PropertyMap2 = Map<prop, any>
+
+type MultiState2 = { authValue: any, predValue: any, deltaValue: any }
+type PredictionResultMap2 = Map<prop, MultiState2>
+type PredictionEntity2 = { 
+    state: PropertyMap2,
+    changes: PropertyMap2
+    multi: PredictionResultMap2
+}
+
+type PredictionFrame2 = { 
+    processed: boolean
+    entities: Map<nid, PredictionEntity2>
+}
+
 class Predictor {
     latestTick: number = -1
 
@@ -165,6 +185,63 @@ class Predictor {
     detached: Map<tick, PredictionFrame> = new Map()
     // used for detatched predictions, stores the authoritative and predicted states of an entity
     multiState: Map<nid, PropDualStates> = new Map()
+
+
+    predictionFrames: Map<tick, PredictionFrame2> = new Map()
+
+    
+
+    register(tick: tick, nid: nid, prop: prop, value: any) {
+        // compute a delta if the previous frame has a value for this prop of this entity
+        let deltaValue = 0
+        if (this.predictionFrames.has(tick - 1)) {
+            const previousFrame = this.predictionFrames.get(tick - 1)!
+            if (previousFrame.entities.has(nid)) {
+                const previousEntityState = previousFrame.entities.get(nid)!
+                if (previousEntityState.state.has(prop)) {
+                    const previousValue = previousEntityState.state.get(prop)!
+                    deltaValue = value - previousValue
+                }
+            }
+        }
+
+        if (!this.predictionFrames.has(tick)) {
+            this.predictionFrames.set(tick, { processed: false, entities: new Map() })
+        }
+
+        const frame = this.predictionFrames.get(tick)!
+
+        if (!frame.entities.has(nid)){
+            frame.entities.set(nid, { state: new Map(), changes: new Map(), multi: new Map() })
+        }
+
+        const entityRecord = frame.entities.get(nid)!
+        entityRecord.state.set(prop, value)
+        entityRecord.changes.set(prop, deltaValue)
+    }
+
+    process(frame: Frame) {
+        const confirmedTick = frame.confirmedClientTick
+        console.log(`frame ${ frame.tick} with clientConfirmedTick ${ frame.confirmedClientTick }`)
+        this.predictionFrames.forEach((predictionFrame: PredictionFrame2, tick: tick) => {
+            if (tick <= confirmedTick && !predictionFrame.processed) {
+                console.log(`processing predictionFrame ${ tick }`)
+                predictionFrame.entities.forEach((predictionEntity: PredictionEntity2, nid: nid) => {
+                    const authEntity = frame.entities.get(nid)
+                    if (authEntity) {
+                        predictionEntity.state.forEach(( value: any, prop: prop) => {                        
+                            const authValue = authEntity[prop]
+                            const predValue = value
+                            const deltaValue = authValue - predValue
+                            console.log(`verifying prediction for ${prop} p:${ predValue} a: ${ authValue}, dv: ${ deltaValue}`)
+                            predictionEntity.multi.set(prop, { authValue, predValue, deltaValue })
+                        })
+                    }
+                })
+                predictionFrame.processed = true
+            }
+        })
+    }
 
     isPredicted(nid: number, prop: string, tick: number) {
         if (this.predictionRange.has(nid)) {
