@@ -21,7 +21,6 @@ export const findSubsequentFrame = (frames: Frame[], previousTick: number): Fram
     return null
 }
 
-
 export class Interpolator {
     client: Client
 
@@ -31,6 +30,8 @@ export class Interpolator {
 
     getInterpolatedState(interpDelay: number): IEntityFrame[] {
         const now = Date.now()
+        // compute an interpolation time that is "interpDelay" into the past, handles timestamp differences
+        // between server and client
         const renderTime = now - interpDelay - this.client.network.chronus.averageTimeDifference
 
         const frameA = findInitialFrame(this.client.network.frames, renderTime)
@@ -42,13 +43,16 @@ export class Interpolator {
             const frameB = findSubsequentFrame(tframes, frameA.tick)
             for (let i = tframes.length - 1; i > -1; i--) {
                 const lateFrame = tframes[i]
+                // these are late frames, e.g. if the game was alt-tabbed and network data accured
+                // these are outside of the interpolation window, but we need to process the in order
+                // because nengi networked state is a DELTA not the full state, so we must catch up
+                // on creations, deletions, and updates (mutation of individual properties)
                 if (lateFrame.tick < frameA.tick) {
                     if (!lateFrame.processed) {
-                        console.log('LATEFRAME')
                         frames.push(lateFrame)
                         lateFrame.processed = true
                         tframes.splice(i, 1)
-                        this.client.predictor.cleanUp(lateFrame.confirmedClientTick - 1)
+                        //this.client.predictor.cleanUp(lateFrame.confirmedClientTick - 1)
                     } else {
                         tframes.splice(i, 1)
                     }
@@ -76,7 +80,7 @@ export class Interpolator {
                     interpState.createEntities = frameA.createEntities.slice()
                     interpState.deleteEntities = frameA.deleteEntities.slice()
                     frameA.processed = true
-                    this.client.predictor.cleanUp(frameA.confirmedClientTick - 1)
+                    //this.client.predictor.cleanUp(frameA.confirmedClientTick - 1)
                 }
 
                 for (let i = 0; i < frameA.updateEntities.length; i++) {
@@ -87,45 +91,11 @@ export class Interpolator {
                     // this only occurs once, otherwise it would be emit the same value repeatedly
                     if (!frameB.once && frameB.updateEntities.findIndex(x => x.nid === nid && x.prop === prop) === -1) {
 
-                        // todo actually make sure we are working on a specific PROPERTY
-                        // not all of the entity state
-                        //if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick)) {
-//
-                        //}
-                        /*
-                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
-                            if (this.client.predictor.predictionRange.has(nid)) {
-                                console.log('state change ending for something under prediction', nid, 'on tick', frameA.confirmedClientTick, 'range was', this.client.predictor.predictionRange.get(nid))
-                                if (this.client.predictor.predictionRange.get(nid)!.end === frameA.confirmedClientTick) {
-                                    console.log('yo prediction end right here', frameA.confirmedClientTick)
-                                }
-                            }
-                            //if (this.client.predictor.obliviousPredictions.has(frameA.confirmedClientTick)) {
-                             //   this.client.predictor.obliviousPredictions.get(frameA.confirmedClientTick)!.entityPredictions.has(nid)
-                            //}
-                            continue
-                            //console.log('entity has prediction in frameB')
-                        }
-                        */
                         const entityA = frameA.entities.get(nid)!
                         const nschema = this.client.context.getSchema(entityA.ntype)!
                         const binarySpec = nschema.props[prop]
                         
-                        //console.log('state change ends', { nid, prop, value }, frameA.confirmedClientTick, frameB.confirmedClientTick)
-                        //console.log('range', this.client.predictor.predictionRange.get(nid))
-
-                        if (this.client.predictor.predictionRange.get(nid)) {
-                            const propRange = this.client.predictor.predictionRange.get(nid)!
-                            if (propRange.has(prop)) {
-                               const range = propRange.get(prop)!
-                               if (this.client.predictor.detached.has(range.end)) {
-                                    const entityPrediction = this.client.predictor.detached.get(range.end)!.entityPredictions.get(nid)!
-                            
-                                    //console.log('last prediction...', entityPrediction.state[prop], 'vs', entityA[prop])
-                                    continue
-                                }
-                            }                           
-                        }
+                        // probably there needs to be a prediction-related CONTINUE cause here
                       
                         if (binarySpec.interp) {
                             interpState.updateEntities.push({ nid, prop, value })
@@ -133,7 +103,7 @@ export class Interpolator {
                             // we skip this final state of interpolation for non-interpolated values if they have
                             // already been emitted
                             if (!frameA.once) {
-                                // does this ever actually happen...?
+                                // does this ever actually happen...? i don't think so
                                 interpState.updateEntities.push({ nid, prop, value })
                             }
                         }
@@ -147,33 +117,15 @@ export class Interpolator {
                     const entityB = frameB.entities.get(nid)
 
                     if (entityA && entityB) {
+                        // the main interpolation case, we have an entity in both frames A & B and we are going to lerp its state
+                        // for its networked properties that have interpolation enabled
                         const nschema = this.client.context.getSchema(entityA.ntype)!
                         const binarySpec = nschema.props[prop]
                         const binaryUtil = binaryGet(binarySpec.type)
-
-
-                        // TODO if either the frame before or after our current point in interpolation is predicted we
-                        // just skip everything for the entity... but what we should really do are
-                        // 1) operate on specific properties, not a whole entitiy
-                        // 2) lerp from predicted state to interpolated state...? consider this
-                        /*
-                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick)) {
-                            //console.log('entity has prediction in frameA')
-                            continue
-                        }
-                        if (!this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick) && this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
-                            //continue
-                            //console.log('entity has prediction in frameB')
-                            console.log('prediction ends this frame')
-                        }
-
-                        if (this.client.predictor.isTickPredictedForEntity(nid, frameA.confirmedClientTick) && 
-                            this.client.predictor.isTickPredictedForEntity(nid, frameB.confirmedClientTick)) {
-                            continue
-                            //console.log('entity has prediction in frameB')
-                        }
-                        */
-
+                        
+                        // the interpolator skips emitting interpolated data for entity state that is currently being predicted
+                        // we have 3 different conditionals here because it is still being decided if there are differences between
+                        // these 3 states that we might handle differently in the future
                         if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) && 
                             this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
                                 //console.log('predicted in A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)

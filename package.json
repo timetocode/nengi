@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-alpha.251",
+  "version": "2.0.0-alpha.294",
   "description": "nengi2 alpha branch",
   "main": "./build/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "lintfix": "npx eslint . --fix --config .eslintrc.js"
   },
   "author": "Alex // timetocode",
-  "license": "Apache 2.0",
+  "license": "proprietary",
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.8",

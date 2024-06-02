@@ -304,14 +304,15 @@ export class ClientNetwork {
         this.frames.push(frame)
         this.latestFrame = frame
 
-        this.client.predictor.process(frame)
+     
+        this.client.network.predictionErrorFrames.push(this.client.predictor.process(frame))
 
-        const predictionErrorFrame = this.client.predictor.getErrors(frame)
-        if (predictionErrorFrame.entities.size > 0) {
-            this.client.network.predictionErrorFrames.push(predictionErrorFrame)
-        }
+        //const predictionErrorFrame = this.client.predictor.getErrors(frame)
+        //if (predictionErrorFrame.entities.size > 0) {
+        //    this.client.network.predictionErrorFrames.push(predictionErrorFrame)
+        //}
 
-        this.client.predictor.cleanUp(frame.confirmedClientTick)
+        //this.client.predictor.cleanUp(frame.confirmedClientTick)
         // commands/prediction
         this.outbound.confirmCommands(snapshot.confirmedClientTick)
         this.previousSnapshot = snapshot
