@@ -134,12 +134,12 @@ class Predictor {
     }
     reapplyPendingPredictions(nid, startTick, callback) {
         const pendingPredictions = this.getPendingPredictions(nid, startTick);
-        let newState = new Map();
+        //let newState = new Map<string, any>()
         pendingPredictions.forEach((predictionEntity, tick) => {
             predictionEntity.changes.forEach((deltaValue, prop) => {
-                const previousValue = newState.get(prop) || predictionEntity.state.get(prop);
+                const previousValue = /*newState.get(prop) ||*/ predictionEntity.state.get(prop);
                 const newPredictedValue = previousValue + deltaValue;
-                newState.set(prop, newPredictedValue);
+                //newState.set(prop, newPredictedValue)
                 // Update the state in the prediction frame
                 predictionEntity.state.set(prop, newPredictedValue);
                 if (callback) {
