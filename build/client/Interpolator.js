@@ -84,6 +84,16 @@ class Interpolator {
                         const nschema = this.client.context.getSchema(entityA.ntype);
                         const binarySpec = nschema.props[prop];
                         // probably there needs to be a prediction-related CONTINUE cause here
+                        //if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) ||
+                        //    this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
+                        //   console.log('end state change PREDICTION OR CLAUSE', frameA.confirmedClientTick, frameB.confirmedClientTick)
+                        //    continue
+                        //}
+                        // perhaps we should be releasing the state in one of these situations
+                        if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) ||
+                            this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
+                            continue;
+                        }
                         if (binarySpec.interp) {
                             interpState.updateEntities.push({ nid, prop, value });
                         }
@@ -107,22 +117,10 @@ class Interpolator {
                         const nschema = this.client.context.getSchema(entityA.ntype);
                         const binarySpec = nschema.props[prop];
                         const binaryUtil = (0, BinaryExt_1.binaryGet)(binarySpec.type);
-                        // the interpolator skips emitting interpolated data for entity state that is currently being predicted
-                        // we have 3 different conditionals here because it is still being decided if there are differences between
-                        // these 3 states that we might handle differently in the future
-                        if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) &&
+                        // NOTE: is it the case that we would ever consider interpolating from an auth state to a predicted state?
+                        // at the moment we skip releasing data if prediction is in the frame
+                        if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) ||
                             this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
-                            //console.log('predicted in A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
-                            continue;
-                        }
-                        if (this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) &&
-                            !this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
-                            //console.log('predicted in A and NOT B', frameA.confirmedClientTick, frameB.confirmedClientTick)
-                            continue;
-                        }
-                        if (!this.client.predictor.isPredicted(nid, prop, frameA.confirmedClientTick) &&
-                            this.client.predictor.isPredicted(nid, prop, frameB.confirmedClientTick)) {
-                            //console.log('predicted in NOT A and B', frameA.confirmedClientTick, frameB.confirmedClientTick)
                             continue;
                         }
                         if (binarySpec.interp) {

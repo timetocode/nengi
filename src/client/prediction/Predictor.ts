@@ -1,10 +1,27 @@
 import { Frame } from '../Frame'
 
+const TICK_MAX = 65535
+
 function areCloseBits(value1: number, value2: number, bits: number): boolean {
     const epsilon = Math.pow(2, -bits)
     const diff = Math.abs(value1 - value2)
     const maxAbsValue = Math.max(Math.abs(value1), Math.abs(value2))
     return diff <= epsilon * maxAbsValue
+}
+
+function computeDelta(previousValue: number, currentValue: number): number {
+    return currentValue - previousValue
+}
+
+function isTickGreater(tick1: number, tick2: number): boolean {
+    if ((tick1 > tick2 && tick1 - tick2 < TICK_MAX / 2) || (tick1 < tick2 && tick2 - tick1 > TICK_MAX / 2)) {
+        return true
+    }
+    return false
+}
+
+function tickDiff(tick1: number, tick2: number): number {
+    return (tick1 - tick2 + TICK_MAX) % TICK_MAX
 }
 
 type tick = number
@@ -13,10 +30,6 @@ type prop = string
 
 type PropMap = Map<prop, any>
 
-type PredictedEntity = {
-    state: PropMap,
-    changes: PropMap
-}
 
 type PredictedFrame = {
     processed: boolean
@@ -30,91 +43,78 @@ type StateBufferEntry = {
     tick: tick
 }
 
-export class Predictor {
-   // latestTick: number = -1
-    predictionFrames: Map<tick, PredictedFrame> = new Map()
-    //stateBuffer: Map<nid, Map<prop, StateBufferEntry>> = new Map()
-    //confirmedStateBuffer: Map<nid, Map<prop, StateBufferEntry>> = new Map()
+class StateChange {
+    constructor(public predValue: any, public authValue: any, public deltaValue: any, public tick: number) { }
+}
 
-    register(tick: tick, nid: nid, prop: prop, value: any) {
-        //if (!this.stateBuffer.has(nid)) {
-       //     this.stateBuffer.set(nid, new Map())
-        //}
-        //const entityState = this.stateBuffer.get(nid)!
+class PredictedEntity {
+    state: Map<string, any> = new Map()
+    changes: Map<string, any> = new Map()
+
+    registerChange(prop: string, value: any, deltaValue: any) {
+        this.state.set(prop, value)
+        this.changes.set(prop, deltaValue)
+    }
+}
+
+class PredictionFrame {
+    processed: boolean = false
+    entities: Map<number, PredictedEntity> = new Map()
+
+    getOrCreateEntity(nid: number): PredictedEntity {
+        if (!this.entities.has(nid)) {
+            this.entities.set(nid, new PredictedEntity())
+        }
+        return this.entities.get(nid)!
+    }
+}
+
+export class Predictor {
+    predictionFrames: Map<number, PredictionFrame> = new Map()
+    lastProcessedTick: number = 0
+    bufferTicks: number = 500
+
+    register(tick: number, nid: number, prop: string, value: any) {
         let deltaValue = 0
 
         // Compute a delta if the previous frame has a value for this prop of this entity
-        if (this.predictionFrames.has(tick - 1)) {
-            const previousFrame = this.predictionFrames.get(tick - 1)!
-            if (previousFrame.entities.has(nid)) {
-                const previousEntityState = previousFrame.entities.get(nid)!
-                if (previousEntityState.state.has(prop)) {
-                    const previousValue = previousEntityState.state.get(prop)!
-                    deltaValue = value - previousValue
-                }
+        const previousFrame = this.predictionFrames.get((tick - 1 + TICK_MAX) % TICK_MAX)
+        if (previousFrame && previousFrame.entities.has(nid)) {
+            const previousEntity = previousFrame.entities.get(nid)
+            if (previousEntity && previousEntity.state.has(prop)) {
+                const previousValue = previousEntity.state.get(prop)
+                deltaValue = computeDelta(previousValue, value)
             }
         }
 
-        //entityState.set(prop, { predValue: value, authValue: null, deltaValue, tick })
-
         if (!this.predictionFrames.has(tick)) {
-            this.predictionFrames.set(tick, { processed: false, entities: new Map() })
+            this.predictionFrames.set(tick, new PredictionFrame())
         }
 
         const frame = this.predictionFrames.get(tick)!
-
-        if (!frame.entities.has(nid)) {
-            frame.entities.set(nid, { state: new Map(), changes: new Map() })
-        }
-
-        const entityRecord = frame.entities.get(nid)!
-        entityRecord.state.set(prop, value)
-        entityRecord.changes.set(prop, deltaValue)
+        const entity = frame.getOrCreateEntity(nid)
+        entity.registerChange(prop, value, deltaValue)
     }
 
-    process(frame: Frame) {
+    process(frame: Frame): Map<number, Map<string, StateChange>> {
         const confirmedTick = frame.confirmedClientTick
-        //console.log(`frame ${ frame.tick} with clientConfirmedTick ${ frame.confirmedClientTick }`)
+        const predictionErrors: Map<number, Map<string, StateChange>> = new Map()
 
-        const report: Map<nid, Map<prop, StateBufferEntry>> = new Map()
-
-        this.predictionFrames.forEach((predictionFrame: PredictedFrame, tick: tick) => {
-            if (tick <= confirmedTick && !predictionFrame.processed) {
-                //console.log(`processing predictionFrame ${ tick }`)
-                predictionFrame.entities.forEach((predictionEntity: PredictedEntity, nid: nid) => {
+        this.predictionFrames.forEach((predictionFrame, tick) => {
+            if (isTickGreater(confirmedTick + 1, tick) && !predictionFrame.processed) {
+                predictionFrame.entities.forEach((predictionEntity, nid) => {
                     const authEntity = frame.entities.get(nid)
                     if (authEntity) {
-                        predictionEntity.state.forEach((value: any, prop: prop) => {
+                        predictionEntity.state.forEach((predValue, prop) => {
                             const authValue = authEntity[prop]
-                            const predValue = value
                             const deltaValue = authValue - predValue
-                            //console.log(`verifying prediction for ${prop} p:${ predValue} a: ${ authValue}, dv: ${ deltaValue}`)
 
-                            //if (!this.confirmedStateBuffer.has(nid)) {
-                            //    this.confirmedStateBuffer.set(nid, new Map())
-                            //}
-                            //const confirmedEntityState = this.confirmedStateBuffer.get(nid)!
-                            //confirmedEntityState.set(prop, { predValue, authValue, deltaValue, tick })
-
-                            //if (this.stateBuffer.has(nid)) {
-                            //    const entityState = this.stateBuffer.get(nid)!
-                            //    entityState.set(prop, { predValue, authValue, deltaValue, tick })
-                            //}
-
-                            if (!report.has(nid)) {
-                                report.set(nid, new Map())
+                            if (!predictionErrors.has(nid)) {
+                                predictionErrors.set(nid, new Map())
                             }
 
-                            const state = report.get(nid)!
-                            if (!state.has(prop)) {
-                                state.set(prop, { predValue, authValue, deltaValue, tick })
-                            } else {
-                                const propState = state.get(prop)!
-                                propState.authValue = authValue
-                                propState.predValue = predValue
-                                propState.deltaValue = deltaValue
-                                propState.tick = tick
-                            }
+                            const state = predictionErrors.get(nid)!
+                            state.set(prop, new StateChange(predValue, authValue, deltaValue, tick))
                         })
                     }
                 })
@@ -122,45 +122,43 @@ export class Predictor {
             }
         })
 
-        this.predictionFrames.forEach((_, tick) => {
-            if (tick <= confirmedTick) {
-                this.predictionFrames.delete(tick)
-            }
-        })
+        this.lastProcessedTick = confirmedTick
 
-        report.forEach((propStateMap: Map<prop, StateBufferEntry>, nid: number) => {
-            propStateMap.forEach((stateBufferEntry: StateBufferEntry, prop: prop) => {
+        // Filter out zero delta entries
+        predictionErrors.forEach((propStateMap, nid) => {
+            Array.from(propStateMap.keys()).forEach((prop) => {
+                const stateBufferEntry = propStateMap.get(prop)!
                 if (stateBufferEntry.deltaValue === 0) {
                     propStateMap.delete(prop)
                 }
             })
 
             if (propStateMap.size === 0) {
-                report.delete(nid)
+                predictionErrors.delete(nid)
             }
         })
-        return report
+
+        return predictionErrors
     }
 
-    isPredicted(nid: number, prop: string, tick: number) {
-        if (this.predictionFrames.has(tick)) {
-            const predictionFrame = this.predictionFrames.get(tick)!
-            if (predictionFrame.entities.has(nid)) {
-                const predictionEntity = predictionFrame.entities.get(nid)!
-                if (predictionEntity.state.has(prop)) {
-                    return true
-                }
+    cleanupOldFrames() {
+        this.predictionFrames.forEach((_, tick) => {
+            if (isTickGreater(this.lastProcessedTick, tick + this.bufferTicks)) {
+                this.predictionFrames.delete(tick)
             }
-        }
-        return false
+        })
     }
 
-    getPendingPredictions(nid: number, startTick: number): Map<tick, PredictedEntity> {
-        const pendingPredictions: Map<tick, PredictedEntity> = new Map()
+    isPredicted(nid: number, prop: string, tick: number): boolean {
+        const predictionFrame = this.predictionFrames.get(tick)
+        return predictionFrame ? !!predictionFrame.entities.get(nid)?.state.has(prop) : false
+    }
+
+    getPendingPredictions(nid: number, startTick: number): Map<number, PredictedEntity> {
+        const pendingPredictions: Map<number, PredictedEntity> = new Map()
         this.predictionFrames.forEach((predictionFrame, tick) => {
-            if (tick > startTick && predictionFrame.entities.has(nid)) {
-                const predictionEntity = predictionFrame.entities.get(nid)!
-                pendingPredictions.set(tick, predictionEntity)
+            if (isTickGreater(tick, startTick) && predictionFrame.entities.has(nid)) {
+                pendingPredictions.set(tick, predictionFrame.entities.get(nid)!)
             }
         })
         return pendingPredictions
@@ -168,7 +166,7 @@ export class Predictor {
 
     reapplyPendingPredictions(nid: number, startTick: number, callback?: (prop: string, value: any) => void): void {
         const pendingPredictions = this.getPendingPredictions(nid, startTick)
-        let newState = new Map<prop, any>()
+        let newState = new Map<string, any>()
 
         pendingPredictions.forEach((predictionEntity, tick) => {
             predictionEntity.changes.forEach((deltaValue, prop) => {
@@ -185,58 +183,4 @@ export class Predictor {
             })
         })
     }
-
-    /*
-    getLastPredictedState(nid: number, prop: string): StateBufferEntry | null {
-        if (this.stateBuffer.has(nid)) {
-            const entityState = this.stateBuffer.get(nid)!
-            if (entityState.has(prop)) {
-                return entityState.get(prop)!
-            }
-        }
-        return null
-    }
-
-    getLastConfirmedState(nid: number, prop: string): StateBufferEntry | null {
-        if (this.confirmedStateBuffer.has(nid)) {
-            const entityState = this.confirmedStateBuffer.get(nid)!
-            if (entityState.has(prop)) {
-                return entityState.get(prop)!
-            }
-        }
-        return null
-    }
-
-    getPendingPredictions(nid: number, startTick: number): Map<prop, StateBufferEntry> {
-        const pendingPredictions: Map<prop, StateBufferEntry> = new Map()
-        this.predictionFrames.forEach((predictionFrame, tick) => {
-            if (tick > startTick && predictionFrame.entities.has(nid)) {
-                const predictionEntity = predictionFrame.entities.get(nid)!
-                predictionEntity.state.forEach((value, prop) => {
-                    if (!pendingPredictions.has(prop)) {
-                        pendingPredictions.set(prop, { predValue: value, authValue: null, deltaValue: 0, tick })
-                    }
-                })
-            }
-        })
-        return pendingPredictions
-    }
-
-    reapplyPendingPredictions(nid: number, startTick: number, callback?: (prop: string, value: any) => void): void {
-        const pendingPredictions = this.getPendingPredictions(nid, startTick)
-        pendingPredictions.forEach((entry, prop) => {
-            if (this.predictionFrames.has(entry.tick)) {
-                const frame = this.predictionFrames.get(entry.tick)!
-                if (frame.entities.has(nid)) {
-                    const entityRecord = frame.entities.get(nid)!
-                    entityRecord.state.set(prop, entry.predValue)
-                }
-            }
-
-            if (callback) {
-                callback(prop, entry.predValue)
-            }
-        })
-    }
-    */
 }
