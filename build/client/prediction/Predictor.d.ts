@@ -10,7 +10,7 @@ declare class Predictor {
     addCustom(tick: number, entity: any, props: string[], nschema: Schema): void;
     add(tick: number, entity: any, props: string[], nschema: Schema): void;
     has(tick: number, nid: number, prop: string): boolean;
-    getErrors(frame: Frame): PredictionErrorFrame;
+    getErrors(frame: Frame, entities: Map<number, any>): PredictionErrorFrame;
 }
 export { Predictor };
 //# sourceMappingURL=Predictor.d.ts.map

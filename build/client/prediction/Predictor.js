@@ -49,7 +49,7 @@ class Predictor {
         }
         return false;
     }
-    getErrors(frame) {
+    getErrors(frame, entities) {
         const predictionErrorFrame = new PredictionErrorFrame_1.PredictionErrorFrame(frame.confirmedClientTick);
         if (frame) {
             // predictions for this frame
@@ -58,7 +58,7 @@ class Predictor {
                 predictionFrame.entityPredictions.forEach(entityPrediction => {
                     // predictions for this entity
                     const nid = entityPrediction.nid;
-                    const authoritative = frame.entities.get(nid);
+                    const authoritative = entities.get(nid);
                     if (authoritative) {
                         entityPrediction.props.forEach(prop => {
                             const authValue = authoritative[prop];

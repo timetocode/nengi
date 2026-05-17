@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.declareBinaryType = exports.binaryGet = void 0;
+exports.lerp = exports.binaryGet = void 0;
+exports.declareBinaryType = declareBinaryType;
 const Binary_1 = require("./Binary");
 function countByteArray(value) {
     return value.length + 4;
@@ -15,12 +16,24 @@ function count8ByteArray(value) {
     return (value.length * 8) + 4;
 }
 function stringByteLength(str) {
-    if (typeof Buffer !== 'undefined') {
-        return Buffer.byteLength(str, 'utf8');
+    let bytes = 0;
+    for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code < 0x80) {
+            bytes += 1;
+        }
+        else if (code < 0x800) {
+            bytes += 2;
+        }
+        else if (code >= 0xd800 && code <= 0xdbff) {
+            bytes += 4;
+            i++;
+        }
+        else {
+            bytes += 3;
+        }
     }
-    else {
-        return new Blob([str]).size;
-    }
+    return bytes;
 }
 function countString(value) {
     const length = stringByteLength(value);
@@ -30,6 +43,7 @@ const data = new Map();
 const lerp = function (a, b, t) {
     return a + ((b - a) * t);
 };
+exports.lerp = lerp;
 const lerpRot = function (a, b, t) {
     const s = (1 - t) * Math.sin(a) + t * Math.sin(b);
     const c = (1 - t) * Math.cos(a) + t * Math.cos(b);
@@ -63,7 +77,6 @@ function declareBinaryType(binaryIndex, spec) {
         clone: (clone) ? clone : (value) => { return value; }
     });
 }
-exports.declareBinaryType = declareBinaryType;
 declareBinaryType(Binary_1.Binary.UInt8, {
     write: (value, bw) => { bw.writeUInt8(value); },
     read: (br) => { return br.readUInt8(); },
@@ -320,23 +333,24 @@ function quatSlerp(a, b, t) {
         Object.assign(out, a);
         return out;
     }
-    if (t === 0) {
+    if (t === 1) {
         Object.assign(out, b);
         return out;
     }
     const { x, y, z, w } = a;
+    let bx = b.x;
+    let by = b.y;
+    let bz = b.z;
+    let bw = b.w;
     // based off three.js quat slerp which cites this:
     // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
-    let cosHalfTheta = w * b.w + x * b.x + y * b.y + z * b.z;
+    let cosHalfTheta = w * bw + x * bx + y * by + z * bz;
     if (cosHalfTheta < 0) {
-        out.w = -b.w;
-        out.x = -b.x;
-        out.y = -b.y;
-        out.z = -b.z;
+        bw = -bw;
+        bx = -bx;
+        by = -by;
+        bz = -bz;
         cosHalfTheta = -cosHalfTheta;
-    }
-    else {
-        return { x: b.x, y: b.y, z: b.z, w: b.w };
     }
     if (cosHalfTheta >= 1.0) {
         out.w = w;
@@ -348,10 +362,10 @@ function quatSlerp(a, b, t) {
     const sqrSinHalfTheta = 1.0 - cosHalfTheta * cosHalfTheta;
     if (sqrSinHalfTheta <= Number.EPSILON) {
         const s = 1 - t;
-        out.w = s * w + t * a.w;
-        out.x = s * x + t * a.x;
-        out.y = s * y + t * a.y;
-        out.z = s * z + t * a.z;
+        out.w = s * w + t * bw;
+        out.x = s * x + t * bx;
+        out.y = s * y + t * by;
+        out.z = s * z + t * bz;
         normalizeQuat(out);
         return out;
     }
@@ -359,10 +373,10 @@ function quatSlerp(a, b, t) {
     const halfTheta = Math.atan2(sinHalfTheta, cosHalfTheta);
     const ratioA = Math.sin((1 - t) * halfTheta) / sinHalfTheta;
     const ratioB = Math.sin(t * halfTheta) / sinHalfTheta;
-    out.w = (w * ratioA + a.w * ratioB);
-    out.x = (x * ratioA + a.x * ratioB);
-    out.y = (y * ratioA + a.y * ratioB);
-    out.z = (z * ratioA + a.z * ratioB);
+    out.w = (w * ratioA + bw * ratioB);
+    out.x = (x * ratioA + bx * ratioB);
+    out.y = (y * ratioA + by * ratioB);
+    out.z = (z * ratioA + bz * ratioB);
     return out;
 }
 declareBinaryType(Binary_1.Binary.Quaternion, {

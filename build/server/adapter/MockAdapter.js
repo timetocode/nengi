@@ -12,12 +12,10 @@ class MockInstanceAdapter {
     constructor(network, config) {
         this.network = network;
         this.serverSockets = [];
-        if (!config || !config.bufferCtor || !config.binaryWriterCtor) {
-            throw new Error('MockAdapter requires a config.bufferCtor and config.binaryWriterCtor to be created.');
+        if (!(config === null || config === void 0 ? void 0 : config.binary)) {
+            throw new Error('MockAdapter requires a config.binary to be created.');
         }
-        this.bufferCtor = config.bufferCtor;
-        this.binaryWriterCtor = config.binaryWriterCtor;
-        this.binaryReaderCtor = config.binaryReaderCtor;
+        this.binary = config.binary;
     }
     listen(port, ready) {
         console.log('MockAdapter listen is fake! No need to invoke it.');
@@ -48,35 +46,18 @@ class MockInstanceAdapter {
     send(user, buffer) {
         user.socket.send(buffer, true);
     }
-    createBuffer(lengthInBytes) {
-        return new this.bufferCtor(lengthInBytes);
-    }
-    createBufferWriter(lengthInBytes) {
-        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes));
-    }
-    createBufferReader(buffer) {
-        return new this.binaryReaderCtor(buffer);
-    }
 }
 exports.MockInstanceAdapter = MockInstanceAdapter;
 class MockClientAdapter {
     constructor(network, config) {
         this.network = network;
-        this.bufferCtor = config.bufferCtor;
-        this.binaryWriterCtor = config.binaryWriterCtor;
-        this.binaryReaderCtor = config.binaryReaderCtor;
-    }
-    createBuffer(lengthInBytes) {
-        return new this.bufferCtor(lengthInBytes);
-    }
-    createBufferWriter(lengthInBytes) {
-        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes));
-    }
-    createBufferReader(buffer) {
-        return new this.binaryReaderCtor(buffer);
+        if (!(config === null || config === void 0 ? void 0 : config.binary)) {
+            throw new Error('MockAdapter requires a config.binary to be created.');
+        }
+        this.binary = config.binary;
     }
     onMessage(buffer) {
-        const br = this.createBufferReader(buffer);
+        const br = this.binary.createReader(buffer);
         this.network.readSnapshot(br);
     }
     connect(wsUrl, handshake) {

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = exports.UserConnectionState = void 0;
+const Protocol_1 = require("../common/binary/Protocol");
 var UserConnectionState;
 (function (UserConnectionState) {
     UserConnectionState[UserConnectionState["NULL"] = 0] = "NULL";
@@ -20,6 +21,7 @@ class User {
         this.engineMessageQueue = [];
         this.messageQueue = [];
         this.responseQueue = [];
+        this.protocol = Object.assign({}, Protocol_1.DEFAULT_PROTOCOL);
         this.tickLastSeen = new Map();
         //tickLastSeen: { [prop: nid]: tick } = {}
         this.currentlyVisible = [];
@@ -89,8 +91,12 @@ class User {
     }
     */
     createOrUpdate(nid, tick, toCreate, toUpdate) {
+        const lastSeenTick = this.tickLastSeen.get(nid);
+        if (lastSeenTick === tick) {
+            return;
+        }
         // was this entity visible last frame?
-        if (!this.tickLastSeen.has(nid)) {
+        if (lastSeenTick === undefined) {
             toCreate.push(nid);
             this.currentlyVisible.push(nid);
         }

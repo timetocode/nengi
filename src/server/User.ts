@@ -2,6 +2,9 @@ import { IChannel } from './IChannel'
 import { Instance } from './Instance'
 import { InstanceNetwork } from './InstanceNetwork'
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
+import { BinaryPayload } from '../common/binary/BinaryAdapter'
+import type { SnapshotResponse } from '../binary/snapshot/SnapshotPlan'
+import { DEFAULT_PROTOCOL, ProtocolConfig } from '../common/binary/Protocol'
 
 export enum UserConnectionState {
     NULL, // initial state
@@ -26,7 +29,8 @@ export class User {
     subscriptions = new Map<number, IChannel>()
     engineMessageQueue: any[] = []
     messageQueue: any[] = []
-    responseQueue: any[] = []
+    responseQueue: SnapshotResponse[] = []
+    protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
     tickLastSeen: Map<nid, tick> = new Map()
     //tickLastSeen: { [prop: nid]: tick } = {}
     currentlyVisible: nid[] = []
@@ -76,7 +80,7 @@ export class User {
         this.messageQueue.push(message)
     }
 
-    send(buffer: Buffer | ArrayBuffer) {
+    send(buffer: BinaryPayload) {
         this.networkAdapter.send(this, buffer)
     }
 
@@ -108,8 +112,13 @@ export class User {
     }
     */
     createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]) {
+        const lastSeenTick = this.tickLastSeen.get(nid)
+        if (lastSeenTick === tick) {
+            return
+        }
+
         // was this entity visible last frame?
-        if (!this.tickLastSeen.has(nid)) {
+        if (lastSeenTick === undefined) {
             toCreate.push(nid)
             this.currentlyVisible.push(nid)
         } else {

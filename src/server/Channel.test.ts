@@ -29,7 +29,15 @@ describe('Channel', () => {
         channel = new Channel(localState)
         // @ts-ignore b/c we don't need real sockets/networking for user tests
         user = new User(undefined, undefined) 
+        user.id = 1
+        user.instance = { localState } as any
         entity = new TestEntity()
+    })
+
+    it('stores an optional developer label without interpreting it', () => {
+        const labeled = new Channel(localState, { label: 'chest:inventory' })
+
+        expect(labeled.label).toBe('chest:inventory')
     })
 
     it('should add 10 entities', () => {
@@ -132,10 +140,41 @@ describe('Channel', () => {
 
     it('should destroy all users and entities', () => {
         channel.addEntity(entity)
+        const entityNid = entity.nid
         channel.subscribe(user)
         channel.destroy()
         expect(channel.entities.size).toBe(0)
         expect(channel.users.size).toBe(0)
+        expect(user.subscriptions.has(channel.nid)).toBe(false)
+        expect(localState.channels.has(channel)).toBe(false)
+        expect(localState.sources.has(entityNid)).toBe(false)
+    })
+
+    it('can unsubscribe all users without removing entities', () => {
+        channel.addEntity(entity)
+        channel.subscribe(user)
+
+        channel.unsubscribeAll()
+
+        expect(channel.users.size).toBe(0)
+        expect(user.subscriptions.has(channel.nid)).toBe(false)
+        expect(channel.entities.get(entity.nid)).toBe(entity)
+    })
+
+    it('can remove all direct entities without mutating during iteration', () => {
+        const addedEntities: TestEntity[] = []
+        for (let i = 0; i < 10; i++) {
+            const next = new TestEntity()
+            channel.addEntity(next)
+            addedEntities.push(next)
+        }
+
+        channel.removeAllEntities()
+
+        expect(channel.entities.size).toBe(0)
+        addedEntities.forEach(removed => {
+            expect(removed.nid).toBe(0)
+        })
     })
 
     it('component test', () =>  {
@@ -148,5 +187,59 @@ describe('Channel', () => {
 
         channel.destroy()
         expect(channel.entities.size).toBe(0)
+    })
+
+    it('cascades child visibility from a visible parent entity', () => {
+        const child = new ComponentTest()
+        channel.addEntity(entity)
+        localState.addChild(entity.nid, child)
+        channel.subscribe(user)
+
+        const visible = user.checkVisibility(1)
+
+        expect(visible.toCreate).toEqual([entity.nid, child.nid])
+        expect(visible.toUpdate).toEqual([])
+        expect(visible.toDelete).toEqual([])
+    })
+
+    it('removes child visibility when the parent source is no longer visible', () => {
+        const child = new ComponentTest()
+        channel.addEntity(entity)
+        localState.addChild(entity.nid, child)
+        channel.subscribe(user)
+
+        user.checkVisibility(1)
+        const parentNid = entity.nid
+        const childNid = child.nid
+
+        channel.removeEntity(entity)
+        const visible = user.checkVisibility(2)
+
+        expect(visible.toCreate).toEqual([])
+        expect(visible.toUpdate).toEqual([])
+        expect(visible.toDelete).toEqual([parentNid, childNid])
+        expect(child.nid).toBe(childNid)
+    })
+
+    it('keeps a child visible when another source still references it', () => {
+        const child = new ComponentTest()
+        const childChannel = new Channel(localState)
+
+        channel.addEntity(entity)
+        localState.addChild(entity.nid, child)
+        childChannel.addEntity(child)
+        channel.subscribe(user)
+        childChannel.subscribe(user)
+
+        user.checkVisibility(1)
+        const parentNid = entity.nid
+        const childNid = child.nid
+
+        channel.removeEntity(entity)
+        const visible = user.checkVisibility(2)
+
+        expect(visible.toCreate).toEqual([])
+        expect(visible.toUpdate).toEqual([childNid])
+        expect(visible.toDelete).toEqual([parentNid])
     })
 })

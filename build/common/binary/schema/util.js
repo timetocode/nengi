@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.compareAndUpdateNObject = exports.updateNObject = exports.copyNObject = void 0;
+exports.copyNObject = copyNObject;
+exports.updateNObject = updateNObject;
+exports.compareAndUpdateNObject = compareAndUpdateNObject;
 const BinaryExt_1 = require("../BinaryExt");
 /**
  * Copies an object based on an nschema, copies only the properties listed in the nschema
@@ -9,7 +11,7 @@ const BinaryExt_1 = require("../BinaryExt");
  * @returns the copied object
  */
 function copyNObject(entity, nschema) {
-    const ncopy = { nid: 0, ntype: 0 };
+    const ncopy = { nid: entity.nid, ntype: entity.ntype };
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i];
         const value = entity[propData.prop];
@@ -18,7 +20,6 @@ function copyNObject(entity, nschema) {
     }
     return ncopy;
 }
-exports.copyNObject = copyNObject;
 /**
  * Copies the networked properties from source to target
  * @param source
@@ -33,7 +34,6 @@ function updateNObject(source, target, nschema) {
         target[propData.prop] = binaryUtil.clone(value);
     }
 }
-exports.updateNObject = updateNObject;
 /**
  * Compares two IEntities looking only at the properties in the nschema and returns any changes
  * @param current
@@ -49,10 +49,9 @@ function compareAndUpdateNObject(current, previous, nschema) {
         const value = current[prop];
         const binaryUtil = (0, BinaryExt_1.binaryGet)(type);
         if (!binaryUtil.compare(oldValue, value)) {
-            entityChanges.push({ nid: current.nid, nschema, prop, value });
+            entityChanges.push({ nid: current.nid, nschema, prop, value: binaryUtil.clone(value) });
             previous[prop] = binaryUtil.clone(value);
         }
     }
     return entityChanges;
 }
-exports.compareAndUpdateNObject = compareAndUpdateNObject;

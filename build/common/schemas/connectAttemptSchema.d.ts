@@ -1,2 +1,2 @@
-export declare const connectionAttemptSchema: import("../binary/schema/Schema").Schema;
+export declare const connectionAttemptSchema: import("../..").Schema;
 //# sourceMappingURL=connectAttemptSchema.d.ts.map

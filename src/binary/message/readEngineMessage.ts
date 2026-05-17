@@ -7,7 +7,7 @@ function readEngineMessage(reader: IBinaryReader, context: Context) {
     const ntype = reader.readUInt8()
     const nschema = context.getEngineSchema(ntype)!
     const obj = { ntype }
-    for (let i = 1; i < nschema.keys.length; i++) {
+    for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
         const binaryUtil = binaryGet(propData.type)
         // @ts-ignore

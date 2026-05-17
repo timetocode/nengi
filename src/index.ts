@@ -16,6 +16,7 @@ export * from './server/adapter/MockAdapter'
 // client
 export * from './client/Client'
 export * from './client/ClientNetwork'
+export * from './client/EntityStore'
 export * from './client/Interpolator'
 export * from './client/prediction/Predictor'
 export * from './client/prediction/PredictionErrorFrame'
@@ -34,12 +35,16 @@ export * from './common/binary/schema/defineSchema'
 export * from './common/binary/NetworkEvent'
 export * from './common/EngineMessage'
 export * from './common/binary/BinaryExt'
+export * from './common/Endpoint'
 
 // types for integration with adapters
 export * from './server/adapter/IServerNetworkAdapter'
 export * from './common/binary/IBinaryReader'
 export * from './common/binary/IBinaryWriter'
+export * from './common/binary/BinaryAdapter'
+export * from './common/binary/Protocol'
 
 
 // benchmarks/tests
 export * from './binary/message/writeMessage'
+export * from './binary/entity/writeEntity'

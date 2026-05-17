@@ -1,3 +1,5 @@
+import type { BinaryPayload } from './BinaryAdapter'
+
 interface IBinaryReader {
     offset: number
     byteLength: number
@@ -20,8 +22,7 @@ interface IBinaryReader {
     readFloat64Array: () => Float64Array
 }
 
-interface IBinaryReaderClass {
-    // note: real type is Buffer | ArrayBuffer!
-    new(bufferOrArrayBuffer: any, offset?: number): IBinaryReader
+interface IBinaryReaderClass<Payload extends BinaryPayload = BinaryPayload> {
+    new(bufferOrArrayBuffer: Payload, offset?: number): IBinaryReader
 }
 export { IBinaryReader, IBinaryReaderClass }

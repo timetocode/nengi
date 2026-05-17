@@ -14,5 +14,6 @@ export enum EngineMessage {
 
     Pong,
     ClientTick,
+    Protocol,
 
 }

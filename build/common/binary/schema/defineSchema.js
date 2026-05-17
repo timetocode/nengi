@@ -1,45 +1,31 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defineSchema = void 0;
-const Binary_1 = require("../Binary");
+exports.createMessage = exports.createEntity = void 0;
+exports.defineEntitySchema = defineEntitySchema;
+exports.defineMessageSchema = defineMessageSchema;
+exports.definePayloadSchema = definePayloadSchema;
 const Schema_1 = require("./Schema");
-function defineSchema(schema) {
-    //console.log('parsing', schema)
-    const compiled = new Schema_1.Schema();
+function compileSchema(schema, kind) {
+    const compiled = new Schema_1.Schema(kind);
     let index = 0;
-    {
-        const prop = 'ntype';
-        const entry = { key: index, prop, type: Binary_1.Binary.UInt8, interp: false };
-        compiled.keys.push(entry);
-        compiled.props[prop] = entry;
-        index++;
-    }
-    {
-        const prop = 'nid';
-        const entry = { key: index, prop, type: Binary_1.Binary.UInt16, interp: false };
-        compiled.keys.push(entry);
-        compiled.props[prop] = entry;
-        index++;
-    }
     for (const prop in schema) {
-        if (prop === 'nid') {
-            throw new Error('No need to define `nid` in a schema, this is added by default.');
+        if ((kind === 'entity' || kind === 'message') && prop === 'ntype') {
+            throw new Error('No need to define `ntype` in a schema, this is added by the network envelope.');
         }
-        if (prop === 'ntype') {
-            throw new Error('No need to define `ntype` in a schema, this is added by default.');
+        if (kind === 'entity' && prop === 'nid') {
+            throw new Error('No need to define `nid` in an entity schema, this is added by the entity envelope.');
         }
-        // @ts-ignore
-        if (schema[prop].type) {
+        const spec = schema[prop];
+        if (typeof spec === 'object' && spec !== null && 'type' in spec) {
             // probably the syntax x: { type: Binary.Float32, interp: true }
-            // @ts-ignore
-            const entry = { key: index, prop, type: schema[prop].type, interp: schema[prop].interp, };
+            const entry = { key: index, prop, type: spec.type, interp: spec.interp, };
             compiled.keys.push(entry);
             compiled.props[prop] = entry;
             index++;
         }
         else {
             // probably the syntax x: Binary.Float32
-            const entry = { key: index, prop, type: schema[prop], interp: false };
+            const entry = { key: index, prop, type: spec, interp: false };
             compiled.keys.push(entry);
             compiled.props[prop] = entry;
             index++;
@@ -47,4 +33,16 @@ function defineSchema(schema) {
     }
     return compiled;
 }
-exports.defineSchema = defineSchema;
+function defineEntitySchema(schema) {
+    return compileSchema(schema, 'entity');
+}
+function defineMessageSchema(schema) {
+    return compileSchema(schema, 'message');
+}
+function definePayloadSchema(schema) {
+    return compileSchema(schema, 'payload');
+}
+const createEntity = defineEntitySchema;
+exports.createEntity = createEntity;
+const createMessage = defineMessageSchema;
+exports.createMessage = createMessage;

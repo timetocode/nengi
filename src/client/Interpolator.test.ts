@@ -1,5 +1,5 @@
 import { Binary } from '../common/binary/Binary'
-import { defineSchema } from '../common/binary/schema/defineSchema'
+import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { Client } from './Client'
 import { Interpolator } from './Interpolator'
@@ -12,7 +12,7 @@ function waitFor(ms: number) : Promise<boolean>{
 }
 
 xtest('', async () => {
-    const aSchema = defineSchema({
+    const aSchema = defineEntitySchema({
         x: Binary.Float64,
         y: Binary.Float64,
         name: Binary.String

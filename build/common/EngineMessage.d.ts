@@ -11,6 +11,7 @@ export declare enum EngineMessage {
     TimeSync = 9,
     Ping = 10,
     Pong = 11,
-    ClientTick = 12
+    ClientTick = 12,
+    Protocol = 13
 }
 //# sourceMappingURL=EngineMessage.d.ts.map

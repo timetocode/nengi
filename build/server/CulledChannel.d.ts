@@ -3,21 +3,26 @@ import { ICulledChannel, VisibilityResolver } from './IChannel';
 import { User } from './User';
 import { IEntity } from '../common/IEntity';
 import { Historian } from './Historian';
+import { ChannelOptions } from './Channel';
+export type CulledChannelOptions = ChannelOptions;
 export declare class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
     private channel;
     private views;
     visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>;
     historian: Historian | null;
     users: Map<number, User>;
-    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, historian?: Historian);
+    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, options?: CulledChannelOptions);
     get nid(): number;
+    get label(): string | undefined;
     get entities(): import("./NDictionary").NDictionary;
     tick(tick: number): void;
     addEntity(entity: IEntity & VisibleObjectType): IEntity;
     removeEntity(entity: IEntity & VisibleObjectType): void;
+    removeAllEntities(): void;
     addMessage(message: any): void;
     subscribe(user: any, view: ViewType): void;
     unsubscribe(user: any): void;
+    unsubscribeAll(): void;
     getVisibleEntities(userId: number): number[];
     destroy(): void;
 }

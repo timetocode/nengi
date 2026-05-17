@@ -20,7 +20,7 @@ function waitFor(ms) {
     });
 }
 xtest('', () => __awaiter(void 0, void 0, void 0, function* () {
-    const aSchema = (0, defineSchema_1.defineSchema)({
+    const aSchema = (0, defineSchema_1.defineEntitySchema)({
         x: Binary_1.Binary.Float64,
         y: Binary_1.Binary.Float64,
         name: Binary_1.Binary.String

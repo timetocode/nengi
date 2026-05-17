@@ -19,12 +19,116 @@ const BinarySection_1 = require("../common/binary/BinarySection");
 const EngineMessage_1 = require("../common/EngineMessage");
 const readEngineMessage_1 = __importDefault(require("../binary/message/readEngineMessage"));
 const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
+const count_1 = __importDefault(require("../binary/message/count"));
+const writeMessage_1 = require("../binary/message/writeMessage");
+const BinaryExt_1 = require("../common/binary/BinaryExt");
+const Binary_1 = require("../common/binary/Binary");
+const EndpointPayload_1 = require("../binary/endpoint/EndpointPayload");
+const Endpoint_1 = require("../common/Endpoint");
+function countStringBytes(value) {
+    return (0, BinaryExt_1.binaryGet)(Binary_1.Binary.String).byteSize(value);
+}
+function errorPayload(code, message) {
+    return { code, message };
+}
 class InstanceNetwork {
     constructor(instance) {
+        this.responseBacklogUsers = new Set();
+        this.onResponseBacklog = (info) => {
+            console.warn(`nengi response backlog: ${info.remaining} responses remain queued for user ${info.user.id} after sending ${info.sent} of ${info.queued} on server tick ${info.tick}.`);
+        };
         this.instance = instance;
     }
     onRequest() {
         // TODO
+    }
+    getProtocol() {
+        return {
+            nidType: this.instance.localState.nidType,
+            ntypeType: this.instance.context.ntypeType
+        };
+    }
+    createProtocolEngineMessage() {
+        const protocol = this.getProtocol();
+        return {
+            ntype: EngineMessage_1.EngineMessage.Protocol,
+            nidType: protocol.nidType,
+            ntypeType: protocol.ntypeType
+        };
+    }
+    queueProtocolIfChanged(user) {
+        const protocol = this.getProtocol();
+        if (user.protocol.nidType !== protocol.nidType || user.protocol.ntypeType !== protocol.ntypeType) {
+            user.queueEngineMessage(this.createProtocolEngineMessage());
+            user.protocol = Object.assign({}, protocol);
+        }
+    }
+    queueResponse(user, requestId, endpoint, response) {
+        var _a;
+        user.responseQueue.push({
+            requestId,
+            status: Endpoint_1.ResponseStatus.Ok,
+            payload: (0, EndpointPayload_1.createEndpointPayload)(response, (_a = endpoint.endpoint) === null || _a === void 0 ? void 0 : _a.responseSchema)
+        });
+    }
+    queueErrorResponse(user, requestId, code, message) {
+        user.responseQueue.push({
+            requestId,
+            status: Endpoint_1.ResponseStatus.Error,
+            payload: (0, EndpointPayload_1.createEndpointPayload)(errorPayload(code, message))
+        });
+    }
+    reportResponseBacklog(user, queued, sent) {
+        const remaining = user.responseQueue.length;
+        if (remaining === 0) {
+            this.responseBacklogUsers.delete(user);
+            return;
+        }
+        if (!this.responseBacklogUsers.has(user)) {
+            this.responseBacklogUsers.add(user);
+            this.onResponseBacklog({
+                user,
+                queued,
+                sent,
+                remaining,
+                tick: this.instance.tick
+            });
+        }
+    }
+    runRequestHandler(user, requestId, endpoint, body) {
+        let sent = false;
+        const send = (response) => {
+            if (sent) {
+                return;
+            }
+            sent = true;
+            this.queueResponse(user, requestId, endpoint, response);
+        };
+        try {
+            const result = endpoint.callback({ user, body }, send);
+            if (result && typeof result.then === 'function') {
+                ;
+                result
+                    .then(response => {
+                    if (response !== undefined) {
+                        send(response);
+                    }
+                })
+                    .catch(err => {
+                    if (!sent) {
+                        this.queueErrorResponse(user, requestId, 'HANDLER_REJECTED', 'Request handler rejected.');
+                    }
+                });
+            }
+            else if (result !== undefined) {
+                send(result);
+            }
+        }
+        catch (err) {
+            if (!sent) {
+                this.queueErrorResponse(user, requestId, 'HANDLER_ERROR', 'Request handler errored.');
+            }
+        }
     }
     onOpen(user) {
         user.connectionState = User_1.UserConnectionState.OpenPreHandshake;
@@ -35,18 +139,25 @@ class InstanceNetwork {
             try {
                 user.connectionState = User_1.UserConnectionState.OpenAwaitingHandshake;
                 const connectionAccepted = yield this.instance.onConnect(handshake);
+                if (connectionAccepted === false) {
+                    throw new Error('Connection denied.');
+                }
                 // @ts-ignore typescript is wrong that connectionState does not change, it changes during the await
                 if (user.connectionState === User_1.UserConnectionState.Closed) {
                     throw new Error('Connection closed before handshake completed.');
                 }
                 user.connectionState = User_1.UserConnectionState.Open;
                 // allow
-                const bw = user.networkAdapter.createBufferWriter(3);
+                const protocolMessage = this.createProtocolEngineMessage();
+                const protocolSchema = this.instance.context.getEngineSchema(protocolMessage.ntype);
+                const bw = user.networkAdapter.binary.createWriter(3 + (0, count_1.default)(protocolSchema, protocolMessage));
                 bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
-                bw.writeUInt8(1);
+                bw.writeUInt8(2);
                 bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionAccepted);
-                user.send(bw.buffer);
+                (0, writeMessage_1.writeMessage)(protocolMessage, protocolSchema, bw);
+                user.send(bw.payload);
                 user.instance = this.instance;
+                user.protocol = Object.assign({}, this.getProtocol());
                 this.onConnectionAccepted(user, connectionAccepted);
             }
             catch (err) {
@@ -58,34 +169,34 @@ class InstanceNetwork {
                 if (user.connectionState === User_1.UserConnectionState.OpenAwaitingHandshake) {
                     // developer's code decided to reject this connection (rejected promise)
                     const jsonErr = JSON.stringify(err);
-                    const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
+                    const denyReasonByteLength = countStringBytes(jsonErr);
                     // deny and send reason
-                    const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
-                    //binaryWriterCtor.create(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/)
+                    const bw = user.networkAdapter.binary.createWriter(3 + denyReasonByteLength);
                     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                     bw.writeUInt8(1);
                     bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
                     bw.writeString(jsonErr);
-                    user.send(bw.buffer);
+                    user.send(bw.payload);
                 }
                 if (user.connectionState === User_1.UserConnectionState.Open) {
                     // a loss of connection after handshake is complete
                     const jsonErr = JSON.stringify(err);
-                    const denyReasonByteLength = Buffer.byteLength(jsonErr, 'utf8');
+                    const denyReasonByteLength = countStringBytes(jsonErr);
                     // deny and send reason
-                    const bw = user.networkAdapter.createBufferWriter(3 + 4 /* string length 32 bits */ + denyReasonByteLength /* length of actual string*/);
+                    const bw = user.networkAdapter.binary.createWriter(3 + denyReasonByteLength);
                     bw.writeUInt8(BinarySection_1.BinarySection.EngineMessages);
                     bw.writeUInt8(1);
                     bw.writeUInt8(EngineMessage_1.EngineMessage.ConnectionDenied);
                     bw.writeString(jsonErr);
-                    user.send(bw.buffer);
+                    user.send(bw.payload);
                 }
             }
         });
     }
     onMessage(user, buffer) {
+        var _a;
         try {
-            const binaryReader = user.networkAdapter.createBufferReader(buffer);
+            const binaryReader = user.networkAdapter.binary.createReader(buffer);
             const commands = [];
             const commandSet = {
                 type: NetworkEvent_1.NetworkEvent.CommandSet,
@@ -118,7 +229,7 @@ class InstanceNetwork {
                     case BinarySection_1.BinarySection.Commands: {
                         const count = binaryReader.readUInt8();
                         for (let i = 0; i < count; i++) {
-                            const msg = (0, readMessage_1.default)(binaryReader, this.instance.context);
+                            const msg = (0, readMessage_1.default)(binaryReader, this.instance.context, this.instance.context.ntypeType);
                             commands.push(msg);
                         }
                         break;
@@ -128,16 +239,15 @@ class InstanceNetwork {
                         for (let i = 0; i < count; i++) {
                             const requestId = binaryReader.readUInt32();
                             const endpoint = binaryReader.readUInt32();
-                            const str = binaryReader.readString();
-                            const body = JSON.parse(str);
-                            const cb = this.instance.responseEndPoints.get(endpoint);
-                            if (cb) {
-                                cb({ user, body }, (response) => {
-                                    user.responseQueue.push({
-                                        requestId,
-                                        response: JSON.stringify(response)
-                                    });
-                                });
+                            const payloadByteLength = binaryReader.readUInt32();
+                            const responseEndpoint = this.instance.responseEndPoints.get(endpoint);
+                            if (!responseEndpoint) {
+                                (0, EndpointPayload_1.skipEndpointPayload)(binaryReader, payloadByteLength);
+                                this.queueErrorResponse(user, requestId, 'NO_ENDPOINT', 'No response handler is registered for this endpoint.');
+                            }
+                            else {
+                                const body = (0, EndpointPayload_1.readSizedEndpointPayload)(binaryReader, payloadByteLength, (_a = responseEndpoint.endpoint) === null || _a === void 0 ? void 0 : _a.requestSchema);
+                                this.runRequestHandler(user, requestId, responseEndpoint, body);
                             }
                         }
                         break;
@@ -180,6 +290,7 @@ class InstanceNetwork {
         });
     }
     onClose(user) {
+        this.responseBacklogUsers.delete(user);
         if (user.connectionState === User_1.UserConnectionState.Open) {
             this.instance.queue.enqueue({
                 type: NetworkEvent_1.NetworkEvent.UserDisconnected,

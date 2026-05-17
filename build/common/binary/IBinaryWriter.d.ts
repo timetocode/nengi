@@ -1,6 +1,7 @@
-/// <reference types="node" />
-interface IBinaryWriter {
-    buffer: Buffer | ArrayBuffer;
+import type { BinaryPayload } from './BinaryAdapter';
+interface IBinaryWriter<Payload extends BinaryPayload = BinaryPayload> {
+    buffer: Payload;
+    payload: Payload;
     writeUInt8(value: number): void;
     writeInt8(value: number): void;
     writeUInt16(value: number): void;
@@ -19,8 +20,9 @@ interface IBinaryWriter {
     writeFloat32Array(value: Float32Array): void;
     writeFloat64Array(value: Float64Array): void;
 }
-interface IBinaryWriterClass {
-    new (bufferOrArrayBuffer: any, offset?: number): IBinaryWriter;
+interface IBinaryWriterClass<Payload extends BinaryPayload = BinaryPayload> {
+    new (bufferOrArrayBuffer: Payload, offset?: number): IBinaryWriter<Payload>;
+    create(byteLength: number): IBinaryWriter<Payload>;
 }
 export { IBinaryWriter, IBinaryWriterClass };
 //# sourceMappingURL=IBinaryWriter.d.ts.map

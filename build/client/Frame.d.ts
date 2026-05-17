@@ -1,20 +1,33 @@
 import { IEntity } from '../common/IEntity';
-import { Snapshot } from './Snapshot';
+export type AppliedEntityChange = {
+    nid: number;
+    prop: string;
+    previous: any;
+    value: any;
+};
+export type DeletedEntity = {
+    nid: number;
+    entity?: IEntity;
+};
 export interface IEntityFrame {
+    tick: number;
+    timestamp: number;
     createEntities: IEntity[];
-    updateEntities: any[];
+    updateEntities: AppliedEntityChange[];
     deleteEntities: number[];
+    deletedEntities: DeletedEntity[];
+    messages: any[];
+    confirmedClientTick: number;
 }
 export declare class Frame implements IEntityFrame {
     tick: number;
     confirmedClientTick: number;
     timestamp: number;
-    processed: boolean;
-    once: boolean;
-    entities: Map<number, IEntity>;
     createEntities: IEntity[];
-    updateEntities: any[];
+    updateEntities: AppliedEntityChange[];
     deleteEntities: number[];
-    constructor(tick: number, snapshot: Snapshot, previousFrame: Frame | null);
+    deletedEntities: DeletedEntity[];
+    messages: any[];
+    constructor(args: IEntityFrame);
 }
 //# sourceMappingURL=Frame.d.ts.map

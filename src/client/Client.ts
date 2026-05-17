@@ -1,10 +1,17 @@
 import { Context } from '../common/Context'
+import { Endpoint, RequestPolicy } from '../common/Endpoint'
 import { ClientNetwork } from './ClientNetwork'
 import { Predictor } from './prediction/Predictor'
 
 type StringOrParsedJSON = string | object
 type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
 type WebsocketErrorHandler = (event: any) => void
+type RequestOptions<Response = any> = {
+    timeoutMs?: number,
+    key?: string,
+    policy?: RequestPolicy,
+    callback?: (response: Response) => any
+}
 
 class Client {
     context: Context
@@ -15,10 +22,10 @@ class Client {
     disconnectHandler: DisconnectHandler
     websocketErrorHandler: WebsocketErrorHandler
 
-    constructor(context: Context, adapterCtor: any, serverTickRate: number) {
+    constructor(context: Context, adapterCtor: any, serverTickRate: number, adapterConfig?: any) {
         this.context = context
         this.network = new ClientNetwork(this)
-        this.adapter = new adapterCtor(this.network)
+        this.adapter = new adapterCtor(this.network, adapterConfig)
         this.serverTickRate = serverTickRate
         this.predictor = new Predictor()
 
@@ -49,6 +56,14 @@ class Client {
 
     addCommand(command: any) {
         this.network.addCommand(command)
+    }
+
+    request<Request = any, Response = any>(
+        endpoint: Endpoint<Request, Response>,
+        payload: Request,
+        callbackOrOptions?: ((response: Response) => any) | RequestOptions<Response>
+    ) {
+        return this.network.request(endpoint, payload, callbackOrOptions)
     }
 }
 

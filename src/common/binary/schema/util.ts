@@ -9,7 +9,7 @@ import { Schema } from './Schema'
  * @returns the copied object
  */
 export function copyNObject(entity: IEntity, nschema: Schema) {
-    const ncopy: IEntity = { nid: 0, ntype: 0 }
+    const ncopy: IEntity = { nid: entity.nid, ntype: entity.ntype }
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
         const value = entity[propData.prop]
@@ -52,7 +52,7 @@ export function compareAndUpdateNObject(current: IEntity, previous: IEntity, nsc
         const value = current[prop]
         const binaryUtil = binaryGet(type)
         if (!binaryUtil.compare(oldValue, value)) {
-            entityChanges.push({ nid: current.nid, nschema, prop, value })
+            entityChanges.push({ nid: current.nid, nschema, prop, value: binaryUtil.clone(value) })
             previous[prop] = binaryUtil.clone(value)
         }
     }

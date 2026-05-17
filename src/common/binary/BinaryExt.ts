@@ -53,11 +53,21 @@ function count8ByteArray(value: RegularOrTypedArray) {
 }
 
 function stringByteLength(str: string): number {
-    if (typeof Buffer !== 'undefined') {
-        return Buffer.byteLength(str, 'utf8')
-    } else {
-        return new Blob([str]).size
+    let bytes = 0
+    for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i)
+        if (code < 0x80) {
+            bytes += 1
+        } else if (code < 0x800) {
+            bytes += 2
+        } else if (code >= 0xd800 && code <= 0xdbff) {
+            bytes += 4
+            i++
+        } else {
+            bytes += 3
+        }
     }
+    return bytes
 }
 
 function countString(value: string): number {
@@ -393,26 +403,28 @@ function quatSlerp(a: Quaternion, b: Quaternion, t: number) {
         Object.assign(out, a)
         return out
     }
-    if (t === 0) {
+    if (t === 1) {
         Object.assign(out, b)
         return out
     }
 
     const { x, y, z, w } = a
+    let bx = b.x
+    let by = b.y
+    let bz = b.z
+    let bw = b.w
 
     // based off three.js quat slerp which cites this:
     // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
 
-    let cosHalfTheta = w * b.w + x * b.x + y * b.y + z * b.z
+    let cosHalfTheta = w * bw + x * bx + y * by + z * bz
 
     if (cosHalfTheta < 0) {
-        out.w = -b.w
-        out.x = -b.x
-        out.y = -b.y
-        out.z = -b.z
+        bw = -bw
+        bx = -bx
+        by = -by
+        bz = -bz
         cosHalfTheta = -cosHalfTheta
-    } else {
-        return { x: b.x, y: b.y, z: b.z, w: b.w }
     }
 
     if (cosHalfTheta >= 1.0) {
@@ -427,10 +439,10 @@ function quatSlerp(a: Quaternion, b: Quaternion, t: number) {
 
     if (sqrSinHalfTheta <= Number.EPSILON) {
         const s = 1 - t
-        out.w = s * w + t * a.w
-        out.x = s * x + t * a.x
-        out.y = s * y + t * a.y
-        out.z = s * z + t * a.z
+        out.w = s * w + t * bw
+        out.x = s * x + t * bx
+        out.y = s * y + t * by
+        out.z = s * z + t * bz
         normalizeQuat(out)
         return out
     }
@@ -440,10 +452,10 @@ function quatSlerp(a: Quaternion, b: Quaternion, t: number) {
     const ratioA = Math.sin((1 - t) * halfTheta) / sinHalfTheta
     const ratioB = Math.sin(t * halfTheta) / sinHalfTheta
 
-    out.w = (w * ratioA + a.w * ratioB)
-    out.x = (x * ratioA + a.x * ratioB)
-    out.y = (y * ratioA + a.y * ratioB)
-    out.z = (z * ratioA + a.z * ratioB)
+    out.w = (w * ratioA + bw * ratioB)
+    out.x = (x * ratioA + bx * ratioB)
+    out.y = (y * ratioA + by * ratioB)
+    out.z = (z * ratioA + bz * ratioB)
 
     return out
 }
@@ -486,4 +498,4 @@ const binaryGet = function (binaryType: Binary) {
     return b
 }
 
-export { binaryGet, declareBinaryType }
+export { binaryGet, declareBinaryType, lerp }

@@ -1,2 +1,2 @@
-export declare const clientTickSchema: import("../binary/schema/Schema").Schema;
+export declare const clientTickSchema: import("../..").Schema;
 //# sourceMappingURL=clientTickSchema.d.ts.map

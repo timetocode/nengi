@@ -3,10 +3,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LocalState = void 0;
 const IdPool_1 = require("./IdPool");
 const NDictionary_1 = require("./NDictionary");
+const Binary_1 = require("../common/binary/Binary");
+const Protocol_1 = require("../common/binary/Protocol");
 class LocalState {
     constructor() {
-        this.nidPool = new IdPool_1.IdPool(65535);
+        this.nidType = Binary_1.Binary.UInt8;
+        this.nidPool = new IdPool_1.IdPool((0, Protocol_1.maxValueForNetworkType)(Binary_1.Binary.UInt8));
+        /**
+         * Entity nid -> source ids currently keeping that entity networked.
+         * Source ids can be channels or parent entity nids. They are networking
+         * references, not ownership of the user's game object.
+         */
         this.sources = new Map();
+        /**
+         * Parent entity nid -> child entity nids. Children cascade visibility from
+         * the parent, but userland still owns object lifetime and game semantics.
+         */
         this.children = new Map();
         this._entities = new NDictionary_1.NDictionary();
         this.channels = new Set();
@@ -30,6 +42,14 @@ class LocalState {
     registerEntity(entity, sourceId) {
         let nid = entity.nid;
         if (!this.sources.has(nid)) {
+            if (!this.nidPool.hasFreshId() && this.nidPool.isFull()) {
+                const nextType = (0, Protocol_1.nextNetworkType)(this.nidType);
+                if (!nextType) {
+                    throw new Error('No nid values are available.');
+                }
+                this.nidType = nextType;
+                this.nidPool.setMax((0, Protocol_1.maxValueForNetworkType)(nextType));
+            }
             nid = this.nidPool.nextId();
             entity.nid = nid;
             this.sources.set(nid, new Set());
@@ -52,6 +72,10 @@ class LocalState {
     }
     getByNid(nid) {
         return this._entities.get(nid);
+    }
+    releaseDeferredIds() {
+        // Returned nids become reusable only after the snapshot boundary.
+        this.nidPool.releaseDeferredIds();
     }
 }
 exports.LocalState = LocalState;

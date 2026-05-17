@@ -1,8 +1,11 @@
-interface IBinaryWriter {
+import type { BinaryPayload } from './BinaryAdapter'
+
+interface IBinaryWriter<Payload extends BinaryPayload = BinaryPayload> {
     // ALSO, but hidden from typescript:
     // new(bufferOrArrayBuffer: any, offset?: number): IBinaryWriter
     // static create(byteLength): IBinaryWriter
-    buffer: Buffer | ArrayBuffer
+    buffer: Payload
+    payload: Payload
     writeUInt8(value: number): void
     writeInt8(value: number): void
     writeUInt16(value: number): void
@@ -21,12 +24,9 @@ interface IBinaryWriter {
     writeFloat32Array(value: Float32Array): void
     writeFloat64Array(value: Float64Array): void
 }
-interface IBinaryWriterClass {
-    // note: real type is Buffer | ArrayBuffer!
-    new(bufferOrArrayBuffer: any, offset?: number): IBinaryWriter
-
-    // ALSO HAS THIS, which is unfortunately not valid typescript
-    // static create(byteLength): IBinaryWriter
+interface IBinaryWriterClass<Payload extends BinaryPayload = BinaryPayload> {
+    new(bufferOrArrayBuffer: Payload, offset?: number): IBinaryWriter<Payload>
+    create(byteLength: number): IBinaryWriter<Payload>
 }
 
 export { IBinaryWriter, IBinaryWriterClass }

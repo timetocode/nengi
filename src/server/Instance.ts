@@ -7,6 +7,19 @@ import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBuffe
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
 import { EngineMessage } from '../common/EngineMessage'
+import { Endpoint, EndpointDefinition, getEndpointDefinition, getEndpointId } from '../common/Endpoint'
+
+type ResponseSender<Response = any> = (response: Response) => void
+type ResponseHandlerArgs<Request = any> = { user: User, body: Request }
+type ResponseHandler<Request = any, Response = any> = (
+    request: ResponseHandlerArgs<Request>,
+    send: ResponseSender<Response>
+) => Response | void | Promise<Response | void>
+
+export type ResponseEndpoint = {
+    endpoint: EndpointDefinition | null,
+    callback: ResponseHandler
+}
 
 export class Instance {
     context: Context
@@ -18,7 +31,7 @@ export class Instance {
     cache: EntityCache
     tick: number
     pingIntervalMs: number
-    responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>
+    responseEndPoints: Map<number, ResponseEndpoint>
     /**
      *
      * @param handshake test test
@@ -59,8 +72,14 @@ export class Instance {
         this.localState.removeChild(parentNid, child)
     }
 
-    respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any) {
-        this.responseEndPoints.set(endpoint, callback)
+    respond<Request = any, Response = any>(
+        endpoint: Endpoint<Request, Response>,
+        callback: ResponseHandler<Request, Response>
+    ) {
+        this.responseEndPoints.set(getEndpointId(endpoint), {
+            endpoint: getEndpointDefinition(endpoint),
+            callback: callback as ResponseHandler
+        })
     }
 
     step() {
@@ -104,5 +123,6 @@ export class Instance {
         })
 
         this.cache.deleteCachesForTick(this.tick)
+        this.localState.releaseDeferredIds()
     }
 }

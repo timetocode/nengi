@@ -3,7 +3,8 @@ declare class Schema {
     props: {
         [key: string]: any;
     };
-    constructor();
+    kind: 'entity' | 'message' | 'payload';
+    constructor(kind?: 'entity' | 'message' | 'payload');
 }
 export { Schema };
 //# sourceMappingURL=Schema.d.ts.map

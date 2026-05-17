@@ -1,8 +1,10 @@
-/// <reference types="node" />
 import { IChannel } from './IChannel';
 import { Instance } from './Instance';
 import { InstanceNetwork } from './InstanceNetwork';
 import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
+import { BinaryPayload } from '../common/binary/BinaryAdapter';
+import type { SnapshotResponse } from '../binary/snapshot/SnapshotPlan';
+import { ProtocolConfig } from '../common/binary/Protocol';
 export declare enum UserConnectionState {
     NULL = 0,// initial state
     OpenPreHandshake = 1,// socket open, handshake not complete
@@ -24,7 +26,8 @@ export declare class User {
     subscriptions: Map<number, IChannel>;
     engineMessageQueue: any[];
     messageQueue: any[];
-    responseQueue: any[];
+    responseQueue: SnapshotResponse[];
+    protocol: ProtocolConfig;
     tickLastSeen: Map<nid, tick>;
     currentlyVisible: nid[];
     lastSentInstanceTick: number;
@@ -39,7 +42,7 @@ export declare class User {
     unsubscribe(channel: IChannel): void;
     queueEngineMessage(engineMessage: any): void;
     queueMessage(message: any): void;
-    send(buffer: Buffer | ArrayBuffer): void;
+    send(buffer: BinaryPayload): void;
     disconnect(reason: StringOrJSONStringifiable): void;
     populateDeletions(tick: number, toDelete: number[]): void;
     createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]): void;

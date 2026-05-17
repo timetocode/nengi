@@ -1,3 +1,4 @@
+import type { BinaryPayload } from './BinaryAdapter';
 interface IBinaryReader {
     offset: number;
     byteLength: number;
@@ -19,8 +20,8 @@ interface IBinaryReader {
     readFloat32Array: () => Float32Array;
     readFloat64Array: () => Float64Array;
 }
-interface IBinaryReaderClass {
-    new (bufferOrArrayBuffer: any, offset?: number): IBinaryReader;
+interface IBinaryReaderClass<Payload extends BinaryPayload = BinaryPayload> {
+    new (bufferOrArrayBuffer: Payload, offset?: number): IBinaryReader;
 }
 export { IBinaryReader, IBinaryReaderClass };
 //# sourceMappingURL=IBinaryReader.d.ts.map

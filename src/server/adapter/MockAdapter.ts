@@ -1,17 +1,13 @@
-import { Buffer } from 'buffer'
 import { IServerNetworkAdapter } from './IServerNetworkAdapter'
 import { InstanceNetwork } from '../InstanceNetwork'
 import { User, UserConnectionState } from '../User'
-import { IBinaryWriter, IBinaryWriterClass } from '../../common/binary/IBinaryWriter'
-import { IBinaryReader, IBinaryReaderClass } from '../../common/binary/IBinaryReader'
 import { NQueue } from '../../NQueue'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
+import { BinaryAdapter, BinaryPayload } from '../../common/binary/BinaryAdapter'
 
-type MockAdapterConfig = {
-    bufferCtor: typeof Buffer | typeof ArrayBuffer
-    binaryWriterCtor: IBinaryWriterClass
-    binaryReaderCtor: IBinaryReaderClass
+type MockAdapterConfig<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> = {
+    binary: BinaryAdapter<InboundPayload, OutboundPayload>
 }
 
 /**
@@ -19,25 +15,20 @@ type MockAdapterConfig = {
  * Used for mixing a server and client together in one application
  * such as for a single player mode or automated testing
  */
-class MockInstanceAdapter implements IServerNetworkAdapter {
+class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IServerNetworkAdapter<InboundPayload, OutboundPayload> {
     network: InstanceNetwork
     serverSockets: MockServerSocket[]
+    binary: BinaryAdapter<InboundPayload, OutboundPayload>
 
-    bufferCtor: typeof Buffer | typeof ArrayBuffer
-    binaryWriterCtor: IBinaryWriterClass
-    binaryReaderCtor: IBinaryReaderClass
-
-    constructor(network: InstanceNetwork, config: MockAdapterConfig) {
+    constructor(network: InstanceNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
         this.network = network
         this.serverSockets = []
 
-        if (!config || !config.bufferCtor || !config.binaryWriterCtor) {
-            throw new Error('MockAdapter requires a config.bufferCtor and config.binaryWriterCtor to be created.')
+        if (!config?.binary) {
+            throw new Error('MockAdapter requires a config.binary to be created.')
         }
 
-        this.bufferCtor = config.bufferCtor
-        this.binaryWriterCtor = config.binaryWriterCtor
-        this.binaryReaderCtor = config.binaryReaderCtor
+        this.binary = config.binary
     }
 
     listen(port: number, ready: () => void) {
@@ -72,50 +63,25 @@ class MockInstanceAdapter implements IServerNetworkAdapter {
         user.socket.end(1000, JSON.stringify(reason))
     }
 
-    send(user: User, buffer: Buffer): void {
+    send(user: User, buffer: OutboundPayload): void {
         user.socket.send(buffer, true)
-    }
-
-    createBuffer(lengthInBytes: number): Buffer | ArrayBuffer {
-        return new this.bufferCtor(lengthInBytes)
-    }
-
-    createBufferWriter(lengthInBytes: number): IBinaryWriter {
-        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes))
-    }
-
-    createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader {
-        return new this.binaryReaderCtor(buffer)
     }
 }
 
-class MockClientAdapter implements IClientNetworkAdapter {
+class MockClientAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IClientNetworkAdapter {
     network: ClientNetwork
-    bufferCtor: typeof Buffer | typeof ArrayBuffer
-    binaryWriterCtor: IBinaryWriterClass
-    binaryReaderCtor: IBinaryReaderClass
+    binary: BinaryAdapter<InboundPayload, OutboundPayload>
 
-    constructor(network: ClientNetwork, config: MockAdapterConfig) {
+    constructor(network: ClientNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
         this.network = network
-        this.bufferCtor = config.bufferCtor
-        this.binaryWriterCtor = config.binaryWriterCtor
-        this.binaryReaderCtor = config.binaryReaderCtor
+        if (!config?.binary) {
+            throw new Error('MockAdapter requires a config.binary to be created.')
+        }
+        this.binary = config.binary
     }
 
-    createBuffer(lengthInBytes: number): Buffer | ArrayBuffer {
-        return new this.bufferCtor(lengthInBytes)
-    }
-
-    createBufferWriter(lengthInBytes: number): IBinaryWriter {
-        return new this.binaryWriterCtor(this.createBuffer(lengthInBytes))
-    }
-
-    createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader {
-        return new this.binaryReaderCtor(buffer)
-    }
-
-    onMessage(buffer: Buffer | ArrayBuffer) {
-        const br = this.createBufferReader(buffer)
+    onMessage(buffer: InboundPayload) {
+        const br = this.binary.createReader(buffer)
         this.network.readSnapshot(br)
     }
 
@@ -158,12 +124,12 @@ class MockServerSocket {
 
     }
 
-    receive(buffer: Buffer) {
+    receive(buffer: BinaryPayload) {
         //this.inboundQueue.enqueue(buffer)
         this.network.onMessage(this.user!, buffer)
     }
 
-    send(buffer: Buffer) {
+    send(buffer: BinaryPayload) {
         if (this.clientSocket) {
             this.clientSocket.receive(buffer)
         }
@@ -186,11 +152,11 @@ class MockClientSocket {
         this.readyState = MockSocketReadyState.CLOSED
     }
 
-    send(buffer: Buffer) {
+    send(buffer: BinaryPayload) {
         this.serverSocket.receive(buffer)
     }
 
-    receive(buffer: Buffer) {
+    receive(buffer: BinaryPayload) {
         this.inboundQueue.enqueue(buffer)
     }
 }

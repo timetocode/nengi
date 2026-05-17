@@ -10,6 +10,7 @@ const EntityCache_1 = require("./EntityCache");
 const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
 const NQueue_1 = require("../NQueue");
 const EngineMessage_1 = require("../common/EngineMessage");
+const Endpoint_1 = require("../common/Endpoint");
 class Instance {
     constructor(context) {
         this.context = context;
@@ -36,7 +37,10 @@ class Instance {
         this.localState.removeChild(parentNid, child);
     }
     respond(endpoint, callback) {
-        this.responseEndPoints.set(endpoint, callback);
+        this.responseEndPoints.set((0, Endpoint_1.getEndpointId)(endpoint), {
+            endpoint: (0, Endpoint_1.getEndpointDefinition)(endpoint),
+            callback: callback
+        });
     }
     step() {
         const timestamp = Date.now();
@@ -74,6 +78,7 @@ class Instance {
             user.lastSentInstanceTick = this.tick;
         });
         this.cache.deleteCachesForTick(this.tick);
+        this.localState.releaseDeferredIds();
     }
 }
 exports.Instance = Instance;

@@ -1,2 +1,2 @@
-export declare const channelAddEntitySchema: import("../binary/schema/Schema").Schema;
+export declare const channelAddEntitySchema: import("../..").Schema;
 //# sourceMappingURL=channelAddEntitySchema.d.ts.map

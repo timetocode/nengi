@@ -5,6 +5,17 @@ import { User } from './User';
 import { EntityCache } from './EntityCache';
 import { IEntity } from '../common/IEntity';
 import { NQueue } from '../NQueue';
+import { Endpoint, EndpointDefinition } from '../common/Endpoint';
+type ResponseSender<Response = any> = (response: Response) => void;
+type ResponseHandlerArgs<Request = any> = {
+    user: User;
+    body: Request;
+};
+type ResponseHandler<Request = any, Response = any> = (request: ResponseHandlerArgs<Request>, send: ResponseSender<Response>) => Response | void | Promise<Response | void>;
+export type ResponseEndpoint = {
+    endpoint: EndpointDefinition | null;
+    callback: ResponseHandler;
+};
 export declare class Instance {
     context: Context;
     localState: LocalState;
@@ -15,7 +26,7 @@ export declare class Instance {
     cache: EntityCache;
     tick: number;
     pingIntervalMs: number;
-    responseEndPoints: Map<number, (body: any, send: (response: any) => void) => any>;
+    responseEndPoints: Map<number, ResponseEndpoint>;
     /**
      *
      * @param handshake test test
@@ -29,7 +40,8 @@ export declare class Instance {
     constructor(context: Context);
     attachEntity(parentNid: number, child: IEntity): void;
     detachEntity(parentNid: number, child: IEntity): void;
-    respond(endpoint: number, callback: (body: any, send: (response: any) => void) => any): void;
+    respond<Request = any, Response = any>(endpoint: Endpoint<Request, Response>, callback: ResponseHandler<Request, Response>): void;
     step(): void;
 }
+export {};
 //# sourceMappingURL=Instance.d.ts.map

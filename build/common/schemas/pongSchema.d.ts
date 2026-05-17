@@ -1,2 +1,2 @@
-export declare const pongSchema: import("../binary/schema/Schema").Schema;
+export declare const pongSchema: import("../..").Schema;
 //# sourceMappingURL=pongSchema.d.ts.map

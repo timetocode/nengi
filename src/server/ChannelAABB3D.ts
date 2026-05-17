@@ -23,6 +23,6 @@ const pointInAABB3D = (p: Point3D, view: AABB3D) => {
 }
 export class ChannelAABB3D extends CulledChannel<Point3D, AABB3D> {
     constructor(localState: LocalState, historian?: Historian) {
-        super(localState, pointInAABB3D, historian)
+        super(localState, pointInAABB3D, { historian })
     }
 }

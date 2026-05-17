@@ -16,4 +16,5 @@ var EngineMessage;
     EngineMessage[EngineMessage["Ping"] = 10] = "Ping";
     EngineMessage[EngineMessage["Pong"] = 11] = "Pong";
     EngineMessage[EngineMessage["ClientTick"] = 12] = "ClientTick";
+    EngineMessage[EngineMessage["Protocol"] = 13] = "Protocol";
 })(EngineMessage || (exports.EngineMessage = EngineMessage = {}));

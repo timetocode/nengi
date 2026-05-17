@@ -1,14 +1,11 @@
-import { IBinaryReader } from '../../common/binary/IBinaryReader'
-import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
+import { BinaryAdapter, BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { User } from '../User'
 
-interface IServerNetworkAdapter {
+interface IServerNetworkAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> {
+    binary: BinaryAdapter<InboundPayload, OutboundPayload>
 	listen(port: number, ready: () => void): void
-	send(user: User, buffer: Buffer | ArrayBuffer): void
+	send(user: User, buffer: OutboundPayload): void
 	disconnect(user: User, reason: any): void
-	createBuffer(lengthInBytes: number): Buffer | ArrayBuffer
-	createBufferWriter(lengthInBytes: number): IBinaryWriter
-	createBufferReader(buffer: Buffer | ArrayBuffer): IBinaryReader
 }
 
 export { IServerNetworkAdapter }

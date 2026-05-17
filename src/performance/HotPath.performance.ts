@@ -4,7 +4,7 @@ import { Channel } from '../server/Channel'
 import { LocalState } from '../server/LocalState'
 import { Instance } from '../server/Instance'
 import { Context } from '../common/Context'
-import { defineSchema } from '../common/binary/schema/defineSchema'
+import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Binary } from '../common/binary/Binary'
 import { IEntity } from '../common/IEntity'
 
@@ -197,8 +197,8 @@ const NType = {
 }
 
 const ncontext = new Context()
-ncontext.register(NType.Channel, defineSchema({}))
-ncontext.register(NType.TestEntity, defineSchema({
+ncontext.register(NType.Channel, defineEntitySchema({}))
+ncontext.register(NType.TestEntity, defineEntitySchema({
     x: Binary.Float64,
     y: Binary.Float64
 }))

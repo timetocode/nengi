@@ -4,6 +4,9 @@ import { User } from './User'
 import { Channel } from './Channel'
 import { IEntity } from '../common/IEntity'
 import { Historian } from './Historian'
+import { ChannelOptions } from './Channel'
+
+export type CulledChannelOptions = ChannelOptions
 
 export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChannel<VisibleObjectType, ViewType> {
     private channel: Channel
@@ -12,16 +15,20 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
     historian: Historian | null = null
     users: Map<number, User> = new Map()
 
-    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, historian?: Historian) {
-        this.channel = new Channel(localState, historian)
+    constructor(localState: LocalState, visibilityResolver: VisibilityResolver<VisibleObjectType, ViewType>, options: CulledChannelOptions = {}) {
+        this.channel = new Channel(localState, options)
         this.visibilityResolver = visibilityResolver
-        if (historian) {
-            this.historian = historian
+        if (options.historian) {
+            this.historian = options.historian
         }
     }
 
     get nid() {
         return this.channel.nid
+    }
+
+    get label() {
+        return this.channel.label
     }
 
     get entities() {
@@ -40,6 +47,10 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
 
     removeEntity(entity: IEntity & VisibleObjectType) {
         return this.channel.removeEntity(entity)
+    }
+
+    removeAllEntities() {
+        return this.channel.removeAllEntities()
     }
 
     addMessage(message: any) {
@@ -62,6 +73,10 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
         this.views.delete(user.id)
         this.users.delete(user.id)
         user.unsubscribe(this)
+    }
+
+    unsubscribeAll() {
+        Array.from(this.users.values()).forEach(user => this.unsubscribe(user))
     }
 
     getVisibleEntities(userId: number): number[] {

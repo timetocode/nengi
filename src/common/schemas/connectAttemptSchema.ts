@@ -1,6 +1,6 @@
-import { defineSchema } from '../binary/schema/defineSchema'
+import { defineMessageSchema } from '../binary/schema/defineSchema'
 import { Binary } from '../binary/Binary'
 
-export const connectionAttemptSchema = defineSchema({
+export const connectionAttemptSchema = defineMessageSchema({
     handshake: Binary.String,
 })

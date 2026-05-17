@@ -1,4 +1,5 @@
 import { Schema } from '../../common/binary/schema/Schema';
-declare function count(schema: Schema, entity: any): number;
+import { NetworkIdType } from '../../common/binary/Protocol';
+declare function count(schema: Schema, message: any, ntypeType?: NetworkIdType): number;
 export default count;
 //# sourceMappingURL=count.d.ts.map

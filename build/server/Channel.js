@@ -3,14 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Channel = void 0;
 const NDictionary_1 = require("./NDictionary");
 class Channel {
-    constructor(localState, historian) {
+    constructor(localState, options = {}) {
         this.entities = new NDictionary_1.NDictionary();
         this.users = new Map();
         this.historian = null;
         this.localState = localState;
         this.nid = localState.nidPool.nextId();
-        if (historian) {
-            this.historian = historian;
+        this.label = options.label;
+        if (options.historian) {
+            this.historian = options.historian;
         }
         this.localState.channels.add(this);
     }
@@ -39,6 +40,13 @@ class Channel {
         this.users.delete(user.id);
         user.unsubscribe(this);
     }
+    unsubscribeAll() {
+        Array.from(this.users.values()).forEach(user => this.unsubscribe(user));
+    }
+    removeAllEntities() {
+        Array.from(this.entities.array).forEach(entity => this.removeEntity(entity));
+        this.entities.removeAll();
+    }
     getVisibleEntities(userId) {
         const visibleNids = [];
         this.entities.forEach((entity) => {
@@ -47,11 +55,8 @@ class Channel {
         return visibleNids;
     }
     destroy() {
-        this.users.forEach(user => this.unsubscribe(user));
-        for (let i = 0; i < this.entities.array.length; i++) {
-            this.removeEntity(this.entities.array[i]);
-        }
-        this.entities.removeAll();
+        this.unsubscribeAll();
+        this.removeAllEntities();
         this.localState.nidPool.returnId(this.nid);
         this.localState.channels.delete(this);
     }

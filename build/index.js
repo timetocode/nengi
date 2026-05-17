@@ -30,6 +30,7 @@ __exportStar(require("./server/adapter/MockAdapter"), exports);
 // client
 __exportStar(require("./client/Client"), exports);
 __exportStar(require("./client/ClientNetwork"), exports);
+__exportStar(require("./client/EntityStore"), exports);
 __exportStar(require("./client/Interpolator"), exports);
 __exportStar(require("./client/prediction/Predictor"), exports);
 __exportStar(require("./client/prediction/PredictionErrorFrame"), exports);
@@ -47,9 +48,13 @@ __exportStar(require("./common/binary/schema/defineSchema"), exports);
 __exportStar(require("./common/binary/NetworkEvent"), exports);
 __exportStar(require("./common/EngineMessage"), exports);
 __exportStar(require("./common/binary/BinaryExt"), exports);
+__exportStar(require("./common/Endpoint"), exports);
 // types for integration with adapters
 __exportStar(require("./server/adapter/IServerNetworkAdapter"), exports);
 __exportStar(require("./common/binary/IBinaryReader"), exports);
 __exportStar(require("./common/binary/IBinaryWriter"), exports);
+__exportStar(require("./common/binary/BinaryAdapter"), exports);
+__exportStar(require("./common/binary/Protocol"), exports);
 // benchmarks/tests
 __exportStar(require("./binary/message/writeMessage"), exports);
+__exportStar(require("./binary/entity/writeEntity"), exports);

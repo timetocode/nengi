@@ -164,8 +164,8 @@ const NType = {
     TestEntity: 2,
 };
 const ncontext = new Context_1.Context();
-ncontext.register(NType.Channel, (0, defineSchema_1.defineSchema)({}));
-ncontext.register(NType.TestEntity, (0, defineSchema_1.defineSchema)({
+ncontext.register(NType.Channel, (0, defineSchema_1.defineEntitySchema)({}));
+ncontext.register(NType.TestEntity, (0, defineSchema_1.defineEntitySchema)({
     x: Binary_1.Binary.Float64,
     y: Binary_1.Binary.Float64
 }));

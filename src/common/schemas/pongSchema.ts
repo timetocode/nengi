@@ -1,3 +1,3 @@
-import { defineSchema } from '../binary/schema/defineSchema'
+import { defineMessageSchema } from '../binary/schema/defineSchema'
 
-export const pongSchema = defineSchema({})
+export const pongSchema = defineMessageSchema({})

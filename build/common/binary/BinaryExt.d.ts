@@ -30,7 +30,8 @@ type BinarySpecification<T> = {
     interp: (a: T, b: T, t: number) => T;
     clone: (value: any) => T;
 };
+declare const lerp: (a: number, b: number, t: number) => number;
 declare function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecification<T>): void;
 declare const binaryGet: (binaryType: Binary) => BinarySpecification<any>;
-export { binaryGet, declareBinaryType };
+export { binaryGet, declareBinaryType, lerp };
 //# sourceMappingURL=BinaryExt.d.ts.map

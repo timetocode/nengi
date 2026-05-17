@@ -3,18 +3,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CulledChannel = void 0;
 const Channel_1 = require("./Channel");
 class CulledChannel {
-    constructor(localState, visibilityResolver, historian) {
+    constructor(localState, visibilityResolver, options = {}) {
         this.views = new Map();
         this.historian = null;
         this.users = new Map();
-        this.channel = new Channel_1.Channel(localState, historian);
+        this.channel = new Channel_1.Channel(localState, options);
         this.visibilityResolver = visibilityResolver;
-        if (historian) {
-            this.historian = historian;
+        if (options.historian) {
+            this.historian = options.historian;
         }
     }
     get nid() {
         return this.channel.nid;
+    }
+    get label() {
+        return this.channel.label;
     }
     get entities() {
         return this.channel.entities;
@@ -29,6 +32,9 @@ class CulledChannel {
     }
     removeEntity(entity) {
         return this.channel.removeEntity(entity);
+    }
+    removeAllEntities() {
+        return this.channel.removeAllEntities();
     }
     addMessage(message) {
         this.users.forEach((user, userId) => {
@@ -47,6 +53,9 @@ class CulledChannel {
         this.views.delete(user.id);
         this.users.delete(user.id);
         user.unsubscribe(this);
+    }
+    unsubscribeAll() {
+        Array.from(this.users.values()).forEach(user => this.unsubscribe(user));
     }
     getVisibleEntities(userId) {
         const view = this.views.get(userId);

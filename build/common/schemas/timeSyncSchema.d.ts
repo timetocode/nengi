@@ -1,2 +1,2 @@
-export declare const timeSyncSchema: import("../binary/schema/Schema").Schema;
+export declare const timeSyncSchema: import("../..").Schema;
 //# sourceMappingURL=timeSyncSchema.d.ts.map

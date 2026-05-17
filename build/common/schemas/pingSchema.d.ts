@@ -1,2 +1,2 @@
-export declare const pingSchema: import("../binary/schema/Schema").Schema;
+export declare const pingSchema: import("../..").Schema;
 //# sourceMappingURL=pingSchema.d.ts.map
