@@ -2,6 +2,7 @@ import { Schema, SchemaProp, SchemaUpdateGroup } from '../common/binary/schema/S
 import { IEntity } from '../common/IEntity'
 import { IChannel } from './IChannel'
 import { LocalState } from './LocalState'
+import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialPlane'
 import { User } from './User'
 
@@ -19,15 +20,7 @@ export type EcsSpatialUpdateLog = {
     manualGroupValues: any[]
 }
 
-type Cell = EcsSpatialUpdateLog & {
-    key: string
-    x: number
-    y: number
-    rootNids: number[]
-    version: number
-}
-
-type CellRef = { key: string, index: number }
+type Cell = SpatialGridCell<EcsSpatialComponent> & EcsSpatialUpdateLog
 
 export type EcsSpatialTypeWriters = {
     [name: string]: any
@@ -60,15 +53,8 @@ function createUpdateLog(): EcsSpatialUpdateLog {
     }
 }
 
-function createCell(key: string, x: number, y: number): Cell {
-    return {
-        key,
-        x,
-        y,
-        rootNids: [],
-        version: 0,
-        ...createUpdateLog()
-    }
+function initializeEcsSpatialCell(cell: SpatialGridCell<EcsSpatialComponent>) {
+    Object.assign(cell, createUpdateLog())
 }
 
 export class EcsSpatialChannel implements IChannel {
@@ -109,8 +95,7 @@ export class EcsSpatialChannel implements IChannel {
     private spatialComponentByRoot: Map<number, EcsSpatialComponent> = new Map()
     private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private cells: Map<string, Cell> = new Map()
-    private rootCells: Map<number, CellRef> = new Map()
+    private grid: SpatialGrid2D<EcsSpatialComponent>
     private visibleCellKeyCache: Map<number, { viewVersion: number, membershipVersion: number, keys: string[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private movedRoots: EcsSpatialMove[] = []
@@ -139,96 +124,37 @@ export class EcsSpatialChannel implements IChannel {
         this.axes = getSpatialPlaneAxes(this.plane)
         this.spatialXProp = options.spatialProps?.x || this.axes.a
         this.spatialYProp = options.spatialProps?.y || this.axes.b
+        this.grid = new SpatialGrid2D({
+            cellSize,
+            getX: component => component[this.spatialXProp],
+            getY: component => component[this.spatialYProp],
+            initializeCell: initializeEcsSpatialCell
+        })
         this.localState.channels.add(this as any)
     }
 
-    private cellCoord(value: number) {
-        return Math.floor(value / this.cellSize)
-    }
-
-    private cellCoordForEnd(value: number) {
-        return Math.ceil(value / this.cellSize) - 1
-    }
-
-    private cellKey(x: number, y: number) {
-        return `${x}:${y}`
-    }
-
-    private cellKeyForComponent(component: EcsSpatialComponent) {
-        return this.cellKey(
-            this.cellCoord(component[this.spatialXProp]),
-            this.cellCoord(component[this.spatialYProp])
-        )
-    }
-
-    private getOrCreateCellForComponent(component: EcsSpatialComponent) {
-        const x = this.cellCoord(component[this.spatialXProp])
-        const y = this.cellCoord(component[this.spatialYProp])
-        const key = this.cellKey(x, y)
-        let cell = this.cells.get(key)
-        if (!cell) {
-            cell = createCell(key, x, y)
-            this.cells.set(key, cell)
-        }
-        return cell
-    }
-
     private addRootToCell(pid: number, component: EcsSpatialComponent) {
-        const cell = this.getOrCreateCellForComponent(component)
-        const wasEmpty = cell.rootNids.length === 0
-        this.rootCells.set(pid, { key: cell.key, index: cell.rootNids.length })
-        cell.rootNids.push(pid)
-        cell.version++
-        return wasEmpty
+        return this.grid.add(pid, component).createdCell
     }
 
     private removeRootFromCell(pid: number) {
-        const ref = this.rootCells.get(pid)
-        if (!ref) {
-            return false
-        }
-        const cell = this.cells.get(ref.key)
-        if (!cell) {
-            this.rootCells.delete(pid)
-            return false
-        }
-
-        const lastIndex = cell.rootNids.length - 1
-        const movedPid = cell.rootNids[lastIndex]
-        cell.rootNids[ref.index] = movedPid
-        cell.rootNids.pop()
-        if (movedPid !== pid) {
-            this.rootCells.set(movedPid, { key: ref.key, index: ref.index })
-        }
-        const removedCell = cell.rootNids.length === 0
-        if (removedCell) {
-            this.cells.delete(ref.key)
-        } else {
-            cell.version++
-        }
-        this.rootCells.delete(pid)
-        return removedCell
+        return this.grid.remove(pid)?.removedCell || false
     }
 
     private updateRootCell(pid: number) {
         const component = this.spatialComponentByRoot.get(pid)
-        const current = this.rootCells.get(pid)
-        if (!component || !current) {
+        if (!component) {
             return
         }
 
-        const nextKey = this.cellKeyForComponent(component)
-        if (current.key === nextKey) {
+        const move = this.grid.update(pid, component)
+        if (!move) {
             return
         }
-
-        const fromCell = current.key
-        const removedCell = this.removeRootFromCell(pid)
-        const createdCell = this.addRootToCell(pid, component)
-        this.movedRoots.push({ pid, fromCell, toCell: nextKey })
+        this.movedRoots.push({ pid, fromCell: move.fromCell, toCell: move.toCell })
         this.membershipVersion++
         this.structuralDeltas = true
-        if (removedCell || createdCell) {
+        if (move.removedCell || move.createdCell) {
             this.invalidateVisibleCellKeyCache()
         } else {
             this.invalidateVisibleNetworkedNidsCache()
@@ -249,10 +175,10 @@ export class EcsSpatialChannel implements IChannel {
         const halfWidth = spatialView.halfA + this.queryPadding
         const halfHeight = spatialView.halfB + this.queryPadding
         return {
-            minX: this.cellCoord(spatialView.a - halfWidth),
-            maxX: this.cellCoordForEnd(spatialView.a + halfWidth),
-            minY: this.cellCoord(spatialView.b - halfHeight),
-            maxY: this.cellCoordForEnd(spatialView.b + halfHeight)
+            minX: this.grid.cellCoord(spatialView.a - halfWidth),
+            maxX: this.grid.cellCoordForEnd(spatialView.a + halfWidth),
+            minY: this.grid.cellCoord(spatialView.b - halfHeight),
+            maxY: this.grid.cellCoordForEnd(spatialView.b + halfHeight)
         }
     }
 
@@ -271,6 +197,19 @@ export class EcsSpatialChannel implements IChannel {
         const separator = key.indexOf(':')
         const x = Number(key.slice(0, separator))
         const y = Number(key.slice(separator + 1))
+        const spatialView = normalizeSpatialView(view, this.plane)
+        if (spatialView.radius !== undefined) {
+            const cellMinX = x * this.cellSize
+            const cellMaxX = cellMinX + this.cellSize
+            const cellMinY = y * this.cellSize
+            const cellMaxY = cellMinY + this.cellSize
+            const nearestX = spatialView.a < cellMinX ? cellMinX : spatialView.a > cellMaxX ? cellMaxX : spatialView.a
+            const nearestY = spatialView.b < cellMinY ? cellMinY : spatialView.b > cellMaxY ? cellMaxY : spatialView.b
+            const dx = spatialView.a - nearestX
+            const dy = spatialView.b - nearestY
+            const radius = spatialView.radius + this.queryPadding
+            return dx * dx + dy * dy <= radius * radius
+        }
         const range = this.viewRange(view)
         return x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY
     }
@@ -281,8 +220,8 @@ export class EcsSpatialChannel implements IChannel {
         if (spatial) {
             this.updateRootCell(pid)
         }
-        const ref = this.rootCells.get(pid)
-        return ref ? this.cells.get(ref.key) || null : null
+        const ref = this.grid.objectCells.get(pid)
+        return ref ? this.grid.cells.get(ref.key) as Cell || null : null
     }
 
     private markCellDirtyForComponent(component: EcsSpatialComponent) {
@@ -301,16 +240,10 @@ export class EcsSpatialChannel implements IChannel {
             return keys
         }
 
-        const range = this.viewRange(view)
-        for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
-            for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
-                const key = this.cellKey(cellX, cellY)
-                if (this.cells.has(key)) {
-                    keys.push(key)
-                }
-            }
-        }
-        return keys
+        const spatialView = normalizeSpatialView(view, this.plane)
+        return spatialView.radius !== undefined ?
+            this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding) :
+            this.grid.getVisibleCellKeys(this.viewRange(view))
     }
 
     private appendRootNetworkedNids(pid: number, nids: number[]) {
@@ -398,7 +331,7 @@ export class EcsSpatialChannel implements IChannel {
         this.componentsByRoot.get(pid)!.push(ecsComponent)
         if (options.spatial) {
             this.spatialComponentByRoot.set(pid, ecsComponent)
-            if (!this.rootCells.has(pid)) {
+            if (!this.grid.objectCells.has(pid)) {
                 this.addRootToCell(pid, ecsComponent)
             } else {
                 this.updateRootCell(pid)
@@ -464,7 +397,7 @@ export class EcsSpatialChannel implements IChannel {
             throw new Error(`Cannot use component nid ${nid} as spatial component for ECS entity nid ${pid}.`)
         }
         this.spatialComponentByRoot.set(pid, component)
-        if (!this.rootCells.has(pid)) {
+        if (!this.grid.objectCells.has(pid)) {
             this.addRootToCell(pid, component)
             this.membershipVersion++
             this.structuralDeltas = true
@@ -506,11 +439,11 @@ export class EcsSpatialChannel implements IChannel {
         const roots: number[] = []
         const keys = this.getVisibleCellKeys(userId)
         for (let i = 0; i < keys.length; i++) {
-            const cell = this.cells.get(keys[i])
+            const cell = this.grid.cells.get(keys[i])
             if (!cell) {
                 continue
             }
-            roots.push(...cell.rootNids)
+            roots.push(...cell.ids)
         }
         return roots
     }
@@ -525,12 +458,12 @@ export class EcsSpatialChannel implements IChannel {
         const nids: number[] = []
         const keys = this.getVisibleCellKeys(userId)
         for (let i = 0; i < keys.length; i++) {
-            const cell = this.cells.get(keys[i])
+            const cell = this.grid.cells.get(keys[i])
             if (!cell) {
                 continue
             }
-            for (let j = 0; j < cell.rootNids.length; j++) {
-                this.appendRootNetworkedNids(cell.rootNids[j], nids)
+            for (let j = 0; j < cell.ids.length; j++) {
+                this.appendRootNetworkedNids(cell.ids[j], nids)
             }
         }
         this.visibleNetworkedNidsCache.set(userId, { viewVersion, membershipVersion: this.membershipVersion, nids })
@@ -550,11 +483,11 @@ export class EcsSpatialChannel implements IChannel {
     }
 
     getCellRootNids(key: string) {
-        return this.cells.get(key)?.rootNids || []
+        return this.grid.cells.get(key)?.ids || []
     }
 
     getManualCellUpdateLog(key: string) {
-        const cell = this.cells.get(key)
+        const cell = this.grid.cells.get(key) as Cell
         if (!cell) {
             return null
         }
@@ -643,7 +576,7 @@ export class EcsSpatialChannel implements IChannel {
             log.manualGroupValues.length = 0
         }
         for (const key of this.dirtyCells) {
-            const cell = this.cells.get(key)
+            const cell = this.grid.cells.get(key) as Cell
             if (cell) {
                 clearLog(cell)
             }

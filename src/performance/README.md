@@ -31,6 +31,7 @@ PROFILE_CHURN=100
 PROFILE_CHILDREN=1
 PROFILE_SPATIAL_DISTRIBUTION=homogeneous  # default | single-cell | centered-cell | homogeneous | clustered
 PROFILE_SPATIAL_PLANE=xy       # xy | xz
+PROFILE_VIEW_SHAPE=aabb        # aabb | circle | sphere
 PROFILE_WORLD_SIZE=5000
 PROFILE_CLUSTERS=8
 PROFILE_MOVE_FRACTION=1
@@ -61,9 +62,12 @@ Scenarios:
   `PROFILE_STABLE_FRAGMENT_CELL_LIMIT` allows stable views to use more copied
   cell fragments than unstable CRUD frames, while keeping broad churny views on
   the normal reconciliation path.
+  `PROFILE_VIEW_SHAPE=circle` uses coarse circular cell selection for 2D or
+  projected views.
 - `spatial-channel-3d`: true volumetric `SpatialChannel3D` workload using
   `AABB3D` views and `x:y:z` cell keys. This is the control for games that
-  need vertical culling rather than horizontal projection.
+  need vertical culling rather than horizontal projection. `PROFILE_VIEW_SHAPE=sphere`
+  uses coarse spherical cell selection.
 - `spatial-grid-channel` and `spatial-grid-channel-3d`: experimental
   comparison channels backed by the shared `SpatialGrid` core. They exist to
   benchmark whether extracting cell bookkeeping costs too much on hot paths.

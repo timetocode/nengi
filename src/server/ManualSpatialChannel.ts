@@ -4,11 +4,11 @@ import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { LocalState } from './LocalState'
 import { NDictionary } from './NDictionary'
+import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialPlane'
 import { User } from './User'
 
 type SpatialEntity = IEntity & Record<string, any>
-type CellRef = { key: string, index: number }
 export type ManualSpatialMove = { entity: SpatialEntity, fromCell: string, toCell: string }
 
 export type ManualSpatialCellLog = {
@@ -21,14 +21,7 @@ export type ManualSpatialCellLog = {
     manualGroupValues: any[]
 }
 
-type Cell = ManualSpatialCellLog & {
-    key: string
-    x: number
-    y: number
-    entities: SpatialEntity[]
-    entityNids: number[]
-    version: number
-}
+type Cell = SpatialGridCell<SpatialEntity> & ManualSpatialCellLog
 
 export type ManualSpatialTypeWriters = {
     [name: string]: any
@@ -46,22 +39,15 @@ export type ManualSpatialChannelOptions = ChannelOptions & {
     spatialProps?: { x?: string, y?: string }
 }
 
-function createCell(key: string, x: number, y: number): Cell {
-    return {
-        key,
-        x,
-        y,
-        entities: [],
-        entityNids: [],
-        version: 0,
-        manualPropNids: [],
-        manualPropSchemas: [],
-        manualPropValues: [],
-        manualGroupNids: [],
-        manualGroupSchemas: [],
-        manualGroupValueOffsets: [],
-        manualGroupValues: []
-    }
+function initializeManualSpatialCell(cell: SpatialGridCell<SpatialEntity>) {
+    const manualCell = cell as Cell
+    manualCell.manualPropNids = []
+    manualCell.manualPropSchemas = []
+    manualCell.manualPropValues = []
+    manualCell.manualGroupNids = []
+    manualCell.manualGroupSchemas = []
+    manualCell.manualGroupValueOffsets = []
+    manualCell.manualGroupValues = []
 }
 
 export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, SpatialView> {
@@ -82,8 +68,7 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
     dirtyCells: Set<string> = new Set()
     private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private cells: Map<string, Cell> = new Map()
-    private entityCells: Map<number, CellRef> = new Map()
+    private grid: SpatialGrid2D<SpatialEntity>
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
@@ -115,106 +100,44 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
         this.axes = getSpatialPlaneAxes(this.plane)
         this.spatialXProp = options.spatialProps?.x || this.axes.a
         this.spatialYProp = options.spatialProps?.y || this.axes.b
+        this.grid = new SpatialGrid2D({
+            cellSize,
+            getX: entity => entity[this.spatialXProp],
+            getY: entity => entity[this.spatialYProp],
+            initializeCell: initializeManualSpatialCell
+        })
         this.localState.channels.add(this as any)
     }
 
-    private cellCoord(value: number) {
-        return Math.floor(value / this.cellSize)
-    }
-
-    private cellCoordForEnd(value: number) {
-        return Math.ceil(value / this.cellSize) - 1
-    }
-
-    private cellKey(x: number, y: number) {
-        return `${x}:${y}`
-    }
-
-    private cellKeyForEntity(entity: SpatialEntity) {
-        return this.cellKey(
-            this.cellCoord(entity[this.spatialXProp]),
-            this.cellCoord(entity[this.spatialYProp])
-        )
-    }
-
     private getOrCreateCellForEntity(entity: SpatialEntity) {
-        const x = this.cellCoord(entity[this.spatialXProp])
-        const y = this.cellCoord(entity[this.spatialYProp])
-        const key = this.cellKey(x, y)
-        let cell = this.cells.get(key)
-        if (!cell) {
-            cell = createCell(key, x, y)
-            this.cells.set(key, cell)
-        }
-        return cell
+        return this.grid.getOrCreateCellForObject(entity) as Cell
     }
 
     private getCellForEntity(entity: SpatialEntity) {
-        const ref = this.entityCells.get(entity.nid)
+        const ref = this.grid.objectCells.get(entity.nid)
         if (ref) {
-            return this.cells.get(ref.key) || this.getOrCreateCellForEntity(entity)
+            return this.grid.cells.get(ref.key) as Cell || this.getOrCreateCellForEntity(entity)
         }
         return this.getOrCreateCellForEntity(entity)
     }
 
     private addToCell(entity: SpatialEntity) {
-        const cell = this.getOrCreateCellForEntity(entity)
-        const wasEmpty = cell.entities.length === 0
-        this.entityCells.set(entity.nid, { key: cell.key, index: cell.entities.length })
-        cell.entities.push(entity)
-        cell.entityNids.push(entity.nid)
-        cell.version++
-        return wasEmpty
+        return this.grid.add(entity.nid, entity).createdCell
     }
 
     private removeFromCell(entity: SpatialEntity) {
-        const ref = this.entityCells.get(entity.nid)
-        if (!ref) {
-            return false
-        }
-
-        const cell = this.cells.get(ref.key)
-        if (!cell) {
-            this.entityCells.delete(entity.nid)
-            return false
-        }
-
-        const lastIndex = cell.entities.length - 1
-        const moved = cell.entities[lastIndex]
-        cell.entities[ref.index] = moved
-        cell.entityNids[ref.index] = moved.nid
-        cell.entities.pop()
-        cell.entityNids.pop()
-        if (moved && moved.nid !== entity.nid) {
-            this.entityCells.set(moved.nid, { key: ref.key, index: ref.index })
-        }
-        const removedCell = cell.entities.length === 0
-        if (removedCell) {
-            this.cells.delete(ref.key)
-        } else {
-            cell.version++
-        }
-        this.entityCells.delete(entity.nid)
-        return removedCell
+        return this.grid.remove(entity.nid)?.removedCell || false
     }
 
     private updateSpatialCell(entity: SpatialEntity) {
-        const current = this.entityCells.get(entity.nid)
-        if (!current) {
+        const move = this.grid.update(entity.nid, entity)
+        if (!move) {
             return
         }
 
-        const nextKey = this.cellKeyForEntity(entity)
-        if (current.key === nextKey) {
-            return
-        }
-
-        const fromCell = current.key
-        const removedCell = this.removeFromCell(entity)
-        const createdCell = this.addToCell(entity)
-        this.movedRoots.push({ entity, fromCell, toCell: nextKey })
+        this.movedRoots.push({ entity, fromCell: move.fromCell, toCell: move.toCell })
         this.membershipVersion++
-        if (removedCell || createdCell) {
+        if (move.removedCell || move.createdCell) {
             this.invalidateVisibleCellKeyCache()
         } else {
             this.invalidateVisibleEntityCache()
@@ -222,23 +145,23 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
     }
 
     private markCellDirtyForEntity(entity: SpatialEntity) {
-        let ref = this.entityCells.get(entity.nid)
+        let ref = this.grid.objectCells.get(entity.nid)
         if (ref) {
             this.updateSpatialCell(entity)
-            ref = this.entityCells.get(entity.nid)
+            ref = this.grid.objectCells.get(entity.nid)
             if (!ref) {
                 return null
             }
             this.dirtyCells.add(ref.key)
-            return this.cells.get(ref.key)
+            return this.grid.cells.get(ref.key) as Cell
         }
 
         const rootNid = this.localState.getRootNid(entity.nid)
         if (rootNid && rootNid !== entity.nid) {
-            const rootRef = this.entityCells.get(rootNid)
+            const rootRef = this.grid.objectCells.get(rootNid)
             if (rootRef) {
                 this.dirtyCells.add(rootRef.key)
-                return this.cells.get(rootRef.key)
+                return this.grid.cells.get(rootRef.key) as Cell
             }
         }
 
@@ -265,10 +188,10 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
         const endY = spatialView.b + halfHeight
 
         return {
-            minX: this.cellCoord(startX),
-            maxX: this.cellCoordForEnd(endX),
-            minY: this.cellCoord(startY),
-            maxY: this.cellCoordForEnd(endY)
+            minX: this.grid.cellCoord(startX),
+            maxX: this.grid.cellCoordForEnd(endX),
+            minY: this.grid.cellCoord(startY),
+            maxY: this.grid.cellCoordForEnd(endY)
         }
     }
 
@@ -280,18 +203,19 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
             return { keys, nids }
         }
 
-        const range = this.viewRange(view)
-        for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
-            for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
-                const key = this.cellKey(cellX, cellY)
-                const cell = this.cells.get(key)
-                if (!cell) {
-                    continue
-                }
-                keys.push(key)
-                for (let i = 0; i < cell.entityNids.length; i++) {
-                    nids.push(cell.entityNids[i])
-                }
+        const spatialView = normalizeSpatialView(view, this.plane)
+        const visibleKeys = spatialView.radius !== undefined ?
+            this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding) :
+            this.grid.getVisibleCellKeys(this.viewRange(view))
+        for (let i = 0; i < visibleKeys.length; i++) {
+            const key = visibleKeys[i]
+            const cell = this.grid.cells.get(key)
+            if (!cell) {
+                continue
+            }
+            keys.push(key)
+            for (let j = 0; j < cell.ids.length; j++) {
+                nids.push(cell.ids[j])
             }
         }
 
@@ -300,13 +224,13 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
 
     private getCellDeleteNids(key: string) {
         const nids: number[] = []
-        const cell = this.cells.get(key)
+        const cell = this.grid.cells.get(key)
         if (!cell) {
             return nids
         }
 
-        for (let i = 0; i < cell.entityNids.length; i++) {
-            this.localState.collectEntityTreeDeletes(cell.entityNids[i], nids)
+        for (let i = 0; i < cell.ids.length; i++) {
+            this.localState.collectEntityTreeDeletes(cell.ids[i], nids)
         }
         return nids
     }
@@ -469,7 +393,7 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
 
     clearSnapshotDeltas() {
         for (const key of this.dirtyCells) {
-            const cell = this.cells.get(key)
+            const cell = this.grid.cells.get(key) as Cell
             if (!cell) {
                 continue
             }
@@ -583,19 +507,19 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
     }
 
     getCellEntities(key: string) {
-        return this.cells.get(key)?.entities || []
+        return this.grid.cells.get(key)?.objects || []
     }
 
     getCellEntityNids(key: string) {
-        return this.cells.get(key)?.entityNids || []
+        return this.grid.cells.get(key)?.ids || []
     }
 
     getCellVersion(key: string) {
-        return this.cells.get(key)?.version || 0
+        return this.grid.cells.get(key)?.version || 0
     }
 
     getManualCellUpdateLog(key: string) {
-        return this.cells.get(key) || null
+        return this.grid.cells.get(key) as Cell || null
     }
 
     cellHasManualUpdates(key: string) {
@@ -678,8 +602,8 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
         this.visibleEntityCache.clear()
         this.rememberedCells.clear()
         this.rememberedCellSignatures.clear()
-        this.cells.clear()
-        this.entityCells.clear()
+        this.grid.cells.clear()
+        this.grid.objectCells.clear()
         this.visibilityResolver = () => true
     }
 }

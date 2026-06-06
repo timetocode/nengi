@@ -83,6 +83,7 @@ const SCENARIOS = new Set<ScenarioName>([
 
 type ManualEmitMode = 'group4' | 'props'
 type EntityShape = 'standard' | 'monolith' | 'ecs'
+type SpatialViewShape = 'aabb' | 'circle' | 'sphere'
 
 const CUSTOM_MUTATION_SCENARIOS = new Set<ScenarioName>([
     'channel-churn',
@@ -173,6 +174,7 @@ type ScenarioConfig = {
     stableFragmentCellLimit: number
     manualEmitMode: ManualEmitMode
     entityShape: EntityShape
+    spatialViewShape: SpatialViewShape
 }
 
 class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
@@ -284,6 +286,10 @@ function readConfig(): ScenarioConfig {
     if (entityShape !== 'standard' && entityShape !== 'monolith' && entityShape !== 'ecs') {
         throw new Error('PROFILE_ENTITY_SHAPE must be "standard", "monolith", or "ecs".')
     }
+    const spatialViewShape = process.env.PROFILE_VIEW_SHAPE || 'aabb'
+    if (spatialViewShape !== 'aabb' && spatialViewShape !== 'circle' && spatialViewShape !== 'sphere') {
+        throw new Error('PROFILE_VIEW_SHAPE must be "aabb", "circle", or "sphere".')
+    }
 
     return {
         scenario,
@@ -308,7 +314,8 @@ function readConfig(): ScenarioConfig {
         fragmentCellLimit: Math.max(1, Math.floor(envNumber('PROFILE_FRAGMENT_CELL_LIMIT', 16))),
         stableFragmentCellLimit: Math.max(1, Math.floor(envNumber('PROFILE_STABLE_FRAGMENT_CELL_LIMIT', 64))),
         manualEmitMode: manualEmitMode as ManualEmitMode,
-        entityShape: entityShape as EntityShape
+        entityShape: entityShape as EntityShape,
+        spatialViewShape: spatialViewShape as SpatialViewShape
     }
 }
 
@@ -1205,18 +1212,36 @@ function setupFixedVisible(instance: Instance, users: User[], entities: TestEnti
 function createSpatialView(userIndex: number, entities: TestEntity[], config: ScenarioConfig) {
     if (config.spatialDistribution === 'single-cell') {
         const side = Math.max(1, config.cellSize * 0.8)
+        if (config.spatialViewShape === 'circle' || config.spatialViewShape === 'sphere') {
+            if (config.spatialPlane === 'xz') {
+                return { x: side * 0.5, z: side * 0.5, radius: config.viewHalf }
+            }
+            return { x: side * 0.5, y: side * 0.5, radius: config.viewHalf }
+        }
         if (config.spatialPlane === 'xz') {
             return { x: side * 0.5, z: side * 0.5, halfX: config.viewHalf, halfZ: config.viewHalf }
         }
         return new AABB2D(side * 0.5, side * 0.5, config.viewHalf, config.viewHalf)
     }
     if (config.spatialDistribution === 'centered-cell') {
+        if (config.spatialViewShape === 'circle' || config.spatialViewShape === 'sphere') {
+            if (config.spatialPlane === 'xz') {
+                return { x: config.cellSize * 0.5, z: config.cellSize * 0.5, radius: config.viewHalf }
+            }
+            return { x: config.cellSize * 0.5, y: config.cellSize * 0.5, radius: config.viewHalf }
+        }
         if (config.spatialPlane === 'xz') {
             return { x: config.cellSize * 0.5, z: config.cellSize * 0.5, halfX: config.viewHalf, halfZ: config.viewHalf }
         }
         return new AABB2D(config.cellSize * 0.5, config.cellSize * 0.5, config.viewHalf, config.viewHalf)
     }
     const entity = entities[(userIndex * Math.max(1, Math.floor(entities.length / Math.max(1, config.users)))) % entities.length]
+    if (config.spatialViewShape === 'circle' || config.spatialViewShape === 'sphere') {
+        if (config.spatialPlane === 'xz') {
+            return { x: entity.x, z: entity.z, radius: config.viewHalf }
+        }
+        return { x: entity.x, y: entity.y, radius: config.viewHalf }
+    }
     if (config.spatialPlane === 'xz') {
         return { x: entity.x, z: entity.z, halfX: config.viewHalf, halfZ: config.viewHalf }
     }
@@ -1225,6 +1250,9 @@ function createSpatialView(userIndex: number, entities: TestEntity[], config: Sc
 
 function createSpatialView3D(userIndex: number, entities: TestEntity[], config: ScenarioConfig) {
     const entity = entities[(userIndex * Math.max(1, Math.floor(entities.length / Math.max(1, config.users)))) % entities.length]
+    if (config.spatialViewShape === 'sphere' || config.spatialViewShape === 'circle') {
+        return { x: entity.x, y: entity.y, z: entity.z, radius: config.viewHalf }
+    }
     return new AABB3D(entity.x, entity.y, entity.z, config.viewHalf, config.viewHalf, config.viewHalf)
 }
 
@@ -1539,6 +1567,7 @@ function run() {
         children: config.children,
         spatialDistribution: config.spatialDistribution,
         spatialPlane: config.spatialPlane,
+        spatialViewShape: config.spatialViewShape,
         worldSize: config.worldSize,
         clusters: config.clusters,
         moveFraction: config.moveFraction,

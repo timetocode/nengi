@@ -248,7 +248,13 @@ export class SpatialGridChannel implements ICulledChannel<SpatialEntity, Spatial
         }
 
         const view = this.views.get(userId)
-        const keys = view ? this.grid.getVisibleCellKeys(this.viewRange(view)) : []
+        let keys: string[] = []
+        if (view) {
+            const spatialView = normalizeSpatialView(view, this.plane)
+            keys = spatialView.radius !== undefined ?
+                this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding) :
+                this.grid.getVisibleCellKeys(this.viewRange(view))
+        }
         this.visibleCellKeyCache.set(userId, {
             viewVersion,
             keys

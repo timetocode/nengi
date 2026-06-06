@@ -1209,6 +1209,75 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(above.nid)).toBe(false)
     })
 
+    it('uses coarse circle cells for SpatialChannel visibility', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, { x: 0, y: 0, radius: 25 })
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 10,
+            y: 0,
+            label: 'circle-visible'
+        } as any)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('circle-visible')
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0'])
+
+        entity.x = 80
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual([])
+    })
+
+    it('uses coarse sphere cells for SpatialChannel3D visibility', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel3D(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, { x: 0, y: 0, z: 0, radius: 25 })
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 10,
+            y: 0,
+            z: 0,
+            label: 'sphere-visible'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('sphere-visible')
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0:0'])
+
+        entity.x = 80
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual([])
+    })
+
     it('uses grid-backed 2D cells for SpatialGridChannel visibility', () => {
         const context = createContext()
         const instance = new Instance(context)

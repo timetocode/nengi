@@ -9,15 +9,25 @@ import { User } from './User'
 
 type SpatialEntity3D = IEntity & Point3D
 export type SpatialGridChannelMove3D = { entity: SpatialEntity3D, fromCell: string, toCell: string }
+export type SpatialGridView3D = AABB3D | { x: number, y: number, z: number, radius: number }
 
-function pointInAABB3D(p: Point3D, view: AABB3D) {
+function pointInSpatialGridView3D(p: Point3D, view: SpatialGridView3D) {
+    const sphere = view as { x: number, y: number, z: number, radius?: number }
+    if (Number.isFinite(sphere.radius) && sphere.radius! >= 0) {
+        const dx = p.x - sphere.x
+        const dy = p.y - sphere.y
+        const dz = p.z - sphere.z
+        return dx * dx + dy * dy + dz * dz <= sphere.radius! * sphere.radius!
+    }
+
+    const aabb = view as AABB3D
     return (
-        p.x >= view.x - view.halfWidth &&
-        p.x < view.x + view.halfWidth &&
-        p.y >= view.y - view.halfHeight &&
-        p.y < view.y + view.halfHeight &&
-        p.z >= view.z - view.halfDepth &&
-        p.z < view.z + view.halfDepth
+        p.x >= aabb.x - aabb.halfWidth &&
+        p.x < aabb.x + aabb.halfWidth &&
+        p.y >= aabb.y - aabb.halfHeight &&
+        p.y < aabb.y + aabb.halfHeight &&
+        p.z >= aabb.z - aabb.halfDepth &&
+        p.z < aabb.z + aabb.halfDepth
     )
 }
 
@@ -27,12 +37,12 @@ export type SpatialGridChannel3DOptions = ChannelOptions & {
     stableFragmentCellLimit?: number
 }
 
-export class SpatialGridChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D> {
+export class SpatialGridChannel3D implements ICulledChannel<SpatialEntity3D, SpatialGridView3D> {
     readonly cellFragmentMode = true
     private channel: Channel
     protected localState: LocalState
     private grid: SpatialGrid3D<SpatialEntity3D>
-    private views: Map<number, AABB3D> = new Map()
+    private views: Map<number, SpatialGridView3D> = new Map()
     private viewVersions: Map<number, number> = new Map()
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
@@ -47,7 +57,7 @@ export class SpatialGridChannel3D implements ICulledChannel<SpatialEntity3D, AAB
     fragmentCellLimit: number
     stableFragmentCellLimit: number
     users: Map<number, User> = new Map()
-    visibilityResolver = pointInAABB3D
+    visibilityResolver = pointInSpatialGridView3D
 
     constructor(localState: LocalState, cellSize: number, options: SpatialGridChannel3DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -98,10 +108,12 @@ export class SpatialGridChannel3D implements ICulledChannel<SpatialEntity3D, AAB
         this.invalidateVisibleEntityCache()
     }
 
-    private viewRange(view: AABB3D) {
-        const halfWidth = view.halfWidth + this.queryPadding
-        const halfHeight = view.halfHeight + this.queryPadding
-        const halfDepth = view.halfDepth + this.queryPadding
+    private viewRange(view: SpatialGridView3D) {
+        const sphere = view as { x: number, y: number, z: number, radius?: number }
+        const isSphere = Number.isFinite(sphere.radius) && sphere.radius! >= 0
+        const halfWidth = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfWidth + this.queryPadding
+        const halfHeight = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfHeight + this.queryPadding
+        const halfDepth = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfDepth + this.queryPadding
         return {
             minX: this.grid.cellCoord(view.x - halfWidth),
             maxX: this.grid.cellCoordForEnd(view.x + halfWidth),
@@ -216,14 +228,14 @@ export class SpatialGridChannel3D implements ICulledChannel<SpatialEntity3D, AAB
         this.structuralDeltas = false
     }
 
-    subscribe(user: User, view: AABB3D) {
+    subscribe(user: User, view: SpatialGridView3D) {
         this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
         user.subscribe(this as any)
     }
 
-    updateView(user: User, view: AABB3D) {
+    updateView(user: User, view: SpatialGridView3D) {
         if (!this.users.has(user.id)) {
             return
         }
@@ -258,7 +270,13 @@ export class SpatialGridChannel3D implements ICulledChannel<SpatialEntity3D, AAB
         }
 
         const view = this.views.get(userId)
-        const keys = view ? this.grid.getVisibleCellKeys(this.viewRange(view)) : []
+        let keys: string[] = []
+        if (view) {
+            const sphere = view as { x: number, y: number, z: number, radius?: number }
+            keys = Number.isFinite(sphere.radius) && sphere.radius! >= 0 ?
+                this.grid.getVisibleCellKeysInSphere(view.x, view.y, view.z, sphere.radius! + this.queryPadding) :
+                this.grid.getVisibleCellKeys(this.viewRange(view))
+        }
         this.visibleCellKeyCache.set(userId, {
             viewVersion,
             keys

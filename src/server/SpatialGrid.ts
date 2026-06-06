@@ -37,6 +37,7 @@ export type SpatialGrid2DOptions<T> = {
     cellSize: number
     getX(object: T): number
     getY(object: T): number
+    initializeCell?: (cell: SpatialGridCell<T>) => void
 }
 
 export type SpatialGrid3DOptions<T> = SpatialGrid2DOptions<T> & {
@@ -49,11 +50,13 @@ export class SpatialGrid2D<T> {
     readonly objectCells: Map<number, SpatialGridCellRef> = new Map()
     private getX: (object: T) => number
     private getY: (object: T) => number
+    private initializeCell?: (cell: SpatialGridCell<T>) => void
 
     constructor(options: SpatialGrid2DOptions<T>) {
         this.cellSize = options.cellSize
         this.getX = options.getX
         this.getY = options.getY
+        this.initializeCell = options.initializeCell
     }
 
     cellCoord(value: number) {
@@ -79,6 +82,9 @@ export class SpatialGrid2D<T> {
         let cell = this.cells.get(key)
         if (!cell) {
             cell = { key, x, y, z: 0, objects: [], ids: [], version: 0 }
+            if (this.initializeCell) {
+                this.initializeCell(cell)
+            }
             this.cells.set(key, cell)
         }
         return cell
@@ -162,6 +168,37 @@ export class SpatialGrid2D<T> {
         }
         return keys
     }
+
+    getVisibleCellKeysInCircle(x: number, y: number, radius: number) {
+        const range = {
+            minX: this.cellCoord(x - radius),
+            maxX: this.cellCoordForEnd(x + radius),
+            minY: this.cellCoord(y - radius),
+            maxY: this.cellCoordForEnd(y + radius)
+        }
+        const radiusSq = radius * radius
+        const keys: string[] = []
+        for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
+            const minX = cellX * this.cellSize
+            const maxX = minX + this.cellSize
+            const nearestX = x < minX ? minX : x > maxX ? maxX : x
+            const dx = x - nearestX
+            for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
+                const minY = cellY * this.cellSize
+                const maxY = minY + this.cellSize
+                const nearestY = y < minY ? minY : y > maxY ? maxY : y
+                const dy = y - nearestY
+                if (dx * dx + dy * dy > radiusSq) {
+                    continue
+                }
+                const key = this.cellKey(cellX, cellY)
+                if (this.cells.has(key)) {
+                    keys.push(key)
+                }
+            }
+        }
+        return keys
+    }
 }
 
 export class SpatialGrid3D<T> {
@@ -171,12 +208,14 @@ export class SpatialGrid3D<T> {
     private getX: (object: T) => number
     private getY: (object: T) => number
     private getZ: (object: T) => number
+    private initializeCell?: (cell: SpatialGridCell<T>) => void
 
     constructor(options: SpatialGrid3DOptions<T>) {
         this.cellSize = options.cellSize
         this.getX = options.getX
         this.getY = options.getY
         this.getZ = options.getZ
+        this.initializeCell = options.initializeCell
     }
 
     cellCoord(value: number) {
@@ -207,6 +246,9 @@ export class SpatialGrid3D<T> {
         let cell = this.cells.get(key)
         if (!cell) {
             cell = { key, x, y, z, objects: [], ids: [], version: 0 }
+            if (this.initializeCell) {
+                this.initializeCell(cell)
+            }
             this.cells.set(key, cell)
         }
         return cell
@@ -283,6 +325,49 @@ export class SpatialGrid3D<T> {
         for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
             for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
                 for (let cellZ = range.minZ; cellZ <= range.maxZ; cellZ++) {
+                    const key = this.cellKey(cellX, cellY, cellZ)
+                    if (this.cells.has(key)) {
+                        keys.push(key)
+                    }
+                }
+            }
+        }
+        return keys
+    }
+
+    getVisibleCellKeysInSphere(x: number, y: number, z: number, radius: number) {
+        const range = {
+            minX: this.cellCoord(x - radius),
+            maxX: this.cellCoordForEnd(x + radius),
+            minY: this.cellCoord(y - radius),
+            maxY: this.cellCoordForEnd(y + radius),
+            minZ: this.cellCoord(z - radius),
+            maxZ: this.cellCoordForEnd(z + radius)
+        }
+        const radiusSq = radius * radius
+        const keys: string[] = []
+        for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
+            const minX = cellX * this.cellSize
+            const maxX = minX + this.cellSize
+            const nearestX = x < minX ? minX : x > maxX ? maxX : x
+            const dx = x - nearestX
+            for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
+                const minY = cellY * this.cellSize
+                const maxY = minY + this.cellSize
+                const nearestY = y < minY ? minY : y > maxY ? maxY : y
+                const dy = y - nearestY
+                const dxy = dx * dx + dy * dy
+                if (dxy > radiusSq) {
+                    continue
+                }
+                for (let cellZ = range.minZ; cellZ <= range.maxZ; cellZ++) {
+                    const minZ = cellZ * this.cellSize
+                    const maxZ = minZ + this.cellSize
+                    const nearestZ = z < minZ ? minZ : z > maxZ ? maxZ : z
+                    const dz = z - nearestZ
+                    if (dxy + dz * dz > radiusSq) {
+                        continue
+                    }
                     const key = this.cellKey(cellX, cellY, cellZ)
                     if (this.cells.has(key)) {
                         keys.push(key)

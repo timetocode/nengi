@@ -2,12 +2,11 @@ import { IEntity } from '../common/IEntity'
 import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { LocalState } from './LocalState'
+import { SpatialGrid2D } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialPlane'
 import { User } from './User'
 
 type SpatialEntity = IEntity & Record<string, any>
-type CellRef = { key: string, index: number }
-type Cell = { key: string, x: number, y: number, entities: SpatialEntity[], entityNids: number[], version: number }
 export type SpatialMove = { entity: SpatialEntity, fromCell: string, toCell: string }
 
 export type SpatialChannelOptions = ChannelOptions & {
@@ -23,8 +22,7 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
     protected localState: LocalState
     private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private cells: Map<string, Cell> = new Map()
-    private entityCells: Map<number, CellRef> = new Map()
+    private grid: SpatialGrid2D<SpatialEntity>
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
@@ -59,6 +57,11 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
         this.stableFragmentCellLimit = Math.max(this.fragmentCellLimit, Math.floor(options.stableFragmentCellLimit || 64))
         this.plane = options.plane || 'xy'
         this.axes = getSpatialPlaneAxes(this.plane)
+        this.grid = new SpatialGrid2D({
+            cellSize,
+            getX: entity => entity[this.axes.a],
+            getY: entity => entity[this.axes.b]
+        })
     }
 
     get nid() {
@@ -75,78 +78,6 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
 
     get entities() {
         return this.channel.entities
-    }
-
-    private cellCoord(value: number) {
-        return Math.floor(value / this.cellSize)
-    }
-
-    private cellCoordForEnd(value: number) {
-        return Math.ceil(value / this.cellSize) - 1
-    }
-
-    private cellKey(x: number, y: number) {
-        return `${x}:${y}`
-    }
-
-    private cellKeyForEntity(entity: SpatialEntity) {
-        return this.cellKey(
-            this.cellCoord(entity[this.axes.a]),
-            this.cellCoord(entity[this.axes.b])
-        )
-    }
-
-    private getOrCreateCellForEntity(entity: SpatialEntity) {
-        const x = this.cellCoord(entity[this.axes.a])
-        const y = this.cellCoord(entity[this.axes.b])
-        const key = this.cellKey(x, y)
-        let cell = this.cells.get(key)
-        if (!cell) {
-            cell = { key, x, y, entities: [], entityNids: [], version: 0 }
-            this.cells.set(key, cell)
-        }
-        return cell
-    }
-
-    private addToCell(entity: SpatialEntity) {
-        const cell = this.getOrCreateCellForEntity(entity)
-        const wasEmpty = cell.entities.length === 0
-        this.entityCells.set(entity.nid, { key: cell.key, index: cell.entities.length })
-        cell.entities.push(entity)
-        cell.entityNids.push(entity.nid)
-        cell.version++
-        return wasEmpty
-    }
-
-    private removeFromCell(entity: SpatialEntity) {
-        const ref = this.entityCells.get(entity.nid)
-        if (!ref) {
-            return false
-        }
-
-        const cell = this.cells.get(ref.key)
-        if (!cell) {
-            this.entityCells.delete(entity.nid)
-            return false
-        }
-
-        const lastIndex = cell.entities.length - 1
-        const moved = cell.entities[lastIndex]
-        cell.entities[ref.index] = moved
-        cell.entityNids[ref.index] = moved.nid
-        cell.entities.pop()
-        cell.entityNids.pop()
-        if (moved && moved.nid !== entity.nid) {
-            this.entityCells.set(moved.nid, { key: ref.key, index: ref.index })
-        }
-        const removedCell = cell.entities.length === 0
-        if (removedCell) {
-            this.cells.delete(ref.key)
-        } else {
-            cell.version++
-        }
-        this.entityCells.delete(entity.nid)
-        return removedCell
     }
 
     private invalidateVisibleEntityCache() {
@@ -169,45 +100,36 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
         const endY = spatialView.b + halfHeight
 
         return {
-            minX: this.cellCoord(startX),
-            maxX: this.cellCoordForEnd(endX),
-            minY: this.cellCoord(startY),
-            maxY: this.cellCoordForEnd(endY)
+            minX: this.grid.cellCoord(startX),
+            maxX: this.grid.cellCoordForEnd(endX),
+            minY: this.grid.cellCoord(startY),
+            maxY: this.grid.cellCoordForEnd(endY)
         }
     }
 
     private buildVisibleCellKeys(userId: number) {
         const view = this.views.get(userId)
-        const keys: string[] = []
         if (!view) {
-            return keys
+            return []
         }
 
-        const range = this.viewRange(view)
-        for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
-            for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
-                const key = this.cellKey(cellX, cellY)
-                const cell = this.cells.get(key)
-                if (!cell) {
-                    continue
-                }
-                keys.push(key)
-            }
+        const spatialView = normalizeSpatialView(view, this.plane)
+        if (spatialView.radius !== undefined) {
+            return this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding)
         }
-
-        return keys
+        return this.grid.getVisibleCellKeys(this.viewRange(view))
     }
 
     private buildVisibleEntities(userId: number) {
         const keys = this.getVisibleCellKeys(userId)
         const nids: number[] = []
         for (let i = 0; i < keys.length; i++) {
-            const cell = this.cells.get(keys[i])
+            const cell = this.grid.cells.get(keys[i])
             if (!cell) {
                 continue
             }
-            for (let j = 0; j < cell.entityNids.length; j++) {
-                nids.push(cell.entityNids[j])
+            for (let j = 0; j < cell.ids.length; j++) {
+                nids.push(cell.ids[j])
             }
         }
         return nids
@@ -215,13 +137,13 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
 
     private getCellDeleteNids(key: string) {
         const nids: number[] = []
-        const cell = this.cells.get(key)
+        const cell = this.grid.cells.get(key)
         if (!cell) {
             return nids
         }
 
-        for (let i = 0; i < cell.entityNids.length; i++) {
-            this.localState.collectEntityTreeDeletes(cell.entityNids[i], nids)
+        for (let i = 0; i < cell.ids.length; i++) {
+            this.localState.collectEntityTreeDeletes(cell.ids[i], nids)
         }
         return nids
     }
@@ -232,7 +154,7 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
 
     addEntity(entity: SpatialEntity) {
         this.channel.addEntity(entity)
-        this.addToCell(entity)
+        this.grid.add(entity.nid, entity)
         this.membershipVersion++
         this.structuralDeltas = true
         this.invalidateVisibleCellKeyCache()
@@ -240,22 +162,13 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
     }
 
     updateEntity(entity: SpatialEntity) {
-        const current = this.entityCells.get(entity.nid)
-        if (!current) {
+        const move = this.grid.update(entity.nid, entity)
+        if (!move) {
             return
         }
-
-        const nextKey = this.cellKeyForEntity(entity)
-        if (current.key === nextKey) {
-            return
-        }
-
-        const fromCell = current.key
-        const removedCell = this.removeFromCell(entity)
-        const createdCell = this.addToCell(entity)
-        this.movedRoots.push({ entity, fromCell, toCell: nextKey })
+        this.movedRoots.push({ entity, fromCell: move.fromCell, toCell: move.toCell })
         this.membershipVersion++
-        if (removedCell || createdCell) {
+        if (move.removedCell || move.createdCell) {
             this.invalidateVisibleCellKeyCache()
         } else {
             this.invalidateVisibleEntityCache()
@@ -263,11 +176,11 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
     }
 
     removeEntity(entity: SpatialEntity) {
-        const removedCell = this.removeFromCell(entity)
+        const removed = this.grid.remove(entity.nid)
         this.channel.removeEntity(entity)
         this.membershipVersion++
         this.structuralDeltas = true
-        if (removedCell) {
+        if (removed?.removedCell) {
             this.invalidateVisibleCellKeyCache()
         } else {
             this.invalidateVisibleEntityCache()
@@ -285,7 +198,7 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
     getDirtyCellKeys() {
         const keys = new Set<string>()
         for (const nid of this.localState.dirtyNids) {
-            const ref = this.entityCells.get(nid)
+            const ref = this.grid.objectCells.get(nid)
             if (ref) {
                 keys.add(ref.key)
             }
@@ -407,15 +320,15 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
     }
 
     getCellEntities(key: string) {
-        return this.cells.get(key)?.entities || []
+        return this.grid.cells.get(key)?.objects || []
     }
 
     getCellEntityNids(key: string) {
-        return this.cells.get(key)?.entityNids || []
+        return this.grid.cells.get(key)?.ids || []
     }
 
     getCellVersion(key: string) {
-        return this.cells.get(key)?.version || 0
+        return this.grid.cells.get(key)?.version || 0
     }
 
     getMovedRoots() {
@@ -493,8 +406,8 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
         this.visibleEntityCache.clear()
         this.rememberedCells.clear()
         this.rememberedCellSignatures.clear()
-        this.cells.clear()
-        this.entityCells.clear()
+        this.grid.cells.clear()
+        this.grid.objectCells.clear()
         this.visibilityResolver = () => true
     }
 }

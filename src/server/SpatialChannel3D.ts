@@ -4,20 +4,29 @@ import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { LocalState } from './LocalState'
 import { Point3D } from './Point3D'
+import { SpatialGrid3D } from './SpatialGrid'
 import { User } from './User'
 
 type SpatialEntity3D = IEntity & Point3D
-type CellRef = { key: string, index: number }
-type Cell = { key: string, x: number, y: number, z: number, entities: SpatialEntity3D[], entityNids: number[], version: number }
 export type SpatialMove3D = { entity: SpatialEntity3D, fromCell: string, toCell: string }
+export type SpatialView3D = AABB3D | { x: number, y: number, z: number, radius: number }
 
-function pointInAABB3D(p: Point3D, view: AABB3D) {
-    const startX = view.x - view.halfWidth
-    const startY = view.y - view.halfHeight
-    const startZ = view.z - view.halfDepth
-    const endX = view.x + view.halfWidth
-    const endY = view.y + view.halfHeight
-    const endZ = view.z + view.halfDepth
+function pointInSpatialView3D(p: Point3D, view: SpatialView3D) {
+    const sphere = view as { x: number, y: number, z: number, radius?: number }
+    if (Number.isFinite(sphere.radius) && sphere.radius! >= 0) {
+        const dx = p.x - sphere.x
+        const dy = p.y - sphere.y
+        const dz = p.z - sphere.z
+        return dx * dx + dy * dy + dz * dz <= sphere.radius! * sphere.radius!
+    }
+
+    const aabb = view as AABB3D
+    const startX = aabb.x - aabb.halfWidth
+    const startY = aabb.y - aabb.halfHeight
+    const startZ = aabb.z - aabb.halfDepth
+    const endX = aabb.x + aabb.halfWidth
+    const endY = aabb.y + aabb.halfHeight
+    const endZ = aabb.z + aabb.halfDepth
 
     return (
         p.x >= startX &&
@@ -35,14 +44,13 @@ export type SpatialChannel3DOptions = ChannelOptions & {
     stableFragmentCellLimit?: number
 }
 
-export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D> {
+export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, SpatialView3D> {
     readonly cellFragmentMode = true
     private channel: Channel
     protected localState: LocalState
-    private views: Map<number, AABB3D> = new Map()
+    private views: Map<number, SpatialView3D> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private cells: Map<string, Cell> = new Map()
-    private entityCells: Map<number, CellRef> = new Map()
+    private grid: SpatialGrid3D<SpatialEntity3D>
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
@@ -56,7 +64,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
     fragmentCellLimit: number
     stableFragmentCellLimit: number
     users: Map<number, User> = new Map()
-    visibilityResolver = pointInAABB3D
+    visibilityResolver = pointInSpatialView3D
 
     constructor(localState: LocalState, cellSize: number, options: SpatialChannel3DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -73,6 +81,12 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
         this.stableFragmentCellLimit = Math.max(this.fragmentCellLimit, Math.floor(options.stableFragmentCellLimit || 64))
+        this.grid = new SpatialGrid3D({
+            cellSize,
+            getX: entity => entity.x,
+            getY: entity => entity.y,
+            getZ: entity => entity.z
+        })
     }
 
     get nid() {
@@ -91,76 +105,6 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
         return this.channel.entities
     }
 
-    private cellCoord(value: number) {
-        return Math.floor(value / this.cellSize)
-    }
-
-    private cellCoordForEnd(value: number) {
-        return Math.ceil(value / this.cellSize) - 1
-    }
-
-    private cellKey(x: number, y: number, z: number) {
-        return `${x}:${y}:${z}`
-    }
-
-    private cellKeyForEntity(entity: SpatialEntity3D) {
-        return this.cellKey(this.cellCoord(entity.x), this.cellCoord(entity.y), this.cellCoord(entity.z))
-    }
-
-    private getOrCreateCellForEntity(entity: SpatialEntity3D) {
-        const x = this.cellCoord(entity.x)
-        const y = this.cellCoord(entity.y)
-        const z = this.cellCoord(entity.z)
-        const key = this.cellKey(x, y, z)
-        let cell = this.cells.get(key)
-        if (!cell) {
-            cell = { key, x, y, z, entities: [], entityNids: [], version: 0 }
-            this.cells.set(key, cell)
-        }
-        return cell
-    }
-
-    private addToCell(entity: SpatialEntity3D) {
-        const cell = this.getOrCreateCellForEntity(entity)
-        const wasEmpty = cell.entities.length === 0
-        this.entityCells.set(entity.nid, { key: cell.key, index: cell.entities.length })
-        cell.entities.push(entity)
-        cell.entityNids.push(entity.nid)
-        cell.version++
-        return wasEmpty
-    }
-
-    private removeFromCell(entity: SpatialEntity3D) {
-        const ref = this.entityCells.get(entity.nid)
-        if (!ref) {
-            return false
-        }
-
-        const cell = this.cells.get(ref.key)
-        if (!cell) {
-            this.entityCells.delete(entity.nid)
-            return false
-        }
-
-        const lastIndex = cell.entities.length - 1
-        const moved = cell.entities[lastIndex]
-        cell.entities[ref.index] = moved
-        cell.entityNids[ref.index] = moved.nid
-        cell.entities.pop()
-        cell.entityNids.pop()
-        if (moved && moved.nid !== entity.nid) {
-            this.entityCells.set(moved.nid, { key: ref.key, index: ref.index })
-        }
-        const removedCell = cell.entities.length === 0
-        if (removedCell) {
-            this.cells.delete(ref.key)
-        } else {
-            cell.version++
-        }
-        this.entityCells.delete(entity.nid)
-        return removedCell
-    }
-
     private invalidateVisibleEntityCache() {
         this.visibleEntityCache.clear()
         this.visibleNetworkedNidsCache.clear()
@@ -171,55 +115,46 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
         this.invalidateVisibleEntityCache()
     }
 
-    private viewRange(view: AABB3D) {
-        const halfWidth = view.halfWidth + this.queryPadding
-        const halfHeight = view.halfHeight + this.queryPadding
-        const halfDepth = view.halfDepth + this.queryPadding
+    private viewRange(view: SpatialView3D) {
+        const sphere = view as { x: number, y: number, z: number, radius?: number }
+        const isSphere = Number.isFinite(sphere.radius) && sphere.radius! >= 0
+        const halfWidth = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfWidth + this.queryPadding
+        const halfHeight = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfHeight + this.queryPadding
+        const halfDepth = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfDepth + this.queryPadding
 
         return {
-            minX: this.cellCoord(view.x - halfWidth),
-            maxX: this.cellCoordForEnd(view.x + halfWidth),
-            minY: this.cellCoord(view.y - halfHeight),
-            maxY: this.cellCoordForEnd(view.y + halfHeight),
-            minZ: this.cellCoord(view.z - halfDepth),
-            maxZ: this.cellCoordForEnd(view.z + halfDepth)
+            minX: this.grid.cellCoord(view.x - halfWidth),
+            maxX: this.grid.cellCoordForEnd(view.x + halfWidth),
+            minY: this.grid.cellCoord(view.y - halfHeight),
+            maxY: this.grid.cellCoordForEnd(view.y + halfHeight),
+            minZ: this.grid.cellCoord(view.z - halfDepth),
+            maxZ: this.grid.cellCoordForEnd(view.z + halfDepth)
         }
     }
 
     private buildVisibleCellKeys(userId: number) {
         const view = this.views.get(userId)
-        const keys: string[] = []
         if (!view) {
-            return keys
+            return []
         }
 
-        const range = this.viewRange(view)
-        for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
-            for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
-                for (let cellZ = range.minZ; cellZ <= range.maxZ; cellZ++) {
-                    const key = this.cellKey(cellX, cellY, cellZ)
-                    const cell = this.cells.get(key)
-                    if (!cell) {
-                        continue
-                    }
-                    keys.push(key)
-                }
-            }
+        const sphere = view as { x: number, y: number, z: number, radius?: number }
+        if (Number.isFinite(sphere.radius) && sphere.radius! >= 0) {
+            return this.grid.getVisibleCellKeysInSphere(view.x, view.y, view.z, sphere.radius! + this.queryPadding)
         }
-
-        return keys
+        return this.grid.getVisibleCellKeys(this.viewRange(view))
     }
 
     private buildVisibleEntities(userId: number) {
         const keys = this.getVisibleCellKeys(userId)
         const nids: number[] = []
         for (let i = 0; i < keys.length; i++) {
-            const cell = this.cells.get(keys[i])
+            const cell = this.grid.cells.get(keys[i])
             if (!cell) {
                 continue
             }
-            for (let j = 0; j < cell.entityNids.length; j++) {
-                nids.push(cell.entityNids[j])
+            for (let j = 0; j < cell.ids.length; j++) {
+                nids.push(cell.ids[j])
             }
         }
         return nids
@@ -227,13 +162,13 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
 
     private getCellDeleteNids(key: string) {
         const nids: number[] = []
-        const cell = this.cells.get(key)
+        const cell = this.grid.cells.get(key)
         if (!cell) {
             return nids
         }
 
-        for (let i = 0; i < cell.entityNids.length; i++) {
-            this.localState.collectEntityTreeDeletes(cell.entityNids[i], nids)
+        for (let i = 0; i < cell.ids.length; i++) {
+            this.localState.collectEntityTreeDeletes(cell.ids[i], nids)
         }
         return nids
     }
@@ -244,7 +179,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
 
     addEntity(entity: SpatialEntity3D) {
         this.channel.addEntity(entity)
-        this.addToCell(entity)
+        this.grid.add(entity.nid, entity)
         this.membershipVersion++
         this.structuralDeltas = true
         this.invalidateVisibleCellKeyCache()
@@ -252,22 +187,13 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
     }
 
     updateEntity(entity: SpatialEntity3D) {
-        const current = this.entityCells.get(entity.nid)
-        if (!current) {
+        const move = this.grid.update(entity.nid, entity)
+        if (!move) {
             return
         }
-
-        const nextKey = this.cellKeyForEntity(entity)
-        if (current.key === nextKey) {
-            return
-        }
-
-        const fromCell = current.key
-        const removedCell = this.removeFromCell(entity)
-        const createdCell = this.addToCell(entity)
-        this.movedRoots.push({ entity, fromCell, toCell: nextKey })
+        this.movedRoots.push({ entity, fromCell: move.fromCell, toCell: move.toCell })
         this.membershipVersion++
-        if (removedCell || createdCell) {
+        if (move.removedCell || move.createdCell) {
             this.invalidateVisibleCellKeyCache()
         } else {
             this.invalidateVisibleEntityCache()
@@ -275,11 +201,11 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
     }
 
     removeEntity(entity: SpatialEntity3D) {
-        const removedCell = this.removeFromCell(entity)
+        const removed = this.grid.remove(entity.nid)
         this.channel.removeEntity(entity)
         this.membershipVersion++
         this.structuralDeltas = true
-        if (removedCell) {
+        if (removed?.removedCell) {
             this.invalidateVisibleCellKeyCache()
         } else {
             this.invalidateVisibleEntityCache()
@@ -297,7 +223,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
     getDirtyCellKeys() {
         const keys = new Set<string>()
         for (const nid of this.localState.dirtyNids) {
-            const ref = this.entityCells.get(nid)
+            const ref = this.grid.objectCells.get(nid)
             if (ref) {
                 keys.add(ref.key)
             }
@@ -322,14 +248,14 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
         this.structuralDeltas = false
     }
 
-    subscribe(user: User, view: AABB3D) {
+    subscribe(user: User, view: SpatialView3D) {
         this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
         user.subscribe(this as any)
     }
 
-    updateView(user: User, view: AABB3D) {
+    updateView(user: User, view: SpatialView3D) {
         if (!this.users.has(user.id)) {
             return
         }
@@ -419,15 +345,15 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
     }
 
     getCellEntities(key: string) {
-        return this.cells.get(key)?.entities || []
+        return this.grid.cells.get(key)?.objects || []
     }
 
     getCellEntityNids(key: string) {
-        return this.cells.get(key)?.entityNids || []
+        return this.grid.cells.get(key)?.ids || []
     }
 
     getCellVersion(key: string) {
-        return this.cells.get(key)?.version || 0
+        return this.grid.cells.get(key)?.version || 0
     }
 
     getMovedRoots() {
@@ -505,8 +431,8 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, AABB3D>
         this.visibleEntityCache.clear()
         this.rememberedCells.clear()
         this.rememberedCellSignatures.clear()
-        this.cells.clear()
-        this.entityCells.clear()
+        this.grid.cells.clear()
+        this.grid.objectCells.clear()
         this.visibilityResolver = () => true
     }
 }
