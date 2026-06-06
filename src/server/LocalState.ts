@@ -5,12 +5,9 @@ import { IChannel } from './IChannel'
 import { Binary } from '../common/binary/Binary'
 import { NetworkIdType, maxValueForNetworkType, nextNetworkType } from '../common/binary/Protocol'
 
-export type MutationMode = 'implicit' | 'dirtyEntity' | 'explicit'
-
 export class LocalState {
     nidType: NetworkIdType = Binary.UInt8
     nidPool: IdPool = new IdPool(maxValueForNetworkType(Binary.UInt8))
-    mutationMode: MutationMode = 'implicit'
     dirtyNids: Set<number> = new Set()
     dirtySources: Map<number, Set<number>> = new Map()
     mutationVersion = 0

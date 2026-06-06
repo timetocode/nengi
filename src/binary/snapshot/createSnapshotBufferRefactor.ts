@@ -4,7 +4,6 @@ import { User } from '../../server/User'
 import { BinarySection } from '../../common/binary/BinarySection'
 import { BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
-import { MutationMode } from '../../server/LocalState'
 import { ProtocolConfig, byteSizeOfNetworkType, writeNetworkId } from '../../common/binary/Protocol'
 import { collectSnapshotPlan, MAX_RESPONSES_PER_FRAME } from './collectSnapshotPlan'
 import { commitSnapshotPlan } from './commitSnapshotPlan'
@@ -25,14 +24,6 @@ type SharedUpdateChannel = Channel & {
 type SharedMessageChannel = {
     nid: number
     broadcastMessages: any[]
-}
-
-type MutationUpdateChannel = SharedUpdateChannel & {
-    mutationChannelMode: true
-    mutationMode: MutationMode
-    dirtyNids: Set<number>
-    propMutations: Map<number, Set<string>>
-    groupMutations: Map<number, Set<string>>
 }
 
 type ManualMutationUpdateChannel = SharedUpdateChannel & {
@@ -127,16 +118,6 @@ type CellFragmentChannel = {
     hasStructuralDeltas(): boolean
 }
 
-type MutationCellFragmentChannel = CellFragmentChannel & {
-    mutationCellFragmentMode: true
-    mutationMode: MutationMode
-    dirtyNids: Set<number>
-    propMutations: Map<number, Set<string>>
-    groupMutations: Map<number, Set<string>>
-    getDirtyNidsForCell(cellKey: string): Set<number>
-    shouldFullScanDirtyCell(cellKey: string): boolean
-}
-
 type MessageFragment = {
     payload: BinaryPayload
     bytes: number
@@ -202,18 +183,6 @@ function isSharedUpdateChannel(channel: any): channel is SharedUpdateChannel {
 
 function isSharedMessageChannel(channel: any): channel is SharedMessageChannel {
     return Array.isArray(channel.broadcastMessages)
-}
-
-function isMutationUpdateChannel(channel: any): channel is MutationUpdateChannel {
-    const candidate = channel as any
-    return isSharedUpdateChannel(channel) &&
-        candidate?.mutationChannelMode === true &&
-        (candidate.mutationMode === 'implicit' ||
-            candidate.mutationMode === 'dirtyEntity' ||
-            candidate.mutationMode === 'explicit') &&
-        candidate.dirtyNids instanceof Set &&
-        candidate.propMutations instanceof Map &&
-        candidate.groupMutations instanceof Map
 }
 
 function isManualMutationUpdateChannel(channel: any): channel is ManualMutationUpdateChannel {
@@ -318,20 +287,6 @@ function isCellFragmentChannel(channel: any): channel is CellFragmentChannel {
         typeof channel.hasStructuralDeltas === 'function'
 }
 
-function isMutationCellFragmentChannel(channel: any): channel is MutationCellFragmentChannel {
-    const candidate = channel as any
-    return isCellFragmentChannel(channel) &&
-        candidate?.mutationCellFragmentMode === true &&
-        (candidate.mutationMode === 'implicit' ||
-            candidate.mutationMode === 'dirtyEntity' ||
-            candidate.mutationMode === 'explicit') &&
-        candidate.dirtyNids instanceof Set &&
-        candidate.propMutations instanceof Map &&
-        candidate.groupMutations instanceof Map &&
-        typeof candidate.getDirtyNidsForCell === 'function' &&
-        typeof candidate.shouldFullScanDirtyCell === 'function'
-}
-
 function isManualSpatialCellFragmentChannel(channel: any): channel is ManualSpatialCellFragmentChannel {
     const candidate = channel as any
     return isCellFragmentChannel(channel) &&
@@ -349,14 +304,6 @@ function getSingleSharedChannel(user: User): SharedUpdateChannel | null {
     }
     const channel = user.subscriptions.values().next().value
     return isSharedUpdateChannel(channel) ? channel : null
-}
-
-function getSingleMutationUpdateChannel(user: User): MutationUpdateChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isMutationUpdateChannel(channel) ? channel : null
 }
 
 function getSingleManualMutationUpdateChannel(user: User): ManualMutationUpdateChannel | null {
@@ -386,14 +333,6 @@ function getSingleCellFragmentChannel(user: User): CellFragmentChannel | null {
     }
     const channel = user.subscriptions.values().next().value
     return isCellFragmentChannel(channel) ? channel : null
-}
-
-function getSingleMutationCellFragmentChannel(user: User): MutationCellFragmentChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isMutationCellFragmentChannel(channel) ? channel : null
 }
 
 function canUseSpatialCellFragments(user: User, channel: SpatialCellChannel) {
@@ -643,149 +582,6 @@ function collectChannelUpdatePlan(instance: Instance, channel: SharedUpdateChann
     return plan
 }
 
-function channelOwnsNid(instance: Instance, channel: SharedUpdateChannel, nid: number): boolean {
-    if (channel.entities.get(nid)) {
-        return true
-    }
-
-    const sources = instance.localState.sources.get(nid)
-    if (!sources) {
-        return false
-    }
-
-    for (const sourceId of sources) {
-        if (sourceId === channel.nid || channelOwnsNid(instance, channel, sourceId)) {
-            return true
-        }
-    }
-    return false
-}
-
-function collectDirtyEntityUpdatePlan(instance: Instance, channel: MutationUpdateChannel, excludedNids?: Set<number>): SnapshotPlan {
-    const plan = createEmptySnapshotPlan()
-
-    for (const nid of channel.dirtyNids) {
-        if (excludedNids?.has(nid)) {
-            continue
-        }
-        if (!channelOwnsNid(instance, channel, nid)) {
-            continue
-        }
-        instance.localState.forEachEntityTree(nid, treeNid => {
-            if (excludedNids?.has(treeNid)) {
-                return
-            }
-            collectEntityUpdatePlan(instance, instance.localState.getByNid(treeNid), plan)
-        })
-    }
-
-    return plan
-}
-
-function getSchemaUpdateGroup(instance: Instance, ntype: number, groupName: string) {
-    const nschema = instance.context.getSchema(ntype)!
-    for (let i = 0; i < nschema.updateGroups.length; i++) {
-        if (nschema.updateGroups[i].name === groupName) {
-            return nschema.updateGroups[i]
-        }
-    }
-    return null
-}
-
-function collectExplicitMutationUpdatePlan(instance: Instance, channel: MutationUpdateChannel, excludedNids?: Set<number>): SnapshotPlan {
-    const plan = createEmptySnapshotPlan()
-
-    const collectNid = (nid: number, groups?: Set<string>, props?: Set<string>) => {
-        if (excludedNids?.has(nid) || !channelOwnsNid(instance, channel, nid)) {
-            return
-        }
-        const entity = instance.localState.getByNid(nid)
-        const nschema = instance.context.getSchema(entity.ntype)!
-        const cached = instance.cache.cache[nid]
-        if (!cached) {
-            collectEntityUpdatePlan(instance, entity, plan)
-            return
-        }
-
-        const emittedGroups = new Set<number>()
-        if (groups) {
-            for (const groupName of groups.keys()) {
-                const group = getSchemaUpdateGroup(instance, entity.ntype, groupName)
-                if (!group) {
-                    throw new Error(`MutationChannel explicit mutation group "${groupName}" is not in schema for ntype ${entity.ntype}.`)
-                }
-                emittedGroups.add(group.key)
-                const values: any[] = []
-                for (let i = 0; i < group.props.length; i++) {
-                    const groupProp = group.props[i]
-                    const value = entity[groupProp.prop]
-                    values.push(groupProp.binary.clone(value))
-                    cached[groupProp.prop] = groupProp.binary.clone(value)
-                }
-                plan.updateEntityGroups.push({ nid, nschema, group, values })
-            }
-        }
-
-        if (!props) {
-            return
-        }
-        for (const prop of props.keys()) {
-            const propSpec = nschema.props[prop]
-            if (!propSpec) {
-                throw new Error(`MutationChannel explicit mutation prop "${prop}" is not in schema for ntype ${entity.ntype}.`)
-            }
-            const group = propSpec.updateGroup
-            if (group) {
-                if (emittedGroups.has(group.key)) {
-                    continue
-                }
-                emittedGroups.add(group.key)
-                const values: any[] = []
-                for (let i = 0; i < group.props.length; i++) {
-                    const groupProp = group.props[i]
-                    const value = entity[groupProp.prop]
-                    values.push(groupProp.binary.clone(value))
-                    cached[groupProp.prop] = groupProp.binary.clone(value)
-                }
-                plan.updateEntityGroups.push({ nid, nschema, group, values })
-            } else {
-                const value = entity[propSpec.prop]
-                plan.updateEntities.push({ nid, nschema, prop: propSpec.prop, value: propSpec.binary.clone(value) })
-                cached[propSpec.prop] = propSpec.binary.clone(value)
-            }
-        }
-    }
-
-    let groupNids: Set<number> | null = null
-    if (channel.groupMutations.size > 0 && channel.propMutations.size > 0) {
-        groupNids = new Set()
-    }
-
-    for (const [nid, groups] of channel.groupMutations) {
-        groupNids?.add(nid)
-        collectNid(nid, groups, channel.propMutations.get(nid))
-    }
-
-    for (const [nid, props] of channel.propMutations) {
-        if (groupNids?.has(nid)) {
-            continue
-        }
-        collectNid(nid, undefined, props)
-    }
-
-    return plan
-}
-
-function collectMutationChannelUpdatePlan(instance: Instance, channel: MutationUpdateChannel, excludedNids?: Set<number>) {
-    if (channel.mutationMode === 'implicit') {
-        return collectChannelUpdatePlan(instance, channel, excludedNids)
-    }
-    if (channel.mutationMode === 'explicit') {
-        return collectExplicitMutationUpdatePlan(instance, channel, excludedNids)
-    }
-    return collectDirtyEntityUpdatePlan(instance, channel, excludedNids)
-}
-
 function collectSpatialCellUpdatePlan(instance: Instance, channel: SpatialCellChannel, cellKey: string): SnapshotPlan {
     const plan = createEmptySnapshotPlan()
     const entities = channel.getCellEntities(cellKey)
@@ -797,114 +593,6 @@ function collectSpatialCellUpdatePlan(instance: Instance, channel: SpatialCellCh
     }
 
     return plan
-}
-
-function collectDirtyMutationCellUpdatePlan(instance: Instance, channel: MutationCellFragmentChannel, cellKey: string): SnapshotPlan {
-    if (channel.shouldFullScanDirtyCell(cellKey)) {
-        return collectSpatialCellUpdatePlan(instance, channel as any, cellKey)
-    }
-
-    const plan = createEmptySnapshotPlan()
-    const dirtyNids = channel.getDirtyNidsForCell(cellKey)
-
-    for (const dirtyNid of dirtyNids) {
-        instance.localState.forEachEntityTree(dirtyNid, nid => {
-            const entity = instance.localState.getByNid(nid)
-            if (entity) {
-                collectEntityUpdatePlan(instance, entity, plan)
-            }
-        })
-    }
-
-    return plan
-}
-
-function collectExplicitMutationCellUpdatePlan(instance: Instance, channel: MutationCellFragmentChannel, cellKey: string): SnapshotPlan {
-    if (channel.shouldFullScanDirtyCell(cellKey)) {
-        return collectSpatialCellUpdatePlan(instance, channel as any, cellKey)
-    }
-
-    const plan = createEmptySnapshotPlan()
-    const dirtyNids = channel.getDirtyNidsForCell(cellKey)
-
-    for (const nid of dirtyNids) {
-        const entity = instance.localState.getByNid(nid)
-        if (!entity) {
-            continue
-        }
-
-        const nschema = instance.context.getSchema(entity.ntype)!
-        const cached = instance.cache.cache[nid]
-        if (!cached) {
-            collectEntityUpdatePlan(instance, entity, plan)
-            continue
-        }
-
-        const emittedGroups = new Set<string>()
-        const groupMutations = channel.groupMutations.get(nid)
-        if (groupMutations) {
-            for (const groupName of groupMutations) {
-                const group = getSchemaUpdateGroup(instance, entity.ntype, groupName)
-                if (!group) {
-                    throw new Error(`MutationCellChannel explicit mutation group "${groupName}" is not in schema for ntype ${entity.ntype}.`)
-                }
-                const values = []
-                for (let i = 0; i < group.props.length; i++) {
-                    const groupProp = group.props[i]
-                    const value = entity[groupProp.prop]
-                    values.push(groupProp.binary.clone(value))
-                    cached[groupProp.prop] = groupProp.binary.clone(value)
-                }
-                plan.updateEntityGroups.push({ nid, nschema, group, values })
-                emittedGroups.add(String(group.key))
-            }
-        }
-
-        const propMutations = channel.propMutations.get(nid)
-        if (!propMutations) {
-            continue
-        }
-
-        for (const prop of propMutations.keys()) {
-            const propSpec = nschema.props[prop]
-            if (!propSpec) {
-                throw new Error(`MutationCellChannel explicit mutation prop "${prop}" is not in schema for ntype ${entity.ntype}.`)
-            }
-
-            const group = propSpec.updateGroup
-            if (group) {
-                if (emittedGroups.has(String(group.key))) {
-                    continue
-                }
-                const values = []
-                for (let i = 0; i < group.props.length; i++) {
-                    const groupProp = group.props[i]
-                    const value = entity[groupProp.prop]
-                    values.push(groupProp.binary.clone(value))
-                    cached[groupProp.prop] = groupProp.binary.clone(value)
-                }
-                plan.updateEntityGroups.push({ nid, nschema, group, values })
-                emittedGroups.add(String(group.key))
-                continue
-            }
-
-            const value = entity[propSpec.prop]
-            plan.updateEntities.push({ nid, nschema, prop: propSpec.prop, value: propSpec.binary.clone(value) })
-            cached[propSpec.prop] = propSpec.binary.clone(value)
-        }
-    }
-
-    return plan
-}
-
-function collectMutationCellUpdatePlan(instance: Instance, channel: MutationCellFragmentChannel, cellKey: string) {
-    if (channel.mutationMode === 'implicit') {
-        return collectSpatialCellUpdatePlan(instance, channel as any, cellKey)
-    }
-    if (channel.mutationMode === 'explicit') {
-        return collectExplicitMutationCellUpdatePlan(instance, channel, cellKey)
-    }
-    return collectDirtyMutationCellUpdatePlan(instance, channel, cellKey)
 }
 
 function collectEntityUpdatePlan(instance: Instance, entity: any, plan: SnapshotPlan) {
@@ -1278,8 +966,7 @@ function getCellUpdateFragment(user: User, instance: Instance, channel: CellFrag
     }
 
     const protocol = instance.network.getProtocol()
-    const mutationMode = isMutationCellFragmentChannel(channel) ? `mutation:${channel.mutationMode}` : 'implicit'
-    const key = `${instance.tick}:${channel.nid}:cell:update:${mutationMode}:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
+    const key = `${instance.tick}:${channel.nid}:cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key)
     if (cached) {
         instance.network.recordSharedFragmentHit()
@@ -1297,9 +984,7 @@ function getCellUpdateFragment(user: User, instance: Instance, channel: CellFrag
     if (measure) {
         collectStart = performance.now()
     }
-    const plan = isMutationCellFragmentChannel(channel)
-        ? collectMutationCellUpdatePlan(instance, channel, cellKey)
-        : collectSpatialCellUpdatePlan(instance, channel as any, cellKey)
+    const plan = collectSpatialCellUpdatePlan(instance, channel as any, cellKey)
     const nids = includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set<number>()
     if (measure) {
         collectMs = performance.now() - collectStart
@@ -1335,9 +1020,7 @@ function cellMayHaveUpdates(channel: CellFragmentChannel, cellKey: string) {
     if (isManualSpatialCellFragmentChannel(channel)) {
         return channel.cellHasManualUpdates(cellKey)
     }
-    return !isMutationCellFragmentChannel(channel) ||
-        channel.mutationMode === 'implicit' ||
-        channel.getDirtyNidsForCell(cellKey).size > 0
+    return true
 }
 
 function getSharedCreateFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
@@ -1485,53 +1168,6 @@ function getSharedUpdateFragment(user: User, instance: Instance, channel: Shared
         collectStart = performance.now()
     }
     const plan = collectChannelUpdatePlan(instance, channel, excludedNids)
-    if (measure) {
-        collectMs = performance.now() - collectStart
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        updateProps: plan.updateEntities.length,
-        updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
-    }
-    instance.network.sharedUpdateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })
-    return fragment
-}
-
-function getMutationUpdateFragment(user: User, instance: Instance, channel: MutationUpdateChannel, excludedNids?: Set<number>) {
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:mutation:${channel.mutationMode}:${protocol.nidType}:${protocol.ntypeType}:${excludedNids ? 'delta' : 'steady'}`
-    const cached = instance.network.sharedUpdateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let collectStart = 0
-    let collectMs = 0
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-
-    if (measure) {
-        collectStart = performance.now()
-    }
-    const plan = collectMutationChannelUpdatePlan(instance, channel, excludedNids)
     if (measure) {
         collectMs = performance.now() - collectStart
         countStart = performance.now()
@@ -2546,94 +2182,6 @@ function createSharedUpdateSnapshotBuffer(user: User, instance: Instance, channe
     return writer.payload
 }
 
-function createMutationUpdateSnapshotBuffer(user: User, instance: Instance, channel: MutationUpdateChannel) {
-    const measure = instance.network.snapshotPerformanceEnabled
-    let collectStart = 0
-    let collectMs = 0
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-    let commitStart = 0
-    let commitMs = 0
-
-    if (measure) {
-        collectStart = performance.now()
-    }
-
-    instance.network.queueProtocolIfChanged(user)
-    const queuedResponses = user.responseQueue.length
-    const protocol = instance.network.getProtocol()
-    const envelope = createEmptySnapshotPlan()
-    envelope.engineMessages = user.engineMessageQueue
-    user.engineMessageQueue = []
-    envelope.messages = user.messageQueue
-    user.messageQueue = []
-    envelope.responses = user.responseQueue.slice(0, MAX_RESPONSES_PER_FRAME)
-    user.lastVisibleCount = user.currentlyVisible.length
-
-    if (measure) {
-        collectMs = performance.now() - collectStart
-    }
-
-    const messageFragments = getSharedMessageFragments(user, instance)
-    const fragment = getMutationUpdateFragment(user, instance, channel)
-
-    if (measure) {
-        countStart = performance.now()
-    }
-
-    const envelopeBytes = countSnapshotBytes(envelope, instance.context, protocol)
-    const bytes = envelopeBytes + sumSharedMessageFragmentBytes(messageFragments) + fragment.bytes
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-
-    writeSnapshot(envelope, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    writeSharedMessageFragments(writer, instance, messageFragments)
-
-    const copyStart = measure ? performance.now() : 0
-    writePayload(writer, fragment.payload)
-
-    if (measure) {
-        instance.network.recordSharedFragmentCopy(performance.now() - copyStart, fragment.bytes)
-        commitStart = performance.now()
-    }
-
-    commitSnapshotPlan(user, envelope)
-    instance.network.reportResponseBacklog(user, queuedResponses, envelope.responses.length)
-
-    if (measure) {
-        commitMs = performance.now() - commitStart
-        instance.network.recordSharedSnapshot()
-        instance.network.recordSnapshotPerformance({
-            collectMs,
-            countMs,
-            writeMs,
-            commitMs,
-            sendMs: 0,
-            bytes,
-            creates: 0,
-            updateProps: fragment.updateProps,
-            updateGroups: fragment.updateGroups,
-            groupedUpdateProps: fragment.groupedUpdateProps,
-            deletes: 0,
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
-            engineMessages: envelope.engineMessages.length,
-            responses: envelope.responses.length
-        })
-    }
-
-    return writer.payload
-}
-
 function createManualMutationUpdateSnapshotBuffer(user: User, instance: Instance, channel: ManualMutationUpdateChannel) {
     const measure = instance.network.snapshotPerformanceEnabled
     let collectStart = 0
@@ -3397,7 +2945,6 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     const ecsSpatialChannel = getSingleEcsSpatialSnapshotChannel(user)
     const ecsChannel = getSingleEcsSnapshotChannel(user)
     const manualMutationChannel = getSingleManualMutationUpdateChannel(user)
-    const mutationChannel = getSingleMutationUpdateChannel(user)
     const sharedChannel = getSingleSharedChannel(user)
     const cellFragmentChannel = getSingleCellFragmentChannel(user)
     const spatialCellChannel = getSingleSpatialCellChannel(user)
@@ -3422,13 +2969,6 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
         manualMutationChannel &&
         canUseSharedUpdateFragment(user, manualMutationChannel)) {
         return createManualMutationUpdateSnapshotBuffer(user, instance, manualMutationChannel)
-    }
-
-    if (instance.network.sharedUpdateFragmentsEnabled &&
-        !instance.network.debugBinaryWrites &&
-        mutationChannel &&
-        canUseSharedUpdateFragment(user, mutationChannel)) {
-        return createMutationUpdateSnapshotBuffer(user, instance, mutationChannel)
     }
 
     if (instance.network.sharedUpdateFragmentsEnabled &&

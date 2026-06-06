@@ -6,24 +6,15 @@ import { IEntity } from '../common/IEntity'
 import { AABB2D } from '../server/AABB2D'
 import { CellChannel } from '../server/CellChannel'
 import { Channel } from '../server/Channel'
-import { MutationChannel } from '../server/MutationChannel'
 import { ManualChannel } from '../server/ManualChannel'
 import { ManualSpatialChannel } from '../server/ManualSpatialChannel'
-import { MutationCellChannel } from '../server/MutationCellChannel'
 import { EcsChannel } from '../server/EcsChannel'
 import { EcsSpatialChannel } from '../server/EcsSpatialChannel'
-import { ChannelAABB2D } from '../server/ChannelAABB2D'
-import { ChannelAABB2DCell } from '../server/ChannelAABB2DCell'
-import { ChannelAABB2DSparseGrid } from '../server/ChannelAABB2DSparseGrid'
-import { EntityCache } from '../server/EntityCache'
 import { IChannel } from '../server/IChannel'
 import { Instance } from '../server/Instance'
 import { User } from '../server/User'
-import { MutationMode } from '../server/LocalState'
 import { IServerNetworkAdapter } from '../server/adapter/IServerNetworkAdapter'
-import { countSnapshotBytes, writeSnapshot } from '../binary/snapshot/createSnapshotBufferRefactor'
-import { createEmptySnapshotPlan, SnapshotPlan } from '../binary/snapshot/SnapshotPlan'
-import { TestBufferReader, TestBufferWriter, testBinaryAdapter } from '../testSupport/BufferBinary'
+import { TestBufferReader, TestBufferWriter } from '../testSupport/BufferBinary'
 
 enum NType {
     Entity = 1,
@@ -39,13 +30,7 @@ type ScenarioName =
     | 'players-300'
     | 'sparse-visible'
     | 'non-overlap'
-    | 'aabb-bruteforce'
-    | 'aabb-grid'
-    | 'aabb-cell'
     | 'cell-channel'
-    | 'mutation-cell-channel'
-    | 'aabb-grid-cache'
-    | 'channel-mutation'
     | 'manual-channel'
     | 'manual-spatial-channel'
     | 'wide-channel'
@@ -67,13 +52,7 @@ const SCENARIOS = new Set<ScenarioName>([
     'players-300',
     'sparse-visible',
     'non-overlap',
-    'aabb-bruteforce',
-    'aabb-grid',
-    'aabb-cell',
     'cell-channel',
-    'mutation-cell-channel',
-    'aabb-grid-cache',
-    'channel-mutation',
     'manual-channel',
     'manual-spatial-channel',
     'wide-channel',
@@ -91,14 +70,11 @@ const SCENARIOS = new Set<ScenarioName>([
     'channel-churn'
 ])
 
-type SpatialCacheVariant = 'current-exact' | 'cell-fragments' | 'interior-fragments'
-type ExplicitMutationApi = 'mutate' | 'mark'
 type ManualEmitMode = 'group4' | 'props'
 type EntityShape = 'standard' | 'monolith' | 'ecs'
 
 const CUSTOM_MUTATION_SCENARIOS = new Set<ScenarioName>([
     'channel-churn',
-    'channel-mutation',
     'manual-channel',
     'manual-spatial-channel',
     'wide-channel',
@@ -109,7 +85,6 @@ const CUSTOM_MUTATION_SCENARIOS = new Set<ScenarioName>([
     'ecs-channel-churn',
     'ecs-manual-spatial',
     'ecs-spatial-channel',
-    'mutation-cell-channel',
     'parent-child-manual-channel',
     'parent-child-manual-spatial-channel'
 ])
@@ -182,15 +157,10 @@ type ScenarioConfig = {
     clusters: number
     moveFraction: number
     queryPadding: number
-    spatialCacheVariant: SpatialCacheVariant
     fragmentCellLimit: number
     stableFragmentCellLimit: number
-    mutationMode: MutationMode
-    explicitMutationApi: ExplicitMutationApi
     manualEmitMode: ManualEmitMode
     entityShape: EntityShape
-    dirtyCellFullScanThreshold: number
-    dirtyCellFullScanMinEntities: number
 }
 
 class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
@@ -292,23 +262,6 @@ function readConfig(): ScenarioConfig {
         throw new Error(`Unknown PROFILE_SCENARIO "${scenarioValue}". Use one of: ${Array.from(SCENARIOS).join(', ')}`)
     }
     const scenario = scenarioValue as ScenarioName
-    const spatialCacheVariant = process.env.PROFILE_SPATIAL_CACHE_VARIANT || 'current-exact'
-    if (spatialCacheVariant !== 'current-exact' &&
-        spatialCacheVariant !== 'cell-fragments' &&
-        spatialCacheVariant !== 'interior-fragments') {
-        throw new Error('PROFILE_SPATIAL_CACHE_VARIANT must be "current-exact", "cell-fragments", or "interior-fragments".')
-    }
-
-    const mutationMode = process.env.PROFILE_MUTATION_MODE || 'implicit'
-    if (mutationMode !== 'implicit' &&
-        mutationMode !== 'dirtyEntity' &&
-        mutationMode !== 'explicit') {
-        throw new Error('PROFILE_MUTATION_MODE must be "implicit", "dirtyEntity", or "explicit".')
-    }
-    const explicitMutationApi = process.env.PROFILE_EXPLICIT_API || 'mutate'
-    if (explicitMutationApi !== 'mutate' && explicitMutationApi !== 'mark') {
-        throw new Error('PROFILE_EXPLICIT_API must be "mutate" or "mark".')
-    }
     const manualEmitMode = process.env.PROFILE_MANUAL_EMIT || 'group4'
     if (manualEmitMode !== 'group4' && manualEmitMode !== 'props') {
         throw new Error('PROFILE_MANUAL_EMIT must be "group4" or "props".')
@@ -339,15 +292,10 @@ function readConfig(): ScenarioConfig {
         clusters: Math.max(1, Math.floor(envNumber('PROFILE_CLUSTERS', 8))),
         moveFraction: Math.min(1, Math.max(0, envNumber('PROFILE_MOVE_FRACTION', 1))),
         queryPadding: Math.max(0, envNumber('PROFILE_QUERY_PADDING', 0)),
-        spatialCacheVariant: spatialCacheVariant as SpatialCacheVariant,
         fragmentCellLimit: Math.max(1, Math.floor(envNumber('PROFILE_FRAGMENT_CELL_LIMIT', 16))),
         stableFragmentCellLimit: Math.max(1, Math.floor(envNumber('PROFILE_STABLE_FRAGMENT_CELL_LIMIT', 64))),
-        mutationMode: mutationMode as MutationMode,
-        explicitMutationApi: explicitMutationApi as ExplicitMutationApi,
         manualEmitMode: manualEmitMode as ManualEmitMode,
-        entityShape: entityShape as EntityShape,
-        dirtyCellFullScanThreshold: Math.min(1, Math.max(0, envNumber('PROFILE_DIRTY_CELL_FULL_SCAN_THRESHOLD', 0.65))),
-        dirtyCellFullScanMinEntities: Math.max(1, Math.floor(envNumber('PROFILE_DIRTY_CELL_FULL_SCAN_MIN_ENTITIES', 8)))
+        entityShape: entityShape as EntityShape
     }
 }
 
@@ -707,61 +655,6 @@ function setupWideChannel(instance: Instance, users: User[], entities: WideEntit
         for (let i = 0; i < moving; i++) {
             const entity = entities[i]
             applyWideValues(entity, nextWideValues(entity, instance.tick, i))
-        }
-    }
-}
-
-function setupMutationChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new MutationChannel(instance.localState, {
-        label: `mutation:${config.mutationMode}`,
-        mutationMode: config.mutationMode
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    subscribeAll(channel, users)
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            const entity = entities[i]
-            const angle = instance.tick * 0.07 + i * 0.013
-            if (config.mutationMode === 'explicit') {
-                const x = entity.x + Math.cos(angle) * 0.4
-                const y = entity.y + Math.sin(angle * 1.13) * 0.4
-                const z = Math.sin(angle * 0.73) * 18
-                const rot = (entity.rot + 0.035 + (i % 7) * 0.001) % (Math.PI * 2)
-                if (config.explicitMutationApi === 'mark') {
-                    entity.x = x
-                    entity.y = y
-                    entity.z = z
-                    entity.rot = rot
-                    if (config.groups) {
-                        channel.markGroupDirty(entity, 'transform')
-                    } else {
-                        channel.markPropDirty(entity, 'x')
-                        channel.markPropDirty(entity, 'y')
-                        channel.markPropDirty(entity, 'z')
-                        channel.markPropDirty(entity, 'rot')
-                    }
-                } else {
-                    if (config.groups) {
-                        channel.mutateGroup(entity, 'transform', { x, y, z, rot })
-                    } else {
-                        channel.mutate(entity, 'x', x)
-                        channel.mutate(entity, 'y', y)
-                        channel.mutate(entity, 'z', z)
-                        channel.mutate(entity, 'rot', rot)
-                    }
-                }
-            } else {
-                entity.x += Math.cos(angle) * 0.4
-                entity.y += Math.sin(angle * 1.13) * 0.4
-                entity.z = Math.sin(angle * 0.73) * 18
-                entity.rot = (entity.rot + 0.035 + (i % 7) * 0.001) % (Math.PI * 2)
-                if (config.mutationMode === 'dirtyEntity') {
-                    channel.markDirty(entity)
-                }
-            }
         }
     }
 }
@@ -1280,54 +1173,6 @@ function createSpatialView(userIndex: number, entities: TestEntity[], config: Sc
     return new AABB2D(entity.x, entity.y, config.viewHalf, config.viewHalf)
 }
 
-function setupAABBBruteforce(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new ChannelAABB2D(instance.localState)
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-}
-
-function setupAABBGrid(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new ChannelAABB2DSparseGrid(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
-        }
-    }
-}
-
-function setupAABBCell(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new ChannelAABB2DCell(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        fragmentCellLimit: config.fragmentCellLimit,
-        label: 'cell'
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
-        }
-    }
-}
-
 function setupCellChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new CellChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
@@ -1345,71 +1190,6 @@ function setupCellChannel(instance: Instance, users: User[], entities: TestEntit
         const moving = Math.floor(entities.length * config.moveFraction)
         for (let i = 0; i < moving; i++) {
             channel.updateEntity(entities[i])
-        }
-    }
-}
-
-function setupMutationCellChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new MutationCellChannel(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        fragmentCellLimit: config.fragmentCellLimit,
-        stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: `mutation-cell:${config.mutationMode}`,
-        mutationMode: config.mutationMode,
-        dirtyCellFullScanThreshold: config.dirtyCellFullScanThreshold,
-        dirtyCellFullScanMinEntities: config.dirtyCellFullScanMinEntities
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            const entity = entities[i]
-            const angle = instance.tick * 0.07 + i * 0.013
-            const values = {
-                x: entity.x + Math.cos(angle) * 0.4,
-                y: entity.y + Math.sin(angle * 1.13) * 0.4,
-                z: Math.sin(angle * 0.73) * 18,
-                rot: (entity.rot + 0.035 + (i % 7) * 0.001) % (Math.PI * 2)
-            }
-
-            if (config.mutationMode === 'explicit') {
-                if (config.explicitMutationApi === 'mark') {
-                    entity.x = values.x
-                    entity.y = values.y
-                    entity.z = values.z
-                    entity.rot = values.rot
-                    if (config.groups) {
-                        channel.markGroupDirty(entity, 'transform')
-                    } else {
-                        channel.markPropDirty(entity, 'x')
-                        channel.markPropDirty(entity, 'y')
-                        channel.markPropDirty(entity, 'z')
-                        channel.markPropDirty(entity, 'rot')
-                    }
-                } else {
-                    if (config.groups) {
-                        channel.mutateGroup(entity, 'transform', values)
-                    } else {
-                        channel.mutate(entity, 'x', values.x)
-                        channel.mutate(entity, 'y', values.y)
-                        channel.mutate(entity, 'z', values.z)
-                        channel.mutate(entity, 'rot', values.rot)
-                    }
-                }
-            } else {
-                entity.x = values.x
-                entity.y = values.y
-                entity.z = values.z
-                entity.rot = values.rot
-                if (config.mutationMode === 'dirtyEntity') {
-                    channel.markDirty(entity)
-                }
-            }
         }
     }
 }
@@ -1447,439 +1227,6 @@ function setupChannelChurn(instance: Instance, users: User[], entities: TestEnti
     }
 }
 
-type CacheCellRef = { key: string, index: number }
-type CacheCell = { key: string, x: number, y: number, entities: TestEntity[] }
-type CellRange = {
-    startX: number
-    startY: number
-    endX: number
-    endY: number
-    minX: number
-    maxX: number
-    minY: number
-    maxY: number
-}
-type CellFragment = {
-    bytes: number
-    payload: Buffer
-    updateProps: number
-    updateGroups: number
-    groupedProps: number
-}
-
-class SpatialCacheGrid {
-    cells: Map<string, CacheCell> = new Map()
-    entityCells: Map<number, CacheCellRef> = new Map()
-    dirtyCells: Set<string> = new Set()
-    cellSize: number
-
-    constructor(cellSize: number) {
-        this.cellSize = cellSize
-    }
-
-    cellKey(x: number, y: number) {
-        return `${x}:${y}`
-    }
-
-    cellCoord(value: number) {
-        return Math.floor(value / this.cellSize)
-    }
-
-    cellCoordForEnd(value: number) {
-        return Math.ceil(value / this.cellSize) - 1
-    }
-
-    cellKeyForEntity(entity: TestEntity) {
-        return this.cellKey(this.cellCoord(entity.x), this.cellCoord(entity.y))
-    }
-
-    addEntity(entity: TestEntity) {
-        const x = this.cellCoord(entity.x)
-        const y = this.cellCoord(entity.y)
-        const key = this.cellKey(x, y)
-        let cell = this.cells.get(key)
-        if (!cell) {
-            cell = { key, x, y, entities: [] }
-            this.cells.set(key, cell)
-        }
-        this.entityCells.set(entity.nid, { key, index: cell.entities.length })
-        cell.entities.push(entity)
-    }
-
-    removeFromCell(entity: TestEntity) {
-        const ref = this.entityCells.get(entity.nid)
-        if (!ref) {
-            return
-        }
-        const cell = this.cells.get(ref.key)
-        if (!cell) {
-            this.entityCells.delete(entity.nid)
-            return
-        }
-        const last = cell.entities[cell.entities.length - 1]
-        cell.entities[ref.index] = last
-        cell.entities.pop()
-        if (last && last.nid !== entity.nid) {
-            this.entityCells.set(last.nid, { key: ref.key, index: ref.index })
-        }
-        if (cell.entities.length === 0) {
-            this.cells.delete(ref.key)
-        }
-        this.entityCells.delete(entity.nid)
-    }
-
-    updateEntity(entity: TestEntity) {
-        const current = this.entityCells.get(entity.nid)
-        if (!current) {
-            return
-        }
-
-        const nextKey = this.cellKeyForEntity(entity)
-        this.dirtyCells.add(current.key)
-        if (current.key === nextKey) {
-            return
-        }
-
-        this.removeFromCell(entity)
-        this.addEntity(entity)
-        this.dirtyCells.add(nextKey)
-    }
-
-    viewRange(view: AABB2D, padding: number): CellRange {
-        const halfWidth = view.halfWidth + padding
-        const halfHeight = view.halfHeight + padding
-        const startX = view.x - halfWidth
-        const startY = view.y - halfHeight
-        const endX = view.x + halfWidth
-        const endY = view.y + halfHeight
-        return {
-            startX,
-            startY,
-            endX,
-            endY,
-            minX: this.cellCoord(startX),
-            maxX: this.cellCoordForEnd(endX),
-            minY: this.cellCoord(startY),
-            maxY: this.cellCoordForEnd(endY)
-        }
-    }
-
-    getCell(x: number, y: number) {
-        return this.cells.get(this.cellKey(x, y))
-    }
-
-    cellIsInterior(x: number, y: number, range: CellRange) {
-        return x * this.cellSize >= range.startX &&
-            y * this.cellSize >= range.startY &&
-            (x + 1) * this.cellSize <= range.endX &&
-            (y + 1) * this.cellSize <= range.endY
-    }
-}
-
-function createUpdatePlanForEntities(
-    entities: TestEntity[],
-    tick: number,
-    context: Context,
-    cache: EntityCache,
-    range?: CellRange
-) {
-    const plan = createEmptySnapshotPlan()
-    const nschema = context.getSchema(NType.Entity)!
-
-    for (let i = 0; i < entities.length; i++) {
-        const entity = entities[i]
-        if (range && (
-            entity.x < range.startX ||
-            entity.x >= range.endX ||
-            entity.y < range.startY ||
-            entity.y >= range.endY
-        )) {
-            continue
-        }
-        const diffs = cache.getAndDiffGrouped(tick, entity, nschema)
-        for (let j = 0; j < diffs.groups.length; j++) {
-            plan.updateEntityGroups.push(diffs.groups[j])
-        }
-        for (let j = 0; j < diffs.changes.length; j++) {
-            plan.updateEntities.push(diffs.changes[j])
-        }
-    }
-
-    return plan
-}
-
-function countGroupedProps(plan: SnapshotPlan) {
-    let groupedProps = 0
-    for (let i = 0; i < plan.updateEntityGroups.length; i++) {
-        groupedProps += plan.updateEntityGroups[i].group.props.length
-    }
-    return groupedProps
-}
-
-function writePlanFragment(plan: SnapshotPlan, context: Context, protocol: any): CellFragment {
-    const bytes = countSnapshotBytes(plan, context, protocol)
-    const writer = TestBufferWriter.create(bytes)
-    writeSnapshot(plan, context, writer, protocol)
-    return {
-        bytes,
-        payload: writer.payload,
-        updateProps: plan.updateEntities.length,
-        updateGroups: plan.updateEntityGroups.length,
-        groupedProps: countGroupedProps(plan)
-    }
-}
-
-function writeCopiedFragments(fragments: CellFragment[]) {
-    let bytes = 0
-    for (let i = 0; i < fragments.length; i++) {
-        bytes += fragments[i].bytes
-    }
-    const writer = TestBufferWriter.create(bytes)
-    for (let i = 0; i < fragments.length; i++) {
-        writer.writeBytes(fragments[i].payload as unknown as Uint8Array)
-    }
-    return bytes
-}
-
-function runSpatialCacheScenario(config: ScenarioConfig) {
-    const context = createContext(config.groups)
-    const protocol = { nidType: Binary.UInt32, ntypeType: context.ntypeType }
-    const cache = new EntityCache()
-    const grid = new SpatialCacheGrid(config.cellSize)
-    const entities: TestEntity[] = []
-    const views: AABB2D[] = []
-    const nschema = context.getSchema(NType.Entity)!
-
-    for (let i = 0; i < config.entities; i++) {
-        const entity = createEntity(i)
-        entity.nid = i + 1
-        entities.push(entity)
-    }
-    applySpatialDistribution(entities, config)
-    for (let i = 0; i < entities.length; i++) {
-        grid.addEntity(entities[i])
-        cache.cacheify(0, entities[i], nschema)
-    }
-    for (let i = 0; i < config.users; i++) {
-        views.push(createSpatialView(i, entities, config))
-    }
-
-    const stepTimes: number[] = []
-    const indexTimes: number[] = []
-    const queryTimes: number[] = []
-    const fragmentBuildTimes: number[] = []
-    const writeTimes: number[] = []
-    const copyTimes: number[] = []
-    let bytesTotal = 0
-    let touchedCellsTotal = 0
-    let interiorCellsTotal = 0
-    let edgeCellsTotal = 0
-    let exactEntitiesScannedTotal = 0
-    let fragmentBuildsTotal = 0
-    let fragmentCopiesTotal = 0
-    let updateGroupsTotal = 0
-    let groupedPropsTotal = 0
-
-    const runTick = (tick: number, measure: boolean) => {
-        cache.createCachesForTick(tick)
-        grid.dirtyCells.clear()
-        mutateEntities(entities, tick, config.moveFraction)
-
-        const indexStart = performance.now()
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            grid.updateEntity(entities[i])
-        }
-        const indexMs = performance.now() - indexStart
-
-        const tickStart = performance.now()
-        const cellFragments = new Map<string, CellFragment>()
-        let queryMs = 0
-        let buildMs = 0
-        let writeMs = 0
-        let copyMs = 0
-        let tickBytes = 0
-        let touchedCells = 0
-        let interiorCells = 0
-        let edgeCells = 0
-        let exactEntitiesScanned = 0
-        let fragmentBuilds = 0
-        let fragmentCopies = 0
-        let updateGroups = 0
-        let groupedProps = 0
-
-        const getCellFragment = (cell: CacheCell) => {
-            const cached = cellFragments.get(cell.key)
-            if (cached) {
-                return cached
-            }
-            if (!grid.dirtyCells.has(cell.key)) {
-                return null
-            }
-
-            const buildStart = performance.now()
-            const plan = createUpdatePlanForEntities(cell.entities, tick, context, cache)
-            const fragment = writePlanFragment(plan, context, protocol)
-            buildMs += performance.now() - buildStart
-            cellFragments.set(cell.key, fragment)
-            fragmentBuilds++
-            return fragment
-        }
-
-        for (let userIndex = 0; userIndex < views.length; userIndex++) {
-            const range = grid.viewRange(views[userIndex], config.queryPadding)
-            const userFragments: CellFragment[] = []
-            const userPlan = createEmptySnapshotPlan()
-            const queryStart = performance.now()
-            const buildBeforeQuery = buildMs
-
-            for (let cellX = range.minX; cellX <= range.maxX; cellX++) {
-                for (let cellY = range.minY; cellY <= range.maxY; cellY++) {
-                    const cell = grid.getCell(cellX, cellY)
-                    if (!cell) {
-                        continue
-                    }
-                    touchedCells++
-
-                    if (config.spatialCacheVariant === 'cell-fragments') {
-                        const fragment = getCellFragment(cell)
-                        if (fragment && (fragment.updateGroups > 0 || fragment.updateProps > 0)) {
-                            userFragments.push(fragment)
-                        }
-                        continue
-                    }
-
-                    if (config.spatialCacheVariant === 'interior-fragments' && grid.cellIsInterior(cellX, cellY, range)) {
-                        interiorCells++
-                        const fragment = getCellFragment(cell)
-                        if (fragment && (fragment.updateGroups > 0 || fragment.updateProps > 0)) {
-                            userFragments.push(fragment)
-                        }
-                        continue
-                    }
-
-                    edgeCells++
-                    exactEntitiesScanned += cell.entities.length
-                    const edgePlan = createUpdatePlanForEntities(cell.entities, tick, context, cache, range)
-                    userPlan.updateEntityGroups.push(...edgePlan.updateEntityGroups)
-                    userPlan.updateEntities.push(...edgePlan.updateEntities)
-                }
-            }
-
-            queryMs += performance.now() - queryStart - (buildMs - buildBeforeQuery)
-
-            const writeStart = performance.now()
-            if (config.spatialCacheVariant === 'current-exact' ||
-                (config.spatialCacheVariant === 'interior-fragments' && userPlan.updateEntityGroups.length > 0)) {
-                const fragment = writePlanFragment(userPlan, context, protocol)
-                tickBytes += fragment.bytes
-                updateGroups += fragment.updateGroups
-                groupedProps += fragment.groupedProps
-            }
-            writeMs += performance.now() - writeStart
-
-            if (userFragments.length > 0) {
-                const copyStart = performance.now()
-                tickBytes += writeCopiedFragments(userFragments)
-                copyMs += performance.now() - copyStart
-                fragmentCopies += userFragments.length
-                for (let i = 0; i < userFragments.length; i++) {
-                    updateGroups += userFragments[i].updateGroups
-                    groupedProps += userFragments[i].groupedProps
-                }
-            }
-        }
-
-        const stepMs = performance.now() - tickStart
-        cache.deleteCachesForTick(tick)
-
-        if (measure) {
-            indexTimes.push(indexMs)
-            stepTimes.push(stepMs)
-            queryTimes.push(queryMs)
-            fragmentBuildTimes.push(buildMs)
-            writeTimes.push(writeMs)
-            copyTimes.push(copyMs)
-            bytesTotal += tickBytes
-            touchedCellsTotal += touchedCells
-            interiorCellsTotal += interiorCells
-            edgeCellsTotal += edgeCells
-            exactEntitiesScannedTotal += exactEntitiesScanned
-            fragmentBuildsTotal += fragmentBuilds
-            fragmentCopiesTotal += fragmentCopies
-            updateGroupsTotal += updateGroups
-            groupedPropsTotal += groupedProps
-        }
-    }
-
-    for (let i = 0; i < config.warmup; i++) {
-        runTick(i + 1, false)
-    }
-    for (let i = 0; i < config.ticks; i++) {
-        runTick(i + config.warmup + 1, true)
-    }
-
-    const snapshots = config.users * config.ticks
-    const stepSummary = summarize(stepTimes)
-    const indexSummary = summarize(indexTimes)
-    const querySummary = summarize(queryTimes)
-    const buildSummary = summarize(fragmentBuildTimes)
-    const writeSummary = summarize(writeTimes)
-    const copySummary = summarize(copyTimes)
-    const result = {
-        scenario: config.scenario,
-        spatialCacheVariant: config.spatialCacheVariant,
-        users: config.users,
-        entities: config.entities,
-        ticks: config.ticks,
-        warmup: config.warmup,
-        groups: config.groups,
-        cellSize: config.cellSize,
-        viewHalf: fmt(config.viewHalf),
-        spatialDistribution: config.spatialDistribution,
-        worldSize: config.worldSize,
-        clusters: config.clusters,
-        moveFraction: config.moveFraction,
-        queryPadding: config.queryPadding,
-        fragmentCellLimit: config.fragmentCellLimit,
-        stableFragmentCellLimit: config.stableFragmentCellLimit,
-        stepMs: {
-            avg: fmt(stepSummary.avg),
-            p50: fmt(stepSummary.p50),
-            p95: fmt(stepSummary.p95),
-            max: fmt(stepSummary.max)
-        },
-        indexMs: {
-            avg: fmt(indexSummary.avg),
-            p50: fmt(indexSummary.p50),
-            p95: fmt(indexSummary.p95),
-            max: fmt(indexSummary.max)
-        },
-        stepPlusIndexMs: {
-            avg: fmt(stepSummary.avg + indexSummary.avg),
-            p50: fmt(stepSummary.p50 + indexSummary.p50),
-            p95: fmt(stepSummary.p95 + indexSummary.p95),
-            max: fmt(stepSummary.max + indexSummary.max)
-        },
-        queryMsPerTick: fmt(querySummary.avg),
-        fragmentBuildMsPerTick: fmt(buildSummary.avg),
-        writeMsPerTick: fmt(writeSummary.avg),
-        copyMsPerTick: fmt(copySummary.avg),
-        bytesPerSnapshot: Math.round(bytesTotal / snapshots),
-        bytesPerTick: Math.round(bytesTotal / config.ticks),
-        touchedCellsPerSnapshot: fmt(touchedCellsTotal / snapshots),
-        interiorCellsPerSnapshot: fmt(interiorCellsTotal / snapshots),
-        edgeCellsPerSnapshot: fmt(edgeCellsTotal / snapshots),
-        exactEntitiesScannedPerSnapshot: fmt(exactEntitiesScannedTotal / snapshots),
-        fragmentBuildsPerTick: fmt(fragmentBuildsTotal / config.ticks),
-        fragmentCopiesPerSnapshot: fmt(fragmentCopiesTotal / snapshots),
-        updateGroupsPerSnapshot: Math.round(updateGroupsTotal / snapshots),
-        groupedPropsPerSnapshot: Math.round(groupedPropsTotal / snapshots)
-    }
-
-    console.log(JSON.stringify(result, null, 2))
-}
-
 function buildScenario(config: ScenarioConfig) {
     const context = createContext(config.groups)
     const instance = new Instance(context)
@@ -1906,18 +1253,13 @@ function buildScenario(config: ScenarioConfig) {
             entities.push(createEntity(i))
         }
     }
-    if (config.scenario === 'aabb-bruteforce' ||
-        config.scenario === 'aabb-grid' ||
-        config.scenario === 'aabb-cell' ||
-        config.scenario === 'cell-channel' ||
-        config.scenario === 'mutation-cell-channel' ||
+    if (config.scenario === 'cell-channel' ||
         config.scenario === 'manual-spatial-channel' ||
         config.scenario === 'wide-manual-spatial' ||
         config.scenario === 'ecs-manual-spatial' ||
         config.scenario === 'ecs-spatial-channel' ||
         config.scenario === 'parent-child-cell-channel' ||
-        config.scenario === 'parent-child-manual-spatial-channel' ||
-        config.scenario === 'aabb-grid-cache') {
+        config.scenario === 'parent-child-manual-spatial-channel') {
         applySpatialDistribution(entities as TestEntity[], config)
         if (config.entityShape === 'ecs') {
             for (let i = 0; i < ecsBundles.length; i++) {
@@ -1932,22 +1274,12 @@ function buildScenario(config: ScenarioConfig) {
     let mutateSet = entities
     if (config.scenario === 'sparse-visible' || config.scenario === 'non-overlap') {
         setupFixedVisible(instance, users, entities, config)
-    } else if (config.scenario === 'aabb-bruteforce') {
-        setupAABBBruteforce(instance, users, entities, config)
-    } else if (config.scenario === 'aabb-grid') {
-        updateSpatialIndex = setupAABBGrid(instance, users, entities, config)
-    } else if (config.scenario === 'aabb-cell') {
-        updateSpatialIndex = setupAABBCell(instance, users, entities, config)
     } else if (config.scenario === 'cell-channel') {
         updateSpatialIndex = setupCellChannel(instance, users, entities, config)
-    } else if (config.scenario === 'mutation-cell-channel') {
-        beforeStep = setupMutationCellChannel(instance, users, entities, config)
     } else if (config.scenario === 'channel-churn') {
         const churn = setupChannelChurn(instance, users, entities, config)
         beforeStep = churn.churn
         mutateSet = churn.liveEntities
-    } else if (config.scenario === 'channel-mutation') {
-        beforeStep = setupMutationChannel(instance, users, entities, config)
     } else if (config.scenario === 'manual-channel') {
         beforeStep = setupManualChannel(instance, users, entities, config)
     } else if (config.scenario === 'manual-spatial-channel') {
@@ -2010,11 +1342,6 @@ function fmt(value: number) {
 
 function run() {
     const config = readConfig()
-    if (config.scenario === 'aabb-grid-cache') {
-        runSpatialCacheScenario(config)
-        return
-    }
-
     const { instance, adapter, entities, updateSpatialIndex, beforeStep } = buildScenario(config)
     const stepTimes: number[] = []
     const mutationTimes: number[] = []
@@ -2086,14 +1413,9 @@ function run() {
         clusters: config.clusters,
         moveFraction: config.moveFraction,
         queryPadding: config.queryPadding,
-        spatialCacheVariant: config.spatialCacheVariant,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        mutationMode: config.mutationMode,
-        explicitMutationApi: config.explicitMutationApi,
         manualEmitMode: config.manualEmitMode,
-        dirtyCellFullScanThreshold: config.dirtyCellFullScanThreshold,
-        dirtyCellFullScanMinEntities: config.dirtyCellFullScanMinEntities,
         stepMs: {
             avg: fmt(summary.avg),
             p50: fmt(summary.p50),
