@@ -11,7 +11,9 @@ import { Context } from '../../common/Context'
 import { ResponseStatus } from '../../common/Endpoint'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { AABB2D } from '../../server/AABB2D'
+import { AABB3D } from '../../server/AABB3D'
 import { SpatialChannel } from '../../server/SpatialChannel'
+import { SpatialChannel3D } from '../../server/SpatialChannel3D'
 import { Channel } from '../../server/Channel'
 import { ManualChannel } from '../../server/ManualChannel'
 import { ManualSpatialChannel } from '../../server/ManualSpatialChannel'
@@ -1169,6 +1171,102 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+    })
+
+    it('uses true 3D cells for SpatialChannel3D visibility', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel3D(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(10, 10, 10, 20, 20, 20))
+        const visible = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            z: 7,
+            label: 'visible-3d'
+        })
+        const above = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 200,
+            z: 7,
+            label: 'above'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(visible.nid)?.label).toBe('visible-3d')
+        expect(clientNetwork.store.entities.has(above.nid)).toBe(false)
+    })
+
+    it('updates SpatialChannel3D visibility when only vertical position changes cells', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel3D(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(10, 10, 10, 20, 20, 20))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            z: 7,
+            label: 'vertical'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(true)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0:0'])
+
+        entity.y = 200
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual([])
+    })
+
+    it('spatially culls SpatialChannel3D messages vertically', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new SpatialChannel3D(instance.localState, 50)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB3D(10, 10, 10, 20, 20, 20))
+        channel.subscribe(secondUser, new AABB3D(10, 200, 10, 20, 20, 20))
+        channel.addMessage({ ntype: NType.Message, text: 'near-3d', x: 10, y: 10, z: 10 })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(firstClient.messages).toEqual([{ ntype: NType.Message, text: 'near-3d' }])
+        expect(secondClient.messages).toEqual([])
     })
 
     it('records explicit dirty hints without requiring them for implicit SpatialChannel updates', () => {
