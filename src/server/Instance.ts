@@ -3,7 +3,7 @@ import { LocalState } from './LocalState'
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
 import { User } from './User'
 import { EntityCache } from './EntityCache'
-import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
+import createSnapshotBuffer from '../binary/snapshot/createSnapshotBuffer'
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
 import { EngineMessage } from '../common/EngineMessage'
@@ -114,7 +114,7 @@ export class Instance {
                 tick: user.lastReceivedClientTick
             })
 
-            const buffer = createSnapshotBufferRefactor(user, this)
+            const buffer = createSnapshotBuffer(user, this)
             if (this.network.snapshotPerformanceEnabled) {
                 // Keep adapter send timing separate from snapshot construction:
                 // WebSocket implementations may queue synchronously while OS I/O

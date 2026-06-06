@@ -1,4 +1,4 @@
-import createSnapshotBufferRefactor from '../binary/snapshot/createSnapshotBufferRefactor'
+import createSnapshotBuffer from '../binary/snapshot/createSnapshotBuffer'
 import { Buffer } from 'buffer'
 import { Binary } from '../common/binary/Binary'
 import { defineEntitySchema, defineMessageSchema, definePayloadSchema } from '../common/binary/schema/defineSchema'
@@ -43,7 +43,7 @@ function deliverRequestAndResponse(instance: Instance, user: User, clientNetwork
     const outbound = clientNetwork.createOutbound(testBinaryAdapter)
     instance.network.onMessage(user, outbound)
 
-    const responseBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
+    const responseBuffer = createSnapshotBuffer(user, instance) as Buffer
     clientNetwork.readSnapshot(testBinaryAdapter.createReader(responseBuffer))
     clientNetwork.processNextFrame()
 }
@@ -454,7 +454,7 @@ describe('request/response', () => {
             code: 'TIMEOUT'
         })
 
-        const responseBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
+        const responseBuffer = createSnapshotBuffer(user, instance) as Buffer
         expect(() => {
             clientNetwork.readSnapshot(testBinaryAdapter.createReader(responseBuffer))
         }).not.toThrow()

@@ -2354,7 +2354,7 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
     return writer.payload
 }
 
-const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
+const createSnapshotBuffer = (user: User, instance: Instance) => {
     const ecsChannels = getEcsSnapshotChannels(user)
     const ecsSpatialChannel = getSingleEcsSpatialSnapshotChannel(user)
     const ecsChannel = getSingleEcsSnapshotChannel(user)
@@ -2517,7 +2517,7 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     return writer.payload
 }
 
-export default createSnapshotBufferRefactor
+export default createSnapshotBuffer
 export { collectSnapshotPlan, collectSnapshotPlan as getVisibleState }
 export { commitSnapshotPlan, countSnapshotBytes, writeSnapshot }
 export type { SnapshotPlan, SnapshotResponse } from './SnapshotPlan'

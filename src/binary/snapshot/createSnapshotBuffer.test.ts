@@ -1,10 +1,10 @@
 import { Buffer } from 'buffer'
-import createSnapshotBufferRefactor, {
+import createSnapshotBuffer, {
     collectSnapshotPlan,
     commitSnapshotPlan,
     countSnapshotBytes,
     writeSnapshot
-} from './createSnapshotBufferRefactor'
+} from './createSnapshotBuffer'
 import { Binary } from '../../common/binary/Binary'
 import { defineEntitySchema, defineMessageSchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
@@ -260,7 +260,7 @@ describe('server snapshot pipeline', () => {
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBufferRefactor(user, instance) as Buffer))
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
         clientNetwork.processNextFrame()
 
         entity.x = 11
@@ -316,7 +316,7 @@ describe('server snapshot pipeline', () => {
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBufferRefactor(user, instance) as Buffer))
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
         clientNetwork.processNextFrame()
 
         first.x = 11
@@ -1414,7 +1414,7 @@ describe('server snapshot pipeline', () => {
         instance.cache.createCachesForTick(instance.tick)
 
         try {
-            createSnapshotBufferRefactor(user, instance)
+            createSnapshotBuffer(user, instance)
             throw new Error('Expected snapshot write to fail.')
         } catch (err: any) {
             expect(err).toBeInstanceOf(BinaryDebugError)
@@ -1474,7 +1474,7 @@ describe('server snapshot pipeline', () => {
             })
         }
 
-        createSnapshotBufferRefactor(user, instance)
+        createSnapshotBuffer(user, instance)
 
         expect(user.responseQueue).toHaveLength(1)
         expect(onResponseBacklog).toHaveBeenCalledWith({
@@ -1485,7 +1485,7 @@ describe('server snapshot pipeline', () => {
             tick: 7
         })
 
-        createSnapshotBufferRefactor(user, instance)
+        createSnapshotBuffer(user, instance)
 
         expect(user.responseQueue).toHaveLength(0)
         expect(onResponseBacklog).toHaveBeenCalledTimes(1)
@@ -1513,7 +1513,7 @@ describe('server snapshot pipeline', () => {
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
-        const buffer = createSnapshotBufferRefactor(user, instance) as Buffer
+        const buffer = createSnapshotBuffer(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(buffer))
         clientNetwork.processNextFrame()
 
@@ -1548,7 +1548,7 @@ describe('server snapshot pipeline', () => {
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
-        const createBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
+        const createBuffer = createSnapshotBuffer(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createBuffer))
         clientNetwork.processNextFrame()
 
@@ -1569,7 +1569,7 @@ describe('server snapshot pipeline', () => {
         entity.x = 11
         instance.tick = 2
         instance.cache.createCachesForTick(instance.tick)
-        const updateBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
+        const updateBuffer = createSnapshotBuffer(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(updateBuffer))
         clientNetwork.processNextFrame()
 
@@ -1582,7 +1582,7 @@ describe('server snapshot pipeline', () => {
         channel.removeEntity(entity)
         instance.tick = 3
         instance.cache.createCachesForTick(instance.tick)
-        const deleteBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
+        const deleteBuffer = createSnapshotBuffer(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(deleteBuffer))
         clientNetwork.processNextFrame()
 
@@ -1609,12 +1609,12 @@ describe('server snapshot pipeline', () => {
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBufferRefactor(user, instance) as Buffer))
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
 
         entity.x = 3
         instance.tick = 2
         instance.cache.createCachesForTick(instance.tick)
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBufferRefactor(user, instance) as Buffer))
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
 
         const frames = clientNetwork.drainFrames()
 
