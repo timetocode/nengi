@@ -14,6 +14,8 @@ import { AABB2D } from '../../server/AABB2D'
 import { AABB3D } from '../../server/AABB3D'
 import { SpatialChannel } from '../../server/SpatialChannel'
 import { SpatialChannel3D } from '../../server/SpatialChannel3D'
+import { SpatialGridChannel } from '../../server/SpatialGridChannel'
+import { SpatialGridChannel3D } from '../../server/SpatialGridChannel3D'
 import { Channel } from '../../server/Channel'
 import { ManualChannel } from '../../server/ManualChannel'
 import { ManualSpatialChannel } from '../../server/ManualSpatialChannel'
@@ -1207,6 +1209,39 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(above.nid)).toBe(false)
     })
 
+    it('uses grid-backed 2D cells for SpatialGridChannel visibility', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialGridChannel(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 20, 20))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            z: 7,
+            label: 'grid-visible'
+        } as any)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('grid-visible')
+
+        entity.x = 200
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+    })
+
     it('updates SpatialChannel3D visibility when only vertical position changes cells', () => {
         const context = createContext()
         const instance = new Instance(context)
@@ -1224,6 +1259,42 @@ describe('server snapshot pipeline', () => {
             y: 6,
             z: 7,
             label: 'vertical'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(true)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0:0'])
+
+        entity.y = 200
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual([])
+    })
+
+    it('uses grid-backed true 3D cells for SpatialGridChannel3D visibility', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialGridChannel3D(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(10, 10, 10, 20, 20, 20))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            z: 7,
+            label: 'grid-3d'
         })
 
         instance.step()

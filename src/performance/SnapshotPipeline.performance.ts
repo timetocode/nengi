@@ -7,6 +7,8 @@ import { AABB2D } from '../server/AABB2D'
 import { AABB3D } from '../server/AABB3D'
 import { SpatialChannel } from '../server/SpatialChannel'
 import { SpatialChannel3D } from '../server/SpatialChannel3D'
+import { SpatialGridChannel } from '../server/SpatialGridChannel'
+import { SpatialGridChannel3D } from '../server/SpatialGridChannel3D'
 import { SpatialPlane } from '../server/SpatialPlane'
 import { Channel } from '../server/Channel'
 import { ManualChannel } from '../server/ManualChannel'
@@ -35,6 +37,8 @@ type ScenarioName =
     | 'non-overlap'
     | 'spatial-channel'
     | 'spatial-channel-3d'
+    | 'spatial-grid-channel'
+    | 'spatial-grid-channel-3d'
     | 'manual-channel'
     | 'manual-spatial-channel'
     | 'wide-channel'
@@ -58,6 +62,8 @@ const SCENARIOS = new Set<ScenarioName>([
     'non-overlap',
     'spatial-channel',
     'spatial-channel-3d',
+    'spatial-grid-channel',
+    'spatial-grid-channel-3d',
     'manual-channel',
     'manual-spatial-channel',
     'wide-channel',
@@ -505,7 +511,7 @@ function spreadEntitiesClustered(entities: TestEntity[], config: ScenarioConfig)
 }
 
 function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig) {
-    if (config.scenario === 'spatial-channel-3d') {
+    if (config.scenario === 'spatial-channel-3d' || config.scenario === 'spatial-grid-channel-3d') {
         spreadEntitiesHomogeneous3D(entities, config)
         return
     }
@@ -1244,12 +1250,55 @@ function setupSpatialChannel(instance: Instance, users: User[], entities: TestEn
     }
 }
 
+function setupSpatialGridChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new SpatialGridChannel(instance.localState, config.cellSize, {
+        queryPadding: config.queryPadding,
+        fragmentCellLimit: config.fragmentCellLimit,
+        stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
+        label: 'spatial-grid-channel'
+    })
+    for (let i = 0; i < entities.length; i++) {
+        channel.addEntity(entities[i])
+    }
+    for (let i = 0; i < users.length; i++) {
+        channel.subscribe(users[i], createSpatialView(i, entities, config))
+    }
+    return () => {
+        const moving = Math.floor(entities.length * config.moveFraction)
+        for (let i = 0; i < moving; i++) {
+            channel.updateEntity(entities[i])
+        }
+    }
+}
+
 function setupSpatialChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new SpatialChannel3D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         label: 'spatial-channel-3d'
+    })
+    for (let i = 0; i < entities.length; i++) {
+        channel.addEntity(entities[i])
+    }
+    for (let i = 0; i < users.length; i++) {
+        channel.subscribe(users[i], createSpatialView3D(i, entities, config))
+    }
+    return () => {
+        const moving = Math.floor(entities.length * config.moveFraction)
+        for (let i = 0; i < moving; i++) {
+            channel.updateEntity(entities[i])
+        }
+    }
+}
+
+function setupSpatialGridChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new SpatialGridChannel3D(instance.localState, config.cellSize, {
+        queryPadding: config.queryPadding,
+        fragmentCellLimit: config.fragmentCellLimit,
+        stableFragmentCellLimit: config.stableFragmentCellLimit,
+        label: 'spatial-grid-channel-3d'
     })
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1326,6 +1375,8 @@ function buildScenario(config: ScenarioConfig) {
     }
     if (config.scenario === 'spatial-channel' ||
         config.scenario === 'spatial-channel-3d' ||
+        config.scenario === 'spatial-grid-channel' ||
+        config.scenario === 'spatial-grid-channel-3d' ||
         config.scenario === 'manual-spatial-channel' ||
         config.scenario === 'wide-manual-spatial' ||
         config.scenario === 'ecs-manual-spatial' ||
@@ -1350,6 +1401,10 @@ function buildScenario(config: ScenarioConfig) {
         updateSpatialIndex = setupSpatialChannel(instance, users, entities, config)
     } else if (config.scenario === 'spatial-channel-3d') {
         updateSpatialIndex = setupSpatialChannel3D(instance, users, entities, config)
+    } else if (config.scenario === 'spatial-grid-channel') {
+        updateSpatialIndex = setupSpatialGridChannel(instance, users, entities, config)
+    } else if (config.scenario === 'spatial-grid-channel-3d') {
+        updateSpatialIndex = setupSpatialGridChannel3D(instance, users, entities, config)
     } else if (config.scenario === 'channel-churn') {
         const churn = setupChannelChurn(instance, users, entities, config)
         beforeStep = churn.churn

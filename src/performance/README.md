@@ -21,7 +21,7 @@ npm run profile:snapshot
 Useful knobs:
 
 ```bash
-PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel | spatial-channel-3d | manual-channel | manual-spatial-channel | ecs-channel | ecs-spatial-channel
+PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel | spatial-channel-3d | spatial-grid-channel | spatial-grid-channel-3d | manual-channel | manual-spatial-channel | ecs-channel | ecs-spatial-channel
 PROFILE_USERS=20
 PROFILE_ENTITIES=1000
 PROFILE_VISIBLE=1000
@@ -64,6 +64,9 @@ Scenarios:
 - `spatial-channel-3d`: true volumetric `SpatialChannel3D` workload using
   `AABB3D` views and `x:y:z` cell keys. This is the control for games that
   need vertical culling rather than horizontal projection.
+- `spatial-grid-channel` and `spatial-grid-channel-3d`: experimental
+  comparison channels backed by the shared `SpatialGrid` core. They exist to
+  benchmark whether extracting cell bookkeeping costs too much on hot paths.
 - `channel-churn`: all users share one plain all-visible channel while the
   server removes and adds `PROFILE_CHURN` roots per tick. `PROFILE_CHILDREN`
   attaches child entities to each created root so create/delete fragments cover
