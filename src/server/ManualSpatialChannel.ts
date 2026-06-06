@@ -1,14 +1,13 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../common/binary/schema/Schema'
 import { IEntity } from '../common/IEntity'
-import { AABB2D } from './AABB2D'
 import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { LocalState } from './LocalState'
 import { NDictionary } from './NDictionary'
-import { Point2D } from './Point2D'
+import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialPlane'
 import { User } from './User'
 
-type SpatialEntity = IEntity & Point2D
+type SpatialEntity = IEntity & Record<string, any>
 type CellRef = { key: string, index: number }
 export type ManualSpatialMove = { entity: SpatialEntity, fromCell: string, toCell: string }
 
@@ -43,21 +42,8 @@ export type ManualSpatialChannelOptions = ChannelOptions & {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
+    plane?: SpatialPlane
     spatialProps?: { x?: string, y?: string }
-}
-
-function pointInAABB2D(p: Point2D, view: AABB2D) {
-    const startX = view.x - view.halfWidth
-    const startY = view.y - view.halfHeight
-    const endX = view.x + view.halfWidth
-    const endY = view.y + view.halfHeight
-
-    return (
-        p.x >= startX &&
-        p.x < endX &&
-        p.y >= startY &&
-        p.y < endY
-    )
 }
 
 function createCell(key: string, x: number, y: number): Cell {
@@ -78,7 +64,7 @@ function createCell(key: string, x: number, y: number): Cell {
     }
 }
 
-export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
+export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, SpatialView> {
     readonly manualSpatialChannelMode = true
     readonly cellFragmentMode = true
     nid: number
@@ -87,14 +73,14 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
     localState: LocalState
     entities = new NDictionary()
     users: Map<number, User> = new Map()
-    visibilityResolver = pointInAABB2D
+    visibilityResolver = (obj: any, view: SpatialView) => objectInSpatialView(obj, view, this.plane)
     cellSize: number
     queryPadding: number
     membershipVersion = 0
     fragmentCellLimit: number
     stableFragmentCellLimit: number
     dirtyCells: Set<string> = new Set()
-    private views: Map<number, AABB2D> = new Map()
+    private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
     private cells: Map<string, Cell> = new Map()
     private entityCells: Map<number, CellRef> = new Map()
@@ -105,6 +91,8 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
     private rememberedCellSignatures: Map<number, string> = new Map()
     private spatialXProp: string
     private spatialYProp: string
+    plane: SpatialPlane
+    private axes: SpatialPlaneAxes
     private movedRoots: ManualSpatialMove[] = []
     private structuralDeltas = false
 
@@ -123,8 +111,10 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
         this.stableFragmentCellLimit = Math.max(this.fragmentCellLimit, Math.floor(options.stableFragmentCellLimit || 64))
-        this.spatialXProp = options.spatialProps?.x || 'x'
-        this.spatialYProp = options.spatialProps?.y || 'y'
+        this.plane = options.plane || 'xy'
+        this.axes = getSpatialPlaneAxes(this.plane)
+        this.spatialXProp = options.spatialProps?.x || this.axes.a
+        this.spatialYProp = options.spatialProps?.y || this.axes.b
         this.localState.channels.add(this as any)
     }
 
@@ -140,13 +130,16 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
         return `${x}:${y}`
     }
 
-    private cellKeyForPoint(point: Point2D) {
-        return this.cellKey(this.cellCoord(point.x), this.cellCoord(point.y))
+    private cellKeyForEntity(entity: SpatialEntity) {
+        return this.cellKey(
+            this.cellCoord(entity[this.spatialXProp]),
+            this.cellCoord(entity[this.spatialYProp])
+        )
     }
 
-    private getOrCreateCellForPoint(point: Point2D) {
-        const x = this.cellCoord(point.x)
-        const y = this.cellCoord(point.y)
+    private getOrCreateCellForEntity(entity: SpatialEntity) {
+        const x = this.cellCoord(entity[this.spatialXProp])
+        const y = this.cellCoord(entity[this.spatialYProp])
         const key = this.cellKey(x, y)
         let cell = this.cells.get(key)
         if (!cell) {
@@ -159,13 +152,13 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
     private getCellForEntity(entity: SpatialEntity) {
         const ref = this.entityCells.get(entity.nid)
         if (ref) {
-            return this.cells.get(ref.key) || this.getOrCreateCellForPoint(entity)
+            return this.cells.get(ref.key) || this.getOrCreateCellForEntity(entity)
         }
-        return this.getOrCreateCellForPoint(entity)
+        return this.getOrCreateCellForEntity(entity)
     }
 
     private addToCell(entity: SpatialEntity) {
-        const cell = this.getOrCreateCellForPoint(entity)
+        const cell = this.getOrCreateCellForEntity(entity)
         const wasEmpty = cell.entities.length === 0
         this.entityCells.set(entity.nid, { key: cell.key, index: cell.entities.length })
         cell.entities.push(entity)
@@ -211,7 +204,7 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
             return
         }
 
-        const nextKey = this.cellKeyForPoint(entity)
+        const nextKey = this.cellKeyForEntity(entity)
         if (current.key === nextKey) {
             return
         }
@@ -262,13 +255,14 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
         this.invalidateVisibleEntityCache()
     }
 
-    private viewRange(view: AABB2D) {
-        const halfWidth = view.halfWidth + this.queryPadding
-        const halfHeight = view.halfHeight + this.queryPadding
-        const startX = view.x - halfWidth
-        const startY = view.y - halfHeight
-        const endX = view.x + halfWidth
-        const endY = view.y + halfHeight
+    private viewRange(view: SpatialView) {
+        const spatialView = normalizeSpatialView(view, this.plane)
+        const halfWidth = spatialView.halfA + this.queryPadding
+        const halfHeight = spatialView.halfB + this.queryPadding
+        const startX = spatialView.a - halfWidth
+        const startY = spatialView.b - halfHeight
+        const endX = spatialView.a + halfWidth
+        const endY = spatialView.b + halfHeight
 
         return {
             minX: this.cellCoord(startX),
@@ -492,14 +486,14 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
         this.structuralDeltas = false
     }
 
-    subscribe(user: User, view: AABB2D) {
+    subscribe(user: User, view: SpatialView) {
         this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
         user.subscribe(this as any)
     }
 
-    updateView(user: User, view: AABB2D) {
+    updateView(user: User, view: SpatialView) {
         if (!this.users.has(user.id)) {
             return
         }

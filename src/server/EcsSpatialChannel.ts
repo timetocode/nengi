@@ -1,9 +1,8 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../common/binary/schema/Schema'
 import { IEntity } from '../common/IEntity'
-import { AABB2D } from './AABB2D'
 import { IChannel } from './IChannel'
 import { LocalState } from './LocalState'
-import { Point2D } from './Point2D'
+import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialPlane'
 import { User } from './User'
 
 export type EcsSpatialComponent = IEntity & { pid: number }
@@ -44,6 +43,7 @@ export type EcsSpatialChannelOptions = {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
+    plane?: SpatialPlane
     spatialProps?: { x?: string, y?: string }
 }
 
@@ -71,15 +71,6 @@ function createCell(key: string, x: number, y: number): Cell {
     }
 }
 
-function pointInAABB2D(p: Point2D, view: AABB2D) {
-    const startX = view.x - view.halfWidth
-    const startY = view.y - view.halfHeight
-    const endX = view.x + view.halfWidth
-    const endY = view.y + view.halfHeight
-
-    return p.x >= startX && p.x < endX && p.y >= startY && p.y < endY
-}
-
 export class EcsSpatialChannel implements IChannel {
     readonly ecsSpatialChannelMode = true
     readonly ecsChannelMode = true
@@ -88,7 +79,7 @@ export class EcsSpatialChannel implements IChannel {
     clientIdentity?: any
     localState: LocalState
     users: Map<number, User> = new Map()
-    visibilityResolver = pointInAABB2D
+    visibilityResolver = (obj: any, view: SpatialView) => objectInSpatialView(obj, view, this.plane)
     cellSize: number
     queryPadding: number
     fragmentCellLimit: number
@@ -116,7 +107,7 @@ export class EcsSpatialChannel implements IChannel {
     private componentsByRoot: Map<number, EcsSpatialComponent[]> = new Map()
     private componentByNid: Map<number, EcsSpatialComponent> = new Map()
     private spatialComponentByRoot: Map<number, EcsSpatialComponent> = new Map()
-    private views: Map<number, AABB2D> = new Map()
+    private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
     private cells: Map<string, Cell> = new Map()
     private rootCells: Map<number, CellRef> = new Map()
@@ -126,6 +117,8 @@ export class EcsSpatialChannel implements IChannel {
     private structuralDeltas = false
     private spatialXProp: string
     private spatialYProp: string
+    plane: SpatialPlane
+    private axes: SpatialPlaneAxes
 
     constructor(localState: LocalState, cellSize: number, options: EcsSpatialChannelOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -142,8 +135,10 @@ export class EcsSpatialChannel implements IChannel {
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
         this.stableFragmentCellLimit = Math.max(this.fragmentCellLimit, Math.floor(options.stableFragmentCellLimit || 64))
-        this.spatialXProp = options.spatialProps?.x || 'x'
-        this.spatialYProp = options.spatialProps?.y || 'y'
+        this.plane = options.plane || 'xy'
+        this.axes = getSpatialPlaneAxes(this.plane)
+        this.spatialXProp = options.spatialProps?.x || this.axes.a
+        this.spatialYProp = options.spatialProps?.y || this.axes.b
         this.localState.channels.add(this as any)
     }
 
@@ -249,15 +244,23 @@ export class EcsSpatialChannel implements IChannel {
         this.invalidateVisibleNetworkedNidsCache()
     }
 
-    private viewRange(view: AABB2D) {
-        const halfWidth = view.halfWidth + this.queryPadding
-        const halfHeight = view.halfHeight + this.queryPadding
+    private viewRange(view: SpatialView) {
+        const spatialView = normalizeSpatialView(view, this.plane)
+        const halfWidth = spatialView.halfA + this.queryPadding
+        const halfHeight = spatialView.halfB + this.queryPadding
         return {
-            minX: this.cellCoord(view.x - halfWidth),
-            maxX: this.cellCoordForEnd(view.x + halfWidth),
-            minY: this.cellCoord(view.y - halfHeight),
-            maxY: this.cellCoordForEnd(view.y + halfHeight)
+            minX: this.cellCoord(spatialView.a - halfWidth),
+            maxX: this.cellCoordForEnd(spatialView.a + halfWidth),
+            minY: this.cellCoord(spatialView.b - halfHeight),
+            maxY: this.cellCoordForEnd(spatialView.b + halfHeight)
         }
+    }
+
+    private defaultView(): SpatialView {
+        if (this.plane === 'xz') {
+            return { x: 0, z: 0, halfX: Number.MAX_SAFE_INTEGER, halfZ: Number.MAX_SAFE_INTEGER }
+        }
+        return { x: 0, y: 0, halfX: Number.MAX_SAFE_INTEGER, halfY: Number.MAX_SAFE_INTEGER }
     }
 
     isCellVisible(userId: number, key: string) {
@@ -586,14 +589,14 @@ export class EcsSpatialChannel implements IChannel {
         return this.manualPropNids.length > 0 || this.manualGroupNids.length > 0 || this.dirtyCells.size > 0
     }
 
-    subscribe(user: User, view?: AABB2D) {
-        this.views.set(user.id, view || new AABB2D(0, 0, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER))
+    subscribe(user: User, view?: SpatialView) {
+        this.views.set(user.id, view || this.defaultView())
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
         user.subscribe(this as any)
     }
 
-    updateView(user: User, view: AABB2D) {
+    updateView(user: User, view: SpatialView) {
         if (!this.users.has(user.id)) {
             return
         }

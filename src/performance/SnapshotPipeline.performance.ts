@@ -5,6 +5,7 @@ import { Context } from '../common/Context'
 import { IEntity } from '../common/IEntity'
 import { AABB2D } from '../server/AABB2D'
 import { SpatialChannel } from '../server/SpatialChannel'
+import { SpatialPlane } from '../server/SpatialPlane'
 import { Channel } from '../server/Channel'
 import { ManualChannel } from '../server/ManualChannel'
 import { ManualSpatialChannel } from '../server/ManualSpatialChannel'
@@ -153,6 +154,7 @@ type ScenarioConfig = {
     churn: number
     children: number
     spatialDistribution: string
+    spatialPlane: SpatialPlane
     worldSize: number
     clusters: number
     moveFraction: number
@@ -288,6 +290,7 @@ function readConfig(): ScenarioConfig {
         churn: Math.max(0, Math.floor(envNumber('PROFILE_CHURN', scenario === 'channel-churn' || scenario === 'ecs-channel-churn' ? 100 : 0))),
         children: Math.max(0, Math.floor(envNumber('PROFILE_CHILDREN', scenario === 'channel-churn' ? 1 : 0))),
         spatialDistribution: process.env.PROFILE_SPATIAL_DISTRIBUTION || 'default',
+        spatialPlane: process.env.PROFILE_SPATIAL_PLANE === 'xz' ? 'xz' : 'xy',
         worldSize: Math.max(1, envNumber('PROFILE_WORLD_SIZE', 5000)),
         clusters: Math.max(1, Math.floor(envNumber('PROFILE_CLUSTERS', 8))),
         moveFraction: Math.min(1, Math.max(0, envNumber('PROFILE_MOVE_FRACTION', 1))),
@@ -496,6 +499,12 @@ function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig
     } else if (config.spatialDistribution === 'clustered') {
         spreadEntitiesClustered(entities, config)
     }
+
+    if (config.spatialPlane === 'xz') {
+        for (let i = 0; i < entities.length; i++) {
+            entities[i].z = entities[i].y
+        }
+    }
 }
 
 function createUser(instance: Instance, id: number, adapter: CountingAdapter) {
@@ -701,6 +710,7 @@ function setupManualSpatialChannel(instance: Instance, users: User[], entities: 
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
         label: 'manual-spatial'
     })
     const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
@@ -765,6 +775,7 @@ function setupWideManualSpatial(instance: Instance, users: User[], entities: Wid
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
         label: 'wide-manual-spatial'
     })
     const Wide = channel.type(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
@@ -925,6 +936,7 @@ function setupEcsManualSpatial(instance: Instance, users: User[], bundles: EcsBu
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
         label: 'ecs-manual-spatial'
     })
     const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
@@ -985,6 +997,7 @@ function setupEcsSpatialChannel(instance: Instance, users: User[], bundles: EcsB
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
         label: 'ecs-spatial'
     })
     const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
@@ -1081,7 +1094,8 @@ function setupParentChildSpatialChannel(instance: Instance, users: User[], entit
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'parent-child-cell'
+        plane: config.spatialPlane,
+        label: 'parent-child-spatial'
     })
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1107,6 +1121,7 @@ function setupParentChildManualSpatialChannel(instance: Instance, users: User[],
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
         label: 'parent-child-manual-spatial'
     })
     const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
@@ -1164,12 +1179,21 @@ function setupFixedVisible(instance: Instance, users: User[], entities: TestEnti
 function createSpatialView(userIndex: number, entities: TestEntity[], config: ScenarioConfig) {
     if (config.spatialDistribution === 'single-cell') {
         const side = Math.max(1, config.cellSize * 0.8)
+        if (config.spatialPlane === 'xz') {
+            return { x: side * 0.5, z: side * 0.5, halfX: config.viewHalf, halfZ: config.viewHalf }
+        }
         return new AABB2D(side * 0.5, side * 0.5, config.viewHalf, config.viewHalf)
     }
     if (config.spatialDistribution === 'centered-cell') {
+        if (config.spatialPlane === 'xz') {
+            return { x: config.cellSize * 0.5, z: config.cellSize * 0.5, halfX: config.viewHalf, halfZ: config.viewHalf }
+        }
         return new AABB2D(config.cellSize * 0.5, config.cellSize * 0.5, config.viewHalf, config.viewHalf)
     }
     const entity = entities[(userIndex * Math.max(1, Math.floor(entities.length / Math.max(1, config.users)))) % entities.length]
+    if (config.spatialPlane === 'xz') {
+        return { x: entity.x, z: entity.z, halfX: config.viewHalf, halfZ: config.viewHalf }
+    }
     return new AABB2D(entity.x, entity.y, config.viewHalf, config.viewHalf)
 }
 
@@ -1178,6 +1202,7 @@ function setupSpatialChannel(instance: Instance, users: User[], entities: TestEn
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
+        plane: config.spatialPlane,
         label: 'spatial-channel'
     })
     for (let i = 0; i < entities.length; i++) {
@@ -1409,6 +1434,7 @@ function run() {
         churn: config.churn,
         children: config.children,
         spatialDistribution: config.spatialDistribution,
+        spatialPlane: config.spatialPlane,
         worldSize: config.worldSize,
         clusters: config.clusters,
         moveFraction: config.moveFraction,

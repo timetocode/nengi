@@ -721,6 +721,48 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
 
+    it('spatially replicates ECS roots on the xz plane without copying z into y', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel(instance.localState, 10, { plane: 'xz' })
+        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, { x: 5, z: 5, halfX: 10, halfZ: 10 })
+
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 500,
+            z: 5
+        } as any)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(500)
+
+        transform.x = 6
+        transform.y = 501
+        transform.z = 50
+        Transform.position(transform, 6, 501)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+        expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
+    })
+
     it('updates manual spatial visibility when movement changes occupied cells', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
@@ -754,6 +796,44 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.store.get(entity.nid)?.x).toBe(150)
         expect(clientNetwork.store.entities.has(entity.nid)).toBe(true)
+    })
+
+    it('updates manual spatial visibility on the xz plane without treating y as horizontal', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new ManualSpatialChannel(instance.localState, 100, { plane: 'xz' })
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, { x: 50, z: 50, halfX: 60, halfZ: 60 })
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 500,
+            z: 5,
+            label: 'xz-mover'
+        } as any)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('xz-mover')
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(500)
+
+        entity.x = 250
+        entity.y = 501
+        entity.z = 5
+        Entity.position(entity, 250, 501)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
     })
 
     it('creates and deletes manual spatial movers per user-visible cell set', () => {
@@ -1055,6 +1135,40 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.sharedUpdateFragments.size).toBe(1)
         expect(firstClient.store.get(entity.nid)?.x).toBe(11)
         expect(secondClient.store.get(entity.nid)?.x).toBe(11)
+    })
+
+    it('uses the xz plane for SpatialChannel visibility without copying z into y', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel(instance.localState, 50, { plane: 'xz' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, { x: 10, z: 10, halfX: 20, halfZ: 20 })
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 500,
+            z: 6,
+            label: 'xz-visible'
+        } as any)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('xz-visible')
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(500)
+
+        entity.z = 200
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
     })
 
     it('records explicit dirty hints without requiring them for implicit SpatialChannel updates', () => {
