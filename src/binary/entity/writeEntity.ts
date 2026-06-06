@@ -1,5 +1,4 @@
 import { Binary } from '../../common/binary/Binary'
-import { binaryGet } from '../../common/binary/BinaryExt'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { NetworkIdType, writeNetworkId } from '../../common/binary/Protocol'
 import { Schema } from '../../common/binary/schema/Schema'
@@ -9,9 +8,8 @@ function writeEntity(entity: any, nschema: Schema, bufferWriter: IBinaryWriter, 
     writeNetworkId(entity.nid, nidType, bufferWriter)
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
-        const binaryUtil = binaryGet(propData.type)
         const value = entity[propData.prop]
-        binaryUtil.write(value, bufferWriter)
+        propData.binary.write(value, bufferWriter)
     }
 }
 

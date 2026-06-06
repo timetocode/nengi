@@ -6,6 +6,7 @@ import { writeMessage } from '../binary/message/writeMessage'
 import { connectionAttemptSchema } from '../common/schemas/connectAttemptSchema'
 import readMessage from '../binary/message/readMessage'
 import readDiff from '../binary/entity/readDiff'
+import readUpdateGroup from '../binary/entity/readUpdateGroup'
 import { IBinaryWriter, IBinaryWriterClass } from '../common/binary/IBinaryWriter'
 import { IBinaryReader } from '../common/binary/IBinaryReader'
 import { BinaryAdapter, BinaryPayload } from '../common/binary/BinaryAdapter'
@@ -38,6 +39,8 @@ import {
     getEndpointId,
     isValidUInt32
 } from '../common/Endpoint'
+import { getLocalTime } from './time'
+import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 
 const MAX_REQUESTS_PER_FRAME = 255
 
@@ -77,12 +80,19 @@ type PendingResponse =
     | { request: ClientRequest, status: ResponseStatus.Ok, response: any }
     | { request: ClientRequest, status: ResponseStatus.Error, error: RequestError }
 
+type PendingServerFrame = {
+    snapshot: Snapshot
+    receivedAt: number
+    pendingResponses: PendingResponse[]
+}
+
 export class ClientNetwork {
     client: Client
     store: EntityStore
     entityNTypes: Map<number, number>
     frames: Frame[] = []
     rawFrames: Frame[] = []
+    pendingFrames: PendingServerFrame[] = []
     latestFrame: Frame | null = null
     messages: any[] = []
     predictionErrorFrames: any[] = []
@@ -97,7 +107,9 @@ export class ClientNetwork {
     previousSnapshot: Snapshot | null = null
     chronus = new Chronus()
     frameTick = 1 // incremented each frame that comes from server
+    maxFrameHistory = 240
     latency = 0
+    sendSchemaFingerprint = false
 
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
         this.rejectPendingRequests(new RequestError('Disconnected before request completed.', 'DISCONNECTED', {
@@ -117,7 +129,7 @@ export class ClientNetwork {
     constructor(client: Client) {
         this.client = client
         this.store = new EntityStore(client.context)
-        this.entityNTypes = this.store.ntypes
+        this.entityNTypes = new Map()
     }
 
     incrementClientTick() {
@@ -263,10 +275,103 @@ export class ClientNetwork {
         })
     }
 
-    drainFrames(): Frame[] {
-        const frames = this.rawFrames
-        this.rawFrames = []
+    drainFrames(maxFrames = Number.POSITIVE_INFINITY): Frame[] {
+        const frames: Frame[] = []
+        while (frames.length < maxFrames) {
+            const frame = this.processNextFrame()
+            if (!frame) {
+                break
+            }
+            frames.push(frame)
+        }
         return frames
+    }
+
+    processNextFrame(): Frame | null {
+        const pending = this.pendingFrames.shift()
+        if (!pending) {
+            return null
+        }
+
+        const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAt)
+        this.frameTick++
+        this.frames.push(frame)
+        while (this.frames.length > this.maxFrameHistory) {
+            this.frames.shift()
+        }
+        if (this.frames.length > 0) {
+            this.store.history.pruneBefore(this.frames[0].tick)
+        }
+        this.latestFrame = frame
+        pending.snapshot.messages.forEach(message => this.messages.push(message))
+
+        const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities)
+        if (predictionErrorFrame.entities.size > 0) {
+            this.client.network.predictionErrorFrames.push(predictionErrorFrame)
+        }
+
+        this.client.predictor.cleanUp(frame.confirmedClientTick)
+        this.outbound.confirmCommands(pending.snapshot.confirmedClientTick)
+
+        pending.pendingResponses.forEach(pendingResponse => {
+            if (pendingResponse.status === ResponseStatus.Ok) {
+                this.resolveRequest(pendingResponse.request, pendingResponse.response)
+            } else {
+                this.rejectRequest(pendingResponse.request, pendingResponse.error)
+            }
+        })
+
+        return frame
+    }
+
+    getPendingFrameCount() {
+        return this.pendingFrames.length
+    }
+
+    queueSnapshot(snapshot: Snapshot, receivedAt = getLocalTime()) {
+        this.pendingFrames.push({
+            snapshot,
+            receivedAt,
+            pendingResponses: []
+        })
+    }
+
+    resolveSnapshotTimestamp(snapshot: Snapshot, receivedAtEpoch = Date.now()) {
+        const tickMs = 1000 / this.client.serverTickRate
+        const actualTimestamp = snapshot.timestamp
+
+        if (actualTimestamp !== -1) {
+            this.chronus.register(actualTimestamp, receivedAtEpoch)
+            snapshot.timestamp = actualTimestamp
+            return
+        }
+
+        if (!this.previousSnapshot || this.previousSnapshot.timestamp === -1) {
+            return
+        }
+
+        const expectedTimestamp = this.previousSnapshot.timestamp + tickMs
+        snapshot.timestamp = expectedTimestamp
+    }
+
+    shiftInterpolationTimestamps(shift: number) {
+        const shifted = new Set<Frame>()
+        this.frames.forEach(frame => {
+            if (frame.timestamp !== -1) {
+                frame.timestamp += shift
+                shifted.add(frame)
+            }
+        })
+        this.rawFrames.forEach(frame => {
+            if (!shifted.has(frame) && frame.timestamp !== -1) {
+                frame.timestamp += shift
+            }
+        })
+        this.pendingFrames.forEach(frame => {
+            if (frame.snapshot.timestamp !== -1) {
+                frame.snapshot.timestamp += shift
+            }
+        })
     }
 
     getRequestsForNextFrame(): ClientRequest[] {
@@ -297,7 +402,8 @@ export class ClientNetwork {
     createHandshake<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(handshake: any, binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
         const handshakeMessage = {
             ntype: EngineMessage.ConnectionAttempt,
-            handshake: JSON.stringify(handshake)
+            handshake: JSON.stringify(handshake),
+            schemaFingerprint: this.sendSchemaFingerprint ? createSchemaFingerprint(this.client.context) : ''
         }
 
         const handshakeByteLength = count(connectionAttemptSchema, handshakeMessage)
@@ -480,10 +586,17 @@ export class ClientNetwork {
     }
 
     readSnapshot(dr: IBinaryReader) {
+        const receivedAt = getLocalTime()
+        const receivedAtEpoch = Date.now()
         const snapshot: Snapshot = {
             timestamp: -1,
             confirmedClientTick: -1,
             messages: [],
+            channelIdentities: [],
+            channelEntityCreates: [],
+            ecsCreateEntities: [],
+            ecsCreateComponents: [],
+            ecsDeleteEntities: [],
             createEntities: [],
             updateEntities: [],
             deleteEntities: []
@@ -561,12 +674,51 @@ export class ClientNetwork {
                 }
                 break
             }
+            case BinarySection.ChannelIdentities: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const channelId = readNetworkId(this.protocol.nidType, dr)
+                    snapshot.channelIdentities!.push({
+                        channelId,
+                        identity: JSON.parse(dr.readString())
+                    })
+                }
+                break
+            }
+            case BinarySection.ChannelEntityCreates: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    snapshot.channelEntityCreates!.push({
+                        nid: readNetworkId(this.protocol.nidType, dr),
+                        channelId: readNetworkId(this.protocol.nidType, dr)
+                    })
+                }
+                break
+            }
             case BinarySection.CreateEntities: {
                 const count = dr.readUInt32()
                 for (let i = 0; i < count; i++) {
                     const entity = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
-                    this.store.ntypes.set(entity.nid, entity.ntype)
+                    this.entityNTypes.set(entity.nid, entity.ntype)
                     snapshot.createEntities.push(entity)
+                }
+                break
+            }
+            case BinarySection.EcsCreateEntities: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    snapshot.ecsCreateEntities!.push(readNetworkId(this.protocol.nidType, dr))
+                }
+                break
+            }
+            case BinarySection.EcsCreateComponents: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const pid = readNetworkId(this.protocol.nidType, dr)
+                    const component = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
+                    ;(component as any).pid = pid
+                    this.entityNTypes.set(component.nid, component.ntype)
+                    snapshot.ecsCreateComponents!.push(component)
                 }
                 break
             }
@@ -578,11 +730,48 @@ export class ClientNetwork {
                 }
                 break
             }
+            case BinarySection.UpdateEntityGroups: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const diffs = readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType)
+                    for (let j = 0; j < diffs.length; j++) {
+                        snapshot.updateEntities.push(diffs[j])
+                    }
+                }
+                break
+            }
+            case BinarySection.EcsUpdateComponentGroups: {
+                const ntype = readNetworkId(this.protocol.ntypeType, dr)
+                const groupKey = dr.readUInt8()
+                const count = dr.readUInt32()
+                const schema = this.client.context.getSchema(ntype)!
+                const group = schema.updateGroups[groupKey]
+                for (let i = 0; i < count; i++) {
+                    const nid = readNetworkId(this.protocol.nidType, dr)
+                    for (let j = 0; j < group.props.length; j++) {
+                        const prop = group.props[j]
+                        snapshot.updateEntities.push({
+                            nid,
+                            prop: prop.prop,
+                            value: prop.binary.read(dr)
+                        })
+                    }
+                }
+                break
+            }
             case BinarySection.DeleteEntities: {
                 const count = dr.readUInt32()
                 for (let i = 0; i < count; i++) {
                     const nid = readNetworkId(this.protocol.nidType, dr)
+                    this.entityNTypes.delete(nid)
                     snapshot.deleteEntities.push(nid)
+                }
+                break
+            }
+            case BinarySection.EcsDeleteEntities: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    snapshot.ecsDeleteEntities!.push(readNetworkId(this.protocol.nidType, dr))
                 }
                 break
             }
@@ -595,39 +784,9 @@ export class ClientNetwork {
 
         // client engine level state
 
-        // timing
-        if (snapshot.timestamp !== -1) {
-            this.client.network.chronus.register(snapshot.timestamp)
-        } else {
-            if (this.previousSnapshot) {
-                snapshot.timestamp = this.previousSnapshot.timestamp + (1000 / this.client.serverTickRate)
-            }
-        }
+        this.resolveSnapshotTimestamp(snapshot, receivedAtEpoch)
 
-        // apply authoritative state once, then expose compact frame events
-        const frame = this.store.applySnapshot(snapshot, this.frameTick)
-        this.frameTick++
-        this.frames.push(frame)
-        this.rawFrames.push(frame)
-        this.latestFrame = frame
-        snapshot.messages.forEach(message => this.messages.push(message))
-
-        const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities)
-        if (predictionErrorFrame.entities.size > 0) {
-            this.client.network.predictionErrorFrames.push(predictionErrorFrame)
-        }
-
-        this.client.predictor.cleanUp(frame.confirmedClientTick)
-        // commands/prediction
-        this.outbound.confirmCommands(snapshot.confirmedClientTick)
+        this.pendingFrames.push({ snapshot, receivedAt, pendingResponses })
         this.previousSnapshot = snapshot
-
-        pendingResponses.forEach(pending => {
-            if (pending.status === ResponseStatus.Ok) {
-                this.resolveRequest(pending.request, pending.response)
-            } else {
-                this.rejectRequest(pending.request, pending.error)
-            }
-        })
     }
 }

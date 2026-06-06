@@ -2,10 +2,23 @@ import { Binary } from '../Binary'
 
 
 type ShorthandBinarySpecification = Binary
-type LonghandBinarySpecification = { type: Binary, interp: boolean, groups?: [[string]] }
+type LonghandBinarySpecification = { type: Binary, interp?: boolean }
 
-type SchemaDefinition = {
-    [key: string]: ShorthandBinarySpecification | LonghandBinarySpecification
+type UpdateGroupDefinition =
+    | string[]
+    | {
+        name?: string
+        props: string[]
+        mode?: 'any' | 'full'
+    }
+
+type SchemaOptions = {
+    updateGroups?: { [name: string]: string[] | { props: string[], mode?: 'any' | 'full' } } | UpdateGroupDefinition[]
 }
 
-export { SchemaDefinition }
+type SchemaDefinition = {
+    [key: string]: ShorthandBinarySpecification | LonghandBinarySpecification | SchemaOptions | undefined
+    $options?: SchemaOptions
+}
+
+export { SchemaDefinition, SchemaOptions, UpdateGroupDefinition }

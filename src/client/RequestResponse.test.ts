@@ -9,6 +9,7 @@ import { Instance } from '../server/Instance'
 import { User } from '../server/User'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 import { ClientNetwork } from './ClientNetwork'
+import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 
 function createUser(instance: Instance) {
     const user = new User(undefined, {
@@ -44,6 +45,7 @@ function deliverRequestAndResponse(instance: Instance, user: User, clientNetwork
 
     const responseBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
     clientNetwork.readSnapshot(testBinaryAdapter.createReader(responseBuffer))
+    clientNetwork.processNextFrame()
 }
 
 describe('request/response', () => {
@@ -67,6 +69,94 @@ describe('request/response', () => {
             nidType: Binary.UInt8,
             ntypeType: Binary.UInt16
         })
+    })
+
+    it('can require matching schema fingerprints during the connection handshake', async () => {
+        const context = new Context()
+        context.register(1, defineMessageSchema({
+            text: Binary.String
+        }))
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        clientNetwork.sendSchemaFingerprint = true
+        instance.network.requireSchemaFingerprint = true
+        instance.onConnect = async () => true
+
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, testBinaryAdapter))
+
+        await new Promise(resolve => setTimeout(resolve, 0))
+        const handshakeBuffer = (user.networkAdapter.send as jest.Mock).mock.calls[0][1] as Buffer
+        const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
+
+        expect(response.accepted).toBe(true)
+        expect(createSchemaFingerprint(context)).toBe(createSchemaFingerprint(instance.context))
+    })
+
+    it('denies schema fingerprint mismatches when required', async () => {
+        const serverContext = new Context()
+        serverContext.register(1, defineMessageSchema({
+            text: Binary.String
+        }))
+        const clientContext = new Context()
+        clientContext.register(1, defineMessageSchema({
+            other: Binary.String
+        }))
+        const instance = new Instance(serverContext)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(clientContext)
+        clientNetwork.sendSchemaFingerprint = true
+        instance.network.requireSchemaFingerprint = true
+        instance.onConnect = async () => true
+
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, testBinaryAdapter))
+
+        await new Promise(resolve => setTimeout(resolve, 0))
+        const handshakeBuffer = (user.networkAdapter.send as jest.Mock).mock.calls[0][1] as Buffer
+        const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
+
+        expect(response.accepted).toBe(false)
+        expect(response.reason.message).toContain('Schema fingerprint mismatch')
+    })
+
+    it('denies missing schema fingerprints when required', async () => {
+        const context = new Context()
+        context.register(1, defineMessageSchema({
+            text: Binary.String
+        }))
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        instance.network.requireSchemaFingerprint = true
+        instance.onConnect = async () => true
+
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, testBinaryAdapter))
+
+        await new Promise(resolve => setTimeout(resolve, 0))
+        const handshakeBuffer = (user.networkAdapter.send as jest.Mock).mock.calls[0][1] as Buffer
+        const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
+
+        expect(response.accepted).toBe(false)
+        expect(response.reason.message).toContain('Schema fingerprint required')
+    })
+
+    it('accepts handshakes without schema fingerprints when not required', async () => {
+        const context = new Context()
+        context.register(1, defineMessageSchema({
+            text: Binary.String
+        }))
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        instance.onConnect = async () => true
+
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, testBinaryAdapter))
+
+        await new Promise(resolve => setTimeout(resolve, 0))
+        const handshakeBuffer = (user.networkAdapter.send as jest.Mock).mock.calls[0][1] as Buffer
+        const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
+
+        expect(response.accepted).toBe(true)
     })
 
     it('round trips plain numeric endpoints with UTF-8 JSON payloads', async () => {
@@ -191,7 +281,13 @@ describe('request/response', () => {
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const inventoryChannel = new Channel(instance.localState, { label: 'chest:123:inventory' })
+        const inventoryChannel = new Channel(instance.localState, {
+            label: 'chest:123:inventory',
+            clientIdentity: {
+                kind: 'container',
+                chestNid: 123
+            }
+        })
         const inventory = inventoryChannel.addEntity({
             nid: 0,
             ntype: NType.Inventory,
@@ -251,6 +347,15 @@ describe('request/response', () => {
             item
         ])
         expect(clientNetwork.store.get(item.nid)?.inventoryNid).toBe(inventory.nid)
+        expect(clientNetwork.store.getChannelId(item.nid)).toBe(inventoryChannel.nid)
+        expect(clientNetwork.store.getChannelIdentity(item.nid)).toEqual({
+            kind: 'container',
+            chestNid: 123
+        })
+        expect(clientNetwork.store.getByChannel(inventoryChannel.nid)).toEqual([
+            inventory,
+            item
+        ])
         expect(callbackSawInventory).toBe(true)
     })
 

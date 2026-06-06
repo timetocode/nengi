@@ -67,6 +67,11 @@ class TestBufferWriter implements IBinaryWriter<Buffer> {
         this.offset += length
     }
 
+    writeBytes(value: Uint8Array) {
+        this.buffer.set(value, this.offset)
+        this.offset += value.byteLength
+    }
+
     writeUInt8Array(value: Uint8Array) {
         this.writeUInt32(value.length)
         for (let i = 0; i < value.length; i++) {

@@ -1,5 +1,5 @@
 import { IEntity } from '../../common/IEntity'
-import { EntityChange } from '../../common/binary/schema/util'
+import { EntityChange, EntityUpdateGroup } from '../../common/binary/schema/util'
 import { ResponseStatus } from '../../common/Endpoint'
 import { EndpointPayload } from '../endpoint/EndpointPayload'
 
@@ -9,12 +9,28 @@ export type SnapshotResponse = {
     payload: EndpointPayload
 }
 
+export type ChannelIdentity = {
+    channelId: number,
+    identity: any
+}
+
+export type ChannelEntityCreate = {
+    nid: number,
+    channelId: number
+}
+
 export type SnapshotPlan = {
     engineMessages: any[],
     messages: any[],
     responses: SnapshotResponse[],
+    channelIdentities: ChannelIdentity[],
+    channelEntityCreates: ChannelEntityCreate[],
+    ecsCreateEntities: number[],
+    ecsCreateComponents: IEntity[],
+    ecsDeleteEntities: number[],
     createEntities: IEntity[],
     updateEntities: EntityChange[],
+    updateEntityGroups: EntityUpdateGroup[],
     deleteEntities: number[]
 }
 
@@ -23,8 +39,14 @@ export function createEmptySnapshotPlan(): SnapshotPlan {
         engineMessages: [],
         messages: [],
         responses: [],
+        channelIdentities: [],
+        channelEntityCreates: [],
+        ecsCreateEntities: [],
+        ecsCreateComponents: [],
+        ecsDeleteEntities: [],
         createEntities: [],
         updateEntities: [],
+        updateEntityGroups: [],
         deleteEntities: []
     }
 }

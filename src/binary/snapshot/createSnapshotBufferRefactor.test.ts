@@ -10,15 +10,26 @@ import { defineEntitySchema, defineMessageSchema } from '../../common/binary/sch
 import { Context } from '../../common/Context'
 import { ResponseStatus } from '../../common/Endpoint'
 import { ClientNetwork } from '../../client/ClientNetwork'
+import { AABB2D } from '../../server/AABB2D'
+import { CellChannel } from '../../server/CellChannel'
 import { Channel } from '../../server/Channel'
+import { MutationChannel } from '../../server/MutationChannel'
+import { TrustedMutationChannel } from '../../server/TrustedMutationChannel'
+import { TrustedMutationSpatialChannel } from '../../server/TrustedMutationSpatialChannel'
+import { MutationCellChannel } from '../../server/MutationCellChannel'
+import { EcsChannel } from '../../server/EcsChannel'
+import { EcsSpatialChannel } from '../../server/EcsSpatialChannel'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { TestBufferWriter, testBinaryAdapter } from '../../testSupport/BufferBinary'
 import { createEndpointPayload } from '../endpoint/EndpointPayload'
+import { BinaryDebugError } from '../BinaryDebugError'
+import { createEmptySnapshotPlan } from './SnapshotPlan'
 
 enum NType {
     Entity = 1,
-    Message = 2
+    Message = 2,
+    Transform = 3
 }
 
 function createContext() {
@@ -30,6 +41,38 @@ function createContext() {
     }))
     context.register(NType.Message, defineMessageSchema({
         text: Binary.String
+    }))
+    return context
+}
+
+function createGroupedContext() {
+    const context = new Context()
+    context.register(NType.Entity, defineEntitySchema({
+        x: Binary.Float64,
+        y: Binary.Float64,
+        label: Binary.String,
+        $options: {
+            updateGroups: {
+                position: ['x', 'y']
+            }
+        }
+    }))
+    context.register(NType.Message, defineMessageSchema({
+        text: Binary.String
+    }))
+    return context
+}
+
+function createEcsContext() {
+    const context = createContext()
+    context.register(NType.Transform, defineEntitySchema({
+        x: Binary.Float64,
+        y: Binary.Float64,
+        $options: {
+            updateGroups: {
+                position: ['x', 'y']
+            }
+        }
     }))
     return context
 }
@@ -60,6 +103,11 @@ function createClientNetwork(context: Context) {
     const network = new ClientNetwork(client as any)
     client.network = network
     return network
+}
+
+function lastSentBuffer(user: User) {
+    const send = user.networkAdapter.send as jest.Mock
+    return send.mock.calls[send.mock.calls.length - 1][1] as Buffer
 }
 
 describe('server snapshot pipeline', () => {
@@ -115,6 +163,52 @@ describe('server snapshot pipeline', () => {
         expect(third.deleteEntities).toEqual([nid])
     })
 
+    it('collects hierarchy creates and updates parent-first, then deletes child-first', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new Channel(instance.localState)
+        channel.subscribe(user)
+
+        const parent = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'parent'
+        })
+        const child = instance.localState.addChild(parent, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'child'
+        })
+        const parentNid = parent.nid
+        const childNid = child.nid
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+        const createPlan = collectSnapshotPlan(user, instance)
+
+        expect(createPlan.createEntities.map(entity => entity.nid)).toEqual([parentNid, childNid])
+
+        parent.x = 11
+        child.x = 13
+        instance.tick = 2
+        instance.cache.createCachesForTick(instance.tick)
+        const updatePlan = collectSnapshotPlan(user, instance)
+
+        expect(updatePlan.updateEntityGroups.map(update => update.nid)).toEqual([parentNid, childNid])
+
+        channel.removeEntity(parent)
+        instance.tick = 3
+        instance.cache.createCachesForTick(instance.tick)
+        const deletePlan = collectSnapshotPlan(user, instance)
+
+        expect(deletePlan.deleteEntities).toEqual([childNid, parentNid])
+    })
+
     it('counts and writes a collected snapshot plan', () => {
         const context = createContext()
         const instance = new Instance(context)
@@ -147,6 +241,1522 @@ describe('server snapshot pipeline', () => {
         commitSnapshotPlan(user, plan)
 
         expect(user.responseQueue).toEqual([{ requestId: 78, status: ResponseStatus.Ok, payload: createEndpointPayload({ late: true }) }])
+    })
+
+    it('bundles grouped entity updates and expands them on the client', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new Channel(instance.localState)
+        const clientNetwork = createClientNetwork(context)
+
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+        const nid = entity.nid
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBufferRefactor(user, instance) as Buffer))
+        clientNetwork.processNextFrame()
+
+        entity.x = 11
+        instance.tick = 2
+        instance.cache.createCachesForTick(instance.tick)
+        const plan = collectSnapshotPlan(user, instance)
+
+        expect(plan.updateEntities).toEqual([])
+        expect(plan.updateEntityGroups).toHaveLength(1)
+        expect(plan.updateEntityGroups[0].group.name).toBe('position')
+        expect(plan.updateEntityGroups[0].values).toEqual([11, 6])
+
+        const byteLength = countSnapshotBytes(plan, context)
+        const writer = TestBufferWriter.create(byteLength)
+        writeSnapshot(plan, context, writer)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(writer.buffer))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.updateEntities).toEqual([
+            { nid, prop: 'x', previous: 5, value: 11 }
+        ])
+        expect(clientNetwork.store.get(nid)).toEqual({
+            nid,
+            ntype: NType.Entity,
+            x: 11,
+            y: 6,
+            label: 'door'
+        })
+    })
+
+    it('allows repeated update group sections in one snapshot', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new Channel(instance.localState)
+        const clientNetwork = createClientNetwork(context)
+
+        channel.subscribe(user)
+        const first = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'first'
+        })
+        const second = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'second'
+        })
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBufferRefactor(user, instance) as Buffer))
+        clientNetwork.processNextFrame()
+
+        first.x = 11
+        second.x = 13
+        instance.tick = 2
+        instance.cache.createCachesForTick(instance.tick)
+        const collected = collectSnapshotPlan(user, instance)
+        const firstPlan = createEmptySnapshotPlan()
+        const secondPlan = createEmptySnapshotPlan()
+        firstPlan.updateEntityGroups = [collected.updateEntityGroups[0]]
+        secondPlan.updateEntityGroups = [collected.updateEntityGroups[1]]
+
+        const byteLength = countSnapshotBytes(firstPlan, context) + countSnapshotBytes(secondPlan, context)
+        const writer = TestBufferWriter.create(byteLength)
+        writeSnapshot(firstPlan, context, writer)
+        writeSnapshot(secondPlan, context, writer)
+
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(writer.buffer))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(first.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(second.nid)?.x).toBe(13)
+    })
+
+    it('can use shared update fragments for steady-state all-visible channels', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser)
+        channel.subscribe(secondUser)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+        const child = instance.localState.addChild(entity, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 15,
+            y: 16,
+            label: 'hinge'
+        })
+        const nid = entity.nid
+        const childNid = child.nid
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        entity.x = 11
+        child.x = 21
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+        expect(firstClient.store.get(nid)?.x).toBe(11)
+        expect(firstClient.store.get(childNid)?.x).toBe(21)
+        expect(secondClient.store.get(nid)?.x).toBe(11)
+        expect(secondClient.store.get(childNid)?.x).toBe(21)
+    })
+
+    it('can use dirty-entity mutation channels to diff only marked entities', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'dirtyEntity' })
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser)
+        channel.subscribe(secondUser)
+        const first = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'first'
+        })
+        const second = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 15,
+            y: 16,
+            label: 'second'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        first.x = 11
+        second.x = 99
+        channel.markDirty(first)
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(firstClient.store.get(first.nid)?.x).toBe(11)
+        expect(secondClient.store.get(first.nid)?.x).toBe(11)
+        expect(firstClient.store.get(second.nid)?.x).toBe(15)
+        expect(secondClient.store.get(second.nid)?.x).toBe(15)
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+    })
+
+    it('can use explicit mutation channels to write recorded prop updates directly', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'explicit' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.mutate(entity, 'x', 11)
+        entity.y = 99
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(6)
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+    })
+
+    it('can use dirty-entity mutation channels for child entity updates', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'dirtyEntity' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const parent = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'parent'
+        })
+        const child = instance.attachChild(parent, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 15,
+            y: 16,
+            label: 'child'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        child.x = 21
+        channel.markDirty(child)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(child.nid)?.x).toBe(21)
+    })
+
+    it('can use explicit mutation channels for child entity updates', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'explicit' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const parent = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'parent'
+        })
+        const child = instance.attachChild(parent, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 15,
+            y: 16,
+            label: 'child'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.mutate(child, 'x', 21)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(child.nid)?.x).toBe(21)
+    })
+
+    it('coalesces repeated explicit prop mutations to the last value', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'explicit' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.mutate(entity, 'x', 10)
+        channel.mutate(entity, 'x', 11)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.latestFrame?.updateEntities).toHaveLength(1)
+    })
+
+    it('emits full update groups for explicit grouped mutations', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'explicit' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.mutateGroup(entity, 'position', { x: 11, y: 12 })
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
+        expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
+    })
+
+    it('writes trusted grouped mutations directly', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new TrustedMutationChannel(instance.localState)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const position = Entity.position
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.x = 11
+        entity.y = 12
+        position(entity, 11, 12)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
+        expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
+    })
+
+    it('writes trusted prop mutations directly', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new TrustedMutationChannel(instance.localState)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const label = Entity.label
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.label = 'gate'
+        label(entity, 'gate')
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('gate')
+        expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['label'])
+    })
+
+    it('writes trusted spatial grouped mutations through cell fragments', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const position = Entity.position
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.x = 11
+        entity.y = 12
+        position(entity, 11, 12)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+    })
+
+    it('writes trusted spatial grouped child mutations through the parent cell fragment', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const position = Entity.position
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const parent = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'parent'
+        })
+        const child = instance.attachChild(parent, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 15,
+            y: 16,
+            label: 'child'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        child.x = 21
+        child.y = 22
+        position(child, 21, 22)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(child.nid)?.x).toBe(21)
+        expect(clientNetwork.store.get(child.nid)?.y).toBe(22)
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+    })
+
+    it('replicates ECS roots as ids and components as pid-owned state', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsChannel(instance.localState)
+        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const pid = channel.createEntity()
+        const transform = channel.addComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 1,
+            y: 2
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(clientNetwork.store.get(transform.nid)).toEqual({
+            nid: transform.nid,
+            ntype: NType.Transform,
+            pid,
+            x: 1,
+            y: 2
+        })
+
+        transform.x = 5
+        transform.y = 6
+        Transform.position(transform, 5, 6)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(6)
+
+        const componentNid = transform.nid
+        channel.removeEntity(pid)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
+        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([componentNid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+        expect(clientNetwork.store.entities.has(componentNid)).toBe(false)
+    })
+
+    it('can compose ECS and regular channels in one user snapshot', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const ecsChannel = new EcsChannel(instance.localState)
+        const regularChannel = new Channel(instance.localState)
+        const Transform = ecsChannel.type(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        ecsChannel.subscribe(user)
+        regularChannel.subscribe(user)
+
+        const pid = ecsChannel.createEntity()
+        const transform = ecsChannel.addComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 1,
+            y: 2
+        })
+        const regular = regularChannel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 3,
+            y: 4,
+            label: 'regular'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([transform.nid, regular.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(1)
+        expect(clientNetwork.store.get(regular.nid)?.label).toBe('regular')
+
+        transform.x = 5
+        transform.y = 6
+        Transform.position(transform, 5, 6)
+        regular.x = 7
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(6)
+        expect(clientNetwork.store.get(regular.nid)?.x).toBe(7)
+
+        const transformNid = transform.nid
+        const regularNid = regular.nid
+        ecsChannel.removeEntity(pid)
+        regularChannel.removeEntity(regular)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([regularNid])
+        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.deleteEntities).toHaveLength(2)
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual(expect.arrayContaining([transformNid, regularNid]))
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+        expect(clientNetwork.store.entities.has(transformNid)).toBe(false)
+        expect(clientNetwork.store.entities.has(regularNid)).toBe(false)
+    })
+
+    it('spatially replicates ECS roots from component state', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel(instance.localState, 10)
+        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(5, 5, 10, 10))
+
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
+
+        transform.x = 6
+        transform.y = 7
+        Transform.position(transform, 6, 7)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(6)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(7)
+
+        transform.x = 50
+        transform.y = 50
+        Transform.position(transform, 50, 50)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
+        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+        expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
+    })
+
+    it('updates trusted spatial visibility when movement changes occupied cells', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const position = Entity.position
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(100, 50, 110, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'moving'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.x = 150
+        entity.y = 6
+        position(entity, 150, 6)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(150)
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(true)
+    })
+
+    it('creates and deletes trusted spatial movers per user-visible cell set', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const position = Entity.position
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(50, 50, 40, 40))
+        channel.subscribe(secondUser, new AABB2D(150, 50, 40, 40))
+        const mover = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'mover'
+        })
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 150,
+            y: 6,
+            label: 'anchor'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        const moverNid = mover.nid
+        mover.x = 150
+        mover.y = 6
+        position(mover, 150, 6)
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(firstClient.latestFrame?.deleteEntities).toEqual([moverNid])
+        expect(firstClient.store.entities.has(moverNid)).toBe(false)
+        expect(secondClient.latestFrame?.createEntities.map(entity => entity.nid)).toContain(moverNid)
+        expect(secondClient.store.get(moverNid)?.x).toBe(150)
+    })
+
+    it('throws when explicit mutation props are not schema-backed', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationChannel(instance.localState, { mutationMode: 'explicit' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        } as any)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.mutate(entity, 'missing', 123)
+
+        expect(() => instance.step()).toThrow('explicit mutation prop "missing" is not in schema')
+    })
+
+    it('can use shared create and delete fragments for synchronized all-visible channel deltas', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        instance.network.snapshotPerformanceEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser)
+        channel.subscribe(secondUser)
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'initial'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        const crate = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'crate'
+        })
+        const item = instance.attachChild(crate, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'item'
+        })
+        const crateNid = crate.nid
+        const itemNid = item.nid
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.sharedCreateFragments.size).toBe(1)
+        expect(firstClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid])
+        expect(secondClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid])
+        expect(firstClient.store.get(itemNid)?.label).toBe('item')
+        expect(secondClient.store.get(itemNid)?.label).toBe('item')
+
+        channel.removeEntity(crate)
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.sharedDeleteFragments.size).toBe(1)
+        expect(firstClient.latestFrame?.deleteEntities).toEqual([itemNid, crateNid])
+        expect(secondClient.latestFrame?.deleteEntities).toEqual([itemNid, crateNid])
+        expect(firstClient.store.entities.has(crateNid)).toBe(false)
+        expect(secondClient.store.entities.has(itemNid)).toBe(false)
+        expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(4)
+        expect(instance.network.snapshotPerformance.sharedFragmentHits).toBe(4)
+    })
+
+    it('keeps new all-visible channel subscribers on the full baseline create path', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const existingUser = createUser(instance)
+        const newUser = createUser(instance)
+        newUser.id = 2
+        const existingClient = createClientNetwork(context)
+        const newClient = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(existingUser.id, existingUser)
+        channel.subscribe(existingUser)
+        const initial = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'initial'
+        })
+
+        instance.step()
+        existingClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(existingUser)))
+        existingClient.processNextFrame()
+
+        instance.users.set(newUser.id, newUser)
+        channel.subscribe(newUser)
+        const added = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 3,
+            y: 4,
+            label: 'added'
+        })
+
+        instance.step()
+        existingClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(existingUser)))
+        existingClient.processNextFrame()
+        newClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(newUser)))
+        newClient.processNextFrame()
+
+        expect(instance.network.sharedCreateFragments.size).toBe(1)
+        expect(existingClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([added.nid])
+        expect(newClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([initial.nid, added.nid])
+    })
+
+    it('does not emit shared create or delete fragments for same-tick transient roots', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'initial'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const transient = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 3,
+            y: 4,
+            label: 'transient'
+        })
+        channel.removeEntity(transient)
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(instance.network.sharedCreateFragments.size).toBe(0)
+        expect(instance.network.sharedDeleteFragments.size).toBe(0)
+        expect(clientNetwork.latestFrame?.createEntities).toEqual([])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
+    })
+
+    it('can use shared message fragments for channel broadcasts', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.snapshotPerformanceEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser)
+        channel.subscribe(secondUser)
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+        channel.addMessage({ ntype: NType.Message, text: 'broadcast' })
+        firstUser.queueMessage({ ntype: NType.Message, text: 'private' })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(firstClient.messages).toEqual([
+            { ntype: NType.Message, text: 'private' },
+            { ntype: NType.Message, text: 'broadcast' }
+        ])
+        expect(secondClient.messages).toEqual([
+            { ntype: NType.Message, text: 'broadcast' }
+        ])
+        expect(channel.broadcastMessages).toEqual([])
+        expect(instance.network.snapshotPerformance.sharedMessageFragmentBuilds).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedMessageFragmentHits).toBe(1)
+        expect(instance.network.snapshotPerformance.messagesTotal).toBe(3)
+    })
+
+    it('can use reusable cell update fragments without userland updateEntity calls', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(10, 10, 5, 5))
+        channel.subscribe(secondUser, new AABB2D(10, 10, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        entity.x = 11
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+        expect(firstClient.store.get(entity.nid)?.x).toBe(11)
+        expect(secondClient.store.get(entity.nid)?.x).toBe(11)
+    })
+
+    it('records explicit dirty hints without requiring them for implicit CellChannel updates', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.x = 11
+        expect(instance.markDirty(entity)).toBe(true)
+        expect(instance.localState.dirtyNids.has(entity.nid)).toBe(true)
+        expect(channel.getDirtyCellKeys()).toEqual(['0:0'])
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(instance.localState.dirtyNids.size).toBe(0)
+        expect(channel.getDirtyCellKeys()).toEqual([])
+    })
+
+    it('can use dirty-entity MutationCellChannel updates within dirty cells', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationCellChannel(instance.localState, 50, { mutationMode: 'dirtyEntity' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const first = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'first'
+        })
+        const second = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'second'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        first.x = 11
+        second.x = 15
+        channel.markDirty(first)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(first.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(second.nid)?.x).toBe(7)
+        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+    })
+
+    it('can use explicit MutationCellChannel updates within dirty cells', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new MutationCellChannel(instance.localState, 50, { mutationMode: 'explicit' })
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.mutateGroup(entity, 'position', { x: 11, y: 12 })
+        entity.label = 'ignored'
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('door')
+        expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
+    })
+
+    it('can reuse cell create and delete fragments when users enter and leave the same cell', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(200, 200, 5, 5))
+        channel.subscribe(secondUser, new AABB2D(200, 200, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'door'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        channel.updateView(firstUser, new AABB2D(10, 10, 5, 5))
+        channel.updateView(secondUser, new AABB2D(10, 10, 5, 5))
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.sharedCreateFragments.size).toBe(1)
+        expect(firstClient.store.get(entity.nid)?.label).toBe('door')
+        expect(secondClient.store.get(entity.nid)?.label).toBe('door')
+
+        channel.updateView(firstUser, new AABB2D(200, 200, 5, 5))
+        channel.updateView(secondUser, new AABB2D(200, 200, 5, 5))
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.sharedDeleteFragments.size).toBe(1)
+        expect(firstClient.store.entities.has(entity.nid)).toBe(false)
+        expect(secondClient.store.entities.has(entity.nid)).toBe(false)
+    })
+
+    it('keeps CellChannel visible cell keys cached for movement between populated cells', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new CellChannel(instance.localState, 100)
+
+        channel.subscribe(user, new AABB2D(100, 50, 150, 75))
+        const first = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 10,
+            y: 10,
+            label: 'first'
+        })
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 20,
+            y: 10,
+            label: 'second'
+        })
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 120,
+            y: 10,
+            label: 'third'
+        })
+
+        const keys = channel.getVisibleCellKeys(user.id)
+        first.x = 130
+        channel.updateEntity(first)
+
+        expect(channel.getVisibleCellKeys(user.id)).toBe(keys)
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0', '1:0'])
+    })
+
+    it('rebuilds CellChannel visible cell keys when movement changes occupied cells', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new CellChannel(instance.localState, 100)
+
+        channel.subscribe(user, new AABB2D(100, 50, 150, 75))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 10,
+            y: 10,
+            label: 'first'
+        })
+
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0'])
+        entity.x = 130
+        channel.updateEntity(entity)
+
+        expect(channel.getVisibleCellKeys(user.id)).toEqual(['1:0'])
+    })
+
+    it('spatially culls CellChannel messages instead of broadcasting them', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(10, 10, 5, 5))
+        channel.subscribe(secondUser, new AABB2D(200, 200, 5, 5))
+        channel.addMessage({ ntype: NType.Message, text: 'near', x: 10, y: 10 })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(firstClient.messages).toEqual([{ ntype: NType.Message, text: 'near' }])
+        expect(secondClient.messages).toEqual([])
+    })
+
+    it('keeps same-cell CellChannel creates on the normal create path', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'first'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const second = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'second'
+        })
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([second.nid])
+        expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
+    })
+
+    it('keeps same-cell CellChannel removes on the normal delete path', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const first = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'first'
+        })
+        const second = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'second'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const firstNid = first.nid
+        channel.removeEntity(first)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([firstNid])
+        expect(clientNetwork.store.entities.has(firstNid)).toBe(false)
+        expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
+    })
+
+    it('updates CellChannel visibility correctly when an entity moves between cells', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(10, 10, 5, 5))
+        channel.subscribe(secondUser, new AABB2D(60, 10, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'moving'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        const nid = entity.nid
+        entity.x = 60
+        channel.updateEntity(entity)
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(firstClient.latestFrame?.deleteEntities).toEqual([nid])
+        expect(firstClient.store.entities.has(nid)).toBe(false)
+        expect(secondClient.latestFrame?.createEntities.map(created => created.nid)).toEqual([nid])
+        expect(secondClient.store.get(nid)?.x).toBe(60)
+    })
+
+    it('orders CellChannel leave-cell tree deletes from child to parent', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new CellChannel(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const parent = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'parent'
+        })
+        const child = instance.attachChild(parent, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 7,
+            y: 8,
+            label: 'child'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const parentNid = parent.nid
+        const childNid = child.nid
+        channel.updateView(user, new AABB2D(200, 200, 5, 5))
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([childNid, parentNid])
+        expect(clientNetwork.store.entities.has(parentNid)).toBe(false)
+        expect(clientNetwork.store.entities.has(childNid)).toBe(false)
+    })
+
+    it('reruns snapshot writes with binary debug context after a write failure', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new Channel(instance.localState)
+        instance.network.debugBinaryWrites = true
+
+        channel.subscribe(user)
+        channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: Symbol('bad'),
+            y: 6,
+            label: 'bad'
+        } as any)
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+
+        try {
+            createSnapshotBufferRefactor(user, instance)
+            throw new Error('Expected snapshot write to fail.')
+        } catch (err: any) {
+            expect(err).toBeInstanceOf(BinaryDebugError)
+            expect(err.context).toEqual(expect.objectContaining({
+                phase: 'write',
+                section: 'CreateEntities',
+                index: 0,
+                prop: 'x',
+                propKey: 0,
+                binaryType: Binary.Float64
+            }))
+            expect(err.message).toContain('CreateEntities')
+            expect(err.message).toContain('prop: "x"')
+        }
     })
 
     it('collects at most 255 queued responses per user frame', () => {
@@ -233,6 +1843,7 @@ describe('server snapshot pipeline', () => {
         instance.cache.createCachesForTick(instance.tick)
         const buffer = createSnapshotBufferRefactor(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(buffer))
+        clientNetwork.processNextFrame()
 
         expect(clientNetwork.protocol.nidType).toBe(Binary.UInt16)
         expect(clientNetwork.latestFrame?.createEntities).toHaveLength(256)
@@ -267,6 +1878,7 @@ describe('server snapshot pipeline', () => {
         instance.cache.createCachesForTick(instance.tick)
         const createBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createBuffer))
+        clientNetwork.processNextFrame()
 
         expect(clientNetwork.messages).toEqual([
             { ntype: NType.Message, text: 'created' }
@@ -287,6 +1899,7 @@ describe('server snapshot pipeline', () => {
         instance.cache.createCachesForTick(instance.tick)
         const updateBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(updateBuffer))
+        clientNetwork.processNextFrame()
 
         expect(clientNetwork.latestFrame?.createEntities).toEqual([])
         expect(clientNetwork.latestFrame?.updateEntities).toEqual([
@@ -299,6 +1912,7 @@ describe('server snapshot pipeline', () => {
         instance.cache.createCachesForTick(instance.tick)
         const deleteBuffer = createSnapshotBufferRefactor(user, instance) as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(deleteBuffer))
+        clientNetwork.processNextFrame()
 
         expect(clientNetwork.latestFrame?.deleteEntities).toEqual([nid])
         expect(clientNetwork.store.entities.has(nid)).toBe(false)

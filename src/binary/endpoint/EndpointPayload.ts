@@ -29,8 +29,7 @@ function countSchemaPayload(schema: Schema, value: any) {
     let bytes = 0
     for (let i = 0; i < schema.keys.length; i++) {
         const propData = schema.keys[i]
-        const spec = binaryGet(propData.type)
-        bytes += spec.byteSize(value[propData.prop])
+        bytes += propData.binary.byteSize(value[propData.prop])
     }
     return bytes
 }
@@ -38,8 +37,7 @@ function countSchemaPayload(schema: Schema, value: any) {
 function writeSchemaPayload(schema: Schema, value: any, writer: IBinaryWriter) {
     for (let i = 0; i < schema.keys.length; i++) {
         const propData = schema.keys[i]
-        const spec = binaryGet(propData.type)
-        spec.write(value[propData.prop], writer)
+        propData.binary.write(value[propData.prop], writer)
     }
 }
 
@@ -47,8 +45,7 @@ function readSchemaPayload(schema: Schema, reader: IBinaryReader) {
     const value: any = {}
     for (let i = 0; i < schema.keys.length; i++) {
         const propData = schema.keys[i]
-        const spec = binaryGet(propData.type)
-        value[propData.prop] = spec.post(spec.read(reader))
+        value[propData.prop] = propData.binary.post(propData.binary.read(reader))
     }
     return value
 }

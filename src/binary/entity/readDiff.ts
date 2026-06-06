@@ -1,4 +1,3 @@
-import { binaryGet } from '../../common/binary/BinaryExt'
 import { Binary } from '../../common/binary/Binary'
 import { IBinaryReader } from '../../common/binary/IBinaryReader'
 import { NetworkIdType, readNetworkId } from '../../common/binary/Protocol'
@@ -10,8 +9,7 @@ function readDiff(reader: IBinaryReader, context: Context, ntypes: Map<number, n
     const ntype = ntypes.get(nid)!
     const nschema = context.getSchema(ntype)!
     const propData = nschema.keys[propKey]
-    const binaryUtil = binaryGet(propData.type)
-    const value = binaryUtil.read(reader)
+    const value = propData.binary.read(reader)
     return {
         nid,
         prop: propData.prop,

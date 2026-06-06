@@ -64,12 +64,16 @@ export class Instance {
         this.network = new InstanceNetwork(this)
     }
 
-    attachEntity(parentNid: number, child: IEntity) {
-        this.localState.addChild(parentNid, child)
+    attachChild(parent: IEntity, child: IEntity) {
+        return this.localState.addChild(parent, child)
     }
 
-    detachEntity(parentNid: number, child: IEntity) {
-        this.localState.removeChild(parentNid, child)
+    detachChild(parent: IEntity, child: IEntity) {
+        this.localState.removeChild(parent, child)
+    }
+
+    markDirty(entity: IEntity) {
+        return this.localState.markDirty(entity)
     }
 
     respond<Request = any, Response = any>(
@@ -92,17 +96,10 @@ export class Instance {
         this.tick++
         this.localState.tick(this.tick)
         this.cache.createCachesForTick(this.tick)
+        this.network.resetSharedUpdateFragments()
 
         this.users.forEach(user => {
-            if (user.lastSentInstanceTick === 0) {
-                // this is the first frame connected!
-                user.queueEngineMessage(timeSyncEngineMessage)
-            } else {
-                // send timeSyncs every 20 ticks
-                if (user.lastSentInstanceTick % 20 === 0) {
-                    user.queueEngineMessage(timeSyncEngineMessage)
-                }
-            }
+            user.queueEngineMessage(timeSyncEngineMessage)
 
             if (user.lastSentPingTimestamp < timestamp - this.pingIntervalMs) {
                 user.queueEngineMessage({
@@ -118,11 +115,31 @@ export class Instance {
             })
 
             const buffer = createSnapshotBufferRefactor(user, this)
-            user.send(buffer)
+            if (this.network.snapshotPerformanceEnabled) {
+                // Keep adapter send timing separate from snapshot construction:
+                // WebSocket implementations may queue synchronously while OS I/O
+                // continues outside this measured server tick.
+                const sendStart = performance.now()
+                user.send(buffer)
+                this.network.recordSnapshotSend(performance.now() - sendStart)
+            } else {
+                user.send(buffer)
+            }
             user.lastSentInstanceTick = this.tick
         })
 
         this.cache.deleteCachesForTick(this.tick)
+        this.localState.channels.forEach(channel => {
+            const clearBroadcastMessages = (channel as any).clearBroadcastMessages
+            if (typeof clearBroadcastMessages === 'function') {
+                clearBroadcastMessages.call(channel)
+            }
+            const clearSnapshotDeltas = (channel as any).clearSnapshotDeltas
+            if (typeof clearSnapshotDeltas === 'function') {
+                clearSnapshotDeltas.call(channel)
+            }
+        })
         this.localState.releaseDeferredIds()
+        this.localState.clearDirty()
     }
 }

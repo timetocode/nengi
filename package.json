@@ -7,6 +7,7 @@
     "test": "npx jest",
     "build": "npx tsc",
     "typecheck": "npx tsc --project tsconfig.test.json",
+    "profile:snapshot": "npx tsx src/performance/SnapshotPipeline.performance.ts",
     "lint": "npx eslint . --config .eslintrc.js",
     "lintfix": "npx eslint . --fix --config .eslintrc.js"
   },
@@ -20,6 +21,7 @@
     "eslint": "^8.46.0",
     "jest": "^29.6.2",
     "ts-jest": "^29.1.1",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3"
   }
 }

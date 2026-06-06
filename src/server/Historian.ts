@@ -1,6 +1,5 @@
 import { Context } from '../common/Context'
 import { IEntity } from '../common/IEntity'
-import { binaryGet } from '../common/binary/BinaryExt'
 import { copyNObject } from '../common/binary/schema/util'
 import { NDictionary } from './NDictionary'
 
@@ -86,14 +85,13 @@ export class Historian {
                     const nschema = this.context.getSchema(computed.ntype)
 
                     for (let i = 0; i < nschema.keys.length; i++) {
-                        const { prop } = nschema.keys[i]
-                        const binarySpec = nschema.props[prop]
-                        const binaryUtil = binaryGet(binarySpec.type)
+                        const binarySpec = nschema.keys[i]
+                        const { prop } = binarySpec
                         const valueA = entityA[prop]
                         const valueB = entityB[prop]
                         if (binarySpec.interp) {
                             // interpolated
-                            const value = binaryUtil.interp(valueA, valueB, portion)
+                            const value = binarySpec.binary.interp(valueA, valueB, portion)
                             computed[prop] = value
                         } else {
                             // not interpolated, go with with nearest state

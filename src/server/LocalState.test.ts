@@ -29,18 +29,141 @@ describe('LocalState', () => {
         localState.registerEntity(parent, source)
         expect(parent.nid).toEqual(1)
     
-        localState.addChild(parent.nid, child)
+        localState.addChild(parent, child)
         expect(child.nid).toEqual(2) // will be 2, now the second networked object
 
         expect(localState.sources.get(1)).toEqual(new Set([123]))
 
         expect(localState.children.get(1)).toEqual(new Set([2])) // entity 1 is now a parent, and it contains entity 2 in its Set
+        expect(localState.getParentNid(child.nid)).toBe(parent.nid)
+        expect(localState.getRootNid(child.nid)).toBe(parent.nid)
 
         //expect(localState.channelSources.get(2)).toEqual(new Set([]))
 
-        localState.removeChild(parent.nid, child) // remove the child
+        localState.removeChild(parent, child) // remove the child
 
         expect(localState.children.get(1)).toEqual(new Set([])) // the set is empty now
+        expect(localState.getParentNid(child.nid)).toBe(0)
+        expect(localState.getRootNid(child.nid)).toBe(0)
+    })
+
+    it('requires a parent to already be networked before attaching a child', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const child = { nid: 0, ntype: 2 }
+
+        expect(() => localState.addChild(parent, child)).toThrow('Cannot attach a child')
+        expect(child.nid).toBe(0)
+    })
+
+    it('allows each entity to have only one network source', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const firstChild = { nid: 0, ntype: 2 }
+        const secondParent = { nid: 0, ntype: 1 }
+
+        localState.registerEntity(parent, 123)
+        localState.registerEntity(secondParent, 456)
+        localState.addChild(parent, firstChild)
+
+        expect(() => localState.addChild(secondParent, firstChild)).toThrow('already networked by another source')
+        expect(() => localState.registerEntity(firstChild, 789)).toThrow('already networked by another source')
+    })
+
+    it('treats attaching the same child to the same parent as idempotent', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const child = { nid: 0, ntype: 2 }
+
+        localState.registerEntity(parent, 123)
+        localState.addChild(parent, child)
+        localState.addChild(parent, child)
+
+        expect(localState.children.get(parent.nid)).toEqual(new Set([child.nid]))
+        expect(localState.sources.get(child.nid)).toEqual(new Set([parent.nid]))
+    })
+
+    it('treats removing a detached child from a registered parent as idempotent', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const child = { nid: 0, ntype: 2 }
+
+        localState.registerEntity(parent, 123)
+
+        expect(() => localState.removeChild(parent, child)).not.toThrow()
+        expect(child.nid).toBe(0)
+    })
+
+    it('unregisters descendants when a parent is unregistered', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const child = { nid: 0, ntype: 2 }
+        const grandchild = { nid: 0, ntype: 2 }
+
+        localState.registerEntity(parent, 123)
+        localState.addChild(parent, child)
+        localState.addChild(child, grandchild)
+        const parentNid = parent.nid
+        const childNid = child.nid
+        const grandchildNid = grandchild.nid
+
+        localState.unregisterEntity(parent, 123)
+
+        expect(parent.nid).toBe(0)
+        expect(child.nid).toBe(0)
+        expect(grandchild.nid).toBe(0)
+        expect(localState.sources.has(parentNid)).toBe(false)
+        expect(localState.sources.has(childNid)).toBe(false)
+        expect(localState.sources.has(grandchildNid)).toBe(false)
+        expect(localState.children.has(parentNid)).toBe(false)
+        expect(localState.children.has(childNid)).toBe(false)
+    })
+
+    it('collects entity trees parent-first and deletes child-first', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const firstChild = { nid: 0, ntype: 2 }
+        const secondChild = { nid: 0, ntype: 2 }
+        const grandchild = { nid: 0, ntype: 2 }
+
+        localState.registerEntity(parent, 123)
+        localState.addChild(parent, firstChild)
+        localState.addChild(parent, secondChild)
+        localState.addChild(firstChild, grandchild)
+
+        expect(localState.getParentNid(firstChild.nid)).toBe(parent.nid)
+        expect(localState.getParentNid(grandchild.nid)).toBe(firstChild.nid)
+        expect(localState.getRootNid(grandchild.nid)).toBe(parent.nid)
+        expect(localState.collectEntityTree(parent.nid, [])).toEqual([
+            parent.nid,
+            firstChild.nid,
+            grandchild.nid,
+            secondChild.nid
+        ])
+        expect(localState.collectEntityTreeDeletes(parent.nid, [])).toEqual([
+            grandchild.nid,
+            firstChild.nid,
+            secondChild.nid,
+            parent.nid
+        ])
+    })
+
+    it('invalidates flattened tree caches when children are added and removed', () => {
+        const localState = new LocalState()
+        const parent = { nid: 0, ntype: 1 }
+        const firstChild = { nid: 0, ntype: 2 }
+        const secondChild = { nid: 0, ntype: 2 }
+
+        localState.registerEntity(parent, 123)
+        localState.addChild(parent, firstChild)
+
+        expect(localState.collectEntityTree(parent.nid, [])).toEqual([parent.nid, firstChild.nid])
+
+        localState.addChild(parent, secondChild)
+        expect(localState.collectEntityTree(parent.nid, [])).toEqual([parent.nid, firstChild.nid, secondChild.nid])
+
+        localState.removeChild(parent, firstChild)
+        expect(localState.collectEntityTree(parent.nid, [])).toEqual([parent.nid, secondChild.nid])
     })
 
 
@@ -112,6 +235,22 @@ describe('LocalState', () => {
         localState.registerEntity(next, 1)
 
         expect(next.nid).toBe(257)
+        expect(localState.nidType).toBe(Binary.UInt16)
+    })
+
+    it('widens when the pool is full even if the allocator cursor has wrapped', () => {
+        const localState = new LocalState()
+
+        for (let i = 0; i < 255; i++) {
+            localState.registerEntity({ nid: 0, ntype: 1 }, 1)
+        }
+
+        localState.nidPool.current = 4
+
+        const widened = { nid: 0, ntype: 1 }
+        localState.registerEntity(widened, 1)
+
+        expect(widened.nid).toBe(256)
         expect(localState.nidType).toBe(Binary.UInt16)
     })
 })

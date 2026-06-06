@@ -1,0 +1,85 @@
+import { Binary } from '../common/binary/Binary'
+import { defineEntitySchema } from '../common/binary/schema/defineSchema'
+import { Context } from '../common/Context'
+import { Client } from './Client'
+import { FixedStepInterpolator, FixedStepInterpolatorOptions } from './FixedStepInterpolator'
+import { Snapshot } from './Snapshot'
+
+class MockAdapter {
+    constructor() {
+    }
+}
+
+export function createInterpolationTestContext() {
+    const context = new Context()
+    context.register(1, defineEntitySchema({
+        x: { type: Binary.Float64, interp: true },
+        y: { type: Binary.Float64, interp: true },
+        label: Binary.String
+    }))
+    return context
+}
+
+export function createTestSnapshot(args: Partial<Snapshot>): Snapshot {
+    return {
+        timestamp: -1,
+        confirmedClientTick: -1,
+        messages: [],
+        createEntities: [],
+        updateEntities: [],
+        deleteEntities: [],
+        ...args
+    }
+}
+
+export function createInterpolationTestClient(tickRate = 20) {
+    return new Client(createInterpolationTestContext(), MockAdapter, tickRate)
+}
+
+export function applyTestSnapshot(client: Client, snapshot: Partial<Snapshot>, receivedAt: number) {
+    const fullSnapshot = createTestSnapshot(snapshot)
+    const frame = client.network.store.applySnapshot(fullSnapshot, client.network.frameTick, receivedAt)
+    client.network.frameTick++
+    client.network.frames.push(frame)
+    client.network.latestFrame = frame
+    client.network.previousSnapshot = fullSnapshot
+    return frame
+}
+
+export class InterpolationTestHarness {
+    context: Context
+    client: Client
+    interpolator: FixedStepInterpolator
+    now: number
+
+    constructor(options: FixedStepInterpolatorOptions = {}, now = 1000, tickRate = 20) {
+        this.context = createInterpolationTestContext()
+        this.client = new Client(this.context, MockAdapter, tickRate)
+        this.interpolator = new FixedStepInterpolator(this.client, options)
+        this.now = now
+    }
+
+    advance(ms: number) {
+        this.now += ms
+        return this.now
+    }
+
+    receive(snapshot: Partial<Snapshot>, receivedAt = this.now) {
+        return applyTestSnapshot(this.client, snapshot, receivedAt)
+    }
+
+    receiveMovingFrames(receivedAtStart: number, count = 4, spacingMs = 50) {
+        for (let i = 0; i < count; i++) {
+            this.receive({
+                timestamp: 1000 + (i * spacingMs),
+                createEntities: i === 0 ? [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }] : [],
+                updateEntities: i > 0 ? [{ nid: 1, prop: 'x', value: i * 10 }] : []
+            }, receivedAtStart + (i * spacingMs))
+        }
+    }
+
+    sample(interpDelay: number, now = this.now) {
+        this.now = now
+        return this.interpolator.sample(interpDelay, this.now)
+    }
+}

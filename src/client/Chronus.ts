@@ -7,8 +7,8 @@ class Chronus {
         this.averageTimeDifference = 0
     }
 
-    register(timestamp: number) {
-        this.timeDifferences.push(Date.now() - timestamp)
+    register(timestamp: number, now = Date.now()) {
+        this.timeDifferences.push(now - timestamp)
         while (this.timeDifferences.length > 20) {
             this.timeDifferences.shift()
         }

@@ -1,5 +1,11 @@
 import { Schema } from '../common/binary/schema/Schema'
-import { compareAndUpdateNObject, copyNObject, updateNObject } from '../common/binary/schema/util'
+import {
+    compareAndUpdateNObject,
+    compareAndUpdateNObjectGrouped,
+    copyNObject,
+    EntityDiffResult,
+    updateNObject
+} from '../common/binary/schema/util'
 import { IEntity } from '../common/IEntity'
 
 function diff(entity: IEntity, cache: IEntity, nschema: Schema) {
@@ -13,11 +19,13 @@ function diff(entity: IEntity, cache: IEntity, nschema: Schema) {
 export class EntityCache {
     cache: { [tick: number]: IEntity }
     diffCache: { [tick: number]: { [nid: number]: any[] } }
+    groupedDiffCache: { [tick: number]: { [nid: number]: EntityDiffResult } }
     //binaryDiffCache: { [tick: number]: { [nid: number]: any[] } }
 
     constructor() {
         this.cache = {}
         this.diffCache = {}
+        this.groupedDiffCache = {}
         //this.binaryDiffCache = {}
     }
 
@@ -27,12 +35,25 @@ export class EntityCache {
 
     createCachesForTick(tick: number) {
         this.diffCache[tick] = {}
+        this.groupedDiffCache[tick] = {}
         //this.binaryDiffCache[tick] = {}
     }
 
     deleteCachesForTick(tick: number) {
         delete this.diffCache[tick]
+        delete this.groupedDiffCache[tick]
         //delete this.binaryDiffCache[tick]
+    }
+
+    getAndDiffGrouped(tick: number, entity: IEntity, nschema: Schema): EntityDiffResult {
+        if (this.groupedDiffCache[tick][entity.nid]) {
+            return this.groupedDiffCache[tick][entity.nid]
+        } else {
+            const cacheObject = this.cache[entity.nid]
+            const diffs = compareAndUpdateNObjectGrouped(entity, cacheObject, nschema)
+            this.groupedDiffCache[tick][entity.nid] = diffs
+            return diffs
+        }
     }
 
     getAndDiff(tick: number, entity: IEntity, nschema: Schema) {
@@ -55,4 +76,3 @@ export class EntityCache {
         updateNObject(entity, cacheObject, nschema)
     }
 }
-

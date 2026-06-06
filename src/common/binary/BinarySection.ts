@@ -8,7 +8,14 @@ enum BinarySection {
     Commands,
     Requests,
     Responses,
-    ClientTick
+    ClientTick,
+    UpdateEntityGroups,
+    EcsCreateEntities,
+    EcsCreateComponents,
+    EcsDeleteEntities,
+    EcsUpdateComponentGroups,
+    ChannelIdentities,
+    ChannelEntityCreates
 }
 
 export { BinarySection }

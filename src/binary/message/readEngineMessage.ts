@@ -1,4 +1,3 @@
-import { binaryGet } from '../../common/binary/BinaryExt'
 import { IBinaryReader } from '../../common/binary/IBinaryReader'
 import { Context } from '../../common/Context'
 
@@ -9,9 +8,8 @@ function readEngineMessage(reader: IBinaryReader, context: Context) {
     const obj = { ntype }
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
-        const binaryUtil = binaryGet(propData.type)
         // @ts-ignore
-        obj[propData.prop] = binaryUtil.read(reader)
+        obj[propData.prop] = propData.binary.read(reader)
     }
     return obj
 }

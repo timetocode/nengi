@@ -14,12 +14,14 @@ import { ProtocolConfig } from '../common/binary/Protocol'
 import { createEndpointPayload, readSizedEndpointPayload, skipEndpointPayload } from '../binary/endpoint/EndpointPayload'
 import { ResponseStatus } from '../common/Endpoint'
 import type { ResponseEndpoint } from './Instance'
+import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 
 export interface INetworkEvent {
     type: NetworkEvent
     user: User
     commands?: any
     clientTick?: number
+    payload?: any
 }
 
 export type ResponseBacklogInfo = {
@@ -30,6 +32,159 @@ export type ResponseBacklogInfo = {
     tick: number
 }
 
+export type SnapshotPerformanceSample = {
+    collectMs: number
+    countMs: number
+    writeMs: number
+    commitMs: number
+    sendMs: number
+    bytes: number
+    creates: number
+    updateProps: number
+    updateGroups: number
+    groupedUpdateProps: number
+    deletes: number
+    messages: number
+    engineMessages: number
+    responses: number
+}
+
+export type SnapshotPerformanceWindow = {
+    snapshots: number
+    sharedSnapshots: number
+    collectTotalMs: number
+    collectMaxMs: number
+    countTotalMs: number
+    countMaxMs: number
+    writeTotalMs: number
+    writeMaxMs: number
+    commitTotalMs: number
+    commitMaxMs: number
+    sendTotalMs: number
+    sendMaxMs: number
+    bytesTotal: number
+    bytesMax: number
+    createsTotal: number
+    updatePropsTotal: number
+    updateGroupsTotal: number
+    groupedUpdatePropsTotal: number
+    deletesTotal: number
+    messagesTotal: number
+    messagesMax: number
+    engineMessagesTotal: number
+    engineMessagesMax: number
+    responsesTotal: number
+    responsesMax: number
+    sharedMessageFragmentBuilds: number
+    sharedMessageFragmentHits: number
+    sharedMessageFragmentCountTotalMs: number
+    sharedMessageFragmentCountMaxMs: number
+    sharedMessageFragmentWriteTotalMs: number
+    sharedMessageFragmentWriteMaxMs: number
+    sharedMessageFragmentBytesTotal: number
+    sharedMessageFragmentBytesMax: number
+    sharedMessageFragmentCopyTotalMs: number
+    sharedMessageFragmentCopyMaxMs: number
+    sharedMessageFragmentCopyBytesTotal: number
+    sharedMessageFragmentMessagesTotal: number
+    sharedFragmentBuilds: number
+    sharedFragmentHits: number
+    sharedFragmentCollectTotalMs: number
+    sharedFragmentCollectMaxMs: number
+    sharedFragmentCountTotalMs: number
+    sharedFragmentCountMaxMs: number
+    sharedFragmentWriteTotalMs: number
+    sharedFragmentWriteMaxMs: number
+    sharedFragmentBytesTotal: number
+    sharedFragmentBytesMax: number
+    sharedFragmentCopyTotalMs: number
+    sharedFragmentCopyMaxMs: number
+    sharedFragmentCopyBytesTotal: number
+}
+
+export type SharedSnapshotFragment = {
+    payload: BinaryPayload
+    bytes: number
+    updateProps: number
+    updateGroups: number
+    groupedUpdateProps: number
+}
+
+export type SharedMessageFragment = {
+    payload: BinaryPayload
+    bytes: number
+    messages: number
+}
+
+export type SharedCreateFragment = {
+    payload: BinaryPayload
+    bytes: number
+    creates: number
+    nids: Set<number>
+}
+
+export type SharedDeleteFragment = {
+    payload: BinaryPayload
+    bytes: number
+    deletes: number
+    nids: Set<number>
+}
+
+function createSnapshotPerformanceWindow(): SnapshotPerformanceWindow {
+    return {
+        snapshots: 0,
+        sharedSnapshots: 0,
+        collectTotalMs: 0,
+        collectMaxMs: 0,
+        countTotalMs: 0,
+        countMaxMs: 0,
+        writeTotalMs: 0,
+        writeMaxMs: 0,
+        commitTotalMs: 0,
+        commitMaxMs: 0,
+        sendTotalMs: 0,
+        sendMaxMs: 0,
+        bytesTotal: 0,
+        bytesMax: 0,
+        createsTotal: 0,
+        updatePropsTotal: 0,
+        updateGroupsTotal: 0,
+        groupedUpdatePropsTotal: 0,
+        deletesTotal: 0,
+        messagesTotal: 0,
+        messagesMax: 0,
+        engineMessagesTotal: 0,
+        engineMessagesMax: 0,
+        responsesTotal: 0,
+        responsesMax: 0,
+        sharedMessageFragmentBuilds: 0,
+        sharedMessageFragmentHits: 0,
+        sharedMessageFragmentCountTotalMs: 0,
+        sharedMessageFragmentCountMaxMs: 0,
+        sharedMessageFragmentWriteTotalMs: 0,
+        sharedMessageFragmentWriteMaxMs: 0,
+        sharedMessageFragmentBytesTotal: 0,
+        sharedMessageFragmentBytesMax: 0,
+        sharedMessageFragmentCopyTotalMs: 0,
+        sharedMessageFragmentCopyMaxMs: 0,
+        sharedMessageFragmentCopyBytesTotal: 0,
+        sharedMessageFragmentMessagesTotal: 0,
+        sharedFragmentBuilds: 0,
+        sharedFragmentHits: 0,
+        sharedFragmentCollectTotalMs: 0,
+        sharedFragmentCollectMaxMs: 0,
+        sharedFragmentCountTotalMs: 0,
+        sharedFragmentCountMaxMs: 0,
+        sharedFragmentWriteTotalMs: 0,
+        sharedFragmentWriteMaxMs: 0,
+        sharedFragmentBytesTotal: 0,
+        sharedFragmentBytesMax: 0,
+        sharedFragmentCopyTotalMs: 0,
+        sharedFragmentCopyMaxMs: 0,
+        sharedFragmentCopyBytesTotal: 0
+    }
+}
+
 function countStringBytes(value: string) {
     return binaryGet(Binary.String).byteSize(value)
 }
@@ -38,9 +193,35 @@ function errorPayload(code: string, message: string) {
     return { code, message }
 }
 
+function serializeConnectionError(err: any) {
+    if (err instanceof Error) {
+        return JSON.stringify({
+            name: err.name,
+            message: err.message
+        })
+    }
+    return JSON.stringify(err)
+}
+
 export class InstanceNetwork {
     instance: Instance
     responseBacklogUsers = new Set<User>()
+    requireSchemaFingerprint = false
+    debugBinaryWrites = false
+    sharedUpdateFragmentsEnabled = false
+    sharedUpdateFragments: Map<string, SharedSnapshotFragment> = new Map()
+    sharedCreateFragments: Map<string, SharedCreateFragment> = new Map()
+    sharedDeleteFragments: Map<string, SharedDeleteFragment> = new Map()
+    sharedMessageFragments: Map<string, SharedMessageFragment> = new Map()
+    /**
+     * Disabled by default because each sample takes several high-resolution
+     * clock reads per user. The fields intentionally mirror the snapshot
+     * pipeline so stress tests can tell whether time is going to visibility
+     * and plan collection, exact byte counting, binary writing, commit work,
+     * or the adapter send call.
+     */
+    snapshotPerformanceEnabled = false
+    snapshotPerformance = createSnapshotPerformanceWindow()
     onResponseBacklog: (info: ResponseBacklogInfo) => void = (info: ResponseBacklogInfo) => {
         console.warn(
             `nengi response backlog: ${info.remaining} responses remain queued for user ${info.user.id} after sending ${info.sent} of ${info.queued} on server tick ${info.tick}.`
@@ -53,6 +234,145 @@ export class InstanceNetwork {
 
     onRequest() {
         // TODO
+    }
+
+    recordSnapshotPerformance(sample: SnapshotPerformanceSample) {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+
+        const metrics = this.snapshotPerformance
+        metrics.snapshots++
+        metrics.collectTotalMs += sample.collectMs
+        metrics.collectMaxMs = Math.max(metrics.collectMaxMs, sample.collectMs)
+        metrics.countTotalMs += sample.countMs
+        metrics.countMaxMs = Math.max(metrics.countMaxMs, sample.countMs)
+        metrics.writeTotalMs += sample.writeMs
+        metrics.writeMaxMs = Math.max(metrics.writeMaxMs, sample.writeMs)
+        metrics.commitTotalMs += sample.commitMs
+        metrics.commitMaxMs = Math.max(metrics.commitMaxMs, sample.commitMs)
+        metrics.sendTotalMs += sample.sendMs
+        metrics.sendMaxMs = Math.max(metrics.sendMaxMs, sample.sendMs)
+        metrics.bytesTotal += sample.bytes
+        metrics.bytesMax = Math.max(metrics.bytesMax, sample.bytes)
+        metrics.createsTotal += sample.creates
+        metrics.updatePropsTotal += sample.updateProps
+        metrics.updateGroupsTotal += sample.updateGroups
+        metrics.groupedUpdatePropsTotal += sample.groupedUpdateProps
+        metrics.deletesTotal += sample.deletes
+        metrics.messagesTotal += sample.messages
+        metrics.messagesMax = Math.max(metrics.messagesMax, sample.messages)
+        metrics.engineMessagesTotal += sample.engineMessages
+        metrics.engineMessagesMax = Math.max(metrics.engineMessagesMax, sample.engineMessages)
+        metrics.responsesTotal += sample.responses
+        metrics.responsesMax = Math.max(metrics.responsesMax, sample.responses)
+    }
+
+    recordSharedSnapshot() {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+        this.snapshotPerformance.sharedSnapshots++
+    }
+
+    recordSharedFragmentHit() {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+        this.snapshotPerformance.sharedFragmentHits++
+    }
+
+    recordSharedFragmentBuild(sample: {
+        collectMs: number
+        countMs: number
+        writeMs: number
+        bytes: number
+    }) {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+
+        const metrics = this.snapshotPerformance
+        metrics.sharedFragmentBuilds++
+        metrics.sharedFragmentCollectTotalMs += sample.collectMs
+        metrics.sharedFragmentCollectMaxMs = Math.max(metrics.sharedFragmentCollectMaxMs, sample.collectMs)
+        metrics.sharedFragmentCountTotalMs += sample.countMs
+        metrics.sharedFragmentCountMaxMs = Math.max(metrics.sharedFragmentCountMaxMs, sample.countMs)
+        metrics.sharedFragmentWriteTotalMs += sample.writeMs
+        metrics.sharedFragmentWriteMaxMs = Math.max(metrics.sharedFragmentWriteMaxMs, sample.writeMs)
+        metrics.sharedFragmentBytesTotal += sample.bytes
+        metrics.sharedFragmentBytesMax = Math.max(metrics.sharedFragmentBytesMax, sample.bytes)
+    }
+
+    recordSharedFragmentCopy(copyMs: number, bytes: number) {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+
+        const metrics = this.snapshotPerformance
+        metrics.sharedFragmentCopyTotalMs += copyMs
+        metrics.sharedFragmentCopyMaxMs = Math.max(metrics.sharedFragmentCopyMaxMs, copyMs)
+        metrics.sharedFragmentCopyBytesTotal += bytes
+    }
+
+    recordSharedMessageFragmentHit() {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+        this.snapshotPerformance.sharedMessageFragmentHits++
+    }
+
+    recordSharedMessageFragmentBuild(sample: {
+        countMs: number
+        writeMs: number
+        bytes: number
+        messages: number
+    }) {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+
+        const metrics = this.snapshotPerformance
+        metrics.sharedMessageFragmentBuilds++
+        metrics.sharedMessageFragmentCountTotalMs += sample.countMs
+        metrics.sharedMessageFragmentCountMaxMs = Math.max(metrics.sharedMessageFragmentCountMaxMs, sample.countMs)
+        metrics.sharedMessageFragmentWriteTotalMs += sample.writeMs
+        metrics.sharedMessageFragmentWriteMaxMs = Math.max(metrics.sharedMessageFragmentWriteMaxMs, sample.writeMs)
+        metrics.sharedMessageFragmentBytesTotal += sample.bytes
+        metrics.sharedMessageFragmentBytesMax = Math.max(metrics.sharedMessageFragmentBytesMax, sample.bytes)
+        metrics.sharedMessageFragmentMessagesTotal += sample.messages
+    }
+
+    recordSharedMessageFragmentCopy(copyMs: number, bytes: number) {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+
+        const metrics = this.snapshotPerformance
+        metrics.sharedMessageFragmentCopyTotalMs += copyMs
+        metrics.sharedMessageFragmentCopyMaxMs = Math.max(metrics.sharedMessageFragmentCopyMaxMs, copyMs)
+        metrics.sharedMessageFragmentCopyBytesTotal += bytes
+    }
+
+    recordSnapshotSend(sendMs: number) {
+        if (!this.snapshotPerformanceEnabled) {
+            return
+        }
+
+        const metrics = this.snapshotPerformance
+        metrics.sendTotalMs += sendMs
+        metrics.sendMaxMs = Math.max(metrics.sendMaxMs, sendMs)
+    }
+
+    resetSnapshotPerformance() {
+        this.snapshotPerformance = createSnapshotPerformanceWindow()
+    }
+
+    resetSharedUpdateFragments() {
+        this.sharedUpdateFragments.clear()
+        this.sharedCreateFragments.clear()
+        this.sharedDeleteFragments.clear()
+        this.sharedMessageFragments.clear()
     }
 
     getProtocol(): ProtocolConfig {
@@ -152,9 +472,19 @@ export class InstanceNetwork {
         user.network = this
     }
 
-    async onHandshake(user: User, handshake: any) {
+    async onHandshake(user: User, handshake: any, clientSchemaFingerprint = '') {
         try {
             user.connectionState = UserConnectionState.OpenAwaitingHandshake
+            if (this.requireSchemaFingerprint) {
+                const serverSchemaFingerprint = createSchemaFingerprint(this.instance.context)
+                if (!clientSchemaFingerprint) {
+                    throw new Error(`Schema fingerprint required. Server fingerprint ${serverSchemaFingerprint}.`)
+                }
+                if (clientSchemaFingerprint !== serverSchemaFingerprint) {
+                    throw new Error(`Schema fingerprint mismatch. Client ${clientSchemaFingerprint}, server ${serverSchemaFingerprint}.`)
+                }
+            }
+
             const connectionAccepted = await this.instance.onConnect(handshake)
 
             if (connectionAccepted === false) {
@@ -191,7 +521,7 @@ export class InstanceNetwork {
 
             if (user.connectionState === UserConnectionState.OpenAwaitingHandshake) {
                 // developer's code decided to reject this connection (rejected promise)
-                const jsonErr = JSON.stringify(err)
+                const jsonErr = serializeConnectionError(err)
                 const denyReasonByteLength = countStringBytes(jsonErr)
 
                 // deny and send reason
@@ -205,7 +535,7 @@ export class InstanceNetwork {
 
             if (user.connectionState === UserConnectionState.Open) {
                 // a loss of connection after handshake is complete
-                const jsonErr = JSON.stringify(err)
+                const jsonErr = serializeConnectionError(err)
                 const denyReasonByteLength = countStringBytes(jsonErr)
 
                 // deny and send reason
@@ -243,7 +573,7 @@ export class InstanceNetwork {
 
                         if (msg.ntype === EngineMessage.ConnectionAttempt) {
                             const handshake = JSON.parse(msg.handshake)
-                            this.onHandshake(user, handshake)
+                            this.onHandshake(user, handshake, msg.schemaFingerprint || '')
                         }
 
                         if (msg.ntype === EngineMessage.ClientTick) {

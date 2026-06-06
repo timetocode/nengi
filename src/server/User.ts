@@ -31,15 +31,30 @@ export class User {
     messageQueue: any[] = []
     responseQueue: SnapshotResponse[] = []
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
+    /**
+     * This odd-looking tick marker setup is intentional and measured. Cleaner
+     * variants that stream through collectors or build Set unions were slower in
+     * stress tests because they add hot-path calls/structures without reducing
+     * the real work. The current shape lets every subscribed channel hand back a
+     * plain nid array, then this user does one cheap tick-mark reconciliation.
+     * A nid already marked for this tick is ignored, and deletions are emitted
+     * only after all subscribed channels have reported.
+     */
     tickLastSeen: Map<nid, tick> = new Map()
-    //tickLastSeen: { [prop: nid]: tick } = {}
     currentlyVisible: nid[] = []
+    sharedChannelVersions: Map<number, number> = new Map()
+    spatialCellChannelVersions: Map<number, number> = new Map()
+    spatialCellVersionSignatures: Map<number, string> = new Map()
+    spatialCellViewVersions: Map<number, number> = new Map()
+    stableVisibleRefs: Map<number, number[]> = new Map()
+    knownClientIdentities: Set<number> = new Set()
     lastSentInstanceTick = 0
     lastReceivedClientTick = 0
     latency = 0
     lastSentPingTimestamp = 0
     recentLatencies: number[] = []
     latencySamples = 3
+    lastVisibleCount = 0
 
     constructor(socket: any, networkAdapter: IServerNetworkAdapter) {
         this.socket = socket
@@ -70,6 +85,7 @@ export class User {
 
     unsubscribe(channel: IChannel) {
         this.subscriptions.delete(channel.nid)
+        this.stableVisibleRefs.delete(channel.nid)
     }
 
     queueEngineMessage(engineMessage: any) {
@@ -87,78 +103,97 @@ export class User {
     disconnect(reason: StringOrJSONStringifiable) {
         this.networkAdapter.disconnect(this, reason)
     }
+
     populateDeletions(tick: number, toDelete: number[]) {
-        for (const [nid, lastSeenTick] of this.tickLastSeen.entries()) {
+        for (let i = this.currentlyVisible.length - 1; i >= 0; i--) {
+            const nid = this.currentlyVisible[i]
+            const lastSeenTick = this.tickLastSeen.get(nid)
             if (lastSeenTick !== tick) {
                 toDelete.push(nid)
                 this.tickLastSeen.delete(nid)
-                const index = this.currentlyVisible.indexOf(nid)
-                if (index > -1) {
-                    this.currentlyVisible.splice(index, 1)
-                }
-            }
-        }
-    }
-    /*
-    populateDeletions(tick: number, toDelete: number[]) {
-        for (let i = this.currentlyVisible.length - 1; i > -1; i--) {
-            const nid = this.currentlyVisible[i]
-            if (this.tickLastSeen[nid] !== tick) {
-                toDelete.push(nid)
-                this.tickLastSeen[nid] = 0
                 this.currentlyVisible.splice(i, 1)
             }
         }
     }
-    */
-    createOrUpdate(nid: number, tick: number, toCreate: number[], toUpdate: number[]) {
+
+    markVisible(
+        nid: number,
+        tick: number,
+        toCreate: number[],
+        toUpdate: number[],
+        channel: IChannel | null,
+        channelEntityCreates: { nid: number, channelId: number }[]
+    ) {
         const lastSeenTick = this.tickLastSeen.get(nid)
         if (lastSeenTick === tick) {
             return
         }
 
-        // was this entity visible last frame?
         if (lastSeenTick === undefined) {
             toCreate.push(nid)
+            if (channel && channel.clientIdentity !== undefined) {
+                channelEntityCreates.push({ nid, channelId: channel.nid })
+            }
             this.currentlyVisible.push(nid)
         } else {
             toUpdate.push(nid)
         }
         this.tickLastSeen.set(nid, tick)
-        /*
-        if (!this.tickLastSeen[nid]) {
-            // no? well then this user needs to create it fully
-            toCreate.push(nid)
-            this.currentlyVisible.push(nid)
-        } else {
-            // yes? well then we just need any changes that have occurred
-            toUpdate.push(nid)
-        }
-        this.tickLastSeen[nid] = tick
-        */
-
-        if (this.instance!.localState.children.has(nid)) {
-            for (const cid of this.instance!.localState.children.get(nid)!) {
-                this.createOrUpdate(cid, tick, toCreate, toUpdate)
-            }
-        }
     }
 
     checkVisibility(tick: number) {
         const toCreate: number[] = []
         const toUpdate: number[] = []
         const toDelete: number[] = []
+        const channelEntityCreates: { nid: number, channelId: number }[] = []
+
+        if (this.subscriptions.size === 1) {
+            for (const [channelId, channel] of this.subscriptions.entries()) {
+                const visibleNids = channel.getVisibleNetworkedNids?.(this.id)
+                if (visibleNids) {
+                    if (
+                        this.stableVisibleRefs.get(channelId) === visibleNids &&
+                        this.currentlyVisible.length === visibleNids.length
+                    ) {
+                        for (let i = 0; i < visibleNids.length; i++) {
+                            toUpdate.push(visibleNids[i])
+                        }
+                        this.lastVisibleCount = this.currentlyVisible.length
+                        return { toDelete, toUpdate, toCreate, channelEntityCreates }
+                    }
+                    this.stableVisibleRefs.set(channelId, visibleNids)
+                    for (let i = 0; i < visibleNids.length; i++) {
+                        this.markVisible(visibleNids[i], tick, toCreate, toUpdate, channel, channelEntityCreates)
+                    }
+                    this.populateDeletions(tick, toDelete)
+                    this.lastVisibleCount = this.currentlyVisible.length
+                    return { toDelete, toUpdate, toCreate, channelEntityCreates }
+                }
+            }
+        }
 
         for (const [channelId, channel] of this.subscriptions.entries()) {
-            const visibleNids = channel.getVisibleEntities(this.id)
-            for (let i = 0; i < visibleNids.length; i++) {
-                this.createOrUpdate(visibleNids[i], tick, toCreate, toUpdate)
+            const visibleNids = channel.getVisibleNetworkedNids?.(this.id)
+            if (visibleNids) {
+                this.stableVisibleRefs.set(channelId, visibleNids)
+                for (let i = 0; i < visibleNids.length; i++) {
+                    this.markVisible(visibleNids[i], tick, toCreate, toUpdate, channel, channelEntityCreates)
+                }
+                continue
+            }
+
+            const visibleRoots = channel.getVisibleEntities(this.id)
+            for (let i = 0; i < visibleRoots.length; i++) {
+                this.instance!.localState.forEachEntityTree(visibleRoots[i], nid => {
+                    this.markVisible(nid, tick, toCreate, toUpdate, channel, channelEntityCreates)
+                })
             }
         }
 
         this.populateDeletions(tick, toDelete)
+        this.lastVisibleCount = this.currentlyVisible.length
 
-        return { toDelete, toUpdate, toCreate }
+        return { toDelete, toUpdate, toCreate, channelEntityCreates }
     }
 
 }

@@ -31,6 +31,10 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
         return this.channel.label
     }
 
+    get clientIdentity() {
+        return this.channel.clientIdentity
+    }
+
     get entities() {
         return this.channel.entities
     }
@@ -69,6 +73,13 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
 
     }
 
+    updateView(user: User, view: ViewType) {
+        if (!this.users.has(user.id)) {
+            return
+        }
+        this.views.set(user.id, view)
+    }
+
     unsubscribe(user: any) {
         this.views.delete(user.id)
         this.users.delete(user.id)
@@ -84,12 +95,15 @@ export class CulledChannel<VisibleObjectType, ViewType> implements ICulledChanne
         const visibleEntities: number[] = []
 
         if (view) {
-            this.channel.entities.forEach((entity: IEntity) => {
+            const entities = this.channel.entities.array
+            for (let i = 0; i < entities.length; i++) {
+                const entity = entities[i]
                 if (this.visibilityResolver(entity as VisibleObjectType, view)) {
                     visibleEntities.push(entity.nid)
                 }
-            })
+            }
         }
+
         return visibleEntities
     }
 
