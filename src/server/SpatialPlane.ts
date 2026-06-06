@@ -1,4 +1,5 @@
 import { AABB2D } from './AABB2D'
+import { AABB3D } from './AABB3D'
 
 export type SpatialPlane = 'xy' | 'xz'
 export type SpatialPlaneAxes = { a: 'x', b: 'y' | 'z' }
@@ -15,6 +16,18 @@ export type SpatialPlaneView = {
     b: number
     halfA: number
     halfB: number
+    radius?: number
+}
+
+export type SpatialView3D = AABB3D | { x: number, y: number, z: number, radius: number }
+
+export type NormalizedSpatialView3D = {
+    x: number
+    y: number
+    z: number
+    halfWidth: number
+    halfHeight: number
+    halfDepth: number
     radius?: number
 }
 
@@ -89,5 +102,51 @@ export function objectInSpatialView(obj: any, view: SpatialView, plane: SpatialP
         a < normalized.a + normalized.halfA &&
         b >= normalized.b - normalized.halfB &&
         b < normalized.b + normalized.halfB
+    )
+}
+
+export function normalizeSpatialView3D(view: SpatialView3D): NormalizedSpatialView3D {
+    const candidate = view as { x: number, y: number, z: number, radius?: number }
+    const radius = Number(candidate.radius)
+    if (Number.isFinite(radius) && radius >= 0) {
+        return {
+            x: candidate.x,
+            y: candidate.y,
+            z: candidate.z,
+            halfWidth: radius,
+            halfHeight: radius,
+            halfDepth: radius,
+            radius
+        }
+    }
+
+    const aabb = view as AABB3D
+    return {
+        x: aabb.x,
+        y: aabb.y,
+        z: aabb.z,
+        halfWidth: aabb.halfWidth,
+        halfHeight: aabb.halfHeight,
+        halfDepth: aabb.halfDepth
+    }
+}
+
+export function objectInSpatialView3D(obj: any, view: SpatialView3D) {
+    const normalized = normalizeSpatialView3D(view)
+
+    if (normalized.radius !== undefined) {
+        const dx = obj.x - normalized.x
+        const dy = obj.y - normalized.y
+        const dz = obj.z - normalized.z
+        return dx * dx + dy * dy + dz * dz <= normalized.radius * normalized.radius
+    }
+
+    return (
+        obj.x >= normalized.x - normalized.halfWidth &&
+        obj.x < normalized.x + normalized.halfWidth &&
+        obj.y >= normalized.y - normalized.halfHeight &&
+        obj.y < normalized.y + normalized.halfHeight &&
+        obj.z >= normalized.z - normalized.halfDepth &&
+        obj.z < normalized.z + normalized.halfDepth
     )
 }

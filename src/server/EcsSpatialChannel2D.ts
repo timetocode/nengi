@@ -6,10 +6,10 @@ import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialPlane'
 import { User } from './User'
 
-export type EcsSpatialComponent = IEntity & { pid: number }
-export type EcsSpatialMove = { pid: number, fromCell: string, toCell: string }
+export type EcsSpatial2DComponent = IEntity & { pid: number }
+export type EcsSpatial2DMove = { pid: number, fromCell: string, toCell: string }
 
-export type EcsSpatialUpdateLog = {
+export type EcsSpatial2DUpdateLog = {
     manualPropNids: number[]
     manualPropSchemas: SchemaProp[]
     manualPropValues: any[]
@@ -20,17 +20,17 @@ export type EcsSpatialUpdateLog = {
     manualGroupValues: any[]
 }
 
-type Cell = SpatialGridCell<EcsSpatialComponent> & EcsSpatialUpdateLog
+type Cell = SpatialGridCell<EcsSpatial2DComponent> & EcsSpatial2DUpdateLog
 
-export type EcsSpatialTypeWriters = {
+export type EcsSpatial2DTypeWriters = {
     [name: string]: any
     readonly ntype: number
     readonly schema: Schema
-    readonly props: { [name: string]: (component: EcsSpatialComponent, value: any) => void }
-    readonly groups: { [name: string]: (component: EcsSpatialComponent, ...values: any[]) => void }
+    readonly props: { [name: string]: (component: EcsSpatial2DComponent, value: any) => void }
+    readonly groups: { [name: string]: (component: EcsSpatial2DComponent, ...values: any[]) => void }
 }
 
-export type EcsSpatialChannelOptions = {
+export type EcsSpatialChannel2DOptions = {
     label?: string
     clientIdentity?: any
     queryPadding?: number
@@ -40,7 +40,7 @@ export type EcsSpatialChannelOptions = {
     spatialProps?: { x?: string, y?: string }
 }
 
-function createUpdateLog(): EcsSpatialUpdateLog {
+function createUpdateLog(): EcsSpatial2DUpdateLog {
     return {
         manualPropNids: [],
         manualPropSchemas: [],
@@ -53,11 +53,11 @@ function createUpdateLog(): EcsSpatialUpdateLog {
     }
 }
 
-function initializeEcsSpatialCell(cell: SpatialGridCell<EcsSpatialComponent>) {
+function initializeEcsSpatialCell(cell: SpatialGridCell<EcsSpatial2DComponent>) {
     Object.assign(cell, createUpdateLog())
 }
 
-export class EcsSpatialChannel implements IChannel {
+export class EcsSpatialChannel2D implements IChannel {
     readonly ecsSpatialChannelMode = true
     readonly ecsChannelMode = true
     nid: number
@@ -75,7 +75,7 @@ export class EcsSpatialChannel implements IChannel {
     componentNids: number[] = []
     createdRoots: number[] = []
     deletedRoots: number[] = []
-    createdComponents: EcsSpatialComponent[] = []
+    createdComponents: EcsSpatial2DComponent[] = []
     deletedComponents: number[] = []
     rootDeletedComponents: number[] = []
     manualPropNids: number[] = []
@@ -90,27 +90,27 @@ export class EcsSpatialChannel implements IChannel {
     broadcastMessages: any[] = []
     private rootSet: Set<number> = new Set()
     private componentSet: Set<number> = new Set()
-    private componentsByRoot: Map<number, EcsSpatialComponent[]> = new Map()
-    private componentByNid: Map<number, EcsSpatialComponent> = new Map()
-    private spatialComponentByRoot: Map<number, EcsSpatialComponent> = new Map()
+    private componentsByRoot: Map<number, EcsSpatial2DComponent[]> = new Map()
+    private componentByNid: Map<number, EcsSpatial2DComponent> = new Map()
+    private spatialComponentByRoot: Map<number, EcsSpatial2DComponent> = new Map()
     private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private grid: SpatialGrid2D<EcsSpatialComponent>
+    private grid: SpatialGrid2D<EcsSpatial2DComponent>
     private visibleCellKeyCache: Map<number, { viewVersion: number, membershipVersion: number, keys: string[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
-    private movedRoots: EcsSpatialMove[] = []
+    private movedRoots: EcsSpatial2DMove[] = []
     private structuralDeltas = false
     private spatialXProp: string
     private spatialYProp: string
     plane: SpatialPlane
     private axes: SpatialPlaneAxes
 
-    constructor(localState: LocalState, cellSize: number, options: EcsSpatialChannelOptions = {}) {
+    constructor(localState: LocalState, cellSize: number, options: EcsSpatialChannel2DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
-            throw new Error('EcsSpatialChannel requires a positive finite cell size.')
+            throw new Error('EcsSpatialChannel2D requires a positive finite cell size.')
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
-            throw new Error('EcsSpatialChannel queryPadding must be a non-negative finite number.')
+            throw new Error('EcsSpatialChannel2D queryPadding must be a non-negative finite number.')
         }
         this.localState = localState
         this.nid = localState.nextNetworkId()
@@ -133,7 +133,7 @@ export class EcsSpatialChannel implements IChannel {
         this.localState.channels.add(this as any)
     }
 
-    private addRootToCell(pid: number, component: EcsSpatialComponent) {
+    private addRootToCell(pid: number, component: EcsSpatial2DComponent) {
         return this.grid.add(pid, component).createdCell
     }
 
@@ -214,7 +214,7 @@ export class EcsSpatialChannel implements IChannel {
         return x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY
     }
 
-    private getComponentCell(component: EcsSpatialComponent) {
+    private getComponentCell(component: EcsSpatial2DComponent) {
         const pid = component.pid
         const spatial = this.spatialComponentByRoot.get(pid)
         if (spatial) {
@@ -224,7 +224,7 @@ export class EcsSpatialChannel implements IChannel {
         return ref ? this.grid.cells.get(ref.key) as Cell || null : null
     }
 
-    private markCellDirtyForComponent(component: EcsSpatialComponent) {
+    private markCellDirtyForComponent(component: EcsSpatial2DComponent) {
         const cell = this.getComponentCell(component)
         if (!cell) {
             return null
@@ -318,11 +318,11 @@ export class EcsSpatialChannel implements IChannel {
         }
     }
 
-    addComponent<T extends IEntity>(pid: number, component: T, options: { spatial?: boolean } = {}): T & EcsSpatialComponent {
+    addComponent<T extends IEntity>(pid: number, component: T, options: { spatial?: boolean } = {}): T & EcsSpatial2DComponent {
         if (!this.rootSet.has(pid)) {
             throw new Error(`Cannot add an ECS spatial component to unknown entity nid ${pid}.`)
         }
-        const ecsComponent = component as T & EcsSpatialComponent
+        const ecsComponent = component as T & EcsSpatial2DComponent
         const nid = this.localState.registerEntity(ecsComponent, pid)
         ecsComponent.pid = pid
         this.componentNids.push(nid)
@@ -348,7 +348,7 @@ export class EcsSpatialChannel implements IChannel {
         return this.addComponent(pid, component, { spatial: true })
     }
 
-    private removeComponentInternal(componentOrNid: EcsSpatialComponent | number, queueDelete: boolean) {
+    private removeComponentInternal(componentOrNid: EcsSpatial2DComponent | number, queueDelete: boolean) {
         const nid = typeof componentOrNid === 'number' ? componentOrNid : componentOrNid.nid
         const component = this.componentByNid.get(nid)
         if (!component) {
@@ -386,11 +386,11 @@ export class EcsSpatialChannel implements IChannel {
         this.invalidateVisibleNetworkedNidsCache()
     }
 
-    removeComponent(componentOrNid: EcsSpatialComponent | number) {
+    removeComponent(componentOrNid: EcsSpatial2DComponent | number) {
         this.removeComponentInternal(componentOrNid, true)
     }
 
-    setSpatialComponent(pid: number, componentOrNid: EcsSpatialComponent | number) {
+    setSpatialComponent(pid: number, componentOrNid: EcsSpatial2DComponent | number) {
         const nid = typeof componentOrNid === 'number' ? componentOrNid : componentOrNid.nid
         const component = this.componentByNid.get(nid)
         if (!component || component.pid !== pid) {
@@ -407,7 +407,7 @@ export class EcsSpatialChannel implements IChannel {
         }
     }
 
-    updateSpatialComponent(componentOrNid: EcsSpatialComponent | number) {
+    updateSpatialComponent(componentOrNid: EcsSpatial2DComponent | number) {
         const nid = typeof componentOrNid === 'number' ? componentOrNid : componentOrNid.nid
         const component = this.componentByNid.get(nid)
         if (component) {
@@ -565,7 +565,7 @@ export class EcsSpatialChannel implements IChannel {
     }
 
     clearSnapshotDeltas() {
-        const clearLog = (log: EcsSpatialUpdateLog) => {
+        const clearLog = (log: EcsSpatial2DUpdateLog) => {
             log.manualPropNids.length = 0
             log.manualPropSchemas.length = 0
             log.manualPropValues.length = 0
@@ -592,10 +592,10 @@ export class EcsSpatialChannel implements IChannel {
         this.structuralDeltas = false
     }
 
-    createComponentWriter(ntype: number, schema: Schema): EcsSpatialTypeWriters {
-        const props: EcsSpatialTypeWriters['props'] = Object.create(null)
-        const groups: EcsSpatialTypeWriters['groups'] = Object.create(null)
-        const writers: EcsSpatialTypeWriters = { ntype, schema, props, groups }
+    createComponentWriter(ntype: number, schema: Schema): EcsSpatial2DTypeWriters {
+        const props: EcsSpatial2DTypeWriters['props'] = Object.create(null)
+        const groups: EcsSpatial2DTypeWriters['groups'] = Object.create(null)
+        const writers: EcsSpatial2DTypeWriters = { ntype, schema, props, groups }
 
         const addAlias = (name: string, writer: any) => {
             if (name === 'ntype' || name === 'schema' || name === 'props' || name === 'groups') {
@@ -608,7 +608,7 @@ export class EcsSpatialChannel implements IChannel {
         for (let i = 0; i < propNames.length; i++) {
             const name = propNames[i]
             const prop = schema.props[name]
-            props[name] = (component: EcsSpatialComponent, value: any) => {
+            props[name] = (component: EcsSpatial2DComponent, value: any) => {
                 const cell = this.markCellDirtyForComponent(component)
                 if (!cell) {
                     return
@@ -623,7 +623,7 @@ export class EcsSpatialChannel implements IChannel {
             addAlias(name, props[name])
         }
 
-        const writeGroup = (component: EcsSpatialComponent, group: SchemaUpdateGroup, values: IArguments | any[]) => {
+        const writeGroup = (component: EcsSpatial2DComponent, group: SchemaUpdateGroup, values: IArguments | any[]) => {
             const cell = this.markCellDirtyForComponent(component)
             if (!cell) {
                 return
@@ -644,7 +644,7 @@ export class EcsSpatialChannel implements IChannel {
 
         for (let i = 0; i < schema.updateGroups.length; i++) {
             const group = schema.updateGroups[i]
-            groups[group.name] = function writeEcsSpatialGroup(component: EcsSpatialComponent) {
+            groups[group.name] = function writeEcsSpatialGroup(component: EcsSpatial2DComponent) {
                 writeGroup(component, group, arguments)
             }
             addAlias(group.name, groups[group.name])
@@ -653,7 +653,7 @@ export class EcsSpatialChannel implements IChannel {
         return writers
     }
 
-    type(ntype: number, schema: Schema): EcsSpatialTypeWriters {
+    type(ntype: number, schema: Schema): EcsSpatial2DTypeWriters {
         return this.createComponentWriter(ntype, schema)
     }
 }

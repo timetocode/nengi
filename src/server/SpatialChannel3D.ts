@@ -1,42 +1,14 @@
 import { IEntity } from '../common/IEntity'
-import { AABB3D } from './AABB3D'
 import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { LocalState } from './LocalState'
 import { Point3D } from './Point3D'
 import { SpatialGrid3D } from './SpatialGrid'
+import { normalizeSpatialView3D, objectInSpatialView3D, SpatialView3D } from './SpatialPlane'
 import { User } from './User'
 
 type SpatialEntity3D = IEntity & Point3D
 export type SpatialMove3D = { entity: SpatialEntity3D, fromCell: string, toCell: string }
-export type SpatialView3D = AABB3D | { x: number, y: number, z: number, radius: number }
-
-function pointInSpatialView3D(p: Point3D, view: SpatialView3D) {
-    const sphere = view as { x: number, y: number, z: number, radius?: number }
-    if (Number.isFinite(sphere.radius) && sphere.radius! >= 0) {
-        const dx = p.x - sphere.x
-        const dy = p.y - sphere.y
-        const dz = p.z - sphere.z
-        return dx * dx + dy * dy + dz * dz <= sphere.radius! * sphere.radius!
-    }
-
-    const aabb = view as AABB3D
-    const startX = aabb.x - aabb.halfWidth
-    const startY = aabb.y - aabb.halfHeight
-    const startZ = aabb.z - aabb.halfDepth
-    const endX = aabb.x + aabb.halfWidth
-    const endY = aabb.y + aabb.halfHeight
-    const endZ = aabb.z + aabb.halfDepth
-
-    return (
-        p.x >= startX &&
-        p.x < endX &&
-        p.y >= startY &&
-        p.y < endY &&
-        p.z >= startZ &&
-        p.z < endZ
-    )
-}
 
 export type SpatialChannel3DOptions = ChannelOptions & {
     queryPadding?: number
@@ -64,7 +36,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
     fragmentCellLimit: number
     stableFragmentCellLimit: number
     users: Map<number, User> = new Map()
-    visibilityResolver = pointInSpatialView3D
+    visibilityResolver = objectInSpatialView3D
 
     constructor(localState: LocalState, cellSize: number, options: SpatialChannel3DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -116,19 +88,18 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
     }
 
     private viewRange(view: SpatialView3D) {
-        const sphere = view as { x: number, y: number, z: number, radius?: number }
-        const isSphere = Number.isFinite(sphere.radius) && sphere.radius! >= 0
-        const halfWidth = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfWidth + this.queryPadding
-        const halfHeight = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfHeight + this.queryPadding
-        const halfDepth = isSphere ? sphere.radius! + this.queryPadding : (view as AABB3D).halfDepth + this.queryPadding
+        const spatialView = normalizeSpatialView3D(view)
+        const halfWidth = spatialView.halfWidth + this.queryPadding
+        const halfHeight = spatialView.halfHeight + this.queryPadding
+        const halfDepth = spatialView.halfDepth + this.queryPadding
 
         return {
-            minX: this.grid.cellCoord(view.x - halfWidth),
-            maxX: this.grid.cellCoordForEnd(view.x + halfWidth),
-            minY: this.grid.cellCoord(view.y - halfHeight),
-            maxY: this.grid.cellCoordForEnd(view.y + halfHeight),
-            minZ: this.grid.cellCoord(view.z - halfDepth),
-            maxZ: this.grid.cellCoordForEnd(view.z + halfDepth)
+            minX: this.grid.cellCoord(spatialView.x - halfWidth),
+            maxX: this.grid.cellCoordForEnd(spatialView.x + halfWidth),
+            minY: this.grid.cellCoord(spatialView.y - halfHeight),
+            maxY: this.grid.cellCoordForEnd(spatialView.y + halfHeight),
+            minZ: this.grid.cellCoord(spatialView.z - halfDepth),
+            maxZ: this.grid.cellCoordForEnd(spatialView.z + halfDepth)
         }
     }
 
@@ -138,9 +109,9 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
             return []
         }
 
-        const sphere = view as { x: number, y: number, z: number, radius?: number }
-        if (Number.isFinite(sphere.radius) && sphere.radius! >= 0) {
-            return this.grid.getVisibleCellKeysInSphere(view.x, view.y, view.z, sphere.radius! + this.queryPadding)
+        const spatialView = normalizeSpatialView3D(view)
+        if (spatialView.radius !== undefined) {
+            return this.grid.getVisibleCellKeysInSphere(spatialView.x, spatialView.y, spatialView.z, spatialView.radius + this.queryPadding)
         }
         return this.grid.getVisibleCellKeys(this.viewRange(view))
     }

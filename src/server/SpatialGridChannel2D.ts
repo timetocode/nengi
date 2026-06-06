@@ -7,28 +7,28 @@ import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, Spatial
 import { User } from './User'
 
 type SpatialEntity = IEntity & Record<string, any>
-export type SpatialMove = { entity: SpatialEntity, fromCell: string, toCell: string }
+export type SpatialGridChannel2DMove = { entity: SpatialEntity, fromCell: string, toCell: string }
 
-export type SpatialChannelOptions = ChannelOptions & {
+export type SpatialGridChannel2DOptions = ChannelOptions & {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
     plane?: SpatialPlane
 }
 
-export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView> {
+export class SpatialGridChannel2D implements ICulledChannel<SpatialEntity, SpatialView> {
     readonly cellFragmentMode = true
     private channel: Channel
     protected localState: LocalState
+    private grid: SpatialGrid2D<SpatialEntity>
     private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private grid: SpatialGrid2D<SpatialEntity>
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
     private rememberedCells: Map<number, Map<string, number[]>> = new Map()
     private rememberedCellSignatures: Map<number, string> = new Map()
-    private movedRoots: SpatialMove[] = []
+    private movedRoots: SpatialGridChannel2DMove[] = []
     private structuralDeltas = false
     cellSize: number
     queryPadding: number
@@ -40,12 +40,12 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
     private axes: SpatialPlaneAxes
     visibilityResolver = (obj: any, view: SpatialView) => objectInSpatialView(obj, view, this.plane)
 
-    constructor(localState: LocalState, cellSize: number, options: SpatialChannelOptions = {}) {
+    constructor(localState: LocalState, cellSize: number, options: SpatialGridChannel2DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
-            throw new Error('SpatialChannel requires a positive finite cell size.')
+            throw new Error('SpatialGridChannel2D requires a positive finite cell size.')
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
-            throw new Error('SpatialChannel queryPadding must be a non-negative finite number.')
+            throw new Error('SpatialGridChannel2D queryPadding must be a non-negative finite number.')
         }
         this.localState = localState
         this.channel = new Channel(localState, options)
@@ -94,30 +94,12 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
         const spatialView = normalizeSpatialView(view, this.plane)
         const halfWidth = spatialView.halfA + this.queryPadding
         const halfHeight = spatialView.halfB + this.queryPadding
-        const startX = spatialView.a - halfWidth
-        const startY = spatialView.b - halfHeight
-        const endX = spatialView.a + halfWidth
-        const endY = spatialView.b + halfHeight
-
         return {
-            minX: this.grid.cellCoord(startX),
-            maxX: this.grid.cellCoordForEnd(endX),
-            minY: this.grid.cellCoord(startY),
-            maxY: this.grid.cellCoordForEnd(endY)
+            minX: this.grid.cellCoord(spatialView.a - halfWidth),
+            maxX: this.grid.cellCoordForEnd(spatialView.a + halfWidth),
+            minY: this.grid.cellCoord(spatialView.b - halfHeight),
+            maxY: this.grid.cellCoordForEnd(spatialView.b + halfHeight)
         }
-    }
-
-    private buildVisibleCellKeys(userId: number) {
-        const view = this.views.get(userId)
-        if (!view) {
-            return []
-        }
-
-        const spatialView = normalizeSpatialView(view, this.plane)
-        if (spatialView.radius !== undefined) {
-            return this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding)
-        }
-        return this.grid.getVisibleCellKeys(this.viewRange(view))
     }
 
     private buildVisibleEntities(userId: number) {
@@ -166,6 +148,7 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
         if (!move) {
             return
         }
+
         this.movedRoots.push({ entity, fromCell: move.fromCell, toCell: move.toCell })
         this.membershipVersion++
         if (move.removedCell || move.createdCell) {
@@ -264,7 +247,14 @@ export class SpatialChannel implements ICulledChannel<SpatialEntity, SpatialView
             return cached.keys
         }
 
-        const keys = this.buildVisibleCellKeys(userId)
+        const view = this.views.get(userId)
+        let keys: string[] = []
+        if (view) {
+            const spatialView = normalizeSpatialView(view, this.plane)
+            keys = spatialView.radius !== undefined ?
+                this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding) :
+                this.grid.getVisibleCellKeys(this.viewRange(view))
+        }
         this.visibleCellKeyCache.set(userId, {
             viewVersion,
             keys

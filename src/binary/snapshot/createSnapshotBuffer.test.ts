@@ -12,15 +12,17 @@ import { ResponseStatus } from '../../common/Endpoint'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { AABB2D } from '../../server/AABB2D'
 import { AABB3D } from '../../server/AABB3D'
-import { SpatialChannel } from '../../server/SpatialChannel'
+import { SpatialChannel2D } from '../../server/SpatialChannel2D'
 import { SpatialChannel3D } from '../../server/SpatialChannel3D'
-import { SpatialGridChannel } from '../../server/SpatialGridChannel'
+import { SpatialGridChannel2D } from '../../server/SpatialGridChannel2D'
 import { SpatialGridChannel3D } from '../../server/SpatialGridChannel3D'
 import { Channel } from '../../server/Channel'
 import { ManualChannel } from '../../server/ManualChannel'
-import { ManualSpatialChannel } from '../../server/ManualSpatialChannel'
+import { ManualSpatialChannel2D } from '../../server/ManualSpatialChannel2D'
+import { ManualSpatialChannel3D } from '../../server/ManualSpatialChannel3D'
 import { EcsChannel } from '../../server/EcsChannel'
-import { EcsSpatialChannel } from '../../server/EcsSpatialChannel'
+import { EcsSpatialChannel2D } from '../../server/EcsSpatialChannel2D'
+import { EcsSpatialChannel3D } from '../../server/EcsSpatialChannel3D'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { TestBufferWriter, testBinaryAdapter } from '../../testSupport/BufferBinary'
@@ -65,6 +67,25 @@ function createGroupedContext() {
     return context
 }
 
+function createGroupedContext3D() {
+    const context = new Context()
+    context.register(NType.Entity, defineEntitySchema({
+        x: Binary.Float64,
+        y: Binary.Float64,
+        z: Binary.Float64,
+        label: Binary.String,
+        $options: {
+            updateGroups: {
+                transform: ['x', 'y', 'z']
+            }
+        }
+    }))
+    context.register(NType.Message, defineMessageSchema({
+        text: Binary.String
+    }))
+    return context
+}
+
 function createEcsContext() {
     const context = createContext()
     context.register(NType.Transform, defineEntitySchema({
@@ -73,6 +94,21 @@ function createEcsContext() {
         $options: {
             updateGroups: {
                 position: ['x', 'y']
+            }
+        }
+    }))
+    return context
+}
+
+function createEcsContext3D() {
+    const context = createContext()
+    context.register(NType.Transform, defineEntitySchema({
+        x: Binary.Float64,
+        y: Binary.Float64,
+        z: Binary.Float64,
+        $options: {
+            updateGroups: {
+                position: ['x', 'y', 'z']
             }
         }
     }))
@@ -474,7 +510,7 @@ describe('server snapshot pipeline', () => {
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new ManualSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel2D(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -504,13 +540,60 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.sharedUpdateFragments.size).toBe(1)
     })
 
+    it('writes manual spatial 3D grouped mutations through cell fragments', () => {
+        const context = createGroupedContext3D()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new ManualSpatialChannel3D(instance.localState, 100)
+        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(50, 50, 50, 60, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            z: 7,
+            label: 'door-3d'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('door-3d')
+
+        entity.x = 11
+        entity.y = 12
+        entity.z = 13
+        Entity.transform(entity, 11, 12, 13)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
+        expect(clientNetwork.store.get(entity.nid)?.z).toBe(13)
+
+        entity.z = 250
+        Entity.transform(entity, 11, 12, 250)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+    })
+
     it('writes manual spatial grouped child mutations through the parent cell fragment', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new ManualSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel2D(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -678,7 +761,7 @@ describe('server snapshot pipeline', () => {
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new EcsSpatialChannel(instance.localState, 10)
+        const channel = new EcsSpatialChannel2D(instance.localState, 10)
         const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
@@ -725,12 +808,64 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
 
+    it('spatially replicates ECS roots from 3D component state', () => {
+        const context = createEcsContext3D()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel3D(instance.localState, 10)
+        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(5, 5, 5, 10, 10, 10))
+
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5,
+            z: 5
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.store.get(transform.nid)?.z).toBe(5)
+
+        transform.x = 6
+        transform.y = 7
+        transform.z = 8
+        Transform.position(transform, 6, 7, 8)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(6)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(7)
+        expect(clientNetwork.store.get(transform.nid)?.z).toBe(8)
+
+        transform.z = 50
+        Transform.position(transform, 6, 7, 50)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+        expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
+    })
+
     it('spatially replicates ECS roots on the xz plane without copying z into y', () => {
         const context = createEcsContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new EcsSpatialChannel(instance.localState, 10, { plane: 'xz' })
+        const channel = new EcsSpatialChannel2D(instance.localState, 10, { plane: 'xz' })
         const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
@@ -773,7 +908,7 @@ describe('server snapshot pipeline', () => {
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new ManualSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel2D(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -808,7 +943,7 @@ describe('server snapshot pipeline', () => {
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new ManualSpatialChannel(instance.localState, 100, { plane: 'xz' })
+        const channel = new ManualSpatialChannel2D(instance.localState, 100, { plane: 'xz' })
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
 
         instance.users.set(user.id, user)
@@ -849,7 +984,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new ManualSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel2D(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -1109,7 +1244,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1141,12 +1276,12 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.get(entity.nid)?.x).toBe(11)
     })
 
-    it('uses the xz plane for SpatialChannel visibility without copying z into y', () => {
+    it('uses the xz plane for SpatialChannel2D visibility without copying z into y', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50, { plane: 'xz' })
+        const channel = new SpatialChannel2D(instance.localState, 50, { plane: 'xz' })
 
         instance.users.set(user.id, user)
         channel.subscribe(user, { x: 10, z: 10, halfX: 20, halfZ: 20 })
@@ -1209,12 +1344,12 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(above.nid)).toBe(false)
     })
 
-    it('uses coarse circle cells for SpatialChannel visibility', () => {
+    it('uses coarse circle cells for SpatialChannel2D visibility', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, { x: 0, y: 0, radius: 25 })
@@ -1278,12 +1413,12 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual([])
     })
 
-    it('uses grid-backed 2D cells for SpatialGridChannel visibility', () => {
+    it('uses grid-backed 2D cells for SpatialGridChannel2D visibility', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialGridChannel(instance.localState, 50)
+        const channel = new SpatialGridChannel2D(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 20, 20))
@@ -1409,13 +1544,13 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.messages).toEqual([])
     })
 
-    it('records explicit dirty hints without requiring them for implicit SpatialChannel updates', () => {
+    it('records explicit dirty hints without requiring them for implicit SpatialChannel2D updates', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
@@ -1454,7 +1589,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1499,11 +1634,11 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.entities.has(entity.nid)).toBe(false)
     })
 
-    it('keeps SpatialChannel visible cell keys cached for movement between populated cells', () => {
+    it('keeps SpatialChannel2D visible cell keys cached for movement between populated cells', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
-        const channel = new SpatialChannel(instance.localState, 100)
+        const channel = new SpatialChannel2D(instance.localState, 100)
 
         channel.subscribe(user, new AABB2D(100, 50, 150, 75))
         const first = channel.addEntity({
@@ -1536,11 +1671,11 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0', '1:0'])
     })
 
-    it('rebuilds SpatialChannel visible cell keys when movement changes occupied cells', () => {
+    it('rebuilds SpatialChannel2D visible cell keys when movement changes occupied cells', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
-        const channel = new SpatialChannel(instance.localState, 100)
+        const channel = new SpatialChannel2D(instance.localState, 100)
 
         channel.subscribe(user, new AABB2D(100, 50, 150, 75))
         const entity = channel.addEntity({
@@ -1558,7 +1693,7 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['1:0'])
     })
 
-    it('spatially culls SpatialChannel messages instead of broadcasting them', () => {
+    it('spatially culls SpatialChannel2D messages instead of broadcasting them', () => {
         const context = createContext()
         const instance = new Instance(context)
         const firstUser = createUser(instance)
@@ -1566,7 +1701,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1584,13 +1719,13 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.messages).toEqual([])
     })
 
-    it('keeps same-cell SpatialChannel creates on the normal create path', () => {
+    it('keeps same-cell SpatialChannel2D creates on the normal create path', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
@@ -1621,13 +1756,13 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
     })
 
-    it('keeps same-cell SpatialChannel removes on the normal delete path', () => {
+    it('keeps same-cell SpatialChannel2D removes on the normal delete path', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
@@ -1661,7 +1796,7 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
     })
 
-    it('updates SpatialChannel visibility correctly when an entity moves between cells', () => {
+    it('updates SpatialChannel2D visibility correctly when an entity moves between cells', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
@@ -1670,7 +1805,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1705,13 +1840,13 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.get(nid)?.x).toBe(60)
     })
 
-    it('orders SpatialChannel leave-cell tree deletes from child to parent', () => {
+    it('orders SpatialChannel2D leave-cell tree deletes from child to parent', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialChannel(instance.localState, 50)
+        const channel = new SpatialChannel2D(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))

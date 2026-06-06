@@ -21,7 +21,7 @@ npm run profile:snapshot
 Useful knobs:
 
 ```bash
-PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel | spatial-channel-3d | spatial-grid-channel | spatial-grid-channel-3d | manual-channel | manual-spatial-channel | ecs-channel | ecs-spatial-channel
+PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel-2d | spatial-channel-3d | manual-channel | manual-spatial-channel-2d | manual-spatial-channel-3d | ecs-channel | ecs-spatial-channel-2d | ecs-spatial-channel-3d
 PROFILE_USERS=20
 PROFILE_ENTITIES=1000
 PROFILE_VISIBLE=1000
@@ -57,7 +57,7 @@ Scenarios:
   world.
 - `non-overlap`: users each see a different fixed slice. This tests whether an
   optimization only helps shared visibility.
-- `spatial-channel`: whole-cell spatial visibility workload through `SpatialChannel`,
+- `spatial-channel-2d`: whole-cell spatial visibility workload through `SpatialChannel2D`,
   using per-cell create/update/delete fragments.
   `PROFILE_STABLE_FRAGMENT_CELL_LIMIT` allows stable views to use more copied
   cell fragments than unstable CRUD frames, while keeping broad churny views on
@@ -68,7 +68,7 @@ Scenarios:
   `AABB3D` views and `x:y:z` cell keys. This is the control for games that
   need vertical culling rather than horizontal projection. `PROFILE_VIEW_SHAPE=sphere`
   uses coarse spherical cell selection.
-- `spatial-grid-channel` and `spatial-grid-channel-3d`: experimental
+- `spatial-grid-channel-2d` and `spatial-grid-channel-3d`: experimental
   comparison channels backed by the shared `SpatialGrid` core. They exist to
   benchmark whether extracting cell bookkeeping costs too much on hot paths.
 - `channel-churn`: all users share one plain all-visible channel while the
@@ -83,13 +83,15 @@ Scenarios:
   without diffing, cloning, schema-name lookup, or cache updates. The generated
   type object also exposes `props` and `groups` namespaces when a schema name
   collides with a reserved/root name.
-- `manual-spatial-channel`: experimental manual spatial channel. Users
+- `manual-spatial-channel-2d`: experimental manual spatial 2D/projected channel. Users
   subscribe with AABB views, entities are bucketed by cell, and generated
   manual writers record updates into per-cell logs. Stable-view snapshots skip
   generic visibility/diff collection and copy only dirty visible cell fragments.
   `PROFILE_MANUAL_EMIT=props` emits the same transform as four manual single
   prop writes instead of one grouped write, which is useful for comparing binary
   representations.
+- `manual-spatial-channel-3d`: true 3D manual spatial channel using AABB or
+  sphere views and `x:y:z` cell keys.
 - `parent-child-channel`, `parent-child-manual-channel`,
   `parent-child-spatial-channel`, and `parent-child-manual-spatial-channel`:
   parent/child variants for the four intended public channel shapes.
@@ -108,9 +110,11 @@ Scenarios:
 - `ecs-channel-churn`: fixed-size `EcsChannel` population where each tick
   removes and creates `PROFILE_CHURN` ECS roots with transform/vitals/loadout
   components. Root deletes imply component deletes on the wire.
-- `ecs-spatial-channel`: dedicated spatial ECS channel. Root visibility comes
+- `ecs-spatial-channel-2d`: dedicated spatial ECS 2D/projected channel. Root visibility comes
   from the spatial component, while transform/vitals/loadout component updates
   are written as typed ECS component group sections per visible dirty cell.
+- `ecs-spatial-channel-3d`: true 3D spatial ECS channel. Root visibility comes
+  from the spatial component using AABB or sphere views and `x:y:z` cell keys.
 
 Output is JSON and includes:
 
@@ -142,8 +146,8 @@ PROFILE_SCENARIO=wide-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PRO
 PROFILE_SCENARIO=ecs-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel-churn PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_CHURN=100 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
-PROFILE_SCENARIO=ecs-spatial-channel PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
-PROFILE_SCENARIO=manual-spatial-channel PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=ecs-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=manual-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 ```
 
 Interpretation notes:

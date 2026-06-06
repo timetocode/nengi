@@ -9,9 +9,9 @@ import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, Spatial
 import { User } from './User'
 
 type SpatialEntity = IEntity & Record<string, any>
-export type ManualSpatialMove = { entity: SpatialEntity, fromCell: string, toCell: string }
+export type ManualSpatial2DMove = { entity: SpatialEntity, fromCell: string, toCell: string }
 
-export type ManualSpatialCellLog = {
+export type ManualSpatial2DCellLog = {
     manualPropNids: number[]
     manualPropSchemas: SchemaProp[]
     manualPropValues: any[]
@@ -21,9 +21,9 @@ export type ManualSpatialCellLog = {
     manualGroupValues: any[]
 }
 
-type Cell = SpatialGridCell<SpatialEntity> & ManualSpatialCellLog
+type Cell = SpatialGridCell<SpatialEntity> & ManualSpatial2DCellLog
 
-export type ManualSpatialTypeWriters = {
+export type ManualSpatial2DTypeWriters = {
     [name: string]: any
     readonly ntype: number
     readonly schema: Schema
@@ -31,7 +31,7 @@ export type ManualSpatialTypeWriters = {
     readonly groups: { [name: string]: (entity: SpatialEntity, ...values: any[]) => void }
 }
 
-export type ManualSpatialChannelOptions = ChannelOptions & {
+export type ManualSpatialChannel2DOptions = ChannelOptions & {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
@@ -50,7 +50,7 @@ function initializeManualSpatialCell(cell: SpatialGridCell<SpatialEntity>) {
     manualCell.manualGroupValues = []
 }
 
-export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, SpatialView> {
+export class ManualSpatialChannel2D implements ICulledChannel<SpatialEntity, SpatialView> {
     readonly manualSpatialChannelMode = true
     readonly cellFragmentMode = true
     nid: number
@@ -78,15 +78,15 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
     private spatialYProp: string
     plane: SpatialPlane
     private axes: SpatialPlaneAxes
-    private movedRoots: ManualSpatialMove[] = []
+    private movedRoots: ManualSpatial2DMove[] = []
     private structuralDeltas = false
 
-    constructor(localState: LocalState, cellSize: number, options: ManualSpatialChannelOptions = {}) {
+    constructor(localState: LocalState, cellSize: number, options: ManualSpatialChannel2DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
-            throw new Error('ManualSpatialChannel requires a positive finite cell size.')
+            throw new Error('ManualSpatialChannel2D requires a positive finite cell size.')
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
-            throw new Error('ManualSpatialChannel queryPadding must be a non-negative finite number.')
+            throw new Error('ManualSpatialChannel2D queryPadding must be a non-negative finite number.')
         }
         this.localState = localState
         this.nid = localState.nextNetworkId()
@@ -235,10 +235,10 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
         return nids
     }
 
-    createEntityWriter(ntype: number, schema: Schema): ManualSpatialTypeWriters {
-        const props: ManualSpatialTypeWriters['props'] = Object.create(null)
-        const groups: ManualSpatialTypeWriters['groups'] = Object.create(null)
-        const writers: ManualSpatialTypeWriters = {
+    createEntityWriter(ntype: number, schema: Schema): ManualSpatial2DTypeWriters {
+        const props: ManualSpatial2DTypeWriters['props'] = Object.create(null)
+        const groups: ManualSpatial2DTypeWriters['groups'] = Object.create(null)
+        const writers: ManualSpatial2DTypeWriters = {
             ntype,
             schema,
             props,
@@ -341,7 +341,7 @@ export class ManualSpatialChannel implements ICulledChannel<SpatialEntity, Spati
         return writers
     }
 
-    type(ntype: number, schema: Schema): ManualSpatialTypeWriters {
+    type(ntype: number, schema: Schema): ManualSpatial2DTypeWriters {
         return this.createEntityWriter(ntype, schema)
     }
 
