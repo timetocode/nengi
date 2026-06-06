@@ -91,7 +91,7 @@ export class ManualSchemaHandles {
 }
 
 export class ManualChannel extends Channel {
-    readonly manualMutationChannelMode = true
+    readonly manualUpdateChannelMode = true
     manualPropNids: number[] = []
     manualPropSchemas: SchemaProp[] = []
     manualPropValues: any[] = []

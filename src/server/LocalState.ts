@@ -10,7 +10,6 @@ export class LocalState {
     nidPool: IdPool = new IdPool(maxValueForNetworkType(Binary.UInt8))
     dirtyNids: Set<number> = new Set()
     dirtySources: Map<number, Set<number>> = new Map()
-    mutationVersion = 0
     entityTreeVersion = 0
     /**
      * Entity nid -> source id currently keeping that entity networked.
@@ -139,7 +138,6 @@ export class LocalState {
 
         if (!this.dirtyNids.has(entity.nid)) {
             this.dirtyNids.add(entity.nid)
-            this.mutationVersion++
         }
 
         const sources = this.sources.get(entity.nid)

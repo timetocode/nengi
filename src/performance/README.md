@@ -101,27 +101,12 @@ Scenarios:
   from the spatial component, while transform/vitals/loadout component updates
   are written as typed ECS component group sections per visible dirty cell.
 
-Archived naming note:
-
-During R&D, the manual mutation scenarios were named with `trusted-*` labels.
-Those labels are archived terminology. The current equivalents are
-`manual-channel`, `manual-spatial-channel`,
-`wide-manual-channel`, `wide-manual-spatial`, `ecs-manual-channel`,
-`ecs-manual-spatial`, `parent-child-manual-channel`, and
-`parent-child-manual-spatial-channel`. `PROFILE_MANUAL_EMIT` replaced the
-archived `PROFILE_TRUSTED_EMIT` env var.
-
-Deleted R&D scenario labels include `aabb-bruteforce`, `aabb-grid`,
-`aabb-cell`, `aabb-grid-cache`, `channel-mutation`, and
-`mutation-cell-channel`. The source for those experiments is preserved in git
-history.
-
 Output is JSON and includes:
 
 - `stepMs`: avg/p50/p95/max for `instance.step()`
-- `mutationMs`: avg/p50/p95/max for the benchmark's pre-step mutation API work
-- `mutationPlusStepMs`: mutation API work plus `instance.step()`
-- `totalMs`: mutation work plus spatial index work plus `instance.step()`
+- `preStepMs`: avg/p50/p95/max for benchmark pre-step work
+- `preStepPlusStepMs`: pre-step work plus `instance.step()`
+- `totalMs`: pre-step work plus spatial index work plus `instance.step()`
 - `bytesPerSnapshot` and `bytesPerTick`
 - per-snapshot collect/count/write/send timing from the existing snapshot
   metrics

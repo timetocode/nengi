@@ -26,11 +26,11 @@ type SharedMessageChannel = {
     broadcastMessages: any[]
 }
 
-type ManualMutationUpdateChannel = SharedUpdateChannel & {
-    manualMutationChannelMode: true
-} & ManualMutationUpdateLog
+type ManualUpdateChannel = SharedUpdateChannel & {
+    manualUpdateChannelMode: true
+} & ManualUpdateLog
 
-type ManualMutationUpdateLog = {
+type ManualUpdateLog = {
     manualPropNids: number[]
     manualPropSchemas: SchemaProp[]
     manualPropValues: any[]
@@ -40,11 +40,11 @@ type ManualMutationUpdateLog = {
     manualGroupValues: any[]
 }
 
-type EcsManualMutationUpdateLog = ManualMutationUpdateLog & {
+type EcsManualUpdateLog = ManualUpdateLog & {
     manualGroupNTypes: number[]
 }
 
-type EcsSnapshotChannel = EcsManualMutationUpdateLog & {
+type EcsSnapshotChannel = EcsManualUpdateLog & {
     ecsChannelMode: true
     nid: number
     clientIdentity?: any
@@ -67,7 +67,7 @@ type EcsSpatialSnapshotChannel = EcsSnapshotChannel & {
     ecsSpatialChannelMode: true
     dirtyCells: Set<string>
     getVisibleCellKeys(userId: number): string[]
-    getManualCellUpdateLog(cellKey: string): EcsManualMutationUpdateLog | null
+    getManualCellUpdateLog(cellKey: string): EcsManualUpdateLog | null
     cellHasManualUpdates(cellKey: string): boolean
     getMovedRoots(): { pid: number, fromCell: string, toCell: string }[]
     hasOnlyMovementDeltas(): boolean
@@ -78,7 +78,7 @@ type EcsSpatialSnapshotChannel = EcsSnapshotChannel & {
 type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
     manualSpatialChannelMode: true
     dirtyCells: Set<string>
-    getManualCellUpdateLog(cellKey: string): ManualMutationUpdateLog | null
+    getManualCellUpdateLog(cellKey: string): ManualUpdateLog | null
     cellHasManualUpdates(cellKey: string): boolean
     getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
     hasStructuralDeltas(): boolean
@@ -185,10 +185,10 @@ function isSharedMessageChannel(channel: any): channel is SharedMessageChannel {
     return Array.isArray(channel.broadcastMessages)
 }
 
-function isManualMutationUpdateChannel(channel: any): channel is ManualMutationUpdateChannel {
+function isManualUpdateChannel(channel: any): channel is ManualUpdateChannel {
     const candidate = channel as any
     return isSharedUpdateChannel(channel) &&
-        candidate?.manualMutationChannelMode === true &&
+        candidate?.manualUpdateChannelMode === true &&
         Array.isArray(candidate.manualPropNids) &&
         Array.isArray(candidate.manualPropSchemas) &&
         Array.isArray(candidate.manualPropValues) &&
@@ -306,12 +306,12 @@ function getSingleSharedChannel(user: User): SharedUpdateChannel | null {
     return isSharedUpdateChannel(channel) ? channel : null
 }
 
-function getSingleManualMutationUpdateChannel(user: User): ManualMutationUpdateChannel | null {
+function getSingleManualUpdateChannel(user: User): ManualUpdateChannel | null {
     if (user.subscriptions.size !== 1) {
         return null
     }
     const channel = user.subscriptions.values().next().value
-    return isManualMutationUpdateChannel(channel) ? channel : null
+    return isManualUpdateChannel(channel) ? channel : null
 }
 
 function getSingleSpatialCellChannel(user: User): SpatialCellChannel | null {
@@ -1194,7 +1194,7 @@ function getSharedUpdateFragment(user: User, instance: Instance, channel: Shared
     return fragment
 }
 
-function countManualGroupUpdates(channel: ManualMutationUpdateLog, protocol: ProtocolConfig) {
+function countManualGroupUpdates(channel: ManualUpdateLog, protocol: ProtocolConfig) {
     const count = channel.manualGroupNids.length
     if (count === 0) {
         return 0
@@ -1214,7 +1214,7 @@ function countManualGroupUpdates(channel: ManualMutationUpdateLog, protocol: Pro
     return bytes
 }
 
-function countManualPropUpdates(channel: ManualMutationUpdateLog, protocol: ProtocolConfig) {
+function countManualPropUpdates(channel: ManualUpdateLog, protocol: ProtocolConfig) {
     const count = channel.manualPropNids.length
     if (count === 0) {
         return 0
@@ -1230,7 +1230,7 @@ function countManualPropUpdates(channel: ManualMutationUpdateLog, protocol: Prot
     return bytes
 }
 
-function writeManualPropUpdates(channel: ManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeManualPropUpdates(channel: ManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
     const count = channel.manualPropNids.length
     if (count === 0) {
         return
@@ -1248,7 +1248,7 @@ function writeManualPropUpdates(channel: ManualMutationUpdateLog, writer: IBinar
     }
 }
 
-function writeManualGroupUpdates(channel: ManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeManualGroupUpdates(channel: ManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
     const count = channel.manualGroupNids.length
     if (count === 0) {
         return
@@ -1271,11 +1271,11 @@ function writeManualGroupUpdates(channel: ManualMutationUpdateLog, writer: IBina
     }
 }
 
-function countManualUpdateBytes(channel: ManualMutationUpdateLog, protocol: ProtocolConfig) {
+function countManualUpdateBytes(channel: ManualUpdateLog, protocol: ProtocolConfig) {
     return countManualPropUpdates(channel, protocol) + countManualGroupUpdates(channel, protocol)
 }
 
-function writeManualUpdates(channel: ManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeManualUpdates(channel: ManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeManualPropUpdates(channel, writer, protocol)
     writeManualGroupUpdates(channel, writer, protocol)
 }
@@ -1286,7 +1286,7 @@ type ManualGroupBatch = {
     count: number
 }
 
-function collectManualGroupBatches(channel: EcsManualMutationUpdateLog) {
+function collectManualGroupBatches(channel: EcsManualUpdateLog) {
     const batches: ManualGroupBatch[] = []
     const ntypes = channel.manualGroupNTypes
     const groups = channel.manualGroupSchemas
@@ -1312,7 +1312,7 @@ function collectManualGroupBatches(channel: EcsManualMutationUpdateLog) {
     return batches
 }
 
-function countEcsManualUpdateBytes(channel: EcsManualMutationUpdateLog, protocol: ProtocolConfig) {
+function countEcsManualUpdateBytes(channel: EcsManualUpdateLog, protocol: ProtocolConfig) {
     let bytes = countManualPropUpdates(channel, protocol)
     const batches = collectManualGroupBatches(channel)
     const nidBytes = byteSizeOfNetworkType(protocol.nidType)
@@ -1341,7 +1341,7 @@ function countEcsManualUpdateBytes(channel: EcsManualMutationUpdateLog, protocol
     return bytes
 }
 
-function writeEcsManualGroupUpdates(channel: EcsManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsManualGroupUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
     const batches = collectManualGroupBatches(channel)
     const nids = channel.manualGroupNids
     const ntypes = channel.manualGroupNTypes
@@ -1370,12 +1370,12 @@ function writeEcsManualGroupUpdates(channel: EcsManualMutationUpdateLog, writer:
     }
 }
 
-function writeEcsManualUpdates(channel: EcsManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsManualUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeManualPropUpdates(channel, writer, protocol)
     writeEcsManualGroupUpdates(channel, writer, protocol)
 }
 
-function countManualGroupedProps(channel: ManualMutationUpdateLog) {
+function countManualGroupedProps(channel: ManualUpdateLog) {
     let props = 0
     const groups = channel.manualGroupSchemas
     for (let i = 0; i < groups.length; i++) {
@@ -1384,7 +1384,7 @@ function countManualGroupedProps(channel: ManualMutationUpdateLog) {
     return props
 }
 
-function getManualUpdateFragment(user: User, instance: Instance, channel: EcsManualMutationUpdateLog & { nid: number }, keyPrefix: string) {
+function getManualUpdateFragment(user: User, instance: Instance, channel: EcsManualUpdateLog & { nid: number }, keyPrefix: string) {
     const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:${keyPrefix}:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key) as ManualUpdateFragment | undefined
@@ -2053,7 +2053,7 @@ function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel:
     return writer.payload
 }
 
-function getManualMutationUpdateFragment(user: User, instance: Instance, channel: ManualMutationUpdateChannel) {
+function getManualUpdateChannelFragment(user: User, instance: Instance, channel: ManualUpdateChannel) {
     const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:manual:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key)
@@ -2182,7 +2182,7 @@ function createSharedUpdateSnapshotBuffer(user: User, instance: Instance, channe
     return writer.payload
 }
 
-function createManualMutationUpdateSnapshotBuffer(user: User, instance: Instance, channel: ManualMutationUpdateChannel) {
+function createManualUpdateSnapshotBuffer(user: User, instance: Instance, channel: ManualUpdateChannel) {
     const measure = instance.network.snapshotPerformanceEnabled
     let collectStart = 0
     let collectMs = 0
@@ -2213,7 +2213,7 @@ function createManualMutationUpdateSnapshotBuffer(user: User, instance: Instance
     }
 
     const messageFragments = getSharedMessageFragments(user, instance)
-    const fragment = getManualMutationUpdateFragment(user, instance, channel)
+    const fragment = getManualUpdateChannelFragment(user, instance, channel)
 
     if (measure) {
         countStart = performance.now()
@@ -2944,7 +2944,7 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     const ecsChannels = getEcsSnapshotChannels(user)
     const ecsSpatialChannel = getSingleEcsSpatialSnapshotChannel(user)
     const ecsChannel = getSingleEcsSnapshotChannel(user)
-    const manualMutationChannel = getSingleManualMutationUpdateChannel(user)
+    const manualUpdateChannel = getSingleManualUpdateChannel(user)
     const sharedChannel = getSingleSharedChannel(user)
     const cellFragmentChannel = getSingleCellFragmentChannel(user)
     const spatialCellChannel = getSingleSpatialCellChannel(user)
@@ -2966,9 +2966,9 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
 
     if (instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.debugBinaryWrites &&
-        manualMutationChannel &&
-        canUseSharedUpdateFragment(user, manualMutationChannel)) {
-        return createManualMutationUpdateSnapshotBuffer(user, instance, manualMutationChannel)
+        manualUpdateChannel &&
+        canUseSharedUpdateFragment(user, manualUpdateChannel)) {
+        return createManualUpdateSnapshotBuffer(user, instance, manualUpdateChannel)
     }
 
     if (instance.network.sharedUpdateFragmentsEnabled &&

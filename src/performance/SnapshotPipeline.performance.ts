@@ -1344,7 +1344,7 @@ function run() {
     const config = readConfig()
     const { instance, adapter, entities, updateSpatialIndex, beforeStep } = buildScenario(config)
     const stepTimes: number[] = []
-    const mutationTimes: number[] = []
+    const preStepTimes: number[] = []
     const indexTimes: number[] = []
 
     for (let i = 0; i < config.warmup; i++) {
@@ -1366,14 +1366,14 @@ function run() {
 
     for (let i = 0; i < config.ticks; i++) {
         if (!CUSTOM_MUTATION_SCENARIOS.has(config.scenario)) {
-            const mutationStart = performance.now()
+            const preStepStart = performance.now()
             mutateEntities(entities, i + config.warmup, config.moveFraction)
-            mutationTimes.push(performance.now() - mutationStart)
+            preStepTimes.push(performance.now() - preStepStart)
         }
         if (beforeStep) {
-            const mutationStart = performance.now()
+            const preStepStart = performance.now()
             beforeStep()
-            mutationTimes.push(performance.now() - mutationStart)
+            preStepTimes.push(performance.now() - preStepStart)
         }
         if (updateSpatialIndex) {
             const indexStart = performance.now()
@@ -1386,7 +1386,7 @@ function run() {
     }
 
     const summary = summarize(stepTimes)
-    const mutationSummary = summarize(mutationTimes)
+    const preStepSummary = summarize(preStepTimes)
     const indexSummary = summarize(indexTimes)
     const perf = instance.network.snapshotPerformance
     const snapshots = perf.snapshots || 1
@@ -1422,17 +1422,17 @@ function run() {
             p95: fmt(summary.p95),
             max: fmt(summary.max)
         },
-        mutationMs: {
-            avg: fmt(mutationSummary.avg),
-            p50: fmt(mutationSummary.p50),
-            p95: fmt(mutationSummary.p95),
-            max: fmt(mutationSummary.max)
+        preStepMs: {
+            avg: fmt(preStepSummary.avg),
+            p50: fmt(preStepSummary.p50),
+            p95: fmt(preStepSummary.p95),
+            max: fmt(preStepSummary.max)
         },
-        mutationPlusStepMs: {
-            avg: fmt(mutationSummary.avg + summary.avg),
-            p50: fmt(mutationSummary.p50 + summary.p50),
-            p95: fmt(mutationSummary.p95 + summary.p95),
-            max: fmt(mutationSummary.max + summary.max)
+        preStepPlusStepMs: {
+            avg: fmt(preStepSummary.avg + summary.avg),
+            p50: fmt(preStepSummary.p50 + summary.p50),
+            p95: fmt(preStepSummary.p95 + summary.p95),
+            max: fmt(preStepSummary.max + summary.max)
         },
         indexMs: {
             avg: fmt(indexSummary.avg),
@@ -1447,10 +1447,10 @@ function run() {
             max: fmt(summary.max + indexSummary.max)
         },
         totalMs: {
-            avg: fmt(mutationSummary.avg + summary.avg + indexSummary.avg),
-            p50: fmt(mutationSummary.p50 + summary.p50 + indexSummary.p50),
-            p95: fmt(mutationSummary.p95 + summary.p95 + indexSummary.p95),
-            max: fmt(mutationSummary.max + summary.max + indexSummary.max)
+            avg: fmt(preStepSummary.avg + summary.avg + indexSummary.avg),
+            p50: fmt(preStepSummary.p50 + summary.p50 + indexSummary.p50),
+            p95: fmt(preStepSummary.p95 + summary.p95 + indexSummary.p95),
+            max: fmt(preStepSummary.max + summary.max + indexSummary.max)
         },
         snapshots: perf.snapshots,
         sharedSnapshots: perf.sharedSnapshots,
