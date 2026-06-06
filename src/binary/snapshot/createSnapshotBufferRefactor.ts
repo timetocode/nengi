@@ -35,25 +35,25 @@ type MutationUpdateChannel = SharedUpdateChannel & {
     groupMutations: Map<number, Set<string>>
 }
 
-type TrustedMutationUpdateChannel = SharedUpdateChannel & {
-    trustedMutationChannelMode: true
-} & TrustedMutationUpdateLog
+type ManualMutationUpdateChannel = SharedUpdateChannel & {
+    manualMutationChannelMode: true
+} & ManualMutationUpdateLog
 
-type TrustedMutationUpdateLog = {
-    trustedPropNids: number[]
-    trustedPropSchemas: SchemaProp[]
-    trustedPropValues: any[]
-    trustedGroupNids: number[]
-    trustedGroupSchemas: SchemaUpdateGroup[]
-    trustedGroupValueOffsets: number[]
-    trustedGroupValues: any[]
+type ManualMutationUpdateLog = {
+    manualPropNids: number[]
+    manualPropSchemas: SchemaProp[]
+    manualPropValues: any[]
+    manualGroupNids: number[]
+    manualGroupSchemas: SchemaUpdateGroup[]
+    manualGroupValueOffsets: number[]
+    manualGroupValues: any[]
 }
 
-type EcsTrustedMutationUpdateLog = TrustedMutationUpdateLog & {
-    trustedGroupNTypes: number[]
+type EcsManualMutationUpdateLog = ManualMutationUpdateLog & {
+    manualGroupNTypes: number[]
 }
 
-type EcsSnapshotChannel = EcsTrustedMutationUpdateLog & {
+type EcsSnapshotChannel = EcsManualMutationUpdateLog & {
     ecsChannelMode: true
     nid: number
     clientIdentity?: any
@@ -63,7 +63,7 @@ type EcsSnapshotChannel = EcsTrustedMutationUpdateLog & {
     createdComponents: any[]
     deletedComponents: number[]
     rootDeletedComponents: number[]
-    trustedGroupNTypes: number[]
+    manualGroupNTypes: number[]
     getVisibleNetworkedNids(userId: number): number[]
     hasStructuralDeltas(): boolean
     isRootNid(nid: number): boolean
@@ -76,19 +76,19 @@ type EcsSpatialSnapshotChannel = EcsSnapshotChannel & {
     ecsSpatialChannelMode: true
     dirtyCells: Set<string>
     getVisibleCellKeys(userId: number): string[]
-    getTrustedCellUpdateLog(cellKey: string): EcsTrustedMutationUpdateLog | null
-    cellHasTrustedUpdates(cellKey: string): boolean
+    getManualCellUpdateLog(cellKey: string): EcsManualMutationUpdateLog | null
+    cellHasManualUpdates(cellKey: string): boolean
     getMovedRoots(): { pid: number, fromCell: string, toCell: string }[]
     hasOnlyMovementDeltas(): boolean
     isCellVisible(userId: number, key: string): boolean
     getRootComponents(pid: number): any[]
 }
 
-type TrustedSpatialCellFragmentChannel = CellFragmentChannel & {
-    trustedMutationSpatialMode: true
+type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
+    manualSpatialChannelMode: true
     dirtyCells: Set<string>
-    getTrustedCellUpdateLog(cellKey: string): TrustedMutationUpdateLog | null
-    cellHasTrustedUpdates(cellKey: string): boolean
+    getManualCellUpdateLog(cellKey: string): ManualMutationUpdateLog | null
+    cellHasManualUpdates(cellKey: string): boolean
     getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
     hasStructuralDeltas(): boolean
 }
@@ -169,7 +169,7 @@ type CellEntityFragment = {
     groupedUpdateProps: number
 }
 
-type TrustedUpdateFragment = {
+type ManualUpdateFragment = {
     payload: BinaryPayload
     bytes: number
     updateProps: number
@@ -216,34 +216,29 @@ function isMutationUpdateChannel(channel: any): channel is MutationUpdateChannel
         candidate.groupMutations instanceof Map
 }
 
-function isTrustedMutationUpdateChannel(channel: any): channel is TrustedMutationUpdateChannel {
+function isManualMutationUpdateChannel(channel: any): channel is ManualMutationUpdateChannel {
     const candidate = channel as any
     return isSharedUpdateChannel(channel) &&
-        candidate?.trustedMutationChannelMode === true &&
-        Array.isArray(candidate.trustedPropNids) &&
-        Array.isArray(candidate.trustedPropSchemas) &&
-        Array.isArray(candidate.trustedPropValues) &&
-        Array.isArray(candidate.createdRoots) &&
-        Array.isArray(candidate.deletedRoots) &&
-        Array.isArray(candidate.createdComponents) &&
-        Array.isArray(candidate.deletedComponents) &&
-        Array.isArray(candidate.rootDeletedComponents) &&
-        Array.isArray(candidate.trustedGroupNids) &&
-        Array.isArray(candidate.trustedGroupSchemas) &&
-        Array.isArray(candidate.trustedGroupValueOffsets) &&
-        Array.isArray(candidate.trustedGroupValues)
+        candidate?.manualMutationChannelMode === true &&
+        Array.isArray(candidate.manualPropNids) &&
+        Array.isArray(candidate.manualPropSchemas) &&
+        Array.isArray(candidate.manualPropValues) &&
+        Array.isArray(candidate.manualGroupNids) &&
+        Array.isArray(candidate.manualGroupSchemas) &&
+        Array.isArray(candidate.manualGroupValueOffsets) &&
+        Array.isArray(candidate.manualGroupValues)
 }
 
 function isEcsSnapshotChannel(channel: any): channel is EcsSnapshotChannel {
     const candidate = channel as any
     return candidate?.ecsChannelMode === true &&
-        Array.isArray(candidate.trustedPropNids) &&
-        Array.isArray(candidate.trustedPropSchemas) &&
-        Array.isArray(candidate.trustedPropValues) &&
-        Array.isArray(candidate.trustedGroupNids) &&
-        Array.isArray(candidate.trustedGroupSchemas) &&
-        Array.isArray(candidate.trustedGroupValueOffsets) &&
-        Array.isArray(candidate.trustedGroupValues) &&
+        Array.isArray(candidate.manualPropNids) &&
+        Array.isArray(candidate.manualPropSchemas) &&
+        Array.isArray(candidate.manualPropValues) &&
+        Array.isArray(candidate.manualGroupNids) &&
+        Array.isArray(candidate.manualGroupSchemas) &&
+        Array.isArray(candidate.manualGroupValueOffsets) &&
+        Array.isArray(candidate.manualGroupValues) &&
         typeof candidate.getVisibleNetworkedNids === 'function' &&
         typeof candidate.hasStructuralDeltas === 'function' &&
         typeof candidate.isRootNid === 'function' &&
@@ -266,8 +261,8 @@ function isEcsSpatialSnapshotChannel(channel: any): channel is EcsSpatialSnapsho
         candidate?.ecsSpatialChannelMode === true &&
         candidate.dirtyCells instanceof Set &&
         typeof candidate.getVisibleCellKeys === 'function' &&
-        typeof candidate.getTrustedCellUpdateLog === 'function' &&
-        typeof candidate.cellHasTrustedUpdates === 'function' &&
+        typeof candidate.getManualCellUpdateLog === 'function' &&
+        typeof candidate.cellHasManualUpdates === 'function' &&
         typeof candidate.getMovedRoots === 'function' &&
         typeof candidate.hasOnlyMovementDeltas === 'function' &&
         typeof candidate.isCellVisible === 'function' &&
@@ -337,13 +332,13 @@ function isMutationCellFragmentChannel(channel: any): channel is MutationCellFra
         typeof candidate.shouldFullScanDirtyCell === 'function'
 }
 
-function isTrustedSpatialCellFragmentChannel(channel: any): channel is TrustedSpatialCellFragmentChannel {
+function isManualSpatialCellFragmentChannel(channel: any): channel is ManualSpatialCellFragmentChannel {
     const candidate = channel as any
     return isCellFragmentChannel(channel) &&
-        candidate?.trustedMutationSpatialMode === true &&
+        candidate?.manualSpatialChannelMode === true &&
         candidate.dirtyCells instanceof Set &&
-        typeof candidate.getTrustedCellUpdateLog === 'function' &&
-        typeof candidate.cellHasTrustedUpdates === 'function' &&
+        typeof candidate.getManualCellUpdateLog === 'function' &&
+        typeof candidate.cellHasManualUpdates === 'function' &&
         typeof candidate.getMovedRoots === 'function' &&
         typeof candidate.hasStructuralDeltas === 'function'
 }
@@ -364,12 +359,12 @@ function getSingleMutationUpdateChannel(user: User): MutationUpdateChannel | nul
     return isMutationUpdateChannel(channel) ? channel : null
 }
 
-function getSingleTrustedMutationUpdateChannel(user: User): TrustedMutationUpdateChannel | null {
+function getSingleManualMutationUpdateChannel(user: User): ManualMutationUpdateChannel | null {
     if (user.subscriptions.size !== 1) {
         return null
     }
     const channel = user.subscriptions.values().next().value
-    return isTrustedMutationUpdateChannel(channel) ? channel : null
+    return isManualMutationUpdateChannel(channel) ? channel : null
 }
 
 function getSingleSpatialCellChannel(user: User): SpatialCellChannel | null {
@@ -1219,8 +1214,8 @@ function getCellDeleteFragment(user: User, instance: Instance, channel: CellFrag
     return fragment
 }
 
-function getTrustedSpatialCellUpdateFragment(user: User, instance: Instance, channel: TrustedSpatialCellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
-    const log = channel.getTrustedCellUpdateLog(cellKey)
+function getManualSpatialCellUpdateFragment(user: User, instance: Instance, channel: ManualSpatialCellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
+    const log = channel.getManualCellUpdateLog(cellKey)
     if (!log) {
         return {
             payload: user.networkAdapter.binary.createWriter(0).payload,
@@ -1235,7 +1230,7 @@ function getTrustedSpatialCellUpdateFragment(user: User, instance: Instance, cha
     }
 
     const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:trusted-cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
+    const key = `${instance.tick}:${channel.nid}:manual-cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key)
     if (cached) {
         instance.network.recordSharedFragmentHit()
@@ -1251,13 +1246,13 @@ function getTrustedSpatialCellUpdateFragment(user: User, instance: Instance, cha
     if (measure) {
         countStart = performance.now()
     }
-    const bytes = countTrustedUpdateBytes(log, protocol)
+    const bytes = countManualUpdateBytes(log, protocol)
     if (measure) {
         countMs = performance.now() - countStart
         writeStart = performance.now()
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeTrustedUpdates(log, writer, protocol)
+    writeManualUpdates(log, writer, protocol)
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -1268,9 +1263,9 @@ function getTrustedSpatialCellUpdateFragment(user: User, instance: Instance, cha
         nids: includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set<number>(),
         creates: 0,
         deletes: 0,
-        updateProps: log.trustedPropNids.length,
-        updateGroups: log.trustedGroupNids.length,
-        groupedUpdateProps: countTrustedGroupedProps(log)
+        updateProps: log.manualPropNids.length,
+        updateGroups: log.manualGroupNids.length,
+        groupedUpdateProps: countManualGroupedProps(log)
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
@@ -1278,8 +1273,8 @@ function getTrustedSpatialCellUpdateFragment(user: User, instance: Instance, cha
 }
 
 function getCellUpdateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
-    if (isTrustedSpatialCellFragmentChannel(channel)) {
-        return getTrustedSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids)
+    if (isManualSpatialCellFragmentChannel(channel)) {
+        return getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids)
     }
 
     const protocol = instance.network.getProtocol()
@@ -1337,8 +1332,8 @@ function getCellUpdateFragment(user: User, instance: Instance, channel: CellFrag
 }
 
 function cellMayHaveUpdates(channel: CellFragmentChannel, cellKey: string) {
-    if (isTrustedSpatialCellFragmentChannel(channel)) {
-        return channel.cellHasTrustedUpdates(cellKey)
+    if (isManualSpatialCellFragmentChannel(channel)) {
+        return channel.cellHasManualUpdates(cellKey)
     }
     return !isMutationCellFragmentChannel(channel) ||
         channel.mutationMode === 'implicit' ||
@@ -1563,18 +1558,18 @@ function getMutationUpdateFragment(user: User, instance: Instance, channel: Muta
     return fragment
 }
 
-function countTrustedGroupUpdates(channel: TrustedMutationUpdateLog, protocol: ProtocolConfig) {
-    const count = channel.trustedGroupNids.length
+function countManualGroupUpdates(channel: ManualMutationUpdateLog, protocol: ProtocolConfig) {
+    const count = channel.manualGroupNids.length
     if (count === 0) {
         return 0
     }
 
     let bytes = 1 + 4
     const nidBytes = byteSizeOfNetworkType(protocol.nidType)
-    const values = channel.trustedGroupValues
+    const values = channel.manualGroupValues
     for (let i = 0; i < count; i++) {
-        const group = channel.trustedGroupSchemas[i]
-        let offset = channel.trustedGroupValueOffsets[i]
+        const group = channel.manualGroupSchemas[i]
+        let offset = channel.manualGroupValueOffsets[i]
         bytes += nidBytes + 1
         for (let j = 0; j < group.props.length; j++) {
             bytes += group.props[j].binary.byteSize(values[offset++])
@@ -1583,33 +1578,33 @@ function countTrustedGroupUpdates(channel: TrustedMutationUpdateLog, protocol: P
     return bytes
 }
 
-function countTrustedPropUpdates(channel: TrustedMutationUpdateLog, protocol: ProtocolConfig) {
-    const count = channel.trustedPropNids.length
+function countManualPropUpdates(channel: ManualMutationUpdateLog, protocol: ProtocolConfig) {
+    const count = channel.manualPropNids.length
     if (count === 0) {
         return 0
     }
 
     let bytes = 1 + 4
     const nidBytes = byteSizeOfNetworkType(protocol.nidType)
-    const props = channel.trustedPropSchemas
-    const values = channel.trustedPropValues
+    const props = channel.manualPropSchemas
+    const values = channel.manualPropValues
     for (let i = 0; i < count; i++) {
         bytes += nidBytes + 1 + props[i].binary.byteSize(values[i])
     }
     return bytes
 }
 
-function writeTrustedPropUpdates(channel: TrustedMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const count = channel.trustedPropNids.length
+function writeManualPropUpdates(channel: ManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    const count = channel.manualPropNids.length
     if (count === 0) {
         return
     }
 
     writer.writeUInt8(BinarySection.UpdateEntities)
     writer.writeUInt32(count)
-    const nids = channel.trustedPropNids
-    const props = channel.trustedPropSchemas
-    const values = channel.trustedPropValues
+    const nids = channel.manualPropNids
+    const props = channel.manualPropSchemas
+    const values = channel.manualPropValues
     for (let i = 0; i < count; i++) {
         writeNetworkId(nids[i], protocol.nidType, writer)
         writer.writeUInt8(props[i].key)
@@ -1617,18 +1612,18 @@ function writeTrustedPropUpdates(channel: TrustedMutationUpdateLog, writer: IBin
     }
 }
 
-function writeTrustedGroupUpdates(channel: TrustedMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const count = channel.trustedGroupNids.length
+function writeManualGroupUpdates(channel: ManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    const count = channel.manualGroupNids.length
     if (count === 0) {
         return
     }
 
     writer.writeUInt8(BinarySection.UpdateEntityGroups)
     writer.writeUInt32(count)
-    const nids = channel.trustedGroupNids
-    const groups = channel.trustedGroupSchemas
-    const offsets = channel.trustedGroupValueOffsets
-    const values = channel.trustedGroupValues
+    const nids = channel.manualGroupNids
+    const groups = channel.manualGroupSchemas
+    const offsets = channel.manualGroupValueOffsets
+    const values = channel.manualGroupValues
     for (let i = 0; i < count; i++) {
         const group = groups[i]
         let offset = offsets[i]
@@ -1640,30 +1635,30 @@ function writeTrustedGroupUpdates(channel: TrustedMutationUpdateLog, writer: IBi
     }
 }
 
-function countTrustedUpdateBytes(channel: TrustedMutationUpdateLog, protocol: ProtocolConfig) {
-    return countTrustedPropUpdates(channel, protocol) + countTrustedGroupUpdates(channel, protocol)
+function countManualUpdateBytes(channel: ManualMutationUpdateLog, protocol: ProtocolConfig) {
+    return countManualPropUpdates(channel, protocol) + countManualGroupUpdates(channel, protocol)
 }
 
-function writeTrustedUpdates(channel: TrustedMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    writeTrustedPropUpdates(channel, writer, protocol)
-    writeTrustedGroupUpdates(channel, writer, protocol)
+function writeManualUpdates(channel: ManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeManualPropUpdates(channel, writer, protocol)
+    writeManualGroupUpdates(channel, writer, protocol)
 }
 
-type TrustedGroupBatch = {
+type ManualGroupBatch = {
     ntype: number
     group: SchemaUpdateGroup
     count: number
 }
 
-function collectTrustedGroupBatches(channel: EcsTrustedMutationUpdateLog) {
-    const batches: TrustedGroupBatch[] = []
-    const ntypes = channel.trustedGroupNTypes
-    const groups = channel.trustedGroupSchemas
+function collectManualGroupBatches(channel: EcsManualMutationUpdateLog) {
+    const batches: ManualGroupBatch[] = []
+    const ntypes = channel.manualGroupNTypes
+    const groups = channel.manualGroupSchemas
 
     for (let i = 0; i < groups.length; i++) {
         const ntype = ntypes[i]
         const group = groups[i]
-        let batch: TrustedGroupBatch | null = null
+        let batch: ManualGroupBatch | null = null
         for (let j = 0; j < batches.length; j++) {
             const candidate = batches[j]
             if (candidate.ntype === ntype && candidate.group.key === group.key) {
@@ -1681,15 +1676,15 @@ function collectTrustedGroupBatches(channel: EcsTrustedMutationUpdateLog) {
     return batches
 }
 
-function countEcsTrustedUpdateBytes(channel: EcsTrustedMutationUpdateLog, protocol: ProtocolConfig) {
-    let bytes = countTrustedPropUpdates(channel, protocol)
-    const batches = collectTrustedGroupBatches(channel)
+function countEcsManualUpdateBytes(channel: EcsManualMutationUpdateLog, protocol: ProtocolConfig) {
+    let bytes = countManualPropUpdates(channel, protocol)
+    const batches = collectManualGroupBatches(channel)
     const nidBytes = byteSizeOfNetworkType(protocol.nidType)
     const ntypeBytes = byteSizeOfNetworkType(protocol.ntypeType)
-    const ntypes = channel.trustedGroupNTypes
-    const groups = channel.trustedGroupSchemas
-    const offsets = channel.trustedGroupValueOffsets
-    const values = channel.trustedGroupValues
+    const ntypes = channel.manualGroupNTypes
+    const groups = channel.manualGroupSchemas
+    const offsets = channel.manualGroupValueOffsets
+    const values = channel.manualGroupValues
 
     for (let i = 0; i < batches.length; i++) {
         const batch = batches[i]
@@ -1710,13 +1705,13 @@ function countEcsTrustedUpdateBytes(channel: EcsTrustedMutationUpdateLog, protoc
     return bytes
 }
 
-function writeEcsTrustedGroupUpdates(channel: EcsTrustedMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const batches = collectTrustedGroupBatches(channel)
-    const nids = channel.trustedGroupNids
-    const ntypes = channel.trustedGroupNTypes
-    const groups = channel.trustedGroupSchemas
-    const offsets = channel.trustedGroupValueOffsets
-    const values = channel.trustedGroupValues
+function writeEcsManualGroupUpdates(channel: EcsManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    const batches = collectManualGroupBatches(channel)
+    const nids = channel.manualGroupNids
+    const ntypes = channel.manualGroupNTypes
+    const groups = channel.manualGroupSchemas
+    const offsets = channel.manualGroupValueOffsets
+    const values = channel.manualGroupValues
 
     for (let i = 0; i < batches.length; i++) {
         const batch = batches[i]
@@ -1739,24 +1734,24 @@ function writeEcsTrustedGroupUpdates(channel: EcsTrustedMutationUpdateLog, write
     }
 }
 
-function writeEcsTrustedUpdates(channel: EcsTrustedMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    writeTrustedPropUpdates(channel, writer, protocol)
-    writeEcsTrustedGroupUpdates(channel, writer, protocol)
+function writeEcsManualUpdates(channel: EcsManualMutationUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeManualPropUpdates(channel, writer, protocol)
+    writeEcsManualGroupUpdates(channel, writer, protocol)
 }
 
-function countTrustedGroupedProps(channel: TrustedMutationUpdateLog) {
+function countManualGroupedProps(channel: ManualMutationUpdateLog) {
     let props = 0
-    const groups = channel.trustedGroupSchemas
+    const groups = channel.manualGroupSchemas
     for (let i = 0; i < groups.length; i++) {
         props += groups[i].props.length
     }
     return props
 }
 
-function getTrustedUpdateFragment(user: User, instance: Instance, channel: EcsTrustedMutationUpdateLog & { nid: number }, keyPrefix: string) {
+function getManualUpdateFragment(user: User, instance: Instance, channel: EcsManualMutationUpdateLog & { nid: number }, keyPrefix: string) {
     const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:${keyPrefix}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedUpdateFragments.get(key) as TrustedUpdateFragment | undefined
+    const cached = instance.network.sharedUpdateFragments.get(key) as ManualUpdateFragment | undefined
     if (cached) {
         instance.network.recordSharedFragmentHit()
         return cached
@@ -1771,13 +1766,13 @@ function getTrustedUpdateFragment(user: User, instance: Instance, channel: EcsTr
     if (measure) {
         countStart = performance.now()
     }
-    const bytes = countEcsTrustedUpdateBytes(channel, protocol)
+    const bytes = countEcsManualUpdateBytes(channel, protocol)
     if (measure) {
         countMs = performance.now() - countStart
         writeStart = performance.now()
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeEcsTrustedUpdates(channel, writer, protocol)
+    writeEcsManualUpdates(channel, writer, protocol)
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -1785,9 +1780,9 @@ function getTrustedUpdateFragment(user: User, instance: Instance, channel: EcsTr
     const fragment = {
         payload: writer.payload,
         bytes,
-        updateProps: channel.trustedPropNids.length,
-        updateGroups: channel.trustedGroupNids.length,
-        groupedUpdateProps: countTrustedGroupedProps(channel)
+        updateProps: channel.manualPropNids.length,
+        updateGroups: channel.manualGroupNids.length,
+        groupedUpdateProps: countManualGroupedProps(channel)
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
@@ -1834,9 +1829,9 @@ function addRegularUpdate(plan: SnapshotPlan, instance: Instance, nid: number) {
     }
 }
 
-function addEcsTrustedUpdates(plan: SnapshotPlan, instance: Instance, channel: EcsSnapshotChannel, visibleUpdates: Set<number>) {
-    for (let i = 0; i < channel.trustedPropNids.length; i++) {
-        const nid = channel.trustedPropNids[i]
+function addEcsManualUpdates(plan: SnapshotPlan, instance: Instance, channel: EcsSnapshotChannel, visibleUpdates: Set<number>) {
+    for (let i = 0; i < channel.manualPropNids.length; i++) {
+        const nid = channel.manualPropNids[i]
         if (!visibleUpdates.has(nid)) {
             continue
         }
@@ -1844,17 +1839,17 @@ function addEcsTrustedUpdates(plan: SnapshotPlan, instance: Instance, channel: E
         if (!component) {
             continue
         }
-        const prop = channel.trustedPropSchemas[i]
+        const prop = channel.manualPropSchemas[i]
         plan.updateEntities.push({
             nid,
             nschema: instance.context.getSchema(component.ntype)!,
             prop: prop.prop,
-            value: channel.trustedPropValues[i]
+            value: channel.manualPropValues[i]
         })
     }
 
-    for (let i = 0; i < channel.trustedGroupNids.length; i++) {
-        const nid = channel.trustedGroupNids[i]
+    for (let i = 0; i < channel.manualGroupNids.length; i++) {
+        const nid = channel.manualGroupNids[i]
         if (!visibleUpdates.has(nid)) {
             continue
         }
@@ -1862,11 +1857,11 @@ function addEcsTrustedUpdates(plan: SnapshotPlan, instance: Instance, channel: E
         if (!component) {
             continue
         }
-        const group = channel.trustedGroupSchemas[i]
+        const group = channel.manualGroupSchemas[i]
         const values = []
-        let offset = channel.trustedGroupValueOffsets[i]
+        let offset = channel.manualGroupValueOffsets[i]
         for (let j = 0; j < group.props.length; j++) {
-            values.push(channel.trustedGroupValues[offset++])
+            values.push(channel.manualGroupValues[offset++])
         }
         plan.updateEntityGroups.push({
             nid,
@@ -1877,8 +1872,8 @@ function addEcsTrustedUpdates(plan: SnapshotPlan, instance: Instance, channel: E
     }
 }
 
-function ecsHasTrustedUpdates(channel: EcsSnapshotChannel) {
-    return channel.trustedPropNids.length > 0 || channel.trustedGroupNids.length > 0
+function ecsHasManualUpdates(channel: EcsSnapshotChannel) {
+    return channel.manualPropNids.length > 0 || channel.manualGroupNids.length > 0
 }
 
 function addEcsEnvelopeQueues(plan: SnapshotPlan, user: User) {
@@ -2084,7 +2079,7 @@ function collectEcsAwareSnapshotPlan(user: User, instance: Instance, channels: E
 
     const visibleUpdates = new Set(toUpdate)
     for (let i = 0; i < channels.length; i++) {
-        addEcsTrustedUpdates(plan, instance, channels[i], visibleUpdates)
+        addEcsManualUpdates(plan, instance, channels[i], visibleUpdates)
     }
 
     addEcsEnvelopeQueues(plan, user)
@@ -2108,7 +2103,7 @@ function collectEcsSnapshotBase(user: User, instance: Instance, channel: EcsSnap
     }
     if (
         channel.hasStructuralDeltas() &&
-        !ecsHasTrustedUpdates(channel) &&
+        !ecsHasManualUpdates(channel) &&
         user.stableVisibleRefs.has(channel.nid)
     ) {
         return collectStableEcsStructuralSnapshotBase(user, channel)
@@ -2159,7 +2154,7 @@ function collectEcsSnapshotBase(user: User, instance: Instance, channel: EcsSnap
 
 function collectEcsSnapshotPlan(user: User, instance: Instance, channel: EcsSnapshotChannel) {
     const { plan, toUpdate } = collectEcsSnapshotBase(user, instance, channel)
-    addEcsTrustedUpdates(plan, instance, channel, new Set(toUpdate))
+    addEcsManualUpdates(plan, instance, channel, new Set(toUpdate))
     return plan
 }
 
@@ -2194,12 +2189,12 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
     if (instance.network.debugBinaryWrites) {
         plan.messages.push(...collectBroadcastMessages(user))
     }
-    const writeTrustedLogDirectly = !hasEcsSnapshotCrud(plan)
-    if (!writeTrustedLogDirectly) {
-        addEcsTrustedUpdates(plan, instance, channel, new Set(base.toUpdate))
+    const writeManualLogDirectly = !hasEcsSnapshotCrud(plan)
+    if (!writeManualLogDirectly) {
+        addEcsManualUpdates(plan, instance, channel, new Set(base.toUpdate))
     }
-    const trustedFragment = writeTrustedLogDirectly && instance.network.sharedUpdateFragmentsEnabled
-        ? getTrustedUpdateFragment(user, instance, channel, 'ecs-trusted')
+    const manualFragment = writeManualLogDirectly && instance.network.sharedUpdateFragmentsEnabled
+        ? getManualUpdateFragment(user, instance, channel, 'ecs-manual')
         : null
 
     if (measure) {
@@ -2208,7 +2203,7 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
     }
 
     const bytes = countSnapshotBytes(plan, instance.context, protocol) +
-        (trustedFragment ? trustedFragment.bytes : writeTrustedLogDirectly ? countEcsTrustedUpdateBytes(channel, protocol) : 0)
+        (manualFragment ? manualFragment.bytes : writeManualLogDirectly ? countEcsManualUpdateBytes(channel, protocol) : 0)
     const writer = user.networkAdapter.binary.createWriter(bytes)
 
     if (measure) {
@@ -2217,14 +2212,14 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
     }
 
     writeSnapshot(plan, instance.context, writer, protocol)
-    if (trustedFragment) {
+    if (manualFragment) {
         const copyStart = measure ? performance.now() : 0
-        writePayload(writer, trustedFragment.payload)
+        writePayload(writer, manualFragment.payload)
         if (measure) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, trustedFragment.bytes)
+            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, manualFragment.bytes)
         }
-    } else if (writeTrustedLogDirectly) {
-        writeEcsTrustedUpdates(channel, writer, protocol)
+    } else if (writeManualLogDirectly) {
+        writeEcsManualUpdates(channel, writer, protocol)
     }
 
     if (measure) {
@@ -2237,7 +2232,7 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
 
     if (measure) {
         commitMs = performance.now() - commitStart
-        if (trustedFragment) {
+        if (manualFragment) {
             instance.network.recordSharedSnapshot()
         }
         instance.network.recordSnapshotPerformance({
@@ -2248,12 +2243,12 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
             sendMs: 0,
             bytes,
             creates: plan.ecsCreateEntities.length + plan.ecsCreateComponents.length,
-            updateProps: trustedFragment ? trustedFragment.updateProps :
-                writeTrustedLogDirectly ? channel.trustedPropNids.length : plan.updateEntities.length,
-            updateGroups: trustedFragment ? trustedFragment.updateGroups :
-                writeTrustedLogDirectly ? channel.trustedGroupNids.length : plan.updateEntityGroups.length,
-            groupedUpdateProps: trustedFragment ? trustedFragment.groupedUpdateProps :
-                writeTrustedLogDirectly ? countTrustedGroupedProps(channel) :
+            updateProps: manualFragment ? manualFragment.updateProps :
+                writeManualLogDirectly ? channel.manualPropNids.length : plan.updateEntities.length,
+            updateGroups: manualFragment ? manualFragment.updateGroups :
+                writeManualLogDirectly ? channel.manualGroupNids.length : plan.updateEntityGroups.length,
+            groupedUpdateProps: manualFragment ? manualFragment.groupedUpdateProps :
+                writeManualLogDirectly ? countManualGroupedProps(channel) :
                 plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
             deletes: plan.ecsDeleteEntities.length + plan.deleteEntities.length,
             messages: plan.messages.length,
@@ -2318,11 +2313,11 @@ function collectEcsSpatialSnapshotBase(user: User, instance: Instance, channel: 
 }
 
 function getEcsSpatialCellUpdateFragment(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel, cellKey: string) {
-    const log = channel.getTrustedCellUpdateLog(cellKey)
+    const log = channel.getManualCellUpdateLog(cellKey)
     if (!log) {
         return null
     }
-    return getTrustedUpdateFragment(user, instance, { nid: channel.nid, ...log }, `ecs-spatial:${cellKey}`)
+    return getManualUpdateFragment(user, instance, { nid: channel.nid, ...log }, `ecs-spatial:${cellKey}`)
 }
 
 function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel) {
@@ -2348,11 +2343,11 @@ function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel:
         plan.messages.push(...collectBroadcastMessages(user))
     }
 
-    const updateFragments: TrustedUpdateFragment[] = []
+    const updateFragments: ManualUpdateFragment[] = []
     const visibleCellKeys = channel.getVisibleCellKeys(user.id)
     for (let i = 0; i < visibleCellKeys.length; i++) {
         const cellKey = visibleCellKeys[i]
-        if (!channel.cellHasTrustedUpdates(cellKey)) {
+        if (!channel.cellHasManualUpdates(cellKey)) {
             continue
         }
         const fragment = getEcsSpatialCellUpdateFragment(user, instance, channel, cellKey)
@@ -2422,9 +2417,9 @@ function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel:
     return writer.payload
 }
 
-function getTrustedMutationUpdateFragment(user: User, instance: Instance, channel: TrustedMutationUpdateChannel) {
+function getManualMutationUpdateFragment(user: User, instance: Instance, channel: ManualMutationUpdateChannel) {
     const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:trusted:${protocol.nidType}:${protocol.ntypeType}`
+    const key = `${instance.tick}:${channel.nid}:manual:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key)
     if (cached) {
         instance.network.recordSharedFragmentHit()
@@ -2440,13 +2435,13 @@ function getTrustedMutationUpdateFragment(user: User, instance: Instance, channe
     if (measure) {
         countStart = performance.now()
     }
-    const bytes = countTrustedUpdateBytes(channel, protocol)
+    const bytes = countManualUpdateBytes(channel, protocol)
     if (measure) {
         countMs = performance.now() - countStart
         writeStart = performance.now()
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeTrustedUpdates(channel, writer, protocol)
+    writeManualUpdates(channel, writer, protocol)
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -2454,9 +2449,9 @@ function getTrustedMutationUpdateFragment(user: User, instance: Instance, channe
     const fragment = {
         payload: writer.payload,
         bytes,
-        updateProps: channel.trustedPropNids.length,
-        updateGroups: channel.trustedGroupNids.length,
-        groupedUpdateProps: countTrustedGroupedProps(channel)
+        updateProps: channel.manualPropNids.length,
+        updateGroups: channel.manualGroupNids.length,
+        groupedUpdateProps: countManualGroupedProps(channel)
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
@@ -2639,7 +2634,7 @@ function createMutationUpdateSnapshotBuffer(user: User, instance: Instance, chan
     return writer.payload
 }
 
-function createTrustedMutationUpdateSnapshotBuffer(user: User, instance: Instance, channel: TrustedMutationUpdateChannel) {
+function createManualMutationUpdateSnapshotBuffer(user: User, instance: Instance, channel: ManualMutationUpdateChannel) {
     const measure = instance.network.snapshotPerformanceEnabled
     let collectStart = 0
     let collectMs = 0
@@ -2670,7 +2665,7 @@ function createTrustedMutationUpdateSnapshotBuffer(user: User, instance: Instanc
     }
 
     const messageFragments = getSharedMessageFragments(user, instance)
-    const fragment = getTrustedMutationUpdateFragment(user, instance, channel)
+    const fragment = getManualMutationUpdateFragment(user, instance, channel)
 
     if (measure) {
         countStart = performance.now()
@@ -2943,7 +2938,7 @@ function allNidsArePlannedDeletes(nids: number[], plannedDeletes: Set<number>) {
     return true
 }
 
-function getTrustedStableVisibleCellKeys(channel: TrustedSpatialCellFragmentChannel, userId: number) {
+function getManualStableVisibleCellKeys(channel: ManualSpatialCellFragmentChannel, userId: number) {
     if (channel.hasStructuralDeltas()) {
         return null
     }
@@ -3000,7 +2995,7 @@ function getMovementStableVisibleCellKeys(channel: CellFragmentChannel, userId: 
     return currentKeys
 }
 
-function addTrustedSpatialCreates(instance: Instance, plan: SnapshotPlan, roots: any[], seen: Set<number>) {
+function addManualSpatialCreates(instance: Instance, plan: SnapshotPlan, roots: any[], seen: Set<number>) {
     const collected = collectCreateEntitiesForRoots(instance, roots)
     for (let i = 0; i < collected.createEntities.length; i++) {
         const entity = collected.createEntities[i]
@@ -3012,7 +3007,7 @@ function addTrustedSpatialCreates(instance: Instance, plan: SnapshotPlan, roots:
     }
 }
 
-function addTrustedSpatialDeletes(instance: Instance, plan: SnapshotPlan, rootNid: number, seen: Set<number>) {
+function addManualSpatialDeletes(instance: Instance, plan: SnapshotPlan, rootNid: number, seen: Set<number>) {
     instance.localState.collectEntityTreeDeletes(rootNid, plan.deleteEntities)
     for (let i = plan.deleteEntities.length - 1; i >= 0; i--) {
         const nid = plan.deleteEntities[i]
@@ -3024,7 +3019,7 @@ function addTrustedSpatialDeletes(instance: Instance, plan: SnapshotPlan, rootNi
     }
 }
 
-function applyTrustedSpatialVisibilityDeltas(user: User, plan: SnapshotPlan, tick: number) {
+function applyManualSpatialVisibilityDeltas(user: User, plan: SnapshotPlan, tick: number) {
     for (let i = 0; i < plan.deleteEntities.length; i++) {
         const nid = plan.deleteEntities[i]
         user.tickLastSeen.delete(nid)
@@ -3044,7 +3039,7 @@ function applyTrustedSpatialVisibilityDeltas(user: User, plan: SnapshotPlan, tic
     user.lastVisibleCount = user.currentlyVisible.length
 }
 
-function createTrustedStableSpatialCellSnapshotBuffer(user: User, instance: Instance, channel: TrustedSpatialCellFragmentChannel, currentCellKeys: string[]) {
+function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Instance, channel: ManualSpatialCellFragmentChannel, currentCellKeys: string[]) {
     const measure = instance.network.snapshotPerformanceEnabled
     let collectStart = 0
     let collectMs = 0
@@ -3079,9 +3074,9 @@ function createTrustedStableSpatialCellSnapshotBuffer(user: User, instance: Inst
         const fromVisible = visibleCellSet.has(move.fromCell)
         const toVisible = visibleCellSet.has(move.toCell)
         if (!fromVisible && toVisible) {
-            addTrustedSpatialCreates(instance, plan, [move.entity], createNids)
+            addManualSpatialCreates(instance, plan, [move.entity], createNids)
         } else if (fromVisible && !toVisible) {
-            addTrustedSpatialDeletes(instance, plan, move.entity.nid, deleteNids)
+            addManualSpatialDeletes(instance, plan, move.entity.nid, deleteNids)
         }
     }
     if (plan.createEntities.length > 0 && channel.clientIdentity !== undefined) {
@@ -3097,10 +3092,10 @@ function createTrustedStableSpatialCellSnapshotBuffer(user: User, instance: Inst
     const updateFragments: CellEntityFragment[] = []
     for (let i = 0; i < currentCellKeys.length; i++) {
         const cellKey = currentCellKeys[i]
-        if (!channel.cellHasTrustedUpdates(cellKey)) {
+        if (!channel.cellHasManualUpdates(cellKey)) {
             continue
         }
-        const fragment = getTrustedSpatialCellUpdateFragment(user, instance, channel, cellKey, false)
+        const fragment = getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, false)
         if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
             updateFragments.push(fragment)
         }
@@ -3133,7 +3128,7 @@ function createTrustedStableSpatialCellSnapshotBuffer(user: User, instance: Inst
         commitStart = performance.now()
     }
 
-    applyTrustedSpatialVisibilityDeltas(user, plan, instance.tick)
+    applyManualSpatialVisibilityDeltas(user, plan, instance.tick)
     commitSnapshotPlan(user, envelope)
     instance.network.reportResponseBacklog(user, queuedResponses, envelope.responses.length)
 
@@ -3265,10 +3260,10 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
         collectStart = performance.now()
     }
 
-    if (isTrustedSpatialCellFragmentChannel(channel)) {
-        const trustedStableCellKeys = getTrustedStableVisibleCellKeys(channel, user.id)
-        if (trustedStableCellKeys) {
-            return createTrustedStableSpatialCellSnapshotBuffer(user, instance, channel, trustedStableCellKeys)
+    if (isManualSpatialCellFragmentChannel(channel)) {
+        const manualStableCellKeys = getManualStableVisibleCellKeys(channel, user.id)
+        if (manualStableCellKeys) {
+            return createManualStableSpatialCellSnapshotBuffer(user, instance, channel, manualStableCellKeys)
         }
     }
 
@@ -3401,7 +3396,7 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
     const ecsChannels = getEcsSnapshotChannels(user)
     const ecsSpatialChannel = getSingleEcsSpatialSnapshotChannel(user)
     const ecsChannel = getSingleEcsSnapshotChannel(user)
-    const trustedMutationChannel = getSingleTrustedMutationUpdateChannel(user)
+    const manualMutationChannel = getSingleManualMutationUpdateChannel(user)
     const mutationChannel = getSingleMutationUpdateChannel(user)
     const sharedChannel = getSingleSharedChannel(user)
     const cellFragmentChannel = getSingleCellFragmentChannel(user)
@@ -3424,9 +3419,9 @@ const createSnapshotBufferRefactor = (user: User, instance: Instance) => {
 
     if (instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.debugBinaryWrites &&
-        trustedMutationChannel &&
-        canUseSharedUpdateFragment(user, trustedMutationChannel)) {
-        return createTrustedMutationUpdateSnapshotBuffer(user, instance, trustedMutationChannel)
+        manualMutationChannel &&
+        canUseSharedUpdateFragment(user, manualMutationChannel)) {
+        return createManualMutationUpdateSnapshotBuffer(user, instance, manualMutationChannel)
     }
 
     if (instance.network.sharedUpdateFragmentsEnabled &&

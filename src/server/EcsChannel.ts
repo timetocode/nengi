@@ -34,14 +34,14 @@ export class EcsChannel implements IChannel {
     createdComponents: EcsComponent[] = []
     deletedComponents: number[] = []
     rootDeletedComponents: number[] = []
-    trustedPropNids: number[] = []
-    trustedPropSchemas: SchemaProp[] = []
-    trustedPropValues: any[] = []
-    trustedGroupNids: number[] = []
-    trustedGroupNTypes: number[] = []
-    trustedGroupSchemas: SchemaUpdateGroup[] = []
-    trustedGroupValueOffsets: number[] = []
-    trustedGroupValues: any[] = []
+    manualPropNids: number[] = []
+    manualPropSchemas: SchemaProp[] = []
+    manualPropValues: any[] = []
+    manualGroupNids: number[] = []
+    manualGroupNTypes: number[] = []
+    manualGroupSchemas: SchemaUpdateGroup[] = []
+    manualGroupValueOffsets: number[] = []
+    manualGroupValues: any[] = []
     broadcastMessages: any[] = []
     private rootSet: Set<number> = new Set()
     private componentSet: Set<number> = new Set()
@@ -241,14 +241,14 @@ export class EcsChannel implements IChannel {
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
         this.rootDeletedComponents.length = 0
-        this.trustedPropNids.length = 0
-        this.trustedPropSchemas.length = 0
-        this.trustedPropValues.length = 0
-        this.trustedGroupNids.length = 0
-        this.trustedGroupNTypes.length = 0
-        this.trustedGroupSchemas.length = 0
-        this.trustedGroupValueOffsets.length = 0
-        this.trustedGroupValues.length = 0
+        this.manualPropNids.length = 0
+        this.manualPropSchemas.length = 0
+        this.manualPropValues.length = 0
+        this.manualGroupNids.length = 0
+        this.manualGroupNTypes.length = 0
+        this.manualGroupSchemas.length = 0
+        this.manualGroupValueOffsets.length = 0
+        this.manualGroupValues.length = 0
     }
 
     createComponentWriter(ntype: number, schema: Schema): EcsTypeWriters {
@@ -263,9 +263,9 @@ export class EcsChannel implements IChannel {
             writers[name] = writer
         }
 
-        const propNids = this.trustedPropNids
-        const propSchemas = this.trustedPropSchemas
-        const propValues = this.trustedPropValues
+        const propNids = this.manualPropNids
+        const propSchemas = this.manualPropSchemas
+        const propValues = this.manualPropValues
         const propNames = Object.keys(schema.props)
         for (let i = 0; i < propNames.length; i++) {
             const name = propNames[i]
@@ -278,11 +278,11 @@ export class EcsChannel implements IChannel {
             addAlias(name, props[name])
         }
 
-        const groupNids = this.trustedGroupNids
-        const groupNTypes = this.trustedGroupNTypes
-        const groupSchemas = this.trustedGroupSchemas
-        const groupValueOffsets = this.trustedGroupValueOffsets
-        const groupValues = this.trustedGroupValues
+        const groupNids = this.manualGroupNids
+        const groupNTypes = this.manualGroupNTypes
+        const groupSchemas = this.manualGroupSchemas
+        const groupValueOffsets = this.manualGroupValueOffsets
+        const groupValues = this.manualGroupValues
         for (let i = 0; i < schema.updateGroups.length; i++) {
             const group = schema.updateGroups[i]
             if (group.props.length === 1) {

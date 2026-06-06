@@ -92,14 +92,13 @@ export class ManualSchemaHandles {
 
 export class ManualChannel extends Channel {
     readonly manualMutationChannelMode = true
-    readonly trustedMutationChannelMode = true
-    trustedPropNids: number[] = []
-    trustedPropSchemas: SchemaProp[] = []
-    trustedPropValues: any[] = []
-    trustedGroupNids: number[] = []
-    trustedGroupSchemas: SchemaUpdateGroup[] = []
-    trustedGroupValueOffsets: number[] = []
-    trustedGroupValues: any[] = []
+    manualPropNids: number[] = []
+    manualPropSchemas: SchemaProp[] = []
+    manualPropValues: any[] = []
+    manualGroupNids: number[] = []
+    manualGroupSchemas: SchemaUpdateGroup[] = []
+    manualGroupValueOffsets: number[] = []
+    manualGroupValues: any[] = []
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
         super(localState, options)
@@ -107,10 +106,6 @@ export class ManualChannel extends Channel {
 
     manual(ntype: number, schema: Schema) {
         return new ManualSchemaHandles(this, ntype, schema)
-    }
-
-    trusted(ntype: number, schema: Schema) {
-        return this.manual(ntype, schema)
     }
 
     createEntityWriter(ntype: number, schema: Schema): ManualTypeWriters {
@@ -137,14 +132,14 @@ export class ManualChannel extends Channel {
             writers[name] = writer
         }
 
-        const propNids = this.trustedPropNids
-        const propSchemas = this.trustedPropSchemas
-        const propValues = this.trustedPropValues
+        const propNids = this.manualPropNids
+        const propSchemas = this.manualPropSchemas
+        const propValues = this.manualPropValues
         const propNames = Object.keys(schema.props)
         for (let i = 0; i < propNames.length; i++) {
             const name = propNames[i]
             const prop = schema.props[name]
-            props[name] = function writeTrustedProp(entity: IEntity, value: any) {
+            props[name] = function writeManualProp(entity: IEntity, value: any) {
                 propNids.push(entity.nid)
                 propSchemas.push(prop)
                 propValues.push(value)
@@ -152,42 +147,42 @@ export class ManualChannel extends Channel {
             addAlias(name, props[name])
         }
 
-        const groupNids = this.trustedGroupNids
-        const groupSchemas = this.trustedGroupSchemas
-        const groupValueOffsets = this.trustedGroupValueOffsets
-        const groupValues = this.trustedGroupValues
+        const groupNids = this.manualGroupNids
+        const groupSchemas = this.manualGroupSchemas
+        const groupValueOffsets = this.manualGroupValueOffsets
+        const groupValues = this.manualGroupValues
         for (let i = 0; i < schema.updateGroups.length; i++) {
             const group = schema.updateGroups[i]
             if (group.props.length === 1) {
-                groups[group.name] = function writeTrustedGroup1(entity: IEntity, v0: any) {
+                groups[group.name] = function writeManualGroup1(entity: IEntity, v0: any) {
                     groupNids.push(entity.nid)
                     groupSchemas.push(group)
                     groupValueOffsets.push(groupValues.length)
                     groupValues.push(v0)
                 }
             } else if (group.props.length === 2) {
-                groups[group.name] = function writeTrustedGroup2(entity: IEntity, v0: any, v1: any) {
+                groups[group.name] = function writeManualGroup2(entity: IEntity, v0: any, v1: any) {
                     groupNids.push(entity.nid)
                     groupSchemas.push(group)
                     groupValueOffsets.push(groupValues.length)
                     groupValues.push(v0, v1)
                 }
             } else if (group.props.length === 3) {
-                groups[group.name] = function writeTrustedGroup3(entity: IEntity, v0: any, v1: any, v2: any) {
+                groups[group.name] = function writeManualGroup3(entity: IEntity, v0: any, v1: any, v2: any) {
                     groupNids.push(entity.nid)
                     groupSchemas.push(group)
                     groupValueOffsets.push(groupValues.length)
                     groupValues.push(v0, v1, v2)
                 }
             } else if (group.props.length === 4) {
-                groups[group.name] = function writeTrustedGroup4(entity: IEntity, v0: any, v1: any, v2: any, v3: any) {
+                groups[group.name] = function writeManualGroup4(entity: IEntity, v0: any, v1: any, v2: any, v3: any) {
                     groupNids.push(entity.nid)
                     groupSchemas.push(group)
                     groupValueOffsets.push(groupValues.length)
                     groupValues.push(v0, v1, v2, v3)
                 }
             } else {
-                groups[group.name] = function writeTrustedGroup(entity: IEntity) {
+                groups[group.name] = function writeManualGroup(entity: IEntity) {
                     groupNids.push(entity.nid)
                     groupSchemas.push(group)
                     groupValueOffsets.push(groupValues.length)
@@ -207,30 +202,30 @@ export class ManualChannel extends Channel {
     }
 
     emitProp(entity: IEntity, handle: ManualPropHandle, value: any) {
-        this.trustedPropNids.push(entity.nid)
-        this.trustedPropSchemas.push(handle.prop)
-        this.trustedPropValues.push(value)
+        this.manualPropNids.push(entity.nid)
+        this.manualPropSchemas.push(handle.prop)
+        this.manualPropValues.push(value)
     }
 
     emitGroup1(entity: IEntity, handle: ManualGroupHandle, v0: any) {
-        this.trustedGroupNids.push(entity.nid)
-        this.trustedGroupSchemas.push(handle.group)
-        this.trustedGroupValueOffsets.push(this.trustedGroupValues.length)
-        this.trustedGroupValues.push(v0)
+        this.manualGroupNids.push(entity.nid)
+        this.manualGroupSchemas.push(handle.group)
+        this.manualGroupValueOffsets.push(this.manualGroupValues.length)
+        this.manualGroupValues.push(v0)
     }
 
     emitGroup2(entity: IEntity, handle: ManualGroupHandle, v0: any, v1: any) {
-        this.trustedGroupNids.push(entity.nid)
-        this.trustedGroupSchemas.push(handle.group)
-        this.trustedGroupValueOffsets.push(this.trustedGroupValues.length)
-        this.trustedGroupValues.push(v0, v1)
+        this.manualGroupNids.push(entity.nid)
+        this.manualGroupSchemas.push(handle.group)
+        this.manualGroupValueOffsets.push(this.manualGroupValues.length)
+        this.manualGroupValues.push(v0, v1)
     }
 
     emitGroup3(entity: IEntity, handle: ManualGroupHandle, v0: any, v1: any, v2: any) {
-        this.trustedGroupNids.push(entity.nid)
-        this.trustedGroupSchemas.push(handle.group)
-        this.trustedGroupValueOffsets.push(this.trustedGroupValues.length)
-        this.trustedGroupValues.push(v0, v1, v2)
+        this.manualGroupNids.push(entity.nid)
+        this.manualGroupSchemas.push(handle.group)
+        this.manualGroupValueOffsets.push(this.manualGroupValues.length)
+        this.manualGroupValues.push(v0, v1, v2)
     }
 
     /**
@@ -238,10 +233,10 @@ export class ManualChannel extends Channel {
      * whose schema has exactly four props and values matching those binary types.
      */
     emitGroup4(entity: IEntity, handle: ManualGroupHandle, v0: any, v1: any, v2: any, v3: any) {
-        this.trustedGroupNids.push(entity.nid)
-        this.trustedGroupSchemas.push(handle.group)
-        this.trustedGroupValueOffsets.push(this.trustedGroupValues.length)
-        this.trustedGroupValues.push(v0, v1, v2, v3)
+        this.manualGroupNids.push(entity.nid)
+        this.manualGroupSchemas.push(handle.group)
+        this.manualGroupValueOffsets.push(this.manualGroupValues.length)
+        this.manualGroupValues.push(v0, v1, v2, v3)
     }
 
     /**
@@ -249,22 +244,22 @@ export class ManualChannel extends Channel {
      * allocate `values` per entity will give back much of the intended win.
      */
     emitGroupValues(entity: IEntity, handle: ManualGroupHandle, values: any[]) {
-        this.trustedGroupNids.push(entity.nid)
-        this.trustedGroupSchemas.push(handle.group)
-        this.trustedGroupValueOffsets.push(this.trustedGroupValues.length)
+        this.manualGroupNids.push(entity.nid)
+        this.manualGroupSchemas.push(handle.group)
+        this.manualGroupValueOffsets.push(this.manualGroupValues.length)
         for (let i = 0; i < handle.group.props.length; i++) {
-            this.trustedGroupValues.push(values[i])
+            this.manualGroupValues.push(values[i])
         }
     }
 
     clearSnapshotDeltas() {
         super.clearSnapshotDeltas()
-        this.trustedPropNids.length = 0
-        this.trustedPropSchemas.length = 0
-        this.trustedPropValues.length = 0
-        this.trustedGroupNids.length = 0
-        this.trustedGroupSchemas.length = 0
-        this.trustedGroupValueOffsets.length = 0
-        this.trustedGroupValues.length = 0
+        this.manualPropNids.length = 0
+        this.manualPropSchemas.length = 0
+        this.manualPropValues.length = 0
+        this.manualGroupNids.length = 0
+        this.manualGroupSchemas.length = 0
+        this.manualGroupValueOffsets.length = 0
+        this.manualGroupValues.length = 0
     }
 }

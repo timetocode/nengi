@@ -13,13 +13,13 @@ type CellRef = { key: string, index: number }
 export type ManualSpatialMove = { entity: SpatialEntity, fromCell: string, toCell: string }
 
 export type ManualSpatialCellLog = {
-    trustedPropNids: number[]
-    trustedPropSchemas: SchemaProp[]
-    trustedPropValues: any[]
-    trustedGroupNids: number[]
-    trustedGroupSchemas: SchemaUpdateGroup[]
-    trustedGroupValueOffsets: number[]
-    trustedGroupValues: any[]
+    manualPropNids: number[]
+    manualPropSchemas: SchemaProp[]
+    manualPropValues: any[]
+    manualGroupNids: number[]
+    manualGroupSchemas: SchemaUpdateGroup[]
+    manualGroupValueOffsets: number[]
+    manualGroupValues: any[]
 }
 
 type Cell = ManualSpatialCellLog & {
@@ -68,19 +68,18 @@ function createCell(key: string, x: number, y: number): Cell {
         entities: [],
         entityNids: [],
         version: 0,
-        trustedPropNids: [],
-        trustedPropSchemas: [],
-        trustedPropValues: [],
-        trustedGroupNids: [],
-        trustedGroupSchemas: [],
-        trustedGroupValueOffsets: [],
-        trustedGroupValues: []
+        manualPropNids: [],
+        manualPropSchemas: [],
+        manualPropValues: [],
+        manualGroupNids: [],
+        manualGroupSchemas: [],
+        manualGroupValueOffsets: [],
+        manualGroupValues: []
     }
 }
 
 export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
     readonly manualSpatialChannelMode = true
-    readonly trustedMutationSpatialMode = true
     readonly cellFragmentMode = true
     nid: number
     label?: string
@@ -351,9 +350,9 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
                 if (!cell) {
                     return
                 }
-                cell.trustedPropNids.push(entity.nid)
-                cell.trustedPropSchemas.push(prop)
-                cell.trustedPropValues.push(value)
+                cell.manualPropNids.push(entity.nid)
+                cell.manualPropSchemas.push(prop)
+                cell.manualPropValues.push(value)
             }
             addAlias(name, props[name])
         }
@@ -366,10 +365,10 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
                     if (!cell) {
                         return
                     }
-                    cell.trustedGroupNids.push(entity.nid)
-                    cell.trustedGroupSchemas.push(group)
-                    cell.trustedGroupValueOffsets.push(cell.trustedGroupValues.length)
-                    cell.trustedGroupValues.push(v0)
+                    cell.manualGroupNids.push(entity.nid)
+                    cell.manualGroupSchemas.push(group)
+                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
+                    cell.manualGroupValues.push(v0)
                 }
             } else if (group.props.length === 2) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any) => {
@@ -377,10 +376,10 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
                     if (!cell) {
                         return
                     }
-                    cell.trustedGroupNids.push(entity.nid)
-                    cell.trustedGroupSchemas.push(group)
-                    cell.trustedGroupValueOffsets.push(cell.trustedGroupValues.length)
-                    cell.trustedGroupValues.push(v0, v1)
+                    cell.manualGroupNids.push(entity.nid)
+                    cell.manualGroupSchemas.push(group)
+                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
+                    cell.manualGroupValues.push(v0, v1)
                 }
             } else if (group.props.length === 3) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any, v2: any) => {
@@ -388,10 +387,10 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
                     if (!cell) {
                         return
                     }
-                    cell.trustedGroupNids.push(entity.nid)
-                    cell.trustedGroupSchemas.push(group)
-                    cell.trustedGroupValueOffsets.push(cell.trustedGroupValues.length)
-                    cell.trustedGroupValues.push(v0, v1, v2)
+                    cell.manualGroupNids.push(entity.nid)
+                    cell.manualGroupSchemas.push(group)
+                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
+                    cell.manualGroupValues.push(v0, v1, v2)
                 }
             } else if (group.props.length === 4) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any, v2: any, v3: any) => {
@@ -399,10 +398,10 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
                     if (!cell) {
                         return
                     }
-                    cell.trustedGroupNids.push(entity.nid)
-                    cell.trustedGroupSchemas.push(group)
-                    cell.trustedGroupValueOffsets.push(cell.trustedGroupValues.length)
-                    cell.trustedGroupValues.push(v0, v1, v2, v3)
+                    cell.manualGroupNids.push(entity.nid)
+                    cell.manualGroupSchemas.push(group)
+                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
+                    cell.manualGroupValues.push(v0, v1, v2, v3)
                 }
             } else {
                 groups[group.name] = (entity: SpatialEntity, ...values: any[]) => {
@@ -410,11 +409,11 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
                     if (!cell) {
                         return
                     }
-                    cell.trustedGroupNids.push(entity.nid)
-                    cell.trustedGroupSchemas.push(group)
-                    cell.trustedGroupValueOffsets.push(cell.trustedGroupValues.length)
+                    cell.manualGroupNids.push(entity.nid)
+                    cell.manualGroupSchemas.push(group)
+                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
                     for (let j = 0; j < group.props.length; j++) {
-                        cell.trustedGroupValues.push(values[j])
+                        cell.manualGroupValues.push(values[j])
                     }
                 }
             }
@@ -480,13 +479,13 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
             if (!cell) {
                 continue
             }
-            cell.trustedPropNids.length = 0
-            cell.trustedPropSchemas.length = 0
-            cell.trustedPropValues.length = 0
-            cell.trustedGroupNids.length = 0
-            cell.trustedGroupSchemas.length = 0
-            cell.trustedGroupValueOffsets.length = 0
-            cell.trustedGroupValues.length = 0
+            cell.manualPropNids.length = 0
+            cell.manualPropSchemas.length = 0
+            cell.manualPropValues.length = 0
+            cell.manualGroupNids.length = 0
+            cell.manualGroupSchemas.length = 0
+            cell.manualGroupValueOffsets.length = 0
+            cell.manualGroupValues.length = 0
         }
         this.dirtyCells.clear()
         this.movedRoots.length = 0
@@ -601,11 +600,11 @@ export class ManualSpatialChannel implements ICulledChannel<Point2D, AABB2D> {
         return this.cells.get(key)?.version || 0
     }
 
-    getTrustedCellUpdateLog(key: string) {
+    getManualCellUpdateLog(key: string) {
         return this.cells.get(key) || null
     }
 
-    cellHasTrustedUpdates(key: string) {
+    cellHasManualUpdates(key: string) {
         return this.dirtyCells.has(key)
     }
 

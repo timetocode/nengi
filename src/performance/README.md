@@ -39,7 +39,7 @@ PROFILE_FRAGMENT_CELL_LIMIT=16
 PROFILE_STABLE_FRAGMENT_CELL_LIMIT=64
 PROFILE_MUTATION_MODE=implicit   # implicit | dirtyEntity | explicit
 PROFILE_EXPLICIT_API=mutate      # mutate | mark
-PROFILE_TRUSTED_EMIT=group4      # group4 | props
+PROFILE_MANUAL_EMIT=group4      # group4 | props
 PROFILE_DIRTY_CELL_FULL_SCAN_THRESHOLD=0.65
 PROFILE_DIRTY_CELL_FULL_SCAN_MIN_ENTITIES=8
 PROFILE_TICKS=300
@@ -114,32 +114,32 @@ Scenarios:
   affected prop/group names with `markPropDirty`/`markGroupDirty`, avoiding
   value-object allocation in the benchmark mutation loop. `PROFILE_MOVE_FRACTION`
   controls the fraction of entities mutated per tick.
-- `trusted-channel`: all users share one experimental `TrustedMutationChannel`.
-  Membership still uses normal `addEntity`/`removeEntity`; the trusted path is
+- `manual-channel`: all users share one experimental `ManualChannel`.
+  Membership still uses normal `addEntity`/`removeEntity`; the manual path is
   only for explicit update writes. The benchmark assigns transform props
   directly and records a generated update writer from `channel.type(ntype,
-  schema).transform`, then the snapshot path writes that trusted log directly
+  schema).transform`, then the snapshot path writes that manual log directly
   without diffing, cloning, schema-name lookup, or cache updates. The generated
   type object also exposes `props` and `groups` namespaces when a schema name
   collides with a reserved/root name.
-- `trusted-spatial-channel`: experimental trusted spatial cell channel. Users
+- `manual-spatial-channel`: experimental manual spatial cell channel. Users
   subscribe with AABB views, entities are bucketed by cell, and generated
-  trusted writers record updates into per-cell logs. Stable-view snapshots skip
+  manual writers record updates into per-cell logs. Stable-view snapshots skip
   generic visibility/diff collection and copy only dirty visible cell fragments.
-  `PROFILE_TRUSTED_EMIT=props` emits the same transform as four trusted single
+  `PROFILE_MANUAL_EMIT=props` emits the same transform as four manual single
   prop writes instead of one grouped write, which is useful for comparing binary
   representations.
-- `parent-child-channel`, `parent-child-trusted-channel`,
-  `parent-child-cell-channel`, and `parent-child-trusted-spatial-channel`:
+- `parent-child-channel`, `parent-child-manual-channel`,
+  `parent-child-cell-channel`, and `parent-child-manual-spatial-channel`:
   parent/child variants for the four intended public channel shapes.
   `PROFILE_ENTITIES` is the number of parent roots and `PROFILE_CHILDREN`
   attaches that many child entities to each root. The steady-state benchmark
   mutates roots and children so child update costs are visible.
-- `wide-channel`, `wide-trusted-channel`, `ecs-trusted-channel`, `ecs-channel`,
-  `wide-trusted-spatial`, and `ecs-trusted-spatial`: compare equivalent
+- `wide-channel`, `wide-manual-channel`, `ecs-manual-channel`, `ecs-channel`,
+  `wide-manual-spatial`, and `ecs-manual-spatial`: compare equivalent
   transform/vitals/loadout state as one wider entity versus ECS-shaped state.
   `wide-channel` is the normal automagic `Channel` scan/diff control;
-  `ecs-trusted-channel` uses the older root-with-child-components model;
+  `ecs-manual-channel` uses the older root-with-child-components model;
   `ecs-channel` uses the dedicated `EcsChannel`, where the root is only a pid
   and transform/vitals/loadout are component entities. `PROFILE_ENTITY_SHAPE`
   can also select the shape explicitly, but these scenarios set the intended
@@ -150,6 +150,16 @@ Scenarios:
 - `ecs-spatial-channel`: dedicated spatial ECS channel. Root visibility comes
   from the spatial component, while transform/vitals/loadout component updates
   are written as typed ECS component group sections per visible dirty cell.
+
+Archived naming note:
+
+During R&D, the manual mutation scenarios were named with `trusted-*` labels.
+Those labels are archived terminology and may be deleted shortly. The current
+equivalents are `manual-channel`, `manual-spatial-channel`,
+`wide-manual-channel`, `wide-manual-spatial`, `ecs-manual-channel`,
+`ecs-manual-spatial`, `parent-child-manual-channel`, and
+`parent-child-manual-spatial-channel`. `PROFILE_MANUAL_EMIT` replaced the
+archived `PROFILE_TRUSTED_EMIT` env var.
 
 Output is JSON and includes:
 
@@ -189,15 +199,15 @@ PROFILE_SCENARIO=channel-mutation PROFILE_MUTATION_MODE=implicit PROFILE_USERS=5
 PROFILE_SCENARIO=channel-mutation PROFILE_MUTATION_MODE=dirtyEntity PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=0.1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=channel-mutation PROFILE_MUTATION_MODE=explicit PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=0.1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=channel-mutation PROFILE_MUTATION_MODE=explicit PROFILE_EXPLICIT_API=mark PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
-PROFILE_SCENARIO=trusted-channel PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
-PROFILE_SCENARIO=trusted-channel PROFILE_TRUSTED_EMIT=props PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=manual-channel PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=manual-channel PROFILE_MANUAL_EMIT=props PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=wide-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
-PROFILE_SCENARIO=wide-trusted-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
-PROFILE_SCENARIO=ecs-trusted-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
+PROFILE_SCENARIO=wide-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
+PROFILE_SCENARIO=ecs-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel-churn PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_CHURN=100 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-spatial-channel PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
-PROFILE_SCENARIO=trusted-spatial-channel PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=manual-spatial-channel PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 ```
 
 Interpretation notes:

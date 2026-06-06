@@ -10,14 +10,14 @@ export type EcsSpatialComponent = IEntity & { pid: number }
 export type EcsSpatialMove = { pid: number, fromCell: string, toCell: string }
 
 export type EcsSpatialUpdateLog = {
-    trustedPropNids: number[]
-    trustedPropSchemas: SchemaProp[]
-    trustedPropValues: any[]
-    trustedGroupNids: number[]
-    trustedGroupNTypes: number[]
-    trustedGroupSchemas: SchemaUpdateGroup[]
-    trustedGroupValueOffsets: number[]
-    trustedGroupValues: any[]
+    manualPropNids: number[]
+    manualPropSchemas: SchemaProp[]
+    manualPropValues: any[]
+    manualGroupNids: number[]
+    manualGroupNTypes: number[]
+    manualGroupSchemas: SchemaUpdateGroup[]
+    manualGroupValueOffsets: number[]
+    manualGroupValues: any[]
 }
 
 type Cell = EcsSpatialUpdateLog & {
@@ -49,14 +49,14 @@ export type EcsSpatialChannelOptions = {
 
 function createUpdateLog(): EcsSpatialUpdateLog {
     return {
-        trustedPropNids: [],
-        trustedPropSchemas: [],
-        trustedPropValues: [],
-        trustedGroupNids: [],
-        trustedGroupNTypes: [],
-        trustedGroupSchemas: [],
-        trustedGroupValueOffsets: [],
-        trustedGroupValues: []
+        manualPropNids: [],
+        manualPropSchemas: [],
+        manualPropValues: [],
+        manualGroupNids: [],
+        manualGroupNTypes: [],
+        manualGroupSchemas: [],
+        manualGroupValueOffsets: [],
+        manualGroupValues: []
     }
 }
 
@@ -101,14 +101,14 @@ export class EcsSpatialChannel implements IChannel {
     createdComponents: EcsSpatialComponent[] = []
     deletedComponents: number[] = []
     rootDeletedComponents: number[] = []
-    trustedPropNids: number[] = []
-    trustedPropSchemas: SchemaProp[] = []
-    trustedPropValues: any[] = []
-    trustedGroupNids: number[] = []
-    trustedGroupNTypes: number[] = []
-    trustedGroupSchemas: SchemaUpdateGroup[] = []
-    trustedGroupValueOffsets: number[] = []
-    trustedGroupValues: any[] = []
+    manualPropNids: number[] = []
+    manualPropSchemas: SchemaProp[] = []
+    manualPropValues: any[] = []
+    manualGroupNids: number[] = []
+    manualGroupNTypes: number[] = []
+    manualGroupSchemas: SchemaUpdateGroup[] = []
+    manualGroupValueOffsets: number[] = []
+    manualGroupValues: any[] = []
     dirtyCells: Set<string> = new Set()
     broadcastMessages: any[] = []
     private rootSet: Set<number> = new Set()
@@ -550,19 +550,19 @@ export class EcsSpatialChannel implements IChannel {
         return this.cells.get(key)?.rootNids || []
     }
 
-    getTrustedCellUpdateLog(key: string) {
+    getManualCellUpdateLog(key: string) {
         const cell = this.cells.get(key)
         if (!cell) {
             return null
         }
-        if (cell.trustedPropNids.length === 0 && cell.trustedGroupNids.length === 0) {
+        if (cell.manualPropNids.length === 0 && cell.manualGroupNids.length === 0) {
             return null
         }
         return cell
     }
 
-    cellHasTrustedUpdates(key: string) {
-        return this.getTrustedCellUpdateLog(key) !== null
+    cellHasManualUpdates(key: string) {
+        return this.getManualCellUpdateLog(key) !== null
     }
 
     getMovedRoots() {
@@ -582,8 +582,8 @@ export class EcsSpatialChannel implements IChannel {
             this.rootDeletedComponents.length === 0
     }
 
-    hasTrustedUpdates() {
-        return this.trustedPropNids.length > 0 || this.trustedGroupNids.length > 0 || this.dirtyCells.size > 0
+    hasManualUpdates() {
+        return this.manualPropNids.length > 0 || this.manualGroupNids.length > 0 || this.dirtyCells.size > 0
     }
 
     subscribe(user: User, view?: AABB2D) {
@@ -630,14 +630,14 @@ export class EcsSpatialChannel implements IChannel {
 
     clearSnapshotDeltas() {
         const clearLog = (log: EcsSpatialUpdateLog) => {
-            log.trustedPropNids.length = 0
-            log.trustedPropSchemas.length = 0
-            log.trustedPropValues.length = 0
-            log.trustedGroupNids.length = 0
-            log.trustedGroupNTypes.length = 0
-            log.trustedGroupSchemas.length = 0
-            log.trustedGroupValueOffsets.length = 0
-            log.trustedGroupValues.length = 0
+            log.manualPropNids.length = 0
+            log.manualPropSchemas.length = 0
+            log.manualPropValues.length = 0
+            log.manualGroupNids.length = 0
+            log.manualGroupNTypes.length = 0
+            log.manualGroupSchemas.length = 0
+            log.manualGroupValueOffsets.length = 0
+            log.manualGroupValues.length = 0
         }
         for (const key of this.dirtyCells) {
             const cell = this.cells.get(key)
@@ -677,12 +677,12 @@ export class EcsSpatialChannel implements IChannel {
                 if (!cell) {
                     return
                 }
-                cell.trustedPropNids.push(component.nid)
-                cell.trustedPropSchemas.push(prop)
-                cell.trustedPropValues.push(value)
-                this.trustedPropNids.push(component.nid)
-                this.trustedPropSchemas.push(prop)
-                this.trustedPropValues.push(value)
+                cell.manualPropNids.push(component.nid)
+                cell.manualPropSchemas.push(prop)
+                cell.manualPropValues.push(value)
+                this.manualPropNids.push(component.nid)
+                this.manualPropSchemas.push(prop)
+                this.manualPropValues.push(value)
             }
             addAlias(name, props[name])
         }
@@ -692,17 +692,17 @@ export class EcsSpatialChannel implements IChannel {
             if (!cell) {
                 return
             }
-            cell.trustedGroupNids.push(component.nid)
-            cell.trustedGroupNTypes.push(ntype)
-            cell.trustedGroupSchemas.push(group)
-            cell.trustedGroupValueOffsets.push(cell.trustedGroupValues.length)
-            this.trustedGroupNids.push(component.nid)
-            this.trustedGroupNTypes.push(ntype)
-            this.trustedGroupSchemas.push(group)
-            this.trustedGroupValueOffsets.push(this.trustedGroupValues.length)
+            cell.manualGroupNids.push(component.nid)
+            cell.manualGroupNTypes.push(ntype)
+            cell.manualGroupSchemas.push(group)
+            cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
+            this.manualGroupNids.push(component.nid)
+            this.manualGroupNTypes.push(ntype)
+            this.manualGroupSchemas.push(group)
+            this.manualGroupValueOffsets.push(this.manualGroupValues.length)
             for (let i = 0; i < group.props.length; i++) {
-                cell.trustedGroupValues.push(values[i + 1])
-                this.trustedGroupValues.push(values[i + 1])
+                cell.manualGroupValues.push(values[i + 1])
+                this.manualGroupValues.push(values[i + 1])
             }
         }
 

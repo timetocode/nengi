@@ -7,8 +7,8 @@ import { AABB2D } from '../server/AABB2D'
 import { CellChannel } from '../server/CellChannel'
 import { Channel } from '../server/Channel'
 import { MutationChannel } from '../server/MutationChannel'
-import { TrustedMutationChannel } from '../server/TrustedMutationChannel'
-import { TrustedMutationSpatialChannel } from '../server/TrustedMutationSpatialChannel'
+import { ManualChannel } from '../server/ManualChannel'
+import { ManualSpatialChannel } from '../server/ManualSpatialChannel'
 import { MutationCellChannel } from '../server/MutationCellChannel'
 import { EcsChannel } from '../server/EcsChannel'
 import { EcsSpatialChannel } from '../server/EcsSpatialChannel'
@@ -46,20 +46,20 @@ type ScenarioName =
     | 'mutation-cell-channel'
     | 'aabb-grid-cache'
     | 'channel-mutation'
-    | 'trusted-channel'
-    | 'trusted-spatial-channel'
+    | 'manual-channel'
+    | 'manual-spatial-channel'
     | 'wide-channel'
-    | 'wide-trusted-channel'
-    | 'ecs-trusted-channel'
+    | 'wide-manual-channel'
+    | 'ecs-manual-channel'
     | 'ecs-channel'
     | 'ecs-channel-churn'
     | 'ecs-spatial-channel'
-    | 'wide-trusted-spatial'
-    | 'ecs-trusted-spatial'
+    | 'wide-manual-spatial'
+    | 'ecs-manual-spatial'
     | 'parent-child-channel'
-    | 'parent-child-trusted-channel'
+    | 'parent-child-manual-channel'
     | 'parent-child-cell-channel'
-    | 'parent-child-trusted-spatial-channel'
+    | 'parent-child-manual-spatial-channel'
     | 'channel-churn'
 
 const SCENARIOS = new Set<ScenarioName>([
@@ -74,44 +74,44 @@ const SCENARIOS = new Set<ScenarioName>([
     'mutation-cell-channel',
     'aabb-grid-cache',
     'channel-mutation',
-    'trusted-channel',
-    'trusted-spatial-channel',
+    'manual-channel',
+    'manual-spatial-channel',
     'wide-channel',
-    'wide-trusted-channel',
-    'ecs-trusted-channel',
+    'wide-manual-channel',
+    'ecs-manual-channel',
     'ecs-channel',
     'ecs-channel-churn',
     'ecs-spatial-channel',
-    'wide-trusted-spatial',
-    'ecs-trusted-spatial',
+    'wide-manual-spatial',
+    'ecs-manual-spatial',
     'parent-child-channel',
-    'parent-child-trusted-channel',
+    'parent-child-manual-channel',
     'parent-child-cell-channel',
-    'parent-child-trusted-spatial-channel',
+    'parent-child-manual-spatial-channel',
     'channel-churn'
 ])
 
 type SpatialCacheVariant = 'current-exact' | 'cell-fragments' | 'interior-fragments'
 type ExplicitMutationApi = 'mutate' | 'mark'
-type TrustedEmitMode = 'group4' | 'props'
+type ManualEmitMode = 'group4' | 'props'
 type EntityShape = 'standard' | 'monolith' | 'ecs'
 
 const CUSTOM_MUTATION_SCENARIOS = new Set<ScenarioName>([
     'channel-churn',
     'channel-mutation',
-    'trusted-channel',
-    'trusted-spatial-channel',
+    'manual-channel',
+    'manual-spatial-channel',
     'wide-channel',
-    'wide-trusted-channel',
-    'wide-trusted-spatial',
-    'ecs-trusted-channel',
+    'wide-manual-channel',
+    'wide-manual-spatial',
+    'ecs-manual-channel',
     'ecs-channel',
     'ecs-channel-churn',
-    'ecs-trusted-spatial',
+    'ecs-manual-spatial',
     'ecs-spatial-channel',
     'mutation-cell-channel',
-    'parent-child-trusted-channel',
-    'parent-child-trusted-spatial-channel'
+    'parent-child-manual-channel',
+    'parent-child-manual-spatial-channel'
 ])
 
 type TestEntity = IEntity & {
@@ -187,7 +187,7 @@ type ScenarioConfig = {
     stableFragmentCellLimit: number
     mutationMode: MutationMode
     explicitMutationApi: ExplicitMutationApi
-    trustedEmitMode: TrustedEmitMode
+    manualEmitMode: ManualEmitMode
     entityShape: EntityShape
     dirtyCellFullScanThreshold: number
     dirtyCellFullScanMinEntities: number
@@ -309,9 +309,9 @@ function readConfig(): ScenarioConfig {
     if (explicitMutationApi !== 'mutate' && explicitMutationApi !== 'mark') {
         throw new Error('PROFILE_EXPLICIT_API must be "mutate" or "mark".')
     }
-    const trustedEmitMode = process.env.PROFILE_TRUSTED_EMIT || 'group4'
-    if (trustedEmitMode !== 'group4' && trustedEmitMode !== 'props') {
-        throw new Error('PROFILE_TRUSTED_EMIT must be "group4" or "props".')
+    const manualEmitMode = process.env.PROFILE_MANUAL_EMIT || 'group4'
+    if (manualEmitMode !== 'group4' && manualEmitMode !== 'props') {
+        throw new Error('PROFILE_MANUAL_EMIT must be "group4" or "props".')
     }
     const entityShape = process.env.PROFILE_ENTITY_SHAPE || (
         scenario.startsWith('wide-') ? 'monolith' : scenario.startsWith('ecs-') ? 'ecs' : 'standard'
@@ -344,7 +344,7 @@ function readConfig(): ScenarioConfig {
         stableFragmentCellLimit: Math.max(1, Math.floor(envNumber('PROFILE_STABLE_FRAGMENT_CELL_LIMIT', 64))),
         mutationMode: mutationMode as MutationMode,
         explicitMutationApi: explicitMutationApi as ExplicitMutationApi,
-        trustedEmitMode: trustedEmitMode as TrustedEmitMode,
+        manualEmitMode: manualEmitMode as ManualEmitMode,
         entityShape: entityShape as EntityShape,
         dirtyCellFullScanThreshold: Math.min(1, Math.max(0, envNumber('PROFILE_DIRTY_CELL_FULL_SCAN_THRESHOLD', 0.65))),
         dirtyCellFullScanMinEntities: Math.max(1, Math.floor(envNumber('PROFILE_DIRTY_CELL_FULL_SCAN_MIN_ENTITIES', 8)))
@@ -570,7 +570,7 @@ function mutateEntities(entities: TestEntity[], tick: number, moveFraction = 1) 
     }
 }
 
-function mutateTrustedEntities(
+function mutateManualEntities(
     entities: TestEntity[],
     tick: number,
     moveFraction: number,
@@ -581,7 +581,7 @@ function mutateTrustedEntities(
         z: (entity: TestEntity, value: number) => void
         rot: (entity: TestEntity, value: number) => void
     },
-    emitMode: TrustedEmitMode = 'group4'
+    emitMode: ManualEmitMode = 'group4'
 ) {
     const moving = Math.floor(entities.length * moveFraction)
     for (let i = 0; i < moving; i++) {
@@ -766,8 +766,8 @@ function setupMutationChannel(instance: Instance, users: User[], entities: TestE
     }
 }
 
-function setupTrustedChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new TrustedMutationChannel(instance.localState, { label: 'trusted' })
+function setupManualChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel(instance.localState, { label: 'manual' })
     const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
     const propX = Entity.x
@@ -791,7 +791,7 @@ function setupTrustedChannel(instance: Instance, users: User[], entities: TestEn
             entity.y = y
             entity.z = z
             entity.rot = rot
-            if (config.trustedEmitMode === 'props') {
+            if (config.manualEmitMode === 'props') {
                 propX(entity, x)
                 propY(entity, y)
                 propZ(entity, z)
@@ -803,12 +803,12 @@ function setupTrustedChannel(instance: Instance, users: User[], entities: TestEn
     }
 }
 
-function setupTrustedSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new TrustedMutationSpatialChannel(instance.localState, config.cellSize, {
+function setupManualSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualSpatialChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'trusted-spatial'
+        label: 'manual-spatial'
     })
     const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
@@ -835,7 +835,7 @@ function setupTrustedSpatialChannel(instance: Instance, users: User[], entities:
             entity.y = y
             entity.z = z
             entity.rot = rot
-            if (config.trustedEmitMode === 'props') {
+            if (config.manualEmitMode === 'props') {
                 propX(entity, x)
                 propY(entity, y)
                 propZ(entity, z)
@@ -847,8 +847,8 @@ function setupTrustedSpatialChannel(instance: Instance, users: User[], entities:
     }
 }
 
-function setupWideTrustedChannel(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
-    const channel = new TrustedMutationChannel(instance.localState, { label: 'wide-trusted' })
+function setupWideManualChannel(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel(instance.localState, { label: 'wide-manual' })
     const Wide = channel.type(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -867,12 +867,12 @@ function setupWideTrustedChannel(instance: Instance, users: User[], entities: Wi
     }
 }
 
-function setupWideTrustedSpatial(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
-    const channel = new TrustedMutationSpatialChannel(instance.localState, config.cellSize, {
+function setupWideManualSpatial(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
+    const channel = new ManualSpatialChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'wide-trusted-spatial'
+        label: 'wide-manual-spatial'
     })
     const Wide = channel.type(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
     for (let i = 0; i < entities.length; i++) {
@@ -894,8 +894,8 @@ function setupWideTrustedSpatial(instance: Instance, users: User[], entities: Wi
     }
 }
 
-function setupEcsTrustedChannel(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
-    const channel = new TrustedMutationChannel(instance.localState, { label: 'ecs-trusted' })
+function setupEcsManualChannel(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
+    const channel = new ManualChannel(instance.localState, { label: 'ecs-manual' })
     const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
     const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
     const Loadout = channel.type(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
@@ -1027,12 +1027,12 @@ function setupEcsChannelChurn(instance: Instance, users: User[], bundles: EcsBun
     }
 }
 
-function setupEcsTrustedSpatial(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
-    const channel = new TrustedMutationSpatialChannel(instance.localState, config.cellSize, {
+function setupEcsManualSpatial(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
+    const channel = new ManualSpatialChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'ecs-trusted-spatial'
+        label: 'ecs-manual-spatial'
     })
     const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
     const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
@@ -1157,8 +1157,8 @@ function setupParentChildChannel(instance: Instance, users: User[], entities: Te
     return entities.concat(children)
 }
 
-function setupParentChildTrustedChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new TrustedMutationChannel(instance.localState, { label: 'parent-child-trusted' })
+function setupParentChildManualChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel(instance.localState, { label: 'parent-child-manual' })
     const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const allEntities = entities.slice()
     for (let i = 0; i < entities.length; i++) {
@@ -1167,7 +1167,7 @@ function setupParentChildTrustedChannel(instance: Instance, users: User[], entit
     allEntities.push(...attachChildren(instance, entities, config))
     subscribeAll(channel, users)
     return () => {
-        mutateTrustedEntities(
+        mutateManualEntities(
             allEntities,
             instance.tick,
             config.moveFraction,
@@ -1178,7 +1178,7 @@ function setupParentChildTrustedChannel(instance: Instance, users: User[], entit
                 z: Entity.z,
                 rot: Entity.rot
             },
-            config.trustedEmitMode
+            config.manualEmitMode
         )
     }
 }
@@ -1209,12 +1209,12 @@ function setupParentChildCellChannel(instance: Instance, users: User[], entities
     }
 }
 
-function setupParentChildTrustedSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new TrustedMutationSpatialChannel(instance.localState, config.cellSize, {
+function setupParentChildManualSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualSpatialChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'parent-child-trusted-spatial'
+        label: 'parent-child-manual-spatial'
     })
     const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const allEntities = entities.slice()
@@ -1226,7 +1226,7 @@ function setupParentChildTrustedSpatialChannel(instance: Instance, users: User[]
         channel.subscribe(users[i], createSpatialView(i, entities, config))
     }
     return () => {
-        mutateTrustedEntities(
+        mutateManualEntities(
             allEntities,
             instance.tick,
             config.moveFraction,
@@ -1237,7 +1237,7 @@ function setupParentChildTrustedSpatialChannel(instance: Instance, users: User[]
                 z: Entity.z,
                 rot: Entity.rot
             },
-            config.trustedEmitMode
+            config.manualEmitMode
         )
     }
 }
@@ -1911,12 +1911,12 @@ function buildScenario(config: ScenarioConfig) {
         config.scenario === 'aabb-cell' ||
         config.scenario === 'cell-channel' ||
         config.scenario === 'mutation-cell-channel' ||
-        config.scenario === 'trusted-spatial-channel' ||
-        config.scenario === 'wide-trusted-spatial' ||
-        config.scenario === 'ecs-trusted-spatial' ||
+        config.scenario === 'manual-spatial-channel' ||
+        config.scenario === 'wide-manual-spatial' ||
+        config.scenario === 'ecs-manual-spatial' ||
         config.scenario === 'ecs-spatial-channel' ||
         config.scenario === 'parent-child-cell-channel' ||
-        config.scenario === 'parent-child-trusted-spatial-channel' ||
+        config.scenario === 'parent-child-manual-spatial-channel' ||
         config.scenario === 'aabb-grid-cache') {
         applySpatialDistribution(entities as TestEntity[], config)
         if (config.entityShape === 'ecs') {
@@ -1948,36 +1948,36 @@ function buildScenario(config: ScenarioConfig) {
         mutateSet = churn.liveEntities
     } else if (config.scenario === 'channel-mutation') {
         beforeStep = setupMutationChannel(instance, users, entities, config)
-    } else if (config.scenario === 'trusted-channel') {
-        beforeStep = setupTrustedChannel(instance, users, entities, config)
-    } else if (config.scenario === 'trusted-spatial-channel') {
-        beforeStep = setupTrustedSpatialChannel(instance, users, entities as TestEntity[], config)
+    } else if (config.scenario === 'manual-channel') {
+        beforeStep = setupManualChannel(instance, users, entities, config)
+    } else if (config.scenario === 'manual-spatial-channel') {
+        beforeStep = setupManualSpatialChannel(instance, users, entities as TestEntity[], config)
     } else if (config.scenario === 'wide-channel') {
         beforeStep = setupWideChannel(instance, users, entities as WideEntity[], config)
-    } else if (config.scenario === 'wide-trusted-channel') {
-        beforeStep = setupWideTrustedChannel(instance, users, entities as WideEntity[], config)
-    } else if (config.scenario === 'wide-trusted-spatial') {
-        beforeStep = setupWideTrustedSpatial(instance, users, entities as WideEntity[], config)
-    } else if (config.scenario === 'ecs-trusted-channel') {
-        beforeStep = setupEcsTrustedChannel(instance, users, ecsBundles, config)
+    } else if (config.scenario === 'wide-manual-channel') {
+        beforeStep = setupWideManualChannel(instance, users, entities as WideEntity[], config)
+    } else if (config.scenario === 'wide-manual-spatial') {
+        beforeStep = setupWideManualSpatial(instance, users, entities as WideEntity[], config)
+    } else if (config.scenario === 'ecs-manual-channel') {
+        beforeStep = setupEcsManualChannel(instance, users, ecsBundles, config)
     } else if (config.scenario === 'ecs-channel') {
         beforeStep = setupEcsChannel(instance, users, ecsBundles, config)
     } else if (config.scenario === 'ecs-channel-churn') {
         beforeStep = setupEcsChannelChurn(instance, users, ecsBundles, config)
-    } else if (config.scenario === 'ecs-trusted-spatial') {
-        beforeStep = setupEcsTrustedSpatial(instance, users, ecsBundles, config)
+    } else if (config.scenario === 'ecs-manual-spatial') {
+        beforeStep = setupEcsManualSpatial(instance, users, ecsBundles, config)
     } else if (config.scenario === 'ecs-spatial-channel') {
         beforeStep = setupEcsSpatialChannel(instance, users, ecsBundles, config)
     } else if (config.scenario === 'parent-child-channel') {
         mutateSet = setupParentChildChannel(instance, users, entities as TestEntity[], config)
-    } else if (config.scenario === 'parent-child-trusted-channel') {
-        beforeStep = setupParentChildTrustedChannel(instance, users, entities as TestEntity[], config)
+    } else if (config.scenario === 'parent-child-manual-channel') {
+        beforeStep = setupParentChildManualChannel(instance, users, entities as TestEntity[], config)
     } else if (config.scenario === 'parent-child-cell-channel') {
         const parentChildCell = setupParentChildCellChannel(instance, users, entities as TestEntity[], config)
         mutateSet = parentChildCell.allEntities
         updateSpatialIndex = parentChildCell.updateSpatialIndex
-    } else if (config.scenario === 'parent-child-trusted-spatial-channel') {
-        beforeStep = setupParentChildTrustedSpatialChannel(instance, users, entities as TestEntity[], config)
+    } else if (config.scenario === 'parent-child-manual-spatial-channel') {
+        beforeStep = setupParentChildManualSpatialChannel(instance, users, entities as TestEntity[], config)
     } else {
         setupShared(instance, users as any, entities as TestEntity[])
     }
@@ -2091,7 +2091,7 @@ function run() {
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         mutationMode: config.mutationMode,
         explicitMutationApi: config.explicitMutationApi,
-        trustedEmitMode: config.trustedEmitMode,
+        manualEmitMode: config.manualEmitMode,
         dirtyCellFullScanThreshold: config.dirtyCellFullScanThreshold,
         dirtyCellFullScanMinEntities: config.dirtyCellFullScanMinEntities,
         stepMs: {

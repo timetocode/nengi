@@ -14,8 +14,8 @@ import { AABB2D } from '../../server/AABB2D'
 import { CellChannel } from '../../server/CellChannel'
 import { Channel } from '../../server/Channel'
 import { MutationChannel } from '../../server/MutationChannel'
-import { TrustedMutationChannel } from '../../server/TrustedMutationChannel'
-import { TrustedMutationSpatialChannel } from '../../server/TrustedMutationSpatialChannel'
+import { ManualChannel } from '../../server/ManualChannel'
+import { ManualSpatialChannel } from '../../server/ManualSpatialChannel'
 import { MutationCellChannel } from '../../server/MutationCellChannel'
 import { EcsChannel } from '../../server/EcsChannel'
 import { EcsSpatialChannel } from '../../server/EcsSpatialChannel'
@@ -620,13 +620,13 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
     })
 
-    it('writes trusted grouped mutations directly', () => {
+    it('writes manual grouped mutations directly', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new TrustedMutationChannel(instance.localState)
+        const channel = new ManualChannel(instance.localState)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -656,13 +656,13 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
     })
 
-    it('writes trusted prop mutations directly', () => {
+    it('writes manual prop mutations directly', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new TrustedMutationChannel(instance.localState)
+        const channel = new ManualChannel(instance.localState)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const label = Entity.label
 
@@ -690,13 +690,13 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['label'])
     })
 
-    it('writes trusted spatial grouped mutations through cell fragments', () => {
+    it('writes manual spatial grouped mutations through cell fragments', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -726,13 +726,13 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.sharedUpdateFragments.size).toBe(1)
     })
 
-    it('writes trusted spatial grouped child mutations through the parent cell fragment', () => {
+    it('writes manual spatial grouped child mutations through the parent cell fragment', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -947,13 +947,13 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
 
-    it('updates trusted spatial visibility when movement changes occupied cells', () => {
+    it('updates manual spatial visibility when movement changes occupied cells', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
@@ -982,7 +982,7 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(entity.nid)).toBe(true)
     })
 
-    it('creates and deletes trusted spatial movers per user-visible cell set', () => {
+    it('creates and deletes manual spatial movers per user-visible cell set', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
@@ -991,7 +991,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new TrustedMutationSpatialChannel(instance.localState, 100)
+        const channel = new ManualSpatialChannel(instance.localState, 100)
         const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
