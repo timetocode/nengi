@@ -1,128 +1,47 @@
 import { Instance } from '../../server/Instance'
-import { Channel } from '../../server/Channel'
 import { User } from '../../server/User'
-import { BinarySection } from '../../common/binary/BinarySection'
 import { BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
-import { ProtocolConfig, byteSizeOfNetworkType, writeNetworkId } from '../../common/binary/Protocol'
 import { collectSnapshotPlan, MAX_RESPONSES_PER_FRAME } from './collectSnapshotPlan'
 import { commitSnapshotPlan } from './commitSnapshotPlan'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { writeSnapshot, writeSnapshotDebug } from './writeSnapshot'
 import { createBinaryDebugError } from '../BinaryDebugError'
 import { createEmptySnapshotPlan, SnapshotPlan } from './SnapshotPlan'
-import { SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
-
-type SharedUpdateChannel = Channel & {
-    entityNids: number[]
-    membershipVersion: number
-    deltaBaseVersion: number
-    createdRoots: any[]
-    deletedNids: number[]
-}
-
-type SharedMessageChannel = {
-    nid: number
-    broadcastMessages: any[]
-}
-
-type ManualUpdateChannel = SharedUpdateChannel & {
-    manualUpdateChannelMode: true
-} & ManualUpdateLog
-
-type ManualUpdateLog = {
-    manualPropNids: number[]
-    manualPropSchemas: SchemaProp[]
-    manualPropValues: any[]
-    manualGroupNids: number[]
-    manualGroupSchemas: SchemaUpdateGroup[]
-    manualGroupValueOffsets: number[]
-    manualGroupValues: any[]
-}
-
-type EcsManualUpdateLog = ManualUpdateLog & {
-    manualGroupNTypes: number[]
-}
-
-type EcsSnapshotChannel = EcsManualUpdateLog & {
-    ecsChannelMode: true
-    nid: number
-    clientIdentity?: any
-    broadcastMessages: any[]
-    createdRoots: number[]
-    deletedRoots: number[]
-    createdComponents: any[]
-    deletedComponents: number[]
-    rootDeletedComponents: number[]
-    manualGroupNTypes: number[]
-    getVisibleNetworkedNids(userId: number): number[]
-    hasStructuralDeltas(): boolean
-    isRootNid(nid: number): boolean
-    isComponentNid(nid: number): boolean
-    isRootDeletedComponentNid(nid: number): boolean
-    getComponent(nid: number): any
-}
-
-type EcsSpatialSnapshotChannel = EcsSnapshotChannel & {
-    ecsSpatialChannelMode: true
-    dirtyCells: Set<string>
-    getVisibleCellKeys(userId: number): string[]
-    getManualCellUpdateLog(cellKey: string): EcsManualUpdateLog | null
-    cellHasManualUpdates(cellKey: string): boolean
-    getMovedRoots(): { pid: number, fromCell: string, toCell: string }[]
-    hasOnlyMovementDeltas(): boolean
-    isCellVisible(userId: number, key: string): boolean
-    getRootComponents(pid: number): any[]
-}
-
-type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
-    manualSpatialChannelMode: true
-    dirtyCells: Set<string>
-    getManualCellUpdateLog(cellKey: string): ManualUpdateLog | null
-    cellHasManualUpdates(cellKey: string): boolean
-    getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
-    hasStructuralDeltas(): boolean
-}
-
-type SpatialCellChannel = {
-    nid: number
-    cellVisibilityMode: true
-    membershipVersion: number
-    fragmentCellLimit: number
-    dirtyCells: Set<string>
-    getVisibleCellKeys(userId: number): string[]
-    getVisibleEntities(userId: number): number[]
-    getCellEntities(key: string): any[]
-    getUserViewVersion(userId: number): number
-    getVisibleCellVersionSignature(userId: number): string
-}
-
-type CellFragmentChannel = {
-    nid: number
-    clientIdentity?: any
-    cellFragmentMode: true
-    membershipVersion: number
-    fragmentCellLimit: number
-    stableFragmentCellLimit: number
-    getVisibleCellKeys(userId: number): string[]
-    getVisibleEntities(userId: number): number[]
-    getCellEntities(key: string): any[]
-    getCellEntityNids(key: string): number[]
-    getCellVersion(key: string): number
-    getRememberedCellKeys(userId: number): string[]
-    getRememberedCellNids(userId: number, key: string): number[]
-    hasStableRememberedCells(userId: number): boolean
-    getStableVisibleCellKeys(userId: number): string[] | null
-    rememberVisibleCells(userId: number): void
-    getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
-    hasStructuralDeltas(): boolean
-}
-
-type MessageFragment = {
-    payload: BinaryPayload
-    bytes: number
-    messages: number
-}
+import {
+    countEcsManualUpdateBytes,
+    countManualGroupedProps,
+    countManualUpdateBytes,
+    getManualUpdateFragment,
+    ManualUpdateFragment,
+    writeEcsManualUpdates,
+    writeManualUpdates
+} from './manualUpdates'
+import {
+    CellFragmentChannel,
+    EcsSnapshotChannel,
+    EcsSpatialSnapshotChannel,
+    getEcsSnapshotChannels,
+    getSingleCellFragmentChannel,
+    getSingleEcsSnapshotChannel,
+    getSingleEcsSpatialSnapshotChannel,
+    getSingleManualUpdateChannel,
+    getSingleSharedChannel,
+    getSingleSpatialCellChannel,
+    isManualSpatialCellFragmentChannel,
+    ManualSpatialCellFragmentChannel,
+    ManualUpdateChannel,
+    SharedUpdateChannel,
+    SpatialCellChannel
+} from './channelModes'
+import {
+    collectBroadcastMessages,
+    getSharedMessageFragments,
+    sumSharedMessageFragmentBytes,
+    sumSharedMessageFragmentMessages,
+    writeSharedMessageFragments
+} from './messageFragments'
+import { writePayload } from './snapshotPayload'
 
 type EntityDeltaFragments = {
     creates: {
@@ -150,189 +69,9 @@ type CellEntityFragment = {
     groupedUpdateProps: number
 }
 
-type ManualUpdateFragment = {
-    payload: BinaryPayload
-    bytes: number
-    updateProps: number
-    updateGroups: number
-    groupedUpdateProps: number
-}
-
-function payloadBytes(payload: BinaryPayload) {
-    if (payload instanceof Uint8Array) {
-        return payload
-    }
-    if (payload instanceof ArrayBuffer) {
-        return new Uint8Array(payload)
-    }
-    return new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
-}
-
-function writePayload(writer: IBinaryWriter, payload: BinaryPayload) {
-    writer.writeBytes(payloadBytes(payload))
-}
-
-function isSharedUpdateChannel(channel: any): channel is SharedUpdateChannel {
-    return Array.isArray(channel.entityNids) &&
-        typeof channel.membershipVersion === 'number' &&
-        typeof channel.deltaBaseVersion === 'number' &&
-        Array.isArray(channel.createdRoots) &&
-        Array.isArray(channel.deletedNids) &&
-        channel.entities?.array
-}
-
-function isSharedMessageChannel(channel: any): channel is SharedMessageChannel {
-    return Array.isArray(channel.broadcastMessages)
-}
-
-function isManualUpdateChannel(channel: any): channel is ManualUpdateChannel {
-    const candidate = channel as any
-    return isSharedUpdateChannel(channel) &&
-        candidate?.manualUpdateChannelMode === true &&
-        Array.isArray(candidate.manualPropNids) &&
-        Array.isArray(candidate.manualPropSchemas) &&
-        Array.isArray(candidate.manualPropValues) &&
-        Array.isArray(candidate.manualGroupNids) &&
-        Array.isArray(candidate.manualGroupSchemas) &&
-        Array.isArray(candidate.manualGroupValueOffsets) &&
-        Array.isArray(candidate.manualGroupValues)
-}
-
-function isEcsSnapshotChannel(channel: any): channel is EcsSnapshotChannel {
-    const candidate = channel as any
-    return candidate?.ecsChannelMode === true &&
-        Array.isArray(candidate.manualPropNids) &&
-        Array.isArray(candidate.manualPropSchemas) &&
-        Array.isArray(candidate.manualPropValues) &&
-        Array.isArray(candidate.manualGroupNids) &&
-        Array.isArray(candidate.manualGroupSchemas) &&
-        Array.isArray(candidate.manualGroupValueOffsets) &&
-        Array.isArray(candidate.manualGroupValues) &&
-        typeof candidate.getVisibleNetworkedNids === 'function' &&
-        typeof candidate.hasStructuralDeltas === 'function' &&
-        typeof candidate.isRootNid === 'function' &&
-        typeof candidate.isComponentNid === 'function' &&
-        typeof candidate.isRootDeletedComponentNid === 'function' &&
-        typeof candidate.getComponent === 'function'
-}
-
-function getSingleEcsSnapshotChannel(user: User): EcsSnapshotChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isEcsSnapshotChannel(channel) ? channel : null
-}
-
-function isEcsSpatialSnapshotChannel(channel: any): channel is EcsSpatialSnapshotChannel {
-    const candidate = channel as any
-    return isEcsSnapshotChannel(channel) &&
-        candidate?.ecsSpatialChannelMode === true &&
-        candidate.dirtyCells instanceof Set &&
-        typeof candidate.getVisibleCellKeys === 'function' &&
-        typeof candidate.getManualCellUpdateLog === 'function' &&
-        typeof candidate.cellHasManualUpdates === 'function' &&
-        typeof candidate.getMovedRoots === 'function' &&
-        typeof candidate.hasOnlyMovementDeltas === 'function' &&
-        typeof candidate.isCellVisible === 'function' &&
-        typeof candidate.getRootComponents === 'function'
-}
-
-function getSingleEcsSpatialSnapshotChannel(user: User): EcsSpatialSnapshotChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isEcsSpatialSnapshotChannel(channel) ? channel : null
-}
-
-function getEcsSnapshotChannels(user: User): EcsSnapshotChannel[] {
-    const channels: EcsSnapshotChannel[] = []
-    for (const channel of user.subscriptions.values()) {
-        if (isEcsSnapshotChannel(channel)) {
-            channels.push(channel)
-        }
-    }
-    return channels
-}
-
-function isSpatialCellChannel(channel: any): channel is SpatialCellChannel {
-    return channel?.cellVisibilityMode === true &&
-        typeof channel.membershipVersion === 'number' &&
-        typeof channel.fragmentCellLimit === 'number' &&
-        channel.dirtyCells instanceof Set &&
-        typeof channel.getVisibleCellKeys === 'function' &&
-        typeof channel.getVisibleEntities === 'function' &&
-        typeof channel.getCellEntities === 'function' &&
-        typeof channel.getUserViewVersion === 'function' &&
-        typeof channel.getVisibleCellVersionSignature === 'function'
-}
-
-function isCellFragmentChannel(channel: any): channel is CellFragmentChannel {
-    return channel?.cellFragmentMode === true &&
-        typeof channel.membershipVersion === 'number' &&
-        typeof channel.fragmentCellLimit === 'number' &&
-        typeof channel.stableFragmentCellLimit === 'number' &&
-        typeof channel.getVisibleCellKeys === 'function' &&
-        typeof channel.getVisibleEntities === 'function' &&
-        typeof channel.getCellEntities === 'function' &&
-        typeof channel.getCellEntityNids === 'function' &&
-        typeof channel.getCellVersion === 'function' &&
-        typeof channel.getRememberedCellKeys === 'function' &&
-        typeof channel.getRememberedCellNids === 'function' &&
-        typeof channel.hasStableRememberedCells === 'function' &&
-        typeof channel.getStableVisibleCellKeys === 'function' &&
-        typeof channel.rememberVisibleCells === 'function' &&
-        typeof channel.getMovedRoots === 'function' &&
-        typeof channel.hasStructuralDeltas === 'function'
-}
-
-function isManualSpatialCellFragmentChannel(channel: any): channel is ManualSpatialCellFragmentChannel {
-    const candidate = channel as any
-    return isCellFragmentChannel(channel) &&
-        candidate?.manualSpatialChannelMode === true &&
-        candidate.dirtyCells instanceof Set &&
-        typeof candidate.getManualCellUpdateLog === 'function' &&
-        typeof candidate.cellHasManualUpdates === 'function' &&
-        typeof candidate.getMovedRoots === 'function' &&
-        typeof candidate.hasStructuralDeltas === 'function'
-}
-
-function getSingleSharedChannel(user: User): SharedUpdateChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isSharedUpdateChannel(channel) ? channel : null
-}
-
-function getSingleManualUpdateChannel(user: User): ManualUpdateChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isManualUpdateChannel(channel) ? channel : null
-}
-
-function getSingleSpatialCellChannel(user: User): SpatialCellChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isSpatialCellChannel(channel) ? channel : null
-}
-
 function canUseSharedUpdateFragment(user: User, channel: SharedUpdateChannel) {
     return user.sharedChannelVersions.get(channel.nid) === channel.membershipVersion &&
         user.currentlyVisible.length === countChannelVisibleEntities(user.instance!, channel)
-}
-
-function getSingleCellFragmentChannel(user: User): CellFragmentChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isCellFragmentChannel(channel) ? channel : null
 }
 
 function canUseSpatialCellFragments(user: User, channel: SpatialCellChannel) {
@@ -357,100 +96,6 @@ function canUseSharedDeltaFragments(user: User, channel: SharedUpdateChannel) {
 
 function hasChannelDeltas(channel: SharedUpdateChannel) {
     return channel.deltaBaseVersion !== channel.membershipVersion
-}
-
-function collectBroadcastMessages(user: User) {
-    const messages: any[] = []
-    user.subscriptions.forEach((channel: any) => {
-        if (isSharedMessageChannel(channel) && channel.broadcastMessages.length > 0) {
-            for (let i = 0; i < channel.broadcastMessages.length; i++) {
-                messages.push(channel.broadcastMessages[i])
-            }
-        }
-    })
-    return messages
-}
-
-function getSharedMessageFragment(user: User, instance: Instance, channel: SharedMessageChannel): MessageFragment {
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:${protocol.ntypeType}`
-    const cached = instance.network.sharedMessageFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedMessageFragmentHit()
-        return cached
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-    const plan = createEmptySnapshotPlan()
-    plan.messages = channel.broadcastMessages
-
-    if (measure) {
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        messages: channel.broadcastMessages.length
-    }
-    instance.network.sharedMessageFragments.set(key, fragment)
-    instance.network.recordSharedMessageFragmentBuild({ countMs, writeMs, bytes, messages: fragment.messages })
-    return fragment
-}
-
-function getSharedMessageFragments(user: User, instance: Instance) {
-    if (instance.network.debugBinaryWrites) {
-        return []
-    }
-
-    const fragments: MessageFragment[] = []
-    user.subscriptions.forEach((channel: any) => {
-        if (isSharedMessageChannel(channel) && channel.broadcastMessages.length > 0) {
-            fragments.push(getSharedMessageFragment(user, instance, channel))
-        }
-    })
-    return fragments
-}
-
-function sumSharedMessageFragmentBytes(fragments: ReturnType<typeof getSharedMessageFragments>) {
-    let bytes = 0
-    for (let i = 0; i < fragments.length; i++) {
-        bytes += fragments[i].bytes
-    }
-    return bytes
-}
-
-function sumSharedMessageFragmentMessages(fragments: ReturnType<typeof getSharedMessageFragments>) {
-    let messages = 0
-    for (let i = 0; i < fragments.length; i++) {
-        messages += fragments[i].messages
-    }
-    return messages
-}
-
-function writeSharedMessageFragments(writer: IBinaryWriter, instance: Instance, fragments: ReturnType<typeof getSharedMessageFragments>) {
-    for (let i = 0; i < fragments.length; i++) {
-        const fragment = fragments[i]
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0
-        writePayload(writer, fragment.payload)
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedMessageFragmentCopy(performance.now() - copyStart, fragment.bytes)
-        }
-    }
 }
 
 function writeEntityDeltaFragments(writer: IBinaryWriter, instance: Instance, fragments: EntityDeltaFragments) {
@@ -1191,237 +836,6 @@ function getSharedUpdateFragment(user: User, instance: Instance, channel: Shared
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })
-    return fragment
-}
-
-function countManualGroupUpdates(channel: ManualUpdateLog, protocol: ProtocolConfig) {
-    const count = channel.manualGroupNids.length
-    if (count === 0) {
-        return 0
-    }
-
-    let bytes = 1 + 4
-    const nidBytes = byteSizeOfNetworkType(protocol.nidType)
-    const values = channel.manualGroupValues
-    for (let i = 0; i < count; i++) {
-        const group = channel.manualGroupSchemas[i]
-        let offset = channel.manualGroupValueOffsets[i]
-        bytes += nidBytes + 1
-        for (let j = 0; j < group.props.length; j++) {
-            bytes += group.props[j].binary.byteSize(values[offset++])
-        }
-    }
-    return bytes
-}
-
-function countManualPropUpdates(channel: ManualUpdateLog, protocol: ProtocolConfig) {
-    const count = channel.manualPropNids.length
-    if (count === 0) {
-        return 0
-    }
-
-    let bytes = 1 + 4
-    const nidBytes = byteSizeOfNetworkType(protocol.nidType)
-    const props = channel.manualPropSchemas
-    const values = channel.manualPropValues
-    for (let i = 0; i < count; i++) {
-        bytes += nidBytes + 1 + props[i].binary.byteSize(values[i])
-    }
-    return bytes
-}
-
-function writeManualPropUpdates(channel: ManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const count = channel.manualPropNids.length
-    if (count === 0) {
-        return
-    }
-
-    writer.writeUInt8(BinarySection.UpdateEntities)
-    writer.writeUInt32(count)
-    const nids = channel.manualPropNids
-    const props = channel.manualPropSchemas
-    const values = channel.manualPropValues
-    for (let i = 0; i < count; i++) {
-        writeNetworkId(nids[i], protocol.nidType, writer)
-        writer.writeUInt8(props[i].key)
-        props[i].binary.write(values[i], writer)
-    }
-}
-
-function writeManualGroupUpdates(channel: ManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const count = channel.manualGroupNids.length
-    if (count === 0) {
-        return
-    }
-
-    writer.writeUInt8(BinarySection.UpdateEntityGroups)
-    writer.writeUInt32(count)
-    const nids = channel.manualGroupNids
-    const groups = channel.manualGroupSchemas
-    const offsets = channel.manualGroupValueOffsets
-    const values = channel.manualGroupValues
-    for (let i = 0; i < count; i++) {
-        const group = groups[i]
-        let offset = offsets[i]
-        writeNetworkId(nids[i], protocol.nidType, writer)
-        writer.writeUInt8(group.key)
-        for (let j = 0; j < group.props.length; j++) {
-            group.props[j].binary.write(values[offset++], writer)
-        }
-    }
-}
-
-function countManualUpdateBytes(channel: ManualUpdateLog, protocol: ProtocolConfig) {
-    return countManualPropUpdates(channel, protocol) + countManualGroupUpdates(channel, protocol)
-}
-
-function writeManualUpdates(channel: ManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    writeManualPropUpdates(channel, writer, protocol)
-    writeManualGroupUpdates(channel, writer, protocol)
-}
-
-type ManualGroupBatch = {
-    ntype: number
-    group: SchemaUpdateGroup
-    count: number
-}
-
-function collectManualGroupBatches(channel: EcsManualUpdateLog) {
-    const batches: ManualGroupBatch[] = []
-    const ntypes = channel.manualGroupNTypes
-    const groups = channel.manualGroupSchemas
-
-    for (let i = 0; i < groups.length; i++) {
-        const ntype = ntypes[i]
-        const group = groups[i]
-        let batch: ManualGroupBatch | null = null
-        for (let j = 0; j < batches.length; j++) {
-            const candidate = batches[j]
-            if (candidate.ntype === ntype && candidate.group.key === group.key) {
-                batch = candidate
-                break
-            }
-        }
-        if (batch) {
-            batch.count++
-        } else {
-            batches.push({ ntype, group, count: 1 })
-        }
-    }
-
-    return batches
-}
-
-function countEcsManualUpdateBytes(channel: EcsManualUpdateLog, protocol: ProtocolConfig) {
-    let bytes = countManualPropUpdates(channel, protocol)
-    const batches = collectManualGroupBatches(channel)
-    const nidBytes = byteSizeOfNetworkType(protocol.nidType)
-    const ntypeBytes = byteSizeOfNetworkType(protocol.ntypeType)
-    const ntypes = channel.manualGroupNTypes
-    const groups = channel.manualGroupSchemas
-    const offsets = channel.manualGroupValueOffsets
-    const values = channel.manualGroupValues
-
-    for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i]
-        bytes += 1 + ntypeBytes + 1 + 4
-        for (let j = 0; j < groups.length; j++) {
-            const group = groups[j]
-            if (ntypes[j] !== batch.ntype || group.key !== batch.group.key) {
-                continue
-            }
-            bytes += nidBytes
-            let offset = offsets[j]
-            for (let k = 0; k < group.props.length; k++) {
-                bytes += group.props[k].binary.byteSize(values[offset++])
-            }
-        }
-    }
-
-    return bytes
-}
-
-function writeEcsManualGroupUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const batches = collectManualGroupBatches(channel)
-    const nids = channel.manualGroupNids
-    const ntypes = channel.manualGroupNTypes
-    const groups = channel.manualGroupSchemas
-    const offsets = channel.manualGroupValueOffsets
-    const values = channel.manualGroupValues
-
-    for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i]
-        writer.writeUInt8(BinarySection.EcsUpdateComponentGroups)
-        writeNetworkId(batch.ntype, protocol.ntypeType, writer)
-        writer.writeUInt8(batch.group.key)
-        writer.writeUInt32(batch.count)
-
-        for (let j = 0; j < groups.length; j++) {
-            const group = groups[j]
-            if (ntypes[j] !== batch.ntype || group.key !== batch.group.key) {
-                continue
-            }
-            let offset = offsets[j]
-            writeNetworkId(nids[j], protocol.nidType, writer)
-            for (let k = 0; k < group.props.length; k++) {
-                group.props[k].binary.write(values[offset++], writer)
-            }
-        }
-    }
-}
-
-function writeEcsManualUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    writeManualPropUpdates(channel, writer, protocol)
-    writeEcsManualGroupUpdates(channel, writer, protocol)
-}
-
-function countManualGroupedProps(channel: ManualUpdateLog) {
-    let props = 0
-    const groups = channel.manualGroupSchemas
-    for (let i = 0; i < groups.length; i++) {
-        props += groups[i].props.length
-    }
-    return props
-}
-
-function getManualUpdateFragment(user: User, instance: Instance, channel: EcsManualUpdateLog & { nid: number }, keyPrefix: string) {
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:${keyPrefix}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedUpdateFragments.get(key) as ManualUpdateFragment | undefined
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-
-    if (measure) {
-        countStart = performance.now()
-    }
-    const bytes = countEcsManualUpdateBytes(channel, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeEcsManualUpdates(channel, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        updateProps: channel.manualPropNids.length,
-        updateGroups: channel.manualGroupNids.length,
-        groupedUpdateProps: countManualGroupedProps(channel)
-    }
-    instance.network.sharedUpdateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
     return fragment
 }
 
