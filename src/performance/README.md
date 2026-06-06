@@ -21,7 +21,7 @@ npm run profile:snapshot
 Useful knobs:
 
 ```bash
-PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | cell-channel | manual-channel | manual-spatial-channel | ecs-channel | ecs-spatial-channel
+PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel | manual-channel | manual-spatial-channel | ecs-channel | ecs-spatial-channel
 PROFILE_USERS=20
 PROFILE_ENTITIES=1000
 PROFILE_VISIBLE=1000
@@ -55,7 +55,7 @@ Scenarios:
   world.
 - `non-overlap`: users each see a different fixed slice. This tests whether an
   optimization only helps shared visibility.
-- `cell-channel`: whole-cell spatial visibility workload through `CellChannel`,
+- `spatial-channel`: whole-cell spatial visibility workload through `SpatialChannel`,
   using per-cell create/update/delete fragments.
   `PROFILE_STABLE_FRAGMENT_CELL_LIMIT` allows stable views to use more copied
   cell fragments than unstable CRUD frames, while keeping broad churny views on
@@ -72,7 +72,7 @@ Scenarios:
   without diffing, cloning, schema-name lookup, or cache updates. The generated
   type object also exposes `props` and `groups` namespaces when a schema name
   collides with a reserved/root name.
-- `manual-spatial-channel`: experimental manual spatial cell channel. Users
+- `manual-spatial-channel`: experimental manual spatial channel. Users
   subscribe with AABB views, entities are bucketed by cell, and generated
   manual writers record updates into per-cell logs. Stable-view snapshots skip
   generic visibility/diff collection and copy only dirty visible cell fragments.
@@ -80,7 +80,7 @@ Scenarios:
   prop writes instead of one grouped write, which is useful for comparing binary
   representations.
 - `parent-child-channel`, `parent-child-manual-channel`,
-  `parent-child-cell-channel`, and `parent-child-manual-spatial-channel`:
+  `parent-child-spatial-channel`, and `parent-child-manual-spatial-channel`:
   parent/child variants for the four intended public channel shapes.
   `PROFILE_ENTITIES` is the number of parent roots and `PROFILE_CHILDREN`
   attaches that many child entities to each root. The steady-state benchmark

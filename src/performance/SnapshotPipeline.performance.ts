@@ -4,7 +4,7 @@ import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { IEntity } from '../common/IEntity'
 import { AABB2D } from '../server/AABB2D'
-import { CellChannel } from '../server/CellChannel'
+import { SpatialChannel } from '../server/SpatialChannel'
 import { Channel } from '../server/Channel'
 import { ManualChannel } from '../server/ManualChannel'
 import { ManualSpatialChannel } from '../server/ManualSpatialChannel'
@@ -30,7 +30,7 @@ type ScenarioName =
     | 'players-300'
     | 'sparse-visible'
     | 'non-overlap'
-    | 'cell-channel'
+    | 'spatial-channel'
     | 'manual-channel'
     | 'manual-spatial-channel'
     | 'wide-channel'
@@ -43,7 +43,7 @@ type ScenarioName =
     | 'ecs-manual-spatial'
     | 'parent-child-channel'
     | 'parent-child-manual-channel'
-    | 'parent-child-cell-channel'
+    | 'parent-child-spatial-channel'
     | 'parent-child-manual-spatial-channel'
     | 'channel-churn'
 
@@ -52,7 +52,7 @@ const SCENARIOS = new Set<ScenarioName>([
     'players-300',
     'sparse-visible',
     'non-overlap',
-    'cell-channel',
+    'spatial-channel',
     'manual-channel',
     'manual-spatial-channel',
     'wide-channel',
@@ -65,7 +65,7 @@ const SCENARIOS = new Set<ScenarioName>([
     'ecs-manual-spatial',
     'parent-child-channel',
     'parent-child-manual-channel',
-    'parent-child-cell-channel',
+    'parent-child-spatial-channel',
     'parent-child-manual-spatial-channel',
     'channel-churn'
 ])
@@ -1076,8 +1076,8 @@ function setupParentChildManualChannel(instance: Instance, users: User[], entiti
     }
 }
 
-function setupParentChildCellChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new CellChannel(instance.localState, config.cellSize, {
+function setupParentChildSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new SpatialChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
@@ -1173,12 +1173,12 @@ function createSpatialView(userIndex: number, entities: TestEntity[], config: Sc
     return new AABB2D(entity.x, entity.y, config.viewHalf, config.viewHalf)
 }
 
-function setupCellChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new CellChannel(instance.localState, config.cellSize, {
+function setupSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new SpatialChannel(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'cell-channel'
+        label: 'spatial-channel'
     })
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1253,12 +1253,12 @@ function buildScenario(config: ScenarioConfig) {
             entities.push(createEntity(i))
         }
     }
-    if (config.scenario === 'cell-channel' ||
+    if (config.scenario === 'spatial-channel' ||
         config.scenario === 'manual-spatial-channel' ||
         config.scenario === 'wide-manual-spatial' ||
         config.scenario === 'ecs-manual-spatial' ||
         config.scenario === 'ecs-spatial-channel' ||
-        config.scenario === 'parent-child-cell-channel' ||
+        config.scenario === 'parent-child-spatial-channel' ||
         config.scenario === 'parent-child-manual-spatial-channel') {
         applySpatialDistribution(entities as TestEntity[], config)
         if (config.entityShape === 'ecs') {
@@ -1274,8 +1274,8 @@ function buildScenario(config: ScenarioConfig) {
     let mutateSet = entities
     if (config.scenario === 'sparse-visible' || config.scenario === 'non-overlap') {
         setupFixedVisible(instance, users, entities, config)
-    } else if (config.scenario === 'cell-channel') {
-        updateSpatialIndex = setupCellChannel(instance, users, entities, config)
+    } else if (config.scenario === 'spatial-channel') {
+        updateSpatialIndex = setupSpatialChannel(instance, users, entities, config)
     } else if (config.scenario === 'channel-churn') {
         const churn = setupChannelChurn(instance, users, entities, config)
         beforeStep = churn.churn
@@ -1304,10 +1304,10 @@ function buildScenario(config: ScenarioConfig) {
         mutateSet = setupParentChildChannel(instance, users, entities as TestEntity[], config)
     } else if (config.scenario === 'parent-child-manual-channel') {
         beforeStep = setupParentChildManualChannel(instance, users, entities as TestEntity[], config)
-    } else if (config.scenario === 'parent-child-cell-channel') {
-        const parentChildCell = setupParentChildCellChannel(instance, users, entities as TestEntity[], config)
-        mutateSet = parentChildCell.allEntities
-        updateSpatialIndex = parentChildCell.updateSpatialIndex
+    } else if (config.scenario === 'parent-child-spatial-channel') {
+        const parentChildSpatial = setupParentChildSpatialChannel(instance, users, entities as TestEntity[], config)
+        mutateSet = parentChildSpatial.allEntities
+        updateSpatialIndex = parentChildSpatial.updateSpatialIndex
     } else if (config.scenario === 'parent-child-manual-spatial-channel') {
         beforeStep = setupParentChildManualSpatialChannel(instance, users, entities as TestEntity[], config)
     } else {

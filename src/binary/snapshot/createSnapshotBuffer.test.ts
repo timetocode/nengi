@@ -11,7 +11,7 @@ import { Context } from '../../common/Context'
 import { ResponseStatus } from '../../common/Endpoint'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { AABB2D } from '../../server/AABB2D'
-import { CellChannel } from '../../server/CellChannel'
+import { SpatialChannel } from '../../server/SpatialChannel'
 import { Channel } from '../../server/Channel'
 import { ManualChannel } from '../../server/ManualChannel'
 import { ManualSpatialChannel } from '../../server/ManualSpatialChannel'
@@ -1025,7 +1025,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1057,13 +1057,13 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.get(entity.nid)?.x).toBe(11)
     })
 
-    it('records explicit dirty hints without requiring them for implicit CellChannel updates', () => {
+    it('records explicit dirty hints without requiring them for implicit SpatialChannel updates', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
@@ -1102,7 +1102,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1147,11 +1147,11 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.entities.has(entity.nid)).toBe(false)
     })
 
-    it('keeps CellChannel visible cell keys cached for movement between populated cells', () => {
+    it('keeps SpatialChannel visible cell keys cached for movement between populated cells', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
-        const channel = new CellChannel(instance.localState, 100)
+        const channel = new SpatialChannel(instance.localState, 100)
 
         channel.subscribe(user, new AABB2D(100, 50, 150, 75))
         const first = channel.addEntity({
@@ -1184,11 +1184,11 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0', '1:0'])
     })
 
-    it('rebuilds CellChannel visible cell keys when movement changes occupied cells', () => {
+    it('rebuilds SpatialChannel visible cell keys when movement changes occupied cells', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
-        const channel = new CellChannel(instance.localState, 100)
+        const channel = new SpatialChannel(instance.localState, 100)
 
         channel.subscribe(user, new AABB2D(100, 50, 150, 75))
         const entity = channel.addEntity({
@@ -1206,7 +1206,7 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['1:0'])
     })
 
-    it('spatially culls CellChannel messages instead of broadcasting them', () => {
+    it('spatially culls SpatialChannel messages instead of broadcasting them', () => {
         const context = createContext()
         const instance = new Instance(context)
         const firstUser = createUser(instance)
@@ -1214,7 +1214,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1232,13 +1232,13 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.messages).toEqual([])
     })
 
-    it('keeps same-cell CellChannel creates on the normal create path', () => {
+    it('keeps same-cell SpatialChannel creates on the normal create path', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
@@ -1269,13 +1269,13 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
     })
 
-    it('keeps same-cell CellChannel removes on the normal delete path', () => {
+    it('keeps same-cell SpatialChannel removes on the normal delete path', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
@@ -1309,7 +1309,7 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
     })
 
-    it('updates CellChannel visibility correctly when an entity moves between cells', () => {
+    it('updates SpatialChannel visibility correctly when an entity moves between cells', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
@@ -1318,7 +1318,7 @@ describe('server snapshot pipeline', () => {
         secondUser.id = 2
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(firstUser.id, firstUser)
         instance.users.set(secondUser.id, secondUser)
@@ -1353,13 +1353,13 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.get(nid)?.x).toBe(60)
     })
 
-    it('orders CellChannel leave-cell tree deletes from child to parent', () => {
+    it('orders SpatialChannel leave-cell tree deletes from child to parent', () => {
         const context = createContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const channel = new CellChannel(instance.localState, 50)
+        const channel = new SpatialChannel(instance.localState, 50)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))

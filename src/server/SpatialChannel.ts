@@ -9,7 +9,7 @@ import { User } from './User'
 type CellEntity = IEntity & Point2D
 type CellRef = { key: string, index: number }
 type Cell = { key: string, x: number, y: number, entities: CellEntity[], entityNids: number[], version: number }
-export type CellMove = { entity: CellEntity, fromCell: string, toCell: string }
+export type SpatialMove = { entity: CellEntity, fromCell: string, toCell: string }
 
 function pointInAABB2D(p: Point2D, view: AABB2D) {
     const startX = view.x - view.halfWidth
@@ -25,13 +25,13 @@ function pointInAABB2D(p: Point2D, view: AABB2D) {
     )
 }
 
-export type CellChannelOptions = ChannelOptions & {
+export type SpatialChannelOptions = ChannelOptions & {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
 }
 
-export class CellChannel implements ICulledChannel<Point2D, AABB2D> {
+export class SpatialChannel implements ICulledChannel<Point2D, AABB2D> {
     readonly cellFragmentMode = true
     private channel: Channel
     protected localState: LocalState
@@ -44,7 +44,7 @@ export class CellChannel implements ICulledChannel<Point2D, AABB2D> {
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
     private rememberedCells: Map<number, Map<string, number[]>> = new Map()
     private rememberedCellSignatures: Map<number, string> = new Map()
-    private movedRoots: CellMove[] = []
+    private movedRoots: SpatialMove[] = []
     private structuralDeltas = false
     cellSize: number
     queryPadding: number
@@ -54,12 +54,12 @@ export class CellChannel implements ICulledChannel<Point2D, AABB2D> {
     users: Map<number, User> = new Map()
     visibilityResolver = pointInAABB2D
 
-    constructor(localState: LocalState, cellSize: number, options: CellChannelOptions = {}) {
+    constructor(localState: LocalState, cellSize: number, options: SpatialChannelOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
-            throw new Error('CellChannel requires a positive finite cell size.')
+            throw new Error('SpatialChannel requires a positive finite cell size.')
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
-            throw new Error('CellChannel queryPadding must be a non-negative finite number.')
+            throw new Error('SpatialChannel queryPadding must be a non-negative finite number.')
         }
         this.localState = localState
         this.channel = new Channel(localState, options)
