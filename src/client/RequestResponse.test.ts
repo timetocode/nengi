@@ -4,12 +4,13 @@ import { Binary } from '../common/binary/Binary'
 import { defineEntitySchema, defineMessageSchema, definePayloadSchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { MAX_UINT32, RequestPolicy, defineEndpoint } from '../common/Endpoint'
-import { Channel } from '../server/Channel'
+import { Channel } from '../server/channel/Channel'
 import { Instance } from '../server/Instance'
 import { User } from '../server/User'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 import { ClientNetwork } from './ClientNetwork'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
+import { Predictor } from './prediction/Predictor'
 
 function createUser(instance: Instance) {
     const user = new User(undefined, {
@@ -28,10 +29,7 @@ function createClientNetwork(context: Context) {
         serverTickRate: 20,
         disconnectHandler: jest.fn(),
         websocketErrorHandler: jest.fn(),
-        predictor: {
-            getErrors: jest.fn(() => ({ entities: new Map() })),
-            cleanUp: jest.fn()
-        },
+        predictor: new Predictor(),
         network: undefined as unknown as ClientNetwork
     }
     const network = new ClientNetwork(client as any)
@@ -220,6 +218,66 @@ describe('request/response', () => {
         })
     })
 
+    it('reconciles request prediction before callback and promise observers run', async () => {
+        const context = new Context()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const localSwitch = { open: false }
+        const callbackStates: boolean[] = []
+
+        const setSwitch = defineEndpoint<
+            { nid: number, open: boolean },
+            { accepted: boolean, open: boolean }
+        >(16, {
+            requestSchema: definePayloadSchema({
+                nid: Binary.UInt32,
+                open: Binary.Boolean
+            }),
+            responseSchema: definePayloadSchema({
+                accepted: Binary.Boolean,
+                open: Binary.Boolean
+            })
+        })
+
+        instance.respond(setSwitch, () => {
+            return {
+                accepted: false,
+                open: false
+            }
+        })
+
+        const response = clientNetwork.request(setSwitch, { nid: 1, open: true }, {
+            timeoutMs: 0,
+            prediction: {
+                affected: [{ nid: 1, props: ['open'] }],
+                applyLocal: () => {
+                    localSwitch.open = true
+                },
+                validate: ({ response }) => response!.accepted,
+                reconcile: ({ accepted, response }) => {
+                    if (!accepted) {
+                        localSwitch.open = response!.open
+                    }
+                }
+            },
+            callback: () => {
+                callbackStates.push(localSwitch.open)
+            }
+        })
+
+        expect(localSwitch.open).toBe(true)
+        deliverRequestAndResponse(instance, user, clientNetwork)
+
+        await expect(response).resolves.toEqual({
+            accepted: false,
+            open: false
+        })
+        expect(callbackStates).toEqual([false])
+        expect(localSwitch.open).toBe(false)
+        expect(clientNetwork.client.predictor.log.getPendingRequests()).toEqual([])
+    })
+
     it('supports send-style handlers and client callbacks', async () => {
         const context = new Context()
         const instance = new Instance(context)
@@ -281,18 +339,15 @@ describe('request/response', () => {
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const inventoryChannel = new Channel(instance.localState, {
-            label: 'chest:123:inventory',
-            clientIdentity: {
-                kind: 'container',
-                chestNid: 123
-            }
-        })
-        const inventory = inventoryChannel.addEntity({
+        const inventory = {
             nid: 0,
             ntype: NType.Inventory,
             chestNid: 123,
             slots: 27
+        }
+        const inventoryChannel = new Channel(instance.localState, {
+            label: 'chest:123:inventory',
+            header: inventory
         })
         const item = inventoryChannel.addEntity({
             nid: 0,
@@ -332,7 +387,7 @@ describe('request/response', () => {
         const response = clientNetwork.request(openChest, { chestNid: 123 }, {
             timeoutMs: 0,
             callback: value => {
-                callbackSawInventory = !!clientNetwork.store.get(value.inventoryNid!)
+                callbackSawInventory = clientNetwork.store.getChannelHeader(inventoryChannel.nid)?.nid === value.inventoryNid
             }
         })
         deliverRequestAndResponse(instance, user, clientNetwork)
@@ -343,17 +398,16 @@ describe('request/response', () => {
             inventoryNid: inventory.nid
         })
         expect(clientNetwork.latestFrame?.createEntities).toEqual([
-            inventory,
             item
         ])
         expect(clientNetwork.store.get(item.nid)?.inventoryNid).toBe(inventory.nid)
         expect(clientNetwork.store.getChannelId(item.nid)).toBe(inventoryChannel.nid)
-        expect(clientNetwork.store.getChannelIdentity(item.nid)).toEqual({
-            kind: 'container',
-            chestNid: 123
+        expect(clientNetwork.store.getChannelHeader(item.nid)).toMatchObject({
+            ntype: NType.Inventory,
+            chestNid: 123,
+            slots: 27
         })
         expect(clientNetwork.store.getByChannel(inventoryChannel.nid)).toEqual([
-            inventory,
             item
         ])
         expect(callbackSawInventory).toBe(true)

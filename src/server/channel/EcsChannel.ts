@@ -1,8 +1,8 @@
-import { Schema, SchemaProp, SchemaUpdateGroup } from '../common/binary/schema/Schema'
-import { IEntity } from '../common/IEntity'
+import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { IEntity } from '../../common/IEntity'
+import { LocalState } from '../LocalState'
+import { User } from '../User'
 import { IChannel } from './IChannel'
-import { LocalState } from './LocalState'
-import { User } from './User'
 
 export type EcsComponent = IEntity & { pid: number }
 
@@ -16,16 +16,19 @@ export type EcsTypeWriters = {
 
 export type EcsChannelOptions = {
     label?: string
-    clientIdentity?: any
+    header?: IEntity
 }
 
 export class EcsChannel implements IChannel {
+    // ECS channels are manual by design: roots are nids, components carry the
+    // replicated state, and userland component writers append the mutation log.
     readonly ecsChannelMode = true
     nid: number
     label?: string
-    clientIdentity?: any
     localState: LocalState
     users: Map<number, User> = new Map()
+    header: IEntity | null = null
+    headerVersion = 0
     rootNids: number[] = []
     componentNids: number[] = []
     membershipVersion = 0
@@ -53,14 +56,19 @@ export class EcsChannel implements IChannel {
         this.localState = localState
         this.nid = localState.nextNetworkId()
         this.label = options.label
-        this.clientIdentity = options.clientIdentity
         this.localState.channels.add(this)
+        if (options.header) {
+            this.setHeader(options.header)
+        }
     }
 
     tick(tick: number) {
     }
 
     createEntity() {
+        // In the ECS model a root entity is only a network id. All replicated
+        // data lives on components, which keeps root CRUD cheap and avoids
+        // pretending there is a monolithic entity object to scan.
         const nid = this.localState.nextNetworkId()
         this.rootNids.push(nid)
         this.rootSet.add(nid)
@@ -75,10 +83,35 @@ export class EcsChannel implements IChannel {
         return this.createEntity()
     }
 
+    setHeader(header: IEntity) {
+        if (this.header !== null && this.header !== header) {
+            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().')
+        }
+        if (this.header === header) {
+            return header
+        }
+        this.localState.registerEntity(header, this.nid)
+        this.header = header
+        this.headerVersion++
+        return header
+    }
+
+    getHeader() {
+        return this.header
+    }
+
+    markHeaderDirty() {
+        if (!this.header) {
+            return false
+        }
+        this.headerVersion++
+        return true
+    }
+
     removeEntity(pidOrEntity: number | IEntity) {
         const pid = typeof pidOrEntity === 'number' ? pidOrEntity : pidOrEntity.nid
         if (!this.rootSet.has(pid)) {
-            return
+            return 0
         }
 
         const components = this.componentsByRoot.get(pid) || []
@@ -101,6 +134,7 @@ export class EcsChannel implements IChannel {
         this.localState.nidPool.returnId(pid)
         this.membershipVersion++
         this.visibleNetworkedNidsCache = null
+        return pid
     }
 
     removeAllEntities() {
@@ -220,6 +254,39 @@ export class EcsChannel implements IChannel {
         Array.from(this.users.values()).forEach(user => this.unsubscribe(user))
     }
 
+    destroy() {
+        this.unsubscribeAll()
+        this.removeAllEntities()
+        if (this.header) {
+            this.localState.unregisterEntity(this.header, this.nid)
+            this.header = null
+            this.headerVersion++
+        }
+        this.localState.nidPool.returnId(this.nid)
+        this.localState.channels.delete(this)
+        this.rootNids.length = 0
+        this.componentNids.length = 0
+        this.createdRoots.length = 0
+        this.deletedRoots.length = 0
+        this.createdComponents.length = 0
+        this.deletedComponents.length = 0
+        this.rootDeletedComponents.length = 0
+        this.manualPropNids.length = 0
+        this.manualPropSchemas.length = 0
+        this.manualPropValues.length = 0
+        this.manualGroupNids.length = 0
+        this.manualGroupNTypes.length = 0
+        this.manualGroupSchemas.length = 0
+        this.manualGroupValueOffsets.length = 0
+        this.manualGroupValues.length = 0
+        this.broadcastMessages.length = 0
+        this.rootSet.clear()
+        this.componentSet.clear()
+        this.componentsByRoot.clear()
+        this.componentByNid.clear()
+        this.visibleNetworkedNidsCache = null
+    }
+
     addMessage(message: any) {
         this.broadcastMessages.push(message)
     }
@@ -256,10 +323,18 @@ export class EcsChannel implements IChannel {
         const groups: EcsTypeWriters['groups'] = Object.create(null)
         const writers: EcsTypeWriters = { ntype, schema, props, groups }
 
+        const aliases = new Set<string>()
+        const blockedAliases = new Set(['ntype', 'schema', 'props', 'groups'])
         const addAlias = (name: string, writer: any) => {
-            if (name === 'ntype' || name === 'schema' || name === 'props' || name === 'groups') {
+            if (blockedAliases.has(name)) {
                 return
             }
+            if (aliases.has(name)) {
+                delete writers[name]
+                blockedAliases.add(name)
+                return
+            }
+            aliases.add(name)
             writers[name] = writer
         }
 
@@ -334,7 +409,4 @@ export class EcsChannel implements IChannel {
         return writers
     }
 
-    type(ntype: number, schema: Schema): EcsTypeWriters {
-        return this.createComponentWriter(ntype, schema)
-    }
 }

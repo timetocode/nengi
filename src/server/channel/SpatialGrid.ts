@@ -170,6 +170,9 @@ export class SpatialGrid2D<T> {
     }
 
     getVisibleCellKeysInCircle(x: number, y: number, radius: number) {
+        // Circle culling is coarse: include any occupied cell touched by the
+        // circle and let gameplay/client logic tolerate the cell-sized margin.
+        // Per-entity circle checks would erase much of the spatial win.
         const range = {
             minX: this.cellCoord(x - radius),
             maxX: this.cellCoordForEnd(x + radius),
@@ -336,6 +339,9 @@ export class SpatialGrid3D<T> {
     }
 
     getVisibleCellKeysInSphere(x: number, y: number, z: number, radius: number) {
+        // Sphere culling follows the same coarse-cell rule as 2D circles. The
+        // channel avoids per-entity tests so large 3D views remain grid-bound
+        // instead of entity-count-bound.
         const range = {
             minX: this.cellCoord(x - radius),
             maxX: this.cellCoordForEnd(x + radius),

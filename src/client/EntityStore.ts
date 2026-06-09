@@ -1,6 +1,6 @@
 import { IEntity } from '../common/IEntity'
 import { Context } from '../common/Context'
-import { AppliedEntityChange, DeletedEntity, Frame } from './Frame'
+import { AppliedEntityChange, ClosedChannel, DeletedEntity, Frame } from './Frame'
 import { Snapshot } from './Snapshot'
 import { getLocalTime } from './time'
 import { EntityHistory } from './EntityHistory'
@@ -13,7 +13,7 @@ export class EntityStore {
     context: Context
     entities: Map<number, IEntity> = new Map()
     ntypes: Map<number, number> = new Map()
-    channelIdentities: Map<number, any> = new Map()
+    channelHeaders: Map<number, IEntity> = new Map()
     entityChannels: Map<number, number> = new Map()
     ecsEntities: Set<number> = new Set()
     ecsComponentsByParent: Map<number, Set<number>> = new Map()
@@ -41,9 +41,9 @@ export class EntityStore {
         return this.entityChannels.get(nid)
     }
 
-    getChannelIdentity(channelOrEntityNid: number) {
+    getChannelHeader(channelOrEntityNid: number) {
         const entityChannelId = this.entityChannels.get(channelOrEntityNid)
-        return this.channelIdentities.get(entityChannelId === undefined ? channelOrEntityNid : entityChannelId)
+        return this.channelHeaders.get(entityChannelId === undefined ? channelOrEntityNid : entityChannelId)
     }
 
     getByChannel(channelId: number) {
@@ -62,16 +62,45 @@ export class EntityStore {
         const updateEntities: AppliedEntityChange[] = []
         const deleteEntities: number[] = []
         const deletedEntities: DeletedEntity[] = []
+        const closedChannels: ClosedChannel[] = []
         const ecsCreateEntities: number[] = []
         const ecsCreateComponents: IEntity[] = []
         const ecsDeleteEntities: number[] = []
-        const channelIdentities = (snapshot.channelIdentities || []).slice()
         const channelEntityCreates = (snapshot.channelEntityCreates || []).slice()
+        const channelHeaderCreates = (snapshot.channelHeaderCreates || []).slice()
+        const channelHeaderUpdates = (snapshot.channelHeaderUpdates || []).slice()
+        const channelHeaderDeletes = (snapshot.channelHeaderDeletes || []).slice()
         const changedNids = new Set<number>()
         const snapshotDeleteNids = new Set(snapshot.deleteEntities)
 
-        channelIdentities.forEach(channelIdentity => {
-            this.channelIdentities.set(channelIdentity.channelId, channelIdentity.identity)
+        channelHeaderDeletes.forEach(headerDelete => {
+            const previous = this.channelHeaders.get(headerDelete.channelId)
+            if (previous) {
+                headerDelete.header = cloneEntity(previous)
+            }
+            const entityNids = this.purgeChannel(headerDelete.channelId, tick)
+            closedChannels.push({
+                channelId: headerDelete.channelId,
+                header: previous ? cloneEntity(previous) : undefined,
+                entityNids
+            })
+            this.channelHeaders.delete(headerDelete.channelId)
+        })
+
+        channelHeaderCreates.forEach(headerCreate => {
+            this.channelHeaders.set(headerCreate.channelId, cloneEntity(headerCreate.header))
+        })
+
+        channelHeaderUpdates.forEach(headerUpdate => {
+            const header = this.channelHeaders.get(headerUpdate.channelId)
+            if (!header) {
+                return
+            }
+            headerUpdate.changes.forEach(update => {
+                const nschema = this.context.getSchema(header.ntype)
+                const propData = nschema.props[update.prop]
+                header[update.prop] = propData.binary.clone(update.value)
+            })
         })
 
         ;(snapshot.ecsDeleteEntities || []).forEach(pid => {
@@ -82,6 +111,7 @@ export class EntityStore {
                         return
                     }
                     const previous = this.entities.get(nid)
+                    const channelId = this.entityChannels.get(nid)
                     this.entities.delete(nid)
                     this.ntypes.delete(nid)
                     this.entityChannels.delete(nid)
@@ -89,7 +119,8 @@ export class EntityStore {
                     deleteEntities.push(nid)
                     deletedEntities.push({
                         nid,
-                        entity: previous ? cloneEntity(previous) : undefined
+                        entity: previous ? cloneEntity(previous) : undefined,
+                        channelId
                     })
                     this.history.recordDelete(tick, nid)
                 })
@@ -102,6 +133,7 @@ export class EntityStore {
 
         snapshot.deleteEntities.forEach(nid => {
             const previous = this.entities.get(nid)
+            const channelId = this.entityChannels.get(nid)
             this.entities.delete(nid)
             this.ntypes.delete(nid)
             this.entityChannels.delete(nid)
@@ -113,7 +145,8 @@ export class EntityStore {
             deleteEntities.push(nid)
             deletedEntities.push({
                 nid,
-                entity: previous ? cloneEntity(previous) : undefined
+                entity: previous ? cloneEntity(previous) : undefined,
+                channelId
             })
             this.history.recordDelete(tick, nid)
         })
@@ -190,13 +223,54 @@ export class EntityStore {
             ecsCreateEntities,
             ecsCreateComponents,
             ecsDeleteEntities,
-            channelIdentities,
             channelEntityCreates,
+            channelHeaderCreates,
+            channelHeaderUpdates,
+            channelHeaderDeletes,
+            closedChannels,
             createEntities,
             updateEntities,
             deleteEntities,
             deletedEntities,
             messages: snapshot.messages.slice()
         })
+    }
+
+    private purgeChannel(channelId: number, tick: number) {
+        const purged: number[] = []
+        const entries = Array.from(this.entityChannels.entries())
+        for (let i = 0; i < entries.length; i++) {
+            const [nid, entityChannelId] = entries[i]
+            if (entityChannelId !== channelId) {
+                continue
+            }
+            if (this.entityChannels.get(nid) !== channelId) {
+                continue
+            }
+            purged.push(nid)
+            this.entityChannels.delete(nid)
+            this.ntypes.delete(nid)
+            this.entities.delete(nid)
+            this.ecsEntities.delete(nid)
+            const pid = this.ecsComponentParent.get(nid)
+            if (pid !== undefined) {
+                this.ecsComponentParent.delete(nid)
+                this.ecsComponentsByParent.get(pid)?.delete(nid)
+            }
+            const components = this.ecsComponentsByParent.get(nid)
+            if (components) {
+                components.forEach(componentNid => {
+                    this.entityChannels.delete(componentNid)
+                    this.ntypes.delete(componentNid)
+                    this.entities.delete(componentNid)
+                    this.ecsComponentParent.delete(componentNid)
+                    purged.push(componentNid)
+                    this.history.recordDelete(tick, componentNid)
+                })
+                this.ecsComponentsByParent.delete(nid)
+            }
+            this.history.recordDelete(tick, nid)
+        }
+        return purged
     }
 }

@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { IChannel } from '../server/IChannel'
-import { Channel } from '../server/Channel'
+import { IChannel } from '../server/channel/IChannel'
+import { Channel } from '../server/channel/Channel'
 import { LocalState } from '../server/LocalState'
 import { Instance } from '../server/Instance'
 import { Context } from '../common/Context'

@@ -68,9 +68,9 @@ Scenarios:
   `AABB3D` views and `x:y:z` cell keys. This is the control for games that
   need vertical culling rather than horizontal projection. `PROFILE_VIEW_SHAPE=sphere`
   uses coarse spherical cell selection.
-- `spatial-grid-channel-2d` and `spatial-grid-channel-3d`: experimental
-  comparison channels backed by the shared `SpatialGrid` core. They exist to
-  benchmark whether extracting cell bookkeeping costs too much on hot paths.
+- `SpatialChannel2D` and `SpatialChannel3D` are backed by the shared
+  `SpatialGrid` core; the older grid comparison channels were removed after the
+  retained spatial channels adopted the same bookkeeping.
 - `channel-churn`: all users share one plain all-visible channel while the
   server removes and adds `PROFILE_CHURN` roots per tick. `PROFILE_CHILDREN`
   attaches child entities to each created root so create/delete fragments cover
@@ -78,8 +78,8 @@ Scenarios:
 - `manual-channel`: all users share one experimental `ManualChannel`.
   Membership still uses normal `addEntity`/`removeEntity`; the manual path is
   only for explicit update writes. The benchmark assigns transform props
-  directly and records a generated update writer from `channel.type(ntype,
-  schema).transform`, then the snapshot path writes that manual log directly
+  directly and records a generated update writer from
+  `channel.createEntityWriter(ntype, schema).transform`, then the snapshot path writes that manual log directly
   without diffing, cloning, schema-name lookup, or cache updates. The generated
   type object also exposes `props` and `groups` namespaces when a schema name
   collides with a reserved/root name.
@@ -102,6 +102,13 @@ Scenarios:
   `wide-manual-spatial`, and `ecs-manual-spatial`: compare equivalent
   transform/vitals/loadout state as one wider entity versus ECS-shaped state.
   `wide-channel` is the normal automagic `Channel` scan/diff control;
+  `wide-manual-channel` is useful in two modes. With
+  `PROFILE_SHARED_UPDATES=1`, it is the intended high-fanout manual-channel
+  shape: one encoded manual update stream is shared across users. With
+  `PROFILE_SHARED_UPDATES=0`, it is a deliberate worst-case fanout control that
+  rewrites the same large manual payload per user. Keep that variant for
+  detecting regressions and understanding costs, but do not treat it as a
+  recommended game architecture.
   `ecs-manual-channel` uses the older root-with-child-components model;
   `ecs-channel` uses the dedicated `EcsChannel`, where the root is only a pid
   and transform/vitals/loadout are component entities. `PROFILE_ENTITY_SHAPE`
@@ -143,6 +150,7 @@ PROFILE_SCENARIO=manual-channel PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_
 PROFILE_SCENARIO=manual-channel PROFILE_MANUAL_EMIT=props PROFILE_USERS=50 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=wide-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=wide-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
+PROFILE_SCENARIO=wide-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel-churn PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_CHURN=100 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot

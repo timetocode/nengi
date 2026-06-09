@@ -41,6 +41,7 @@ import {
 } from '../common/Endpoint'
 import { getLocalTime } from './time'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
+import type { PredictionOperationOptions } from './prediction/Predictor'
 
 const MAX_REQUESTS_PER_FRAME = 255
 
@@ -68,7 +69,8 @@ type RequestOptions<Response = any> = {
     timeoutMs?: number,
     key?: string,
     policy?: RequestPolicy,
-    callback?: (response: Response) => any
+    callback?: (response: Response) => any,
+    prediction?: PredictionOperationOptions<Response>
 }
 
 type HandshakeResponse = {
@@ -147,6 +149,16 @@ export class ClientNetwork {
         this.outbound.addCommand(command)
     }
 
+    predictCommand(command: any, options: PredictionOperationOptions = {}) {
+        const tick = this.clientTick
+        this.addCommand(command)
+        return this.client.predictor.addCommand?.(command, tick, options)
+    }
+
+    predictState(payload: any, options: PredictionOperationOptions = {}) {
+        return this.client.predictor.addState?.(payload, this.clientTick, options)
+    }
+
     flush() {
         this.outbound.flush()
     }
@@ -212,6 +224,9 @@ export class ClientNetwork {
 
         this.requestQueue.enqueue(obj)
         this.requests.set(obj.requestId, obj)
+        if (options.prediction) {
+            this.client.predictor.addRequest?.(obj.requestId, obj.endpointId, payload, this.clientTick, options.prediction)
+        }
         return promise
     }
 
@@ -256,6 +271,7 @@ export class ClientNetwork {
         if (this.requestQueue.length === 0) {
             this.requestBacklogActive = false
         }
+        this.client.predictor.rejectRequest?.(request.requestId, reason, this.latestFrame || undefined, this.store)
         request.reject(reason)
     }
 
@@ -265,6 +281,7 @@ export class ClientNetwork {
             request.timeout = null
         }
         this.requests.delete(request.requestId)
+        this.client.predictor.resolveRequest?.(request.requestId, response, this.latestFrame || undefined, this.store)
         request.resolve(response)
         request.callback(response)
     }
@@ -294,6 +311,12 @@ export class ClientNetwork {
         }
 
         const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAt)
+        frame.deleteEntities.forEach(nid => {
+            this.entityNTypes.delete(nid)
+        })
+        frame.closedChannels.forEach(closed => {
+            closed.entityNids.forEach(nid => this.entityNTypes.delete(nid))
+        })
         this.frameTick++
         this.frames.push(frame)
         while (this.frames.length > this.maxFrameHistory) {
@@ -310,6 +333,7 @@ export class ClientNetwork {
             this.client.network.predictionErrorFrames.push(predictionErrorFrame)
         }
 
+        this.client.predictor.resolveFrame?.(frame, this.store)
         this.client.predictor.cleanUp(frame.confirmedClientTick)
         this.outbound.confirmCommands(pending.snapshot.confirmedClientTick)
 
@@ -592,8 +616,10 @@ export class ClientNetwork {
             timestamp: -1,
             confirmedClientTick: -1,
             messages: [],
-            channelIdentities: [],
             channelEntityCreates: [],
+            channelHeaderCreates: [],
+            channelHeaderUpdates: [],
+            channelHeaderDeletes: [],
             ecsCreateEntities: [],
             ecsCreateComponents: [],
             ecsDeleteEntities: [],
@@ -674,22 +700,59 @@ export class ClientNetwork {
                 }
                 break
             }
-            case BinarySection.ChannelIdentities: {
-                const count = dr.readUInt32()
-                for (let i = 0; i < count; i++) {
-                    const channelId = readNetworkId(this.protocol.nidType, dr)
-                    snapshot.channelIdentities!.push({
-                        channelId,
-                        identity: JSON.parse(dr.readString())
-                    })
-                }
-                break
-            }
             case BinarySection.ChannelEntityCreates: {
                 const count = dr.readUInt32()
                 for (let i = 0; i < count; i++) {
                     snapshot.channelEntityCreates!.push({
                         nid: readNetworkId(this.protocol.nidType, dr),
+                        channelId: readNetworkId(this.protocol.nidType, dr)
+                    })
+                }
+                break
+            }
+            case BinarySection.ChannelHeaderCreates: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const channelId = readNetworkId(this.protocol.nidType, dr)
+                    const header = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
+                    this.entityNTypes.set(header.nid, header.ntype)
+                    snapshot.channelHeaderCreates!.push({
+                        channelId,
+                        header,
+                        version: 0
+                    })
+                }
+                break
+            }
+            case BinarySection.ChannelHeaderUpdates: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const channelId = readNetworkId(this.protocol.nidType, dr)
+                    const propCount = dr.readUInt32()
+                    const changes = []
+                    for (let j = 0; j < propCount; j++) {
+                        changes.push(readDiff(dr, this.client.context, this.entityNTypes, this.protocol.nidType))
+                    }
+                    const groupCount = dr.readUInt32()
+                    for (let j = 0; j < groupCount; j++) {
+                        const diffs = readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType)
+                        for (let k = 0; k < diffs.length; k++) {
+                            changes.push(diffs[k])
+                        }
+                    }
+                    snapshot.channelHeaderUpdates!.push({
+                        channelId,
+                        changes,
+                        groups: [],
+                        version: 0
+                    })
+                }
+                break
+            }
+            case BinarySection.ChannelHeaderDeletes: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    snapshot.channelHeaderDeletes!.push({
                         channelId: readNetworkId(this.protocol.nidType, dr)
                     })
                 }

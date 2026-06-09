@@ -1,6 +1,6 @@
 import { IEntity } from '../common/IEntity'
 import { Client } from './Client'
-import { AppliedEntityChange, DeletedEntity, Frame } from './Frame'
+import { AppliedEntityChange, ClosedChannel, DeletedEntity, Frame } from './Frame'
 import { FixedStepInterpolator, FixedStepInterpolatorOptions, InterpolationSample, InterpolationStatus, InterpolatedState, StaticInterpolator } from './FixedStepInterpolator'
 
 export enum ClientEntityMode {
@@ -29,6 +29,8 @@ export type TrackOptions<Local = any, Meta = any> = {
 export type RoutedEntity<Local = any, Meta = any> = {
     entity: IEntity
     tracked: TrackedClientEntity<Local, Meta>
+    channelId?: number
+    channelHeader?: IEntity
 }
 
 export type RoutedUpdate<Local = any, Meta = any> = {
@@ -45,6 +47,10 @@ export type RoutedDelete<Local = any, Meta = any> = {
 
 export type RoutedFrameBatch = {
     frames: Frame[]
+    closedChannels: ClosedChannel[]
+    ecsCreateEntities: number[]
+    ecsCreateComponents: IEntity[]
+    ecsDeleteEntities: number[]
     createEntities: IEntity[]
     updateEntities: AppliedEntityChange[]
     deleteEntities: number[]
@@ -63,20 +69,37 @@ export type InterpolatedRouterSample<Local = any, Meta = any> = {
     entities: RoutedEntity<Local, Meta>[]
     entered: RoutedEntity<Local, Meta>[]
     exited: TrackedClientEntity<Local, Meta>[]
+    messages: any[]
 }
 
 type CreateHandler = (entity: IEntity, tracked: TrackedClientEntity | undefined, frame: Frame) => void
+export type ChannelRouteContext = {
+    channelId: number
+    header?: IEntity
+    closed?: ClosedChannel
+}
+type ChannelRoutePredicate = (ctx: ChannelRouteContext, frame: Frame) => boolean
+type ChannelRouteOpenHandler = (ctx: ChannelRouteContext, frame: Frame) => void
+type ChannelRouteHeaderUpdateHandler = (update: any, ctx: ChannelRouteContext, frame: Frame) => void
+type ChannelRouteCreateHandler = (entity: IEntity, tracked: TrackedClientEntity | undefined, ctx: ChannelRouteContext, frame: Frame) => void
+type ChannelRouteUpdateHandler = (update: AppliedEntityChange, entity: IEntity | undefined, tracked: TrackedClientEntity | undefined, ctx: ChannelRouteContext, frame: Frame) => void
+type ChannelRouteDeleteHandler = (nid: number, deleted: DeletedEntity, tracked: TrackedClientEntity | undefined, ctx: ChannelRouteContext, frame: Frame) => void
+type ChannelRouteCloseHandler = (ctx: ChannelRouteContext, frame: Frame) => void
+type ChannelHeaderCreateHandler = (header: IEntity, frame: Frame, channelId: number) => void
+type ChannelHeaderUpdateHandler = (update: any, header: IEntity | undefined, frame: Frame, channelId: number) => void
+type ChannelHeaderDeleteHandler = (channelId: number, header: IEntity | undefined, frame: Frame) => void
+type EcsCreateEntityHandler = (pid: number, frame: Frame) => void
+type EcsCreateComponentHandler = (component: IEntity, frame: Frame) => void
+type EcsDeleteEntityHandler = (pid: number, frame: Frame) => void
 type UpdateHandler = (update: AppliedEntityChange, entity: IEntity | undefined, tracked: TrackedClientEntity | undefined, frame: Frame) => void
 type DeleteHandler = (nid: number, deleted: DeletedEntity, tracked: TrackedClientEntity | undefined, frame: Frame) => void
 type MessageHandler = (message: any, frame: Frame) => void
 
-export type ClientStateRouterOptions = {
+export type ReplicaRouterOptions = {
     defaultMode?: ClientEntityMode | null
     interpolator?: FixedStepInterpolator
     interpolatorOptions?: FixedStepInterpolatorOptions
 }
-
-export type ClientFrameRouterOptions = ClientStateRouterOptions
 
 export type ProcessServerFramesOptions = {
     maxFrames?: number
@@ -85,6 +108,10 @@ export type ProcessServerFramesOptions = {
 function emptyBatch(frames: Frame[] = []): RoutedFrameBatch {
     return {
         frames,
+        closedChannels: [],
+        ecsCreateEntities: [],
+        ecsCreateComponents: [],
+        ecsDeleteEntities: [],
         createEntities: [],
         updateEntities: [],
         deleteEntities: [],
@@ -103,7 +130,55 @@ function addHandler<T>(handlers: Map<number, T[]>, ntype: number, handler: T) {
     handlers.set(ntype, arr)
 }
 
-export class ClientStateRouter {
+type ChannelRoute = {
+    predicate: ChannelRoutePredicate
+    openHandlers: ChannelRouteOpenHandler[]
+    headerUpdateHandlers: ChannelRouteHeaderUpdateHandler[]
+    closeHandlers: ChannelRouteCloseHandler[]
+    createHandlers: Map<number, ChannelRouteCreateHandler[]>
+    updateHandlers: Map<number, ChannelRouteUpdateHandler[]>
+    deleteHandlers: Map<number, ChannelRouteDeleteHandler[]>
+}
+
+export class ChannelRouteBuilder {
+    private route: ChannelRoute
+
+    constructor(route: ChannelRoute) {
+        this.route = route
+    }
+
+    onOpen(handler: ChannelRouteOpenHandler) {
+        this.route.openHandlers.push(handler)
+        return this
+    }
+
+    onHeaderUpdate(handler: ChannelRouteHeaderUpdateHandler) {
+        this.route.headerUpdateHandlers.push(handler)
+        return this
+    }
+
+    onCreate(ntype: number, handler: ChannelRouteCreateHandler) {
+        addHandler(this.route.createHandlers, ntype, handler)
+        return this
+    }
+
+    onUpdate(ntype: number, handler: ChannelRouteUpdateHandler) {
+        addHandler(this.route.updateHandlers, ntype, handler)
+        return this
+    }
+
+    onDelete(ntype: number, handler: ChannelRouteDeleteHandler) {
+        addHandler(this.route.deleteHandlers, ntype, handler)
+        return this
+    }
+
+    onClose(handler: ChannelRouteCloseHandler) {
+        this.route.closeHandlers.push(handler)
+        return this
+    }
+}
+
+export class ReplicaRouter {
     client: Client
     interpolator: FixedStepInterpolator
     defaultMode: ClientEntityMode | null
@@ -114,13 +189,23 @@ export class ClientStateRouter {
     private updateHandlers = new Map<number, UpdateHandler[]>()
     private deleteHandlers = new Map<number, DeleteHandler[]>()
     private messageHandlers = new Map<number, MessageHandler[]>()
+    private interpolatedMessageHandlers = new Map<number, MessageHandler[]>()
+    private channelRoutes: ChannelRoute[] = []
+    private channelHeaderCreateHandlers: ChannelHeaderCreateHandler[] = []
+    private channelHeaderUpdateHandlers: ChannelHeaderUpdateHandler[] = []
+    private channelHeaderDeleteHandlers: ChannelHeaderDeleteHandler[] = []
+    private ecsCreateEntityHandlers: EcsCreateEntityHandler[] = []
+    private ecsCreateComponentHandlers: EcsCreateComponentHandler[] = []
+    private ecsDeleteEntityHandlers: EcsDeleteEntityHandler[] = []
     private anyCreateHandlers: CreateHandler[] = []
     private anyUpdateHandlers: UpdateHandler[] = []
     private anyDeleteHandlers: DeleteHandler[] = []
     private anyMessageHandlers: MessageHandler[] = []
+    private anyInterpolatedMessageHandlers: MessageHandler[] = []
     private interpolatedVisible = new Set<number>()
+    private lastInterpolatedMessageTick = Number.NEGATIVE_INFINITY
 
-    constructor(client: Client, options: ClientStateRouterOptions = {}) {
+    constructor(client: Client, options: ReplicaRouterOptions = {}) {
         this.client = client
         this.interpolator = options.interpolator || (
             options.interpolatorOptions
@@ -136,6 +221,44 @@ export class ClientStateRouter {
 
     onCreateAny(handler: CreateHandler) {
         this.anyCreateHandlers.push(handler)
+    }
+
+    channel(predicate: ChannelRoutePredicate) {
+        const route: ChannelRoute = {
+            predicate,
+            openHandlers: [],
+            headerUpdateHandlers: [],
+            closeHandlers: [],
+            createHandlers: new Map(),
+            updateHandlers: new Map(),
+            deleteHandlers: new Map()
+        }
+        this.channelRoutes.push(route)
+        return new ChannelRouteBuilder(route)
+    }
+
+    onChannelHeaderCreate(handler: ChannelHeaderCreateHandler) {
+        this.channelHeaderCreateHandlers.push(handler)
+    }
+
+    onChannelHeaderUpdate(handler: ChannelHeaderUpdateHandler) {
+        this.channelHeaderUpdateHandlers.push(handler)
+    }
+
+    onChannelHeaderDelete(handler: ChannelHeaderDeleteHandler) {
+        this.channelHeaderDeleteHandlers.push(handler)
+    }
+
+    onEcsCreateEntity(handler: EcsCreateEntityHandler) {
+        this.ecsCreateEntityHandlers.push(handler)
+    }
+
+    onEcsCreateComponent(handler: EcsCreateComponentHandler) {
+        this.ecsCreateComponentHandlers.push(handler)
+    }
+
+    onEcsDeleteEntity(handler: EcsDeleteEntityHandler) {
+        this.ecsDeleteEntityHandlers.push(handler)
     }
 
     onUpdate(ntype: number, handler: UpdateHandler) {
@@ -162,6 +285,14 @@ export class ClientStateRouter {
         this.anyMessageHandlers.push(handler)
     }
 
+    onInterpolatedMessage(ntype: number, handler: MessageHandler) {
+        addHandler(this.interpolatedMessageHandlers, ntype, handler)
+    }
+
+    onInterpolatedMessageAny(handler: MessageHandler) {
+        this.anyInterpolatedMessageHandlers.push(handler)
+    }
+
     process(options: ProcessServerFramesOptions = {}): RoutedFrameBatch {
         return this.processServerFrames(options)
     }
@@ -176,8 +307,35 @@ export class ClientStateRouter {
                 break
             }
             batch.frames.push(frame)
+            frame.channelHeaderCreates.forEach(create => {
+                this.processChannelHeaderCreate(frame, create.channelId, create.header)
+            })
+
+            frame.channelHeaderUpdates.forEach(update => {
+                const header = this.client.network.store.getChannelHeader(update.channelId)
+                update.changes.forEach(change => {
+                    this.processChannelHeaderUpdate(frame, update.channelId, change, header)
+                })
+            })
+
+            frame.closedChannels.forEach(closed => {
+                this.processChannelClose(frame, closed, batch)
+            })
+
+            frame.ecsDeleteEntities.forEach(pid => {
+                this.processEcsDeleteEntity(frame, pid, batch)
+            })
+
             frame.deletedEntities.forEach(deleted => {
                 this.processDelete(frame, deleted, batch)
+            })
+
+            frame.ecsCreateEntities.forEach(pid => {
+                this.processEcsCreateEntity(frame, pid, batch)
+            })
+
+            frame.ecsCreateComponents.forEach(component => {
+                this.processEcsCreateComponent(frame, component, batch)
             })
 
             frame.createEntities.forEach(entity => {
@@ -241,6 +399,14 @@ export class ClientStateRouter {
         return this.client.network.store.get(nid)
     }
 
+    getChannelId(nid: number) {
+        return this.client.network.store.getChannelId(nid)
+    }
+
+    getChannelHeader(channelOrEntityNid: number) {
+        return this.client.network.store.getChannelHeader(channelOrEntityNid)
+    }
+
     getLastConfirmedClientTick() {
         return this.client.network.latestFrame?.confirmedClientTick ?? -1
     }
@@ -292,7 +458,8 @@ export class ClientStateRouter {
                 state: null,
                 entities: [],
                 entered: [],
-                exited: []
+                exited: [],
+                messages: []
             }
         }
 
@@ -322,8 +489,57 @@ export class ClientStateRouter {
             }
         })
 
+        const messages = this.processInterpolatedMessages(state.targetFrameTick)
         this.interpolatedVisible = currentVisible
-        return { status: sample.status, sample, state, entities, entered, exited }
+        return { status: sample.status, sample, state, entities, entered, exited, messages }
+    }
+
+    private processEcsCreateEntity(frame: Frame, pid: number, batch: RoutedFrameBatch) {
+        batch.ecsCreateEntities.push(pid)
+        this.ecsCreateEntityHandlers.forEach(handler => handler(pid, frame))
+    }
+
+    private processChannelHeaderCreate(frame: Frame, channelId: number, header: IEntity) {
+        this.channelHeaderCreateHandlers.forEach(handler => handler(header, frame, channelId))
+        const ctx = { channelId, header }
+        this.matchingChannelRoutes(ctx, frame).forEach(route => {
+            route.openHandlers.forEach(handler => handler(ctx, frame))
+        })
+    }
+
+    private processChannelHeaderUpdate(frame: Frame, channelId: number, update: any, header: IEntity | undefined) {
+        this.channelHeaderUpdateHandlers.forEach(handler => handler(update, header, frame, channelId))
+        const ctx = this.getChannelRouteContext(channelId, frame)
+        if (!ctx) {
+            return
+        }
+        this.matchingChannelRoutes(ctx, frame).forEach(route => {
+            route.headerUpdateHandlers.forEach(handler => handler(update, ctx, frame))
+        })
+    }
+
+    private processChannelClose(frame: Frame, closed: ClosedChannel, batch: RoutedFrameBatch) {
+        batch.closedChannels.push(closed)
+        this.channelHeaderDeleteHandlers.forEach(handler => handler(closed.channelId, closed.header, frame))
+        const ctx = { channelId: closed.channelId, header: closed.header, closed }
+        this.matchingChannelRoutes(ctx, frame).forEach(route => {
+            route.closeHandlers.forEach(handler => handler(ctx, frame))
+        })
+        for (let i = 0; i < closed.entityNids.length; i++) {
+            this.untrack(closed.entityNids[i])
+            batch.deletedNids.add(closed.entityNids[i])
+            batch.changedNids.add(closed.entityNids[i])
+        }
+    }
+
+    private processEcsCreateComponent(frame: Frame, component: IEntity, batch: RoutedFrameBatch) {
+        batch.ecsCreateComponents.push(component)
+        this.ecsCreateComponentHandlers.forEach(handler => handler(component, frame))
+    }
+
+    private processEcsDeleteEntity(frame: Frame, pid: number, batch: RoutedFrameBatch) {
+        batch.ecsDeleteEntities.push(pid)
+        this.ecsDeleteEntityHandlers.forEach(handler => handler(pid, frame))
     }
 
     private processCreate(frame: Frame, entity: IEntity, batch: RoutedFrameBatch) {
@@ -341,14 +557,25 @@ export class ClientStateRouter {
         batch.createdNids.add(entity.nid)
         batch.changedNids.add(entity.nid)
 
+        const channelId = this.client.network.store.getChannelId(entity.nid)
+        const channelContext = channelId === undefined ? undefined : this.getChannelRouteContext(channelId, frame)
+
         this.anyCreateHandlers.forEach(handler => handler(entity, tracked, frame))
         const handlers = this.createHandlers.get(entity.ntype) || []
         handlers.forEach(handler => handler(entity, tracked, frame))
+        if (channelContext) {
+            this.matchingChannelRoutes(channelContext, frame).forEach(route => {
+                const channelHandlers = route.createHandlers.get(entity.ntype) || []
+                channelHandlers.forEach(handler => handler(entity, tracked, channelContext, frame))
+            })
+        }
     }
 
     private processUpdate(frame: Frame, update: AppliedEntityChange, batch: RoutedFrameBatch) {
         const entity = this.client.network.store.get(update.nid)
         const tracked = this.tracked.get(update.nid)
+        const channelId = this.client.network.store.getChannelId(update.nid)
+        const channelContext = channelId === undefined ? undefined : this.getChannelRouteContext(channelId, frame)
 
         batch.updateEntities.push(update)
         batch.updatedNids.add(update.nid)
@@ -359,6 +586,12 @@ export class ClientStateRouter {
         if (ntype !== undefined) {
             const handlers = this.updateHandlers.get(ntype) || []
             handlers.forEach(handler => handler(update, entity, tracked, frame))
+            if (channelContext) {
+                this.matchingChannelRoutes(channelContext, frame).forEach(route => {
+                    const channelHandlers = route.updateHandlers.get(ntype) || []
+                    channelHandlers.forEach(handler => handler(update, entity, tracked, channelContext, frame))
+                })
+            }
         }
     }
 
@@ -383,6 +616,15 @@ export class ClientStateRouter {
         if (ntype !== undefined) {
             const handlers = this.deleteHandlers.get(ntype) || []
             handlers.forEach(handler => handler(deleted.nid, deleted, tracked, frame))
+            if (deleted.channelId !== undefined) {
+                const channelContext = this.getChannelRouteContext(deleted.channelId, frame)
+                if (channelContext) {
+                    this.matchingChannelRoutes(channelContext, frame).forEach(route => {
+                        const channelHandlers = route.deleteHandlers.get(ntype) || []
+                        channelHandlers.forEach(handler => handler(deleted.nid, deleted, tracked, channelContext, frame))
+                    })
+                }
+            }
         }
     }
 
@@ -392,6 +634,46 @@ export class ClientStateRouter {
         const handlers = this.messageHandlers.get(message.ntype) || []
         handlers.forEach(handler => handler(message, frame))
     }
-}
 
-export { ClientStateRouter as ClientFrameRouter }
+    private processInterpolatedMessages(targetFrameTick: number) {
+        const messages: any[] = []
+        const frames = this.client.network.frames
+        for (let i = 0; i < frames.length; i++) {
+            const frame = frames[i]
+            if (frame.tick <= this.lastInterpolatedMessageTick || frame.tick > targetFrameTick) {
+                continue
+            }
+            for (let j = 0; j < frame.messages.length; j++) {
+                const message = frame.messages[j]
+                messages.push(message)
+                this.anyInterpolatedMessageHandlers.forEach(handler => handler(message, frame))
+                const handlers = this.interpolatedMessageHandlers.get(message.ntype) || []
+                handlers.forEach(handler => handler(message, frame))
+            }
+        }
+        if (Number.isFinite(targetFrameTick)) {
+            this.lastInterpolatedMessageTick = Math.max(this.lastInterpolatedMessageTick, targetFrameTick)
+        }
+        return messages
+    }
+
+    private getChannelRouteContext(channelId: number, frame: Frame): ChannelRouteContext | undefined {
+        const header = this.client.network.store.getChannelHeader(channelId) ||
+            frame.channelHeaderDeletes.find(deleted => deleted.channelId === channelId)?.header
+        if (!header) {
+            return undefined
+        }
+        return { channelId, header }
+    }
+
+    private matchingChannelRoutes(ctx: ChannelRouteContext, frame: Frame) {
+        const routes: ChannelRoute[] = []
+        for (let i = 0; i < this.channelRoutes.length; i++) {
+            const route = this.channelRoutes[i]
+            if (route.predicate(ctx, frame)) {
+                routes.push(route)
+            }
+        }
+        return routes
+    }
+}

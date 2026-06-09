@@ -71,6 +71,44 @@ Channel helpers:
 - `removeAllEntities()`
 - `destroy()`
 
+The current channel family is intentionally plural:
+
+- `Channel`: automatic all-visible entity channel; scans visible entities against schemas.
+- `ManualChannel`: all-visible entity channel where userland explicitly appends prop/group mutations.
+- `SpatialChannel2D` / `SpatialChannel3D`: automatic grid-culled entity channels.
+- `ManualSpatialChannel2D` / `ManualSpatialChannel3D`: grid-culled entity channels with explicit mutation logs per dirty cell.
+- `EcsChannel`: manual ECS channel where roots are nids and replicated state lives on component entities.
+- `EcsSpatialChannel2D` / `EcsSpatialChannel3D`: ECS channel where a selected spatial component places the root in the grid.
+
+Manual means "userland tells nengi what changed." It is the fast path and intentionally does less validation in production. Debug options may add checks, but the default writer path should remain close to direct array appends.
+
+Spatial circle/sphere views are coarse cell queries. They include occupied cells intersecting the circle/sphere; they do not filter every entity against the exact shape.
+
+Users can be subscribed to multiple channels. The snapshot writer appends per-channel streams; it should not globally merge visibility or dedupe entities across channels in the hot path. Putting the same entity in multiple channels is treated as a userland mistake, not a production-path validation case.
+
+Channel headers are optional schema-backed client context sent before normal channel entities. Use headers when the client needs to route scoped CRUD, such as inventories, team state, or remote map views. `label` stays local housekeeping and is not client context. When a known headered channel closes, the client treats it as a channel close and purges contained entities instead of requiring individual delete events.
+
+Channel messages have two delivery styles. Plain, manual, and non-spatial ECS channels store broadcast messages until the snapshot boundary and can share cached message fragments. Spatial channels evaluate the message against each subscribed user's current view immediately and queue the message directly on matching users.
+
+### ECS channels
+
+ECS channels use nengi's binary schema system, but they assume a narrower ECS shape than plain entity channels.
+
+In plain `Channel`, an entity is a replicated object: it has an `nid`, an `ntype`, schema properties, and nengi can scan it for property diffs. In `EcsChannel`, the root "entity" is a network identity only. It is a stable `nid` that groups components; it is not an object with userland state for nengi to diff.
+
+Replicated ECS state lives on component entities:
+
+- A root has an `nid`.
+- A component has its own `nid`, an `ntype`, schema properties, and a `pid` pointing at the root.
+- Root creates/deletes are networked separately from component creates/deletes.
+- Component updates are manual prop/group writes through `createComponentWriter`.
+
+This ECS model is intentionally one root-to-components layer, not a general scene graph. It assumes each component instance is individually addressable over the network so nengi can send one changed component without sending the rest of the root's state.
+
+Spatial ECS channels place roots in the grid through a chosen spatial component. The root still has no position by itself; `addSpatialComponent`, `setSpatialComponent`, or `updateSpatialComponent` tells the channel which component determines visibility.
+
+Avoid treating ECS channels as a wrapper around normal nengi entities. The performance value comes from this different contract: roots are ids, components are the replicated records, and userland mutation points append the network log directly.
+
 ### Entity children
 
 Entity children are cascading visibility references. If a parent entity is visible, its children become visible too. Children are not owned or destroyed by nengi as game objects. If userland removes a parent source and the child has no other source, nengi stops networking the child; it does not destroy the child object.
@@ -86,7 +124,7 @@ Important distinction:
 - Channel source: visibility root for users.
 - Parent entity source: visibility cascade from another entity.
 
-The shared abstraction is “source references keep an entity networked,” not “channels and entities are the same thing.”
+The shared abstraction is "source references keep an entity networked," not "channels and entities are the same thing."
 
 ## Snapshot pipeline
 
@@ -100,6 +138,8 @@ The server snapshot path is intentionally pipeline-shaped:
 6. Send to the user.
 
 Prefer keeping these steps testable. Avoid burying visibility, diffing, counting, writing, and queue mutation in one opaque function.
+
+Snapshot writing is now chunk-oriented: the envelope is written first, followed by channel-specific chunks and cached binary fragments. Specialized channels should prepare their own create/update/delete streams and let the top-level writer append them. This keeps channel performance work local and avoids reintroducing one giant merged snapshot plan.
 
 ## Client state model
 

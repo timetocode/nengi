@@ -2,6 +2,7 @@ import { Context } from '../common/Context'
 import { Endpoint, RequestPolicy } from '../common/Endpoint'
 import { ClientNetwork } from './ClientNetwork'
 import { Predictor } from './prediction/Predictor'
+import type { PredictionOperationOptions } from './prediction/Predictor'
 
 type StringOrParsedJSON = string | object
 type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
@@ -10,7 +11,8 @@ type RequestOptions<Response = any> = {
     timeoutMs?: number,
     key?: string,
     policy?: RequestPolicy,
-    callback?: (response: Response) => any
+    callback?: (response: Response) => any,
+    prediction?: PredictionOperationOptions<Response>
 }
 
 class Client {
@@ -56,6 +58,14 @@ class Client {
 
     addCommand(command: any) {
         this.network.addCommand(command)
+    }
+
+    predictCommand(command: any, options: PredictionOperationOptions = {}) {
+        return this.network.predictCommand(command, options)
+    }
+
+    predictState(payload: any, options: PredictionOperationOptions = {}) {
+        return this.network.predictState(payload, options)
     }
 
     request<Request = any, Response = any>(

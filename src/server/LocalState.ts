@@ -1,7 +1,7 @@
 import { IdPool } from './IdPool'
 import { IEntity } from '../common/IEntity'
 import { NDictionary } from './NDictionary'
-import { IChannel } from './IChannel'
+import { IChannel } from './channel/IChannel'
 import { Binary } from '../common/binary/Binary'
 import { NetworkIdType, maxValueForNetworkType, nextNetworkType } from '../common/binary/Protocol'
 

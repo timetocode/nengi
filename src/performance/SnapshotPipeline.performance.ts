@@ -3,21 +3,19 @@ import { BinaryAdapter, BinaryPayload } from '../common/binary/BinaryAdapter'
 import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { IEntity } from '../common/IEntity'
-import { AABB2D } from '../server/AABB2D'
-import { AABB3D } from '../server/AABB3D'
-import { SpatialChannel2D } from '../server/SpatialChannel2D'
-import { SpatialChannel3D } from '../server/SpatialChannel3D'
-import { SpatialGridChannel2D } from '../server/SpatialGridChannel2D'
-import { SpatialGridChannel3D } from '../server/SpatialGridChannel3D'
-import { SpatialPlane } from '../server/SpatialPlane'
-import { Channel } from '../server/Channel'
-import { ManualChannel } from '../server/ManualChannel'
-import { ManualSpatialChannel2D } from '../server/ManualSpatialChannel2D'
-import { ManualSpatialChannel3D } from '../server/ManualSpatialChannel3D'
-import { EcsChannel } from '../server/EcsChannel'
-import { EcsSpatialChannel2D } from '../server/EcsSpatialChannel2D'
-import { EcsSpatialChannel3D } from '../server/EcsSpatialChannel3D'
-import { IChannel } from '../server/IChannel'
+import { AABB2D } from '../server/channel/AABB2D'
+import { AABB3D } from '../server/channel/AABB3D'
+import { SpatialChannel2D } from '../server/channel/SpatialChannel2D'
+import { SpatialChannel3D } from '../server/channel/SpatialChannel3D'
+import { SpatialPlane } from '../server/channel/SpatialView'
+import { Channel } from '../server/channel/Channel'
+import { ManualChannel } from '../server/channel/ManualChannel'
+import { ManualSpatialChannel2D } from '../server/channel/ManualSpatialChannel2D'
+import { ManualSpatialChannel3D } from '../server/channel/ManualSpatialChannel3D'
+import { EcsChannel } from '../server/channel/EcsChannel'
+import { EcsSpatialChannel2D } from '../server/channel/EcsSpatialChannel2D'
+import { EcsSpatialChannel3D } from '../server/channel/EcsSpatialChannel3D'
+import { IChannel } from '../server/channel/IChannel'
 import { Instance } from '../server/Instance'
 import { User } from '../server/User'
 import { IServerNetworkAdapter } from '../server/adapter/IServerNetworkAdapter'
@@ -39,8 +37,6 @@ type ScenarioName =
     | 'non-overlap'
     | 'spatial-channel-2d'
     | 'spatial-channel-3d'
-    | 'spatial-grid-channel-2d'
-    | 'spatial-grid-channel-3d'
     | 'manual-channel'
     | 'manual-spatial-channel-2d'
     | 'manual-spatial-channel-3d'
@@ -66,8 +62,6 @@ const SCENARIOS = new Set<ScenarioName>([
     'non-overlap',
     'spatial-channel-2d',
     'spatial-channel-3d',
-    'spatial-grid-channel-2d',
-    'spatial-grid-channel-3d',
     'manual-channel',
     'manual-spatial-channel-2d',
     'manual-spatial-channel-3d',
@@ -532,7 +526,6 @@ function spreadEntitiesClustered(entities: TestEntity[], config: ScenarioConfig)
 function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig) {
     if (
         config.scenario === 'spatial-channel-3d' ||
-        config.scenario === 'spatial-grid-channel-3d' ||
         config.scenario === 'manual-spatial-channel-3d' ||
         config.scenario === 'ecs-spatial-channel-3d'
     ) {
@@ -720,7 +713,7 @@ function setupWideChannel(instance: Instance, users: User[], entities: WideEntit
 
 function setupManualChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new ManualChannel(instance.localState, { label: 'manual' })
-    const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
+    const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
     const propX = Entity.x
     const propY = Entity.y
@@ -763,7 +756,7 @@ function setupManualSpatialChannel(instance: Instance, users: User[], entities: 
         plane: config.spatialPlane,
         label: 'manual-spatial'
     })
-    const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
+    const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
     const propX = Entity.x
     const propY = Entity.y
@@ -807,7 +800,7 @@ function setupManualSpatialChannel3D(instance: Instance, users: User[], entities
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         label: 'manual-spatial-channel-3d'
     })
-    const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
+    const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
     const propX = Entity.x
     const propY = Entity.y
@@ -845,8 +838,12 @@ function setupManualSpatialChannel3D(instance: Instance, users: User[], entities
 }
 
 function setupWideManualChannel(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
+    // This all-visible manual channel is intentionally kept as a fanout control.
+    // With shared update fragments enabled it measures the intended high-fanout
+    // manual shape; with PROFILE_SHARED_UPDATES=0 it rewrites the same large
+    // manual payload per user and should be treated as a diagnostic worst case.
     const channel = new ManualChannel(instance.localState, { label: 'wide-manual' })
-    const Wide = channel.type(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
+    const Wide = channel.createEntityWriter(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
     }
@@ -872,7 +869,7 @@ function setupWideManualSpatial(instance: Instance, users: User[], entities: Wid
         plane: config.spatialPlane,
         label: 'wide-manual-spatial'
     })
-    const Wide = channel.type(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
+    const Wide = channel.createEntityWriter(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
     }
@@ -894,9 +891,9 @@ function setupWideManualSpatial(instance: Instance, users: User[], entities: Wid
 
 function setupEcsManualChannel(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
     const channel = new ManualChannel(instance.localState, { label: 'ecs-manual' })
-    const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
-    const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
-    const Loadout = channel.type(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
+    const Transform = channel.createEntityWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
+    const Vitals = channel.createEntityWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
+    const Loadout = channel.createEntityWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
     for (let i = 0; i < bundles.length; i++) {
         const bundle = bundles[i]
         channel.addEntity(bundle.root)
@@ -944,9 +941,9 @@ function setupEcsManualChannel(instance: Instance, users: User[], bundles: EcsBu
 
 function setupEcsChannel(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
     const channel = new EcsChannel(instance.localState, { label: 'ecs' })
-    const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
-    const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
-    const Loadout = channel.type(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
+    const Transform = channel.createComponentWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
+    const Vitals = channel.createComponentWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
+    const Loadout = channel.createComponentWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
     for (let i = 0; i < bundles.length; i++) {
         const bundle = bundles[i]
         const pid = channel.createEntity()
@@ -1033,9 +1030,9 @@ function setupEcsManualSpatial(instance: Instance, users: User[], bundles: EcsBu
         plane: config.spatialPlane,
         label: 'ecs-manual-spatial'
     })
-    const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
-    const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
-    const Loadout = channel.type(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
+    const Transform = channel.createEntityWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
+    const Vitals = channel.createEntityWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
+    const Loadout = channel.createEntityWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
     const roots: EcsRoot[] = []
     for (let i = 0; i < bundles.length; i++) {
         const bundle = bundles[i]
@@ -1094,9 +1091,9 @@ function setupEcsSpatialChannel(instance: Instance, users: User[], bundles: EcsB
         plane: config.spatialPlane,
         label: 'ecs-spatial'
     })
-    const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
-    const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
-    const Loadout = channel.type(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
+    const Transform = channel.createComponentWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
+    const Vitals = channel.createComponentWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
+    const Loadout = channel.createComponentWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
     const roots: EcsRoot[] = []
     for (let i = 0; i < bundles.length; i++) {
         const bundle = bundles[i]
@@ -1154,9 +1151,9 @@ function setupEcsSpatialChannel3D(instance: Instance, users: User[], bundles: Ec
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         label: 'ecs-spatial-channel-3d'
     })
-    const Transform = channel.type(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
-    const Vitals = channel.type(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
-    const Loadout = channel.type(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
+    const Transform = channel.createComponentWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
+    const Vitals = channel.createComponentWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
+    const Loadout = channel.createComponentWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
     const transforms: TransformComponent[] = []
     for (let i = 0; i < bundles.length; i++) {
         const bundle = bundles[i]
@@ -1221,7 +1218,7 @@ function setupParentChildChannel(instance: Instance, users: User[], entities: Te
 
 function setupParentChildManualChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new ManualChannel(instance.localState, { label: 'parent-child-manual' })
-    const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
+    const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const allEntities = entities.slice()
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1280,7 +1277,7 @@ function setupParentChildManualSpatialChannel(instance: Instance, users: User[],
         plane: config.spatialPlane,
         label: 'parent-child-manual-spatial'
     })
-    const Entity = channel.type(NType.Entity, instance.context.getSchema(NType.Entity)!)
+    const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const allEntities = entities.slice()
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1401,55 +1398,12 @@ function setupSpatialChannel(instance: Instance, users: User[], entities: TestEn
     }
 }
 
-function setupSpatialGridChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new SpatialGridChannel2D(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        fragmentCellLimit: config.fragmentCellLimit,
-        stableFragmentCellLimit: config.stableFragmentCellLimit,
-        plane: config.spatialPlane,
-        label: 'spatial-grid-channel-2d'
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
-        }
-    }
-}
-
 function setupSpatialChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new SpatialChannel3D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         label: 'spatial-channel-3d'
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView3D(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
-        }
-    }
-}
-
-function setupSpatialGridChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new SpatialGridChannel3D(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        fragmentCellLimit: config.fragmentCellLimit,
-        stableFragmentCellLimit: config.stableFragmentCellLimit,
-        label: 'spatial-grid-channel-3d'
     })
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1526,8 +1480,6 @@ function buildScenario(config: ScenarioConfig) {
     }
     if (config.scenario === 'spatial-channel-2d' ||
         config.scenario === 'spatial-channel-3d' ||
-        config.scenario === 'spatial-grid-channel-2d' ||
-        config.scenario === 'spatial-grid-channel-3d' ||
         config.scenario === 'manual-spatial-channel-2d' ||
         config.scenario === 'manual-spatial-channel-3d' ||
         config.scenario === 'wide-manual-spatial' ||
@@ -1555,10 +1507,6 @@ function buildScenario(config: ScenarioConfig) {
         updateSpatialIndex = setupSpatialChannel(instance, users, entities, config)
     } else if (config.scenario === 'spatial-channel-3d') {
         updateSpatialIndex = setupSpatialChannel3D(instance, users, entities, config)
-    } else if (config.scenario === 'spatial-grid-channel-2d') {
-        updateSpatialIndex = setupSpatialGridChannel(instance, users, entities, config)
-    } else if (config.scenario === 'spatial-grid-channel-3d') {
-        updateSpatialIndex = setupSpatialGridChannel3D(instance, users, entities, config)
     } else if (config.scenario === 'channel-churn') {
         const churn = setupChannelChurn(instance, users, entities, config)
         beforeStep = churn.churn

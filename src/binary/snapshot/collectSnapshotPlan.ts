@@ -50,19 +50,38 @@ export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPla
     const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkVisibility(instance.tick)
     const plan = createEmptySnapshotPlan()
 
+    const headerDeletes = user.consumePendingChannelHeaderDeletes()
+    for (let i = 0; i < headerDeletes.length; i++) {
+        plan.channelHeaderDeletes.push({ channelId: headerDeletes[i] })
+    }
+
     plan.channelEntityCreates = channelEntityCreates
-    for (let i = 0; i < channelEntityCreates.length; i++) {
-        const channelId = channelEntityCreates[i].channelId
-        if (user.knownClientIdentities.has(channelId) ||
-            plan.channelIdentities.some(identity => identity.channelId === channelId)) {
+
+    for (const channel of user.subscriptions.values()) {
+        const header = channel.header || channel.getHeader?.()
+        const headerVersion = channel.headerVersion || 0
+        if (!header || headerVersion <= 0) {
             continue
         }
-        const channel = user.subscriptions.get(channelId)
-        if (channel && channel.clientIdentity !== undefined) {
-            plan.channelIdentities.push({
-                channelId,
-                identity: channel.clientIdentity
-            })
+        const knownVersion = user.knownChannelHeaderVersions.get(channel.nid)
+        const nschema = instance.context.getSchema(header.ntype)!
+        if (knownVersion === undefined) {
+            if (!instance.cache.cacheContains(header.nid)) {
+                instance.cache.cacheify(instance.tick, header, nschema)
+            }
+            plan.channelHeaderCreates.push({ channelId: channel.nid, header, version: headerVersion })
+            plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion })
+        } else if (knownVersion < headerVersion) {
+            const diffs = instance.cache.getAndDiffGrouped(instance.tick, header, nschema)
+            if (diffs.changes.length > 0 || diffs.groups.length > 0) {
+                plan.channelHeaderUpdates.push({
+                    channelId: channel.nid,
+                    changes: diffs.changes,
+                    groups: diffs.groups,
+                    version: headerVersion
+                })
+            }
+            plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion })
         }
     }
 

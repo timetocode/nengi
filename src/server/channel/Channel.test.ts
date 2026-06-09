@@ -1,7 +1,7 @@
 import { Channel } from './Channel'
-import { User } from './User'
-import { IEntity } from '../common/IEntity'
-import { LocalState } from './LocalState'
+import { User } from '../User'
+import { IEntity } from '../../common/IEntity'
+import { LocalState } from '../LocalState'
 
 enum NType {
     PlayerEntity = 1, // You may have other types here
@@ -82,6 +82,25 @@ describe('Channel', () => {
         expect(channel.entities.size).toBe(5)
     })
 
+    it('should ignore stale remove objects instead of removing by nid alone', () => {
+        channel.addEntity(entity)
+        const nid = entity.nid
+        const stale = { nid, ntype: NType.PlayerEntity }
+
+        expect(channel.removeEntity(stale)).toBe(0)
+        expect(channel.entities.get(nid)).toBe(entity)
+        expect(localState.sources.has(nid)).toBe(true)
+        expect(entity.nid).toBe(nid)
+    })
+
+    it('returns the removed nid before clearing the entity nid', () => {
+        channel.addEntity(entity)
+        const nid = entity.nid
+
+        expect(channel.removeEntity(entity)).toBe(nid)
+        expect(entity.nid).toBe(0)
+    })
+
     it('should add 10 entities and have no entities after being destroyed', () => {
         const addedEntities: TestEntity[] = []
         for (let i = 0; i < 10; i++) {
@@ -89,8 +108,8 @@ describe('Channel', () => {
             channel.addEntity(entity)
             addedEntities.push(entity)
         }
-        channel.removeEntity({ nid: 2, ntype: NType.PlayerEntity })
-        channel.removeEntity({ nid: 6, ntype: NType.PlayerEntity })
+        channel.removeEntity(addedEntities[1])
+        channel.removeEntity(addedEntities[5])
 
         {
             const entity = new TestEntity()
@@ -105,6 +124,21 @@ describe('Channel', () => {
     it('should add an entity', () => {
         channel.addEntity(entity)
         expect(channel.entities.get(entity.nid)).toBe(entity)
+    })
+
+    it('registers an optional channel header separately from normal entities', () => {
+        const header = new TestEntity()
+        channel.setHeader(header)
+
+        expect(channel.getHeader()).toBe(header)
+        expect(channel.headerVersion).toBe(1)
+        expect(header.nid).toBeGreaterThan(0)
+        expect(channel.entities.size).toBe(0)
+        expect(localState.sources.has(header.nid)).toBe(true)
+
+        header.x = 5
+        expect(channel.markHeaderDirty()).toBe(true)
+        expect(channel.headerVersion).toBe(2)
     })
 
     it('should remove an entity', () => {

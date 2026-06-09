@@ -1,7 +1,11 @@
-import { Channel } from '../../server/Channel'
+import { Channel } from '../../server/channel/Channel'
 import { User } from '../../server/User'
 import { EcsManualUpdateLog, ManualUpdateLog } from './manualUpdates'
 
+// Snapshot mode checks are intentionally structural. Channel classes expose a
+// small set of hot-path marker fields and arrays, and the snapshot writer uses
+// those fields to select the fastest binary path without importing every
+// concrete channel class or relying on instanceof across package boundaries.
 export type SharedUpdateChannel = Channel & {
     entityNids: number[]
     membershipVersion: number
@@ -22,7 +26,7 @@ export type ManualUpdateChannel = SharedUpdateChannel & {
 export type EcsSnapshotChannel = EcsManualUpdateLog & {
     ecsChannelMode: true
     nid: number
-    clientIdentity?: any
+    header?: any
     broadcastMessages: any[]
     createdRoots: number[]
     deletedRoots: number[]
@@ -59,22 +63,9 @@ export type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
     hasStructuralDeltas(): boolean
 }
 
-export type SpatialCellChannel = {
-    nid: number
-    cellVisibilityMode: true
-    membershipVersion: number
-    fragmentCellLimit: number
-    dirtyCells: Set<string>
-    getVisibleCellKeys(userId: number): string[]
-    getVisibleEntities(userId: number): number[]
-    getCellEntities(key: string): any[]
-    getUserViewVersion(userId: number): number
-    getVisibleCellVersionSignature(userId: number): string
-}
-
 export type CellFragmentChannel = {
     nid: number
-    clientIdentity?: any
+    header?: any
     cellFragmentMode: true
     membershipVersion: number
     fragmentCellLimit: number
@@ -86,7 +77,6 @@ export type CellFragmentChannel = {
     getCellVersion(key: string): number
     getRememberedCellKeys(userId: number): string[]
     getRememberedCellNids(userId: number, key: string): number[]
-    hasStableRememberedCells(userId: number): boolean
     getStableVisibleCellKeys(userId: number): string[] | null
     rememberVisibleCells(userId: number): void
     getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
@@ -177,18 +167,6 @@ export function getEcsSnapshotChannels(user: User): EcsSnapshotChannel[] {
     return channels
 }
 
-export function isSpatialCellChannel(channel: any): channel is SpatialCellChannel {
-    return channel?.cellVisibilityMode === true &&
-        typeof channel.membershipVersion === 'number' &&
-        typeof channel.fragmentCellLimit === 'number' &&
-        channel.dirtyCells instanceof Set &&
-        typeof channel.getVisibleCellKeys === 'function' &&
-        typeof channel.getVisibleEntities === 'function' &&
-        typeof channel.getCellEntities === 'function' &&
-        typeof channel.getUserViewVersion === 'function' &&
-        typeof channel.getVisibleCellVersionSignature === 'function'
-}
-
 export function isCellFragmentChannel(channel: any): channel is CellFragmentChannel {
     return channel?.cellFragmentMode === true &&
         typeof channel.membershipVersion === 'number' &&
@@ -201,7 +179,6 @@ export function isCellFragmentChannel(channel: any): channel is CellFragmentChan
         typeof channel.getCellVersion === 'function' &&
         typeof channel.getRememberedCellKeys === 'function' &&
         typeof channel.getRememberedCellNids === 'function' &&
-        typeof channel.hasStableRememberedCells === 'function' &&
         typeof channel.getStableVisibleCellKeys === 'function' &&
         typeof channel.rememberVisibleCells === 'function' &&
         typeof channel.getMovedRoots === 'function' &&
@@ -233,14 +210,6 @@ export function getSingleManualUpdateChannel(user: User): ManualUpdateChannel | 
     }
     const channel = user.subscriptions.values().next().value
     return isManualUpdateChannel(channel) ? channel : null
-}
-
-export function getSingleSpatialCellChannel(user: User): SpatialCellChannel | null {
-    if (user.subscriptions.size !== 1) {
-        return null
-    }
-    const channel = user.subscriptions.values().next().value
-    return isSpatialCellChannel(channel) ? channel : null
 }
 
 export function getSingleCellFragmentChannel(user: User): CellFragmentChannel | null {

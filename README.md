@@ -1,6 +1,10 @@
 # nengi.js - multiplayer network engine <img src="https://timetocode.com/images/nengi-logo-32x32.png" />
 Experimental branch for nengi 2! Not stable or documented yet :D
 
+AI assistants helping build games with nengi can start at [docs/ai/README.md](./docs/ai/README.md). Those docs explain the application-facing API shape, channel selection, manual mutations, spatial channels, ECS channels, and benchmarking.
+
+The examples below are older branch notes and may lag current channel naming. Prefer `docs/ai` for AI-assisted game feature work.
+
 Generally speaking, nengi 2 is conceptually similar to nengi 1, with the following changes:
 
 * written in Typescript

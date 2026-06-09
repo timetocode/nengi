@@ -1,29 +1,23 @@
-import { LocalState } from './LocalState'
-import { IEntity } from '../common/IEntity'
-import { IChannel } from './IChannel'
-import { User } from './User'
-import { NDictionary } from './NDictionary'
-import { Historian } from './Historian'
+import { IEntity } from '../../common/IEntity'
+import { Historian } from '../Historian'
+import { LocalState } from '../LocalState'
+import { NDictionary } from '../NDictionary'
+import { User } from '../User'
+import { IObjectChannel } from './IChannel'
 
 export type ChannelOptions = {
     historian?: Historian
+    header?: IEntity
     /**
      * Developer-defined label for debugging, logs, tests, or game tooling.
      * Nengi does not interpret this value or send it over the network.
      */
     label?: string
-    /**
-     * Optional JSON-serializable identity exposed to subscribed clients. When
-     * present, entities created through this channel are tagged with the
-     * channel id on the client.
-     */
-    clientIdentity?: any
 }
 
-export class Channel implements IChannel {
+export class Channel implements IObjectChannel {
     nid: number
     label?: string
-    clientIdentity?: any
     localState: LocalState
     entities = new NDictionary()
     entityNids: number[] = []
@@ -34,17 +28,21 @@ export class Channel implements IChannel {
     broadcastMessages: any[] = []
     users: Map<number, User> = new Map()
     historian: Historian | null = null
+    header: IEntity | null = null
+    headerVersion = 0
     private visibleNetworkedNidsCache: { membershipVersion: number, entityTreeVersion: number, nids: number[] } | null = null
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
         this.localState = localState
         this.nid = localState.nextNetworkId()
         this.label = options.label
-        this.clientIdentity = options.clientIdentity
         if (options.historian) {
             this.historian = options.historian
         }
         this.localState.channels.add(this)
+        if (options.header) {
+            this.setHeader(options.header)
+        }
     }
 
     tick(tick: number) {
@@ -69,8 +67,36 @@ export class Channel implements IChannel {
         return entity
     }
 
+    setHeader(header: IEntity) {
+        if (this.header !== null && this.header !== header) {
+            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().')
+        }
+        if (this.header === header) {
+            return header
+        }
+        this.localState.registerEntity(header, this.nid)
+        this.header = header
+        this.headerVersion++
+        return header
+    }
+
+    getHeader() {
+        return this.header
+    }
+
+    markHeaderDirty() {
+        if (!this.header) {
+            return false
+        }
+        this.headerVersion++
+        return true
+    }
+
     removeEntity(entity: IEntity) {
         const nid = entity.nid
+        if (this.entities.get(nid) !== entity) {
+            return 0
+        }
         this.beginDelta()
         const createdIndex = this.createdRoots.findIndex(created => created.nid === nid)
         if (createdIndex > -1) {
@@ -85,6 +111,7 @@ export class Channel implements IChannel {
             this.entityNids.splice(index, 1)
         }
         this.membershipVersion++
+        return nid
     }
 
     markDirty(entity: IEntity) {
@@ -105,12 +132,12 @@ export class Channel implements IChannel {
         this.deltaBaseVersion = this.membershipVersion
     }
 
-    subscribe(user: any) {
+    subscribe(user: User) {
         this.users.set(user.id, user)
         user.subscribe(this)
     }
 
-    unsubscribe(user: any) {
+    unsubscribe(user: User) {
         this.users.delete(user.id)
         user.unsubscribe(this)
     }
@@ -132,10 +159,6 @@ export class Channel implements IChannel {
 
     getVisibleNetworkedNids(userId: number) {
         const entityTreeVersion = this.localState.entityTreeVersion
-        if (entityTreeVersion === 0) {
-            return this.entityNids
-        }
-
         const cached = this.visibleNetworkedNidsCache
         if (
             cached &&
@@ -145,9 +168,18 @@ export class Channel implements IChannel {
             return cached.nids
         }
 
+        // Return a versioned snapshot, not the mutable entityNids array. A
+        // same-length remove+add must produce a fresh ref so User visibility
+        // cannot mistake the new membership for stable updates.
         const nids: number[] = []
-        for (let i = 0; i < this.entityNids.length; i++) {
-            this.localState.collectEntityTree(this.entityNids[i], nids)
+        if (entityTreeVersion === 0) {
+            for (let i = 0; i < this.entityNids.length; i++) {
+                nids.push(this.entityNids[i])
+            }
+        } else {
+            for (let i = 0; i < this.entityNids.length; i++) {
+                this.localState.collectEntityTree(this.entityNids[i], nids)
+            }
         }
         this.visibleNetworkedNidsCache = {
             membershipVersion: this.membershipVersion,
@@ -160,6 +192,11 @@ export class Channel implements IChannel {
     destroy() {
         this.unsubscribeAll()
         this.removeAllEntities()
+        if (this.header) {
+            this.localState.unregisterEntity(this.header, this.nid)
+            this.header = null
+            this.headerVersion++
+        }
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this)
     }

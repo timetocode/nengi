@@ -1,5 +1,5 @@
 import { IEntity } from '../common/IEntity'
-import type { ChannelEntityCreate, ChannelIdentity } from '../binary/snapshot/SnapshotPlan'
+import type { ChannelEntityCreate, ChannelHeaderCreate, ChannelHeaderDelete, ChannelHeaderUpdate } from '../binary/snapshot/SnapshotPlan'
 
 export type AppliedEntityChange = {
     nid: number
@@ -11,6 +11,13 @@ export type AppliedEntityChange = {
 export type DeletedEntity = {
     nid: number
     entity?: IEntity
+    channelId?: number
+}
+
+export type ClosedChannel = {
+    channelId: number
+    header?: IEntity
+    entityNids: number[]
 }
 
 export interface IEntityFrame {
@@ -20,8 +27,11 @@ export interface IEntityFrame {
     ecsCreateEntities?: number[]
     ecsCreateComponents?: IEntity[]
     ecsDeleteEntities?: number[]
-    channelIdentities?: ChannelIdentity[]
     channelEntityCreates?: ChannelEntityCreate[]
+    channelHeaderCreates?: ChannelHeaderCreate[]
+    channelHeaderUpdates?: ChannelHeaderUpdate[]
+    channelHeaderDeletes?: ChannelHeaderDelete[]
+    closedChannels?: ClosedChannel[]
     createEntities: IEntity[]
     updateEntities: AppliedEntityChange[]
     deleteEntities: number[]
@@ -38,8 +48,11 @@ export class Frame implements IEntityFrame {
     ecsCreateEntities: number[]
     ecsCreateComponents: IEntity[]
     ecsDeleteEntities: number[]
-    channelIdentities: ChannelIdentity[]
     channelEntityCreates: ChannelEntityCreate[]
+    channelHeaderCreates: ChannelHeaderCreate[]
+    channelHeaderUpdates: ChannelHeaderUpdate[]
+    channelHeaderDeletes: ChannelHeaderDelete[]
+    closedChannels: ClosedChannel[]
     createEntities: IEntity[]
     updateEntities: AppliedEntityChange[]
     deleteEntities: number[]
@@ -54,8 +67,11 @@ export class Frame implements IEntityFrame {
         this.ecsCreateEntities = args.ecsCreateEntities || []
         this.ecsCreateComponents = args.ecsCreateComponents || []
         this.ecsDeleteEntities = args.ecsDeleteEntities || []
-        this.channelIdentities = args.channelIdentities || []
         this.channelEntityCreates = args.channelEntityCreates || []
+        this.channelHeaderCreates = args.channelHeaderCreates || []
+        this.channelHeaderUpdates = args.channelHeaderUpdates || []
+        this.channelHeaderDeletes = args.channelHeaderDeletes || []
+        this.closedChannels = args.closedChannels || []
         this.createEntities = args.createEntities
         this.updateEntities = args.updateEntities
         this.deleteEntities = args.deleteEntities

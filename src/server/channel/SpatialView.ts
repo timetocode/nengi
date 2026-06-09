@@ -60,6 +60,8 @@ export function normalizeSpatialView(view: SpatialView, plane: SpatialPlane): Sp
         }
         return {
             a: xz.x,
+            // Accepting y as a fallback keeps object-style 2D views usable for
+            // xz planes, but z is the clearer user-facing property.
             b: Number(xz.z ?? xz.y),
             halfA: half(xz.halfX, xz.halfWidth),
             halfB: half(xz.halfZ, xz.halfDepth ?? xz.halfHeight)

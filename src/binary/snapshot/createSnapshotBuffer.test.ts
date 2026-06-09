@@ -10,19 +10,17 @@ import { defineEntitySchema, defineMessageSchema } from '../../common/binary/sch
 import { Context } from '../../common/Context'
 import { ResponseStatus } from '../../common/Endpoint'
 import { ClientNetwork } from '../../client/ClientNetwork'
-import { AABB2D } from '../../server/AABB2D'
-import { AABB3D } from '../../server/AABB3D'
-import { SpatialChannel2D } from '../../server/SpatialChannel2D'
-import { SpatialChannel3D } from '../../server/SpatialChannel3D'
-import { SpatialGridChannel2D } from '../../server/SpatialGridChannel2D'
-import { SpatialGridChannel3D } from '../../server/SpatialGridChannel3D'
-import { Channel } from '../../server/Channel'
-import { ManualChannel } from '../../server/ManualChannel'
-import { ManualSpatialChannel2D } from '../../server/ManualSpatialChannel2D'
-import { ManualSpatialChannel3D } from '../../server/ManualSpatialChannel3D'
-import { EcsChannel } from '../../server/EcsChannel'
-import { EcsSpatialChannel2D } from '../../server/EcsSpatialChannel2D'
-import { EcsSpatialChannel3D } from '../../server/EcsSpatialChannel3D'
+import { AABB2D } from '../../server/channel/AABB2D'
+import { AABB3D } from '../../server/channel/AABB3D'
+import { SpatialChannel2D } from '../../server/channel/SpatialChannel2D'
+import { SpatialChannel3D } from '../../server/channel/SpatialChannel3D'
+import { Channel } from '../../server/channel/Channel'
+import { ManualChannel } from '../../server/channel/ManualChannel'
+import { ManualSpatialChannel2D } from '../../server/channel/ManualSpatialChannel2D'
+import { ManualSpatialChannel3D } from '../../server/channel/ManualSpatialChannel3D'
+import { EcsChannel } from '../../server/channel/EcsChannel'
+import { EcsSpatialChannel2D } from '../../server/channel/EcsSpatialChannel2D'
+import { EcsSpatialChannel3D } from '../../server/channel/EcsSpatialChannel3D'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { TestBufferWriter, testBinaryAdapter } from '../../testSupport/BufferBinary'
@@ -199,6 +197,47 @@ describe('server snapshot pipeline', () => {
         expect(third.createEntities).toEqual([])
         expect(third.updateEntities).toEqual([])
         expect(third.deleteEntities).toEqual([nid])
+    })
+
+    it('does not miss a same-length all-visible channel membership replacement', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const first = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'first'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const firstNid = first.nid
+        channel.removeEntity(first)
+        const replacement = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 3,
+            y: 4,
+            label: 'replacement'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([firstNid])
+        expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([replacement.nid])
+        expect(clientNetwork.store.entities.has(firstNid)).toBe(false)
+        expect(clientNetwork.store.get(replacement.nid)?.label).toBe('replacement')
     })
 
     it('collects hierarchy creates and updates parent-first, then deletes child-first', () => {
@@ -441,7 +480,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualChannel(instance.localState)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
         instance.users.set(user.id, user)
@@ -477,7 +516,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualChannel(instance.localState)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const label = Entity.label
 
         instance.users.set(user.id, user)
@@ -504,6 +543,55 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['label'])
     })
 
+    it('does not scan ManualChannel entities in the mixed-channel fallback', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const manualChannel = new ManualChannel(instance.localState)
+        const regularChannel = new Channel(instance.localState)
+        const ManualEntity = manualChannel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        manualChannel.subscribe(user)
+        regularChannel.subscribe(user)
+        const manualEntity = manualChannel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'manual'
+        })
+        const regularEntity = regularChannel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 15,
+            y: 16,
+            label: 'regular'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        manualEntity.x = 50
+        regularEntity.x = 150
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(manualEntity.nid)?.x).toBe(5)
+        expect(clientNetwork.store.get(regularEntity.nid)?.x).toBe(150)
+
+        manualEntity.x = 55
+        ManualEntity.x(manualEntity, 55)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(manualEntity.nid)?.x).toBe(55)
+    })
+
     it('writes manual spatial grouped mutations through cell fragments', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
@@ -511,7 +599,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualSpatialChannel2D(instance.localState, 100)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
         instance.users.set(user.id, user)
@@ -540,6 +628,44 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.sharedUpdateFragments.size).toBe(1)
     })
 
+    it('does not scan ManualSpatialChannel2D entities in the generic fallback', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new ManualSpatialChannel2D(instance.localState, 100)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'manual-spatial'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.label = 'direct-only'
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('manual-spatial')
+
+        entity.label = 'manual-write'
+        Entity.label(entity, 'manual-write')
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('manual-write')
+    })
+
     it('writes manual spatial 3D grouped mutations through cell fragments', () => {
         const context = createGroupedContext3D()
         const instance = new Instance(context)
@@ -547,7 +673,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualSpatialChannel3D(instance.localState, 100)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB3D(50, 50, 50, 60, 60, 60))
@@ -594,7 +720,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualSpatialChannel2D(instance.localState, 100)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
         instance.users.set(user.id, user)
@@ -636,7 +762,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new EcsChannel(instance.localState)
-        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
         channel.subscribe(user)
@@ -686,6 +812,48 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(componentNid)).toBe(false)
     })
 
+    it('does not scan ECS components without manual writer calls', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsChannel(instance.localState)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const pid = channel.createEntity()
+        const transform = channel.addComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 1,
+            y: 2
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        transform.x = 5
+        transform.y = 6
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(1)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(2)
+
+        transform.x = 7
+        transform.y = 8
+        Transform.position(transform, 7, 8)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(7)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(8)
+    })
+
     it('can compose ECS and regular channels in one user snapshot', () => {
         const context = createEcsContext()
         const instance = new Instance(context)
@@ -693,7 +861,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const ecsChannel = new EcsChannel(instance.localState)
         const regularChannel = new Channel(instance.localState)
-        const Transform = ecsChannel.type(NType.Transform, context.getSchema(NType.Transform)!)
+        const Transform = ecsChannel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
         ecsChannel.subscribe(user)
@@ -756,13 +924,57 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(regularNid)).toBe(false)
     })
 
+    it('sends unsubscribe deletes without merging away remaining channel updates', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const worldChannel = new Channel(instance.localState)
+        const inventoryChannel = new Channel(instance.localState)
+
+        instance.users.set(user.id, user)
+        worldChannel.subscribe(user)
+        inventoryChannel.subscribe(user)
+
+        const worldEntity = worldChannel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'world'
+        })
+        const item = inventoryChannel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 3,
+            y: 4,
+            label: 'item'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const itemNid = item.nid
+        inventoryChannel.unsubscribe(user)
+        worldEntity.x = 10
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([itemNid])
+        expect(clientNetwork.store.get(worldEntity.nid)?.x).toBe(10)
+        expect(clientNetwork.store.entities.has(itemNid)).toBe(false)
+    })
+
     it('spatially replicates ECS roots from component state', () => {
         const context = createEcsContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new EcsSpatialChannel2D(instance.localState, 10)
-        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB2D(5, 5, 10, 10))
@@ -808,13 +1020,55 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
 
+    it('does not scan ECS spatial components without manual writer calls', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel2D(instance.localState, 10)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(5, 5, 10, 10))
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        transform.x = 6
+        transform.y = 7
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(5)
+
+        transform.x = 8
+        transform.y = 9
+        Transform.position(transform, 8, 9)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(8)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(9)
+    })
+
     it('spatially replicates ECS roots from 3D component state', () => {
         const context = createEcsContext3D()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new EcsSpatialChannel3D(instance.localState, 10)
-        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, new AABB3D(5, 5, 5, 10, 10, 10))
@@ -866,7 +1120,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new EcsSpatialChannel2D(instance.localState, 10, { plane: 'xz' })
-        const Transform = channel.type(NType.Transform, context.getSchema(NType.Transform)!)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, { x: 5, z: 5, halfX: 10, halfZ: 10 })
@@ -909,7 +1163,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualSpatialChannel2D(instance.localState, 100)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
         instance.users.set(user.id, user)
@@ -944,7 +1198,7 @@ describe('server snapshot pipeline', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const channel = new ManualSpatialChannel2D(instance.localState, 100, { plane: 'xz' })
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
         instance.users.set(user.id, user)
         channel.subscribe(user, { x: 50, z: 50, halfX: 60, halfZ: 60 })
@@ -985,7 +1239,7 @@ describe('server snapshot pipeline', () => {
         const firstClient = createClientNetwork(context)
         const secondClient = createClientNetwork(context)
         const channel = new ManualSpatialChannel2D(instance.localState, 100)
-        const Entity = channel.type(NType.Entity, context.getSchema(NType.Entity)!)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
         instance.users.set(firstUser.id, firstUser)
@@ -1413,39 +1667,6 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual([])
     })
 
-    it('uses grid-backed 2D cells for SpatialGridChannel2D visibility', () => {
-        const context = createContext()
-        const instance = new Instance(context)
-        const user = createUser(instance)
-        const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialGridChannel2D(instance.localState, 50)
-
-        instance.users.set(user.id, user)
-        channel.subscribe(user, new AABB2D(10, 10, 20, 20))
-        const entity = channel.addEntity({
-            nid: 0,
-            ntype: NType.Entity,
-            x: 5,
-            y: 6,
-            z: 7,
-            label: 'grid-visible'
-        } as any)
-
-        instance.step()
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
-        clientNetwork.processNextFrame()
-
-        expect(clientNetwork.store.get(entity.nid)?.label).toBe('grid-visible')
-
-        entity.x = 200
-        channel.updateEntity(entity)
-        instance.step()
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
-        clientNetwork.processNextFrame()
-
-        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
-    })
-
     it('updates SpatialChannel3D visibility when only vertical position changes cells', () => {
         const context = createContext()
         const instance = new Instance(context)
@@ -1463,42 +1684,6 @@ describe('server snapshot pipeline', () => {
             y: 6,
             z: 7,
             label: 'vertical'
-        })
-
-        instance.step()
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
-        clientNetwork.processNextFrame()
-
-        expect(clientNetwork.store.entities.has(entity.nid)).toBe(true)
-        expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0:0'])
-
-        entity.y = 200
-        channel.updateEntity(entity)
-        instance.step()
-        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
-        clientNetwork.processNextFrame()
-
-        expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
-        expect(channel.getVisibleCellKeys(user.id)).toEqual([])
-    })
-
-    it('uses grid-backed true 3D cells for SpatialGridChannel3D visibility', () => {
-        const context = createContext()
-        const instance = new Instance(context)
-        instance.network.sharedUpdateFragmentsEnabled = true
-        const user = createUser(instance)
-        const clientNetwork = createClientNetwork(context)
-        const channel = new SpatialGridChannel3D(instance.localState, 50)
-
-        instance.users.set(user.id, user)
-        channel.subscribe(user, new AABB3D(10, 10, 10, 20, 20, 20))
-        const entity = channel.addEntity({
-            nid: 0,
-            ntype: NType.Entity,
-            x: 5,
-            y: 6,
-            z: 7,
-            label: 'grid-3d'
         })
 
         instance.step()
@@ -1918,6 +2103,40 @@ describe('server snapshot pipeline', () => {
         }
     })
 
+    it('reruns ECS component snapshot writes with binary debug context after a write failure', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const channel = new EcsChannel(instance.localState)
+        instance.network.debugBinaryWrites = true
+
+        channel.subscribe(user)
+        const pid = channel.createEntity()
+        channel.addComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: Symbol('bad'),
+            y: 6
+        } as any)
+
+        try {
+            createSnapshotBuffer(user, instance)
+            throw new Error('Expected ECS snapshot write to fail.')
+        } catch (err: any) {
+            expect(err).toBeInstanceOf(BinaryDebugError)
+            expect(err.context).toEqual(expect.objectContaining({
+                phase: 'write',
+                section: 'EcsCreateComponents',
+                index: 0,
+                prop: 'x',
+                propKey: 0,
+                binaryType: Binary.Float64
+            }))
+            expect(err.message).toContain('EcsCreateComponents')
+            expect(err.message).toContain('prop: "x"')
+        }
+    })
+
     it('collects at most 255 queued responses per user frame', () => {
         const context = createContext()
         const instance = new Instance(context)
@@ -2076,6 +2295,182 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.deleteEntities).toEqual([nid])
         expect(clientNetwork.store.entities.has(nid)).toBe(false)
         expect(clientNetwork.entityNTypes.has(nid)).toBe(false)
+    })
+
+    it('sends channel headers before normal channel entities and applies header updates', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const header = {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 0,
+            y: 0,
+            label: 'inventory'
+        }
+        const channel = new Channel(instance.localState, { header })
+        const clientNetwork = createClientNetwork(context)
+
+        channel.subscribe(user)
+        const item = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'item'
+        })
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+        const createBuffer = createSnapshotBuffer(user, instance) as Buffer
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createBuffer))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.channelHeaderCreates).toEqual([
+            {
+                channelId: channel.nid,
+                version: 0,
+                header: { nid: header.nid, ntype: NType.Entity, x: 0, y: 0, label: 'inventory' }
+            }
+        ])
+        expect(clientNetwork.latestFrame?.createEntities).toEqual([
+            { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
+        ])
+        expect(clientNetwork.store.getChannelHeader(channel.nid)).toEqual({
+            nid: header.nid,
+            ntype: NType.Entity,
+            x: 0,
+            y: 0,
+            label: 'inventory'
+        })
+
+        header.label = 'renamed'
+        channel.markHeaderDirty()
+        instance.tick = 2
+        instance.cache.createCachesForTick(instance.tick)
+        const updateBuffer = createSnapshotBuffer(user, instance) as Buffer
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(updateBuffer))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.channelHeaderUpdates).toHaveLength(1)
+        expect(clientNetwork.store.getChannelHeader(channel.nid)?.label).toBe('renamed')
+        expect(clientNetwork.latestFrame?.createEntities).toEqual([])
+    })
+
+    it('sends a newly subscribed headered channel alongside an existing world channel', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const world = new Channel(instance.localState, { label: 'world' })
+        const inventoryHeader = {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 0,
+            y: 0,
+            label: 'inventory'
+        }
+        const inventory = new Channel(instance.localState, {
+            label: 'inventory',
+            header: inventoryHeader
+        })
+        world.subscribe(user)
+        const player = world.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'player'
+        })
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
+        clientNetwork.processNextFrame()
+        expect(clientNetwork.store.get(player.nid)).toBeDefined()
+
+        inventory.subscribe(user)
+        const item = inventory.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'item'
+        })
+
+        instance.tick = 2
+        instance.cache.createCachesForTick(instance.tick)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.channelHeaderCreates.map(create => create.channelId)).toEqual([inventory.nid])
+        expect(clientNetwork.latestFrame?.channelEntityCreates).toEqual([
+            { nid: item.nid, channelId: inventory.nid }
+        ])
+        expect(clientNetwork.latestFrame?.createEntities).toEqual([
+            { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
+        ])
+        expect(clientNetwork.store.getChannelHeader(item.nid)).toEqual({
+            nid: inventoryHeader.nid,
+            ntype: NType.Entity,
+            x: 0,
+            y: 0,
+            label: 'inventory'
+        })
+    })
+
+    it('closes a known headered channel without sending each contained entity delete', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const header = {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 0,
+            y: 0,
+            label: 'inventory'
+        }
+        const channel = new Channel(instance.localState, { header })
+
+        channel.subscribe(user)
+        const item = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'item'
+        })
+
+        instance.tick = 1
+        instance.cache.createCachesForTick(instance.tick)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
+        clientNetwork.processNextFrame()
+        expect(clientNetwork.store.get(item.nid)).toBeDefined()
+
+        const itemNid = item.nid
+        channel.unsubscribe(user)
+        instance.tick = 2
+        instance.cache.createCachesForTick(instance.tick)
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.channelHeaderDeletes).toEqual([
+            {
+                channelId: channel.nid,
+                header: { nid: header.nid, ntype: NType.Entity, x: 0, y: 0, label: 'inventory' }
+            }
+        ])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
+        expect(clientNetwork.latestFrame?.closedChannels).toEqual([
+            {
+                channelId: channel.nid,
+                header: { nid: header.nid, ntype: NType.Entity, x: 0, y: 0, label: 'inventory' },
+                entityNids: [itemNid]
+            }
+        ])
+        expect(clientNetwork.store.get(itemNid)).toBeUndefined()
+        expect(clientNetwork.store.getChannelHeader(channel.nid)).toBeUndefined()
     })
 
     it('drains applied frames in receive order without duplicating authoritative state', () => {

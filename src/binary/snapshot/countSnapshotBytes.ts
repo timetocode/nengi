@@ -1,7 +1,5 @@
 import { Context } from '../../common/Context'
 import { DEFAULT_PROTOCOL, ProtocolConfig, byteSizeOfNetworkType } from '../../common/binary/Protocol'
-import { Binary } from '../../common/binary/Binary'
-import { binaryGet } from '../../common/binary/BinaryExt'
 import { countEndpointPayload } from '../endpoint/EndpointPayload'
 import countEntity from '../entity/countEntity'
 import countDiff from '../entity/countDiff'
@@ -15,20 +13,6 @@ const UINT32_COUNT_BYTES = 4
 const UINT32_BYTES = 4
 const RESPONSE_STATUS_BYTES = 1
 
-function countChannelIdentities(plan: SnapshotPlan, protocol: ProtocolConfig) {
-    if (plan.channelIdentities.length === 0) {
-        return 0
-    }
-
-    let bytes = SECTION_BYTES + UINT32_COUNT_BYTES
-    const stringBinary = binaryGet(Binary.String)
-    for (let i = 0; i < plan.channelIdentities.length; i++) {
-        bytes += byteSizeOfNetworkType(protocol.nidType)
-        bytes += stringBinary.byteSize(JSON.stringify(plan.channelIdentities[i].identity) ?? 'null')
-    }
-    return bytes
-}
-
 function countChannelEntityCreates(plan: SnapshotPlan, protocol: ProtocolConfig) {
     if (plan.channelEntityCreates.length === 0) {
         return 0
@@ -36,6 +20,51 @@ function countChannelEntityCreates(plan: SnapshotPlan, protocol: ProtocolConfig)
 
     return SECTION_BYTES + UINT32_COUNT_BYTES +
         (plan.channelEntityCreates.length * byteSizeOfNetworkType(protocol.nidType) * 2)
+}
+
+function countChannelHeaderCreates(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+    if (plan.channelHeaderCreates.length === 0) {
+        return 0
+    }
+
+    let bytes = SECTION_BYTES + UINT32_COUNT_BYTES
+    for (let i = 0; i < plan.channelHeaderCreates.length; i++) {
+        const header = plan.channelHeaderCreates[i].header
+        bytes += byteSizeOfNetworkType(protocol.nidType)
+        bytes += countEntity(context.getSchema(header.ntype)!, header, protocol.ntypeType, protocol.nidType)
+    }
+    return bytes
+}
+
+function countChannelHeaderUpdates(plan: SnapshotPlan, protocol: ProtocolConfig) {
+    if (plan.channelHeaderUpdates.length === 0) {
+        return 0
+    }
+
+    let bytes = SECTION_BYTES + UINT32_COUNT_BYTES
+    for (let i = 0; i < plan.channelHeaderUpdates.length; i++) {
+        const update = plan.channelHeaderUpdates[i]
+        bytes += byteSizeOfNetworkType(protocol.nidType)
+        bytes += UINT32_COUNT_BYTES
+        for (let j = 0; j < update.changes.length; j++) {
+            const diff = update.changes[j]
+            bytes += countDiff(diff, diff.nschema, protocol.nidType)
+        }
+        bytes += UINT32_COUNT_BYTES
+        for (let j = 0; j < update.groups.length; j++) {
+            bytes += countUpdateGroup(update.groups[j], protocol.nidType)
+        }
+    }
+    return bytes
+}
+
+function countChannelHeaderDeletes(plan: SnapshotPlan, protocol: ProtocolConfig) {
+    if (plan.channelHeaderDeletes.length === 0) {
+        return 0
+    }
+
+    return SECTION_BYTES + UINT32_COUNT_BYTES +
+        (plan.channelHeaderDeletes.length * byteSizeOfNetworkType(protocol.nidType))
 }
 
 function countEngineMessages(plan: SnapshotPlan, context: Context) {
@@ -163,8 +192,10 @@ export function countSnapshotBytes(plan: SnapshotPlan, context: Context, protoco
     return countEngineMessages(plan, context) +
         countMessages(plan, context, protocol) +
         countResponses(plan) +
-        countChannelIdentities(plan, protocol) +
         countChannelEntityCreates(plan, protocol) +
+        countChannelHeaderCreates(plan, context, protocol) +
+        countChannelHeaderUpdates(plan, protocol) +
+        countChannelHeaderDeletes(plan, protocol) +
         countEcsCreateEntities(plan, protocol) +
         countEcsCreateComponents(plan, context, protocol) +
         countCreateEntities(plan, context, protocol) +
