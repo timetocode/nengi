@@ -18,6 +18,24 @@ Pick the channel that matches visibility:
 
 Nengi is a networking framework. It does not own your game objects, game loop, physics, inventory system, ECS scheduler, or renderer.
 
+## Expected AI workflow
+
+When asked to build a game feature, do not start by inventing a full engine
+architecture. First choose the smallest networking primitive that represents the
+feature correctly, then write ordinary game code around it.
+
+Prefer primitive patterns that can be remixed:
+
+- world object with position and durable state: entity in a world channel
+- private count or HUD value: private message or one small private entity
+- shared container with item lifecycle: headered `Channel`
+- repeated player input: command
+- validated interaction: request/response
+- one-shot visual/audio event: message
+
+Only reach for a larger game-template pattern after these primitive choices are
+clear.
+
 ## Before choosing an API
 
 For any requested feature, answer these questions:
@@ -36,6 +54,9 @@ Use this map instead of reading every file every time.
 
 - If deciding which channel to use, read [channel-selection.md](./channel-selection.md).
 - If deciding between entities, messages, commands, and requests, read [networking-primitives.md](./networking-primitives.md).
+- If wiring client state into a renderer, read [client-router.md](./client-router.md).
+- If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).
+- If wiring sockets or local test transports, read [adapters.md](./adapters.md).
 - If adding common game features, read [channel-recipes.md](./channel-recipes.md).
 - If optimizing explicit updates, read [manual-mutations.md](./manual-mutations.md).
 - If visibility depends on position, read [spatial-channels.md](./spatial-channels.md).

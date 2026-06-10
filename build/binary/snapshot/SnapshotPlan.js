@@ -6,8 +6,17 @@ function createEmptySnapshotPlan() {
         engineMessages: [],
         messages: [],
         responses: [],
+        channelEntityCreates: [],
+        channelHeaderCreates: [],
+        channelHeaderUpdates: [],
+        channelHeaderDeletes: [],
+        channelHeaderVersions: [],
+        ecsCreateEntities: [],
+        ecsCreateComponents: [],
+        ecsDeleteEntities: [],
         createEntities: [],
         updateEntities: [],
+        updateEntityGroups: [],
         deleteEntities: []
     };
 }

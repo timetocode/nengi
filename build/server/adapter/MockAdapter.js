@@ -1,24 +1,26 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MockServerSocket = exports.MockClientSocket = exports.MockClientAdapter = exports.MockInstanceAdapter = void 0;
+exports.MockServerSocket = exports.MockClientSocket = exports.MockClientAdapter = exports.MockInstanceAdapter = exports.LocalClientAdapter = exports.LocalInstanceAdapter = void 0;
 const User_1 = require("../User");
 const NQueue_1 = require("../../NQueue");
 /**
- * Not a real network adapter, data is passed without using a real socket.
- * Used for mixing a server and client together in one application
- * such as for a single player mode or automated testing
+ * Dependency-free in-memory transport.
+ * Useful for single-player modes, embedded simulations, and tests where a real
+ * socket would add environment-specific noise without changing nengi behavior.
  */
-class MockInstanceAdapter {
+class LocalInstanceAdapter {
     constructor(network, config) {
         this.network = network;
         this.serverSockets = [];
         if (!(config === null || config === void 0 ? void 0 : config.binary)) {
-            throw new Error('MockAdapter requires a config.binary to be created.');
+            throw new Error('LocalInstanceAdapter requires a config.binary to be created.');
         }
         this.binary = config.binary;
     }
-    listen(port, ready) {
-        console.log('MockAdapter listen is fake! No need to invoke it.');
+    listen(options, ready) {
+        var _a;
+        ready === null || ready === void 0 ? void 0 : ready();
+        (_a = options === null || options === void 0 ? void 0 : options.ready) === null || _a === void 0 ? void 0 : _a.call(options);
     }
     createMockConnect() {
         const socket = new MockServerSocket(this.network);
@@ -41,34 +43,70 @@ class MockInstanceAdapter {
         }
     }
     disconnect(user, reason) {
-        user.socket.end(1000, JSON.stringify(reason));
+        user.socket.end(reason);
     }
     send(user, buffer) {
         user.socket.send(buffer, true);
     }
 }
-exports.MockInstanceAdapter = MockInstanceAdapter;
-class MockClientAdapter {
+exports.LocalInstanceAdapter = LocalInstanceAdapter;
+class LocalClientAdapter {
     constructor(network, config) {
+        this.socket = null;
+        this.connected = false;
+        this.pendingConnect = null;
         this.network = network;
         if (!(config === null || config === void 0 ? void 0 : config.binary)) {
-            throw new Error('MockAdapter requires a config.binary to be created.');
+            throw new Error('LocalClientAdapter requires a config.binary to be created.');
         }
         this.binary = config.binary;
     }
     onMessage(buffer) {
+        var _a, _b;
+        if (!this.connected) {
+            const result = this.network.readHandshakeResponse(this.binary.createReader(buffer));
+            if (result.accepted) {
+                this.connected = true;
+                (_a = this.pendingConnect) === null || _a === void 0 ? void 0 : _a.resolve(result);
+            }
+            else {
+                (_b = this.pendingConnect) === null || _b === void 0 ? void 0 : _b.reject(result.reason);
+            }
+            this.pendingConnect = null;
+            return;
+        }
         const br = this.binary.createReader(buffer);
         this.network.readSnapshot(br);
     }
-    connect(wsUrl, handshake) {
+    connect(target, handshake) {
+        this.socket = target || null;
+        if (!this.socket) {
+            this.connected = true;
+            return Promise.resolve({ accepted: true });
+        }
+        this.socket.adapter = this;
         return new Promise((resolve, reject) => {
-            resolve(true);
+            this.pendingConnect = { resolve, reject };
+            this.socket.send(this.network.createHandshake(handshake, this.binary));
         });
     }
     flush() {
+        if (!this.socket) {
+            return;
+        }
+        if (!this.connected) {
+            return;
+        }
+        this.socket.send(this.network.createOutbound(this.binary));
+    }
+    disconnect(reason) {
+        var _a;
+        (_a = this.socket) === null || _a === void 0 ? void 0 : _a.close(reason);
+        this.socket = null;
+        this.connected = false;
     }
 }
-exports.MockClientAdapter = MockClientAdapter;
+exports.LocalClientAdapter = LocalClientAdapter;
 var MockSocketReadyState;
 (function (MockSocketReadyState) {
     MockSocketReadyState[MockSocketReadyState["CONNECTING"] = 0] = "CONNECTING";
@@ -85,7 +123,9 @@ class MockServerSocket {
         this.network = network;
         this.readyState = MockSocketReadyState.OPEN;
     }
-    end() {
+    end(reason) {
+        this.readyState = MockSocketReadyState.CLOSED;
+        this.clientSocket.close(reason);
     }
     receive(buffer) {
         //this.inboundQueue.enqueue(buffer)
@@ -100,19 +140,31 @@ class MockServerSocket {
 exports.MockServerSocket = MockServerSocket;
 class MockClientSocket {
     constructor(serverSocket) {
+        this.adapter = null;
         this.inboundQueue = new NQueue_1.NQueue();
         this.readyState = MockSocketReadyState.CONNECTING;
         this.serverSocket = serverSocket;
         this.readyState = MockSocketReadyState.OPEN;
     }
-    close() {
+    close(reason) {
         this.readyState = MockSocketReadyState.CLOSED;
+        if (this.serverSocket.user) {
+            this.serverSocket.network.onClose(this.serverSocket.user);
+        }
     }
     send(buffer) {
         this.serverSocket.receive(buffer);
     }
     receive(buffer) {
+        if (this.adapter) {
+            this.adapter.onMessage(buffer);
+            return;
+        }
         this.inboundQueue.enqueue(buffer);
     }
 }
 exports.MockClientSocket = MockClientSocket;
+const MockInstanceAdapter = LocalInstanceAdapter;
+exports.MockInstanceAdapter = MockInstanceAdapter;
+const MockClientAdapter = LocalClientAdapter;
+exports.MockClientAdapter = MockClientAdapter;

@@ -12,16 +12,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
+const createSnapshotBuffer_1 = __importDefault(require("../binary/snapshot/createSnapshotBuffer"));
 const Binary_1 = require("../common/binary/Binary");
 const defineSchema_1 = require("../common/binary/schema/defineSchema");
 const Context_1 = require("../common/Context");
 const Endpoint_1 = require("../common/Endpoint");
-const Channel_1 = require("../server/Channel");
+const Channel_1 = require("../server/channel/Channel");
 const Instance_1 = require("../server/Instance");
 const User_1 = require("../server/User");
 const BufferBinary_1 = require("../testSupport/BufferBinary");
 const ClientNetwork_1 = require("./ClientNetwork");
+const schemaFingerprint_1 = require("../common/binary/schema/schemaFingerprint");
+const Predictor_1 = require("./prediction/Predictor");
 function createUser(instance) {
     const user = new User_1.User(undefined, {
         binary: BufferBinary_1.testBinaryAdapter,
@@ -38,10 +40,7 @@ function createClientNetwork(context) {
         serverTickRate: 20,
         disconnectHandler: jest.fn(),
         websocketErrorHandler: jest.fn(),
-        predictor: {
-            getErrors: jest.fn(() => ({ entities: new Map() })),
-            cleanUp: jest.fn()
-        },
+        predictor: new Predictor_1.Predictor(),
         network: undefined
     };
     const network = new ClientNetwork_1.ClientNetwork(client);
@@ -51,8 +50,9 @@ function createClientNetwork(context) {
 function deliverRequestAndResponse(instance, user, clientNetwork) {
     const outbound = clientNetwork.createOutbound(BufferBinary_1.testBinaryAdapter);
     instance.network.onMessage(user, outbound);
-    const responseBuffer = (0, createSnapshotBufferRefactor_1.default)(user, instance);
+    const responseBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
     clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(responseBuffer));
+    clientNetwork.processNextFrame();
 }
 describe('request/response', () => {
     it('receives protocol id widths during the connection handshake', () => __awaiter(void 0, void 0, void 0, function* () {
@@ -72,6 +72,78 @@ describe('request/response', () => {
             nidType: Binary_1.Binary.UInt8,
             ntypeType: Binary_1.Binary.UInt16
         });
+    }));
+    it('can require matching schema fingerprints during the connection handshake', () => __awaiter(void 0, void 0, void 0, function* () {
+        const context = new Context_1.Context();
+        context.register(1, (0, defineSchema_1.defineMessageSchema)({
+            text: Binary_1.Binary.String
+        }));
+        const instance = new Instance_1.Instance(context);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(context);
+        clientNetwork.sendSchemaFingerprint = true;
+        instance.network.requireSchemaFingerprint = true;
+        instance.onConnect = () => __awaiter(void 0, void 0, void 0, function* () { return true; });
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, BufferBinary_1.testBinaryAdapter));
+        yield new Promise(resolve => setTimeout(resolve, 0));
+        const handshakeBuffer = user.networkAdapter.send.mock.calls[0][1];
+        const response = clientNetwork.readHandshakeResponse(BufferBinary_1.testBinaryAdapter.createReader(handshakeBuffer));
+        expect(response.accepted).toBe(true);
+        expect((0, schemaFingerprint_1.createSchemaFingerprint)(context)).toBe((0, schemaFingerprint_1.createSchemaFingerprint)(instance.context));
+    }));
+    it('denies schema fingerprint mismatches when required', () => __awaiter(void 0, void 0, void 0, function* () {
+        const serverContext = new Context_1.Context();
+        serverContext.register(1, (0, defineSchema_1.defineMessageSchema)({
+            text: Binary_1.Binary.String
+        }));
+        const clientContext = new Context_1.Context();
+        clientContext.register(1, (0, defineSchema_1.defineMessageSchema)({
+            other: Binary_1.Binary.String
+        }));
+        const instance = new Instance_1.Instance(serverContext);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(clientContext);
+        clientNetwork.sendSchemaFingerprint = true;
+        instance.network.requireSchemaFingerprint = true;
+        instance.onConnect = () => __awaiter(void 0, void 0, void 0, function* () { return true; });
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, BufferBinary_1.testBinaryAdapter));
+        yield new Promise(resolve => setTimeout(resolve, 0));
+        const handshakeBuffer = user.networkAdapter.send.mock.calls[0][1];
+        const response = clientNetwork.readHandshakeResponse(BufferBinary_1.testBinaryAdapter.createReader(handshakeBuffer));
+        expect(response.accepted).toBe(false);
+        expect(response.reason.message).toContain('Schema fingerprint mismatch');
+    }));
+    it('denies missing schema fingerprints when required', () => __awaiter(void 0, void 0, void 0, function* () {
+        const context = new Context_1.Context();
+        context.register(1, (0, defineSchema_1.defineMessageSchema)({
+            text: Binary_1.Binary.String
+        }));
+        const instance = new Instance_1.Instance(context);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(context);
+        instance.network.requireSchemaFingerprint = true;
+        instance.onConnect = () => __awaiter(void 0, void 0, void 0, function* () { return true; });
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, BufferBinary_1.testBinaryAdapter));
+        yield new Promise(resolve => setTimeout(resolve, 0));
+        const handshakeBuffer = user.networkAdapter.send.mock.calls[0][1];
+        const response = clientNetwork.readHandshakeResponse(BufferBinary_1.testBinaryAdapter.createReader(handshakeBuffer));
+        expect(response.accepted).toBe(false);
+        expect(response.reason.message).toContain('Schema fingerprint required');
+    }));
+    it('accepts handshakes without schema fingerprints when not required', () => __awaiter(void 0, void 0, void 0, function* () {
+        const context = new Context_1.Context();
+        context.register(1, (0, defineSchema_1.defineMessageSchema)({
+            text: Binary_1.Binary.String
+        }));
+        const instance = new Instance_1.Instance(context);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(context);
+        instance.onConnect = () => __awaiter(void 0, void 0, void 0, function* () { return true; });
+        instance.network.onMessage(user, clientNetwork.createHandshake({}, BufferBinary_1.testBinaryAdapter));
+        yield new Promise(resolve => setTimeout(resolve, 0));
+        const handshakeBuffer = user.networkAdapter.send.mock.calls[0][1];
+        const response = clientNetwork.readHandshakeResponse(BufferBinary_1.testBinaryAdapter.createReader(handshakeBuffer));
+        expect(response.accepted).toBe(true);
     }));
     it('round trips plain numeric endpoints with UTF-8 JSON payloads', () => __awaiter(void 0, void 0, void 0, function* () {
         const context = new Context_1.Context();
@@ -121,6 +193,57 @@ describe('request/response', () => {
             accepted: true,
             label: 'cafe\u0301'
         });
+    }));
+    it('reconciles request prediction before callback and promise observers run', () => __awaiter(void 0, void 0, void 0, function* () {
+        const context = new Context_1.Context();
+        const instance = new Instance_1.Instance(context);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(context);
+        const localSwitch = { open: false };
+        const callbackStates = [];
+        const setSwitch = (0, Endpoint_1.defineEndpoint)(16, {
+            requestSchema: (0, defineSchema_1.definePayloadSchema)({
+                nid: Binary_1.Binary.UInt32,
+                open: Binary_1.Binary.Boolean
+            }),
+            responseSchema: (0, defineSchema_1.definePayloadSchema)({
+                accepted: Binary_1.Binary.Boolean,
+                open: Binary_1.Binary.Boolean
+            })
+        });
+        instance.respond(setSwitch, () => {
+            return {
+                accepted: false,
+                open: false
+            };
+        });
+        const response = clientNetwork.request(setSwitch, { nid: 1, open: true }, {
+            timeoutMs: 0,
+            prediction: {
+                affected: [{ nid: 1, props: ['open'] }],
+                applyLocal: () => {
+                    localSwitch.open = true;
+                },
+                validate: ({ response }) => response.accepted,
+                reconcile: ({ accepted, response }) => {
+                    if (!accepted) {
+                        localSwitch.open = response.open;
+                    }
+                }
+            },
+            callback: () => {
+                callbackStates.push(localSwitch.open);
+            }
+        });
+        expect(localSwitch.open).toBe(true);
+        deliverRequestAndResponse(instance, user, clientNetwork);
+        yield expect(response).resolves.toEqual({
+            accepted: false,
+            open: false
+        });
+        expect(callbackStates).toEqual([false]);
+        expect(localSwitch.open).toBe(false);
+        expect(clientNetwork.client.predictor.log.getPendingRequests()).toEqual([]);
     }));
     it('supports send-style handlers and client callbacks', () => __awaiter(void 0, void 0, void 0, function* () {
         const context = new Context_1.Context();
@@ -177,12 +300,15 @@ describe('request/response', () => {
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
         const clientNetwork = createClientNetwork(context);
-        const inventoryChannel = new Channel_1.Channel(instance.localState, { label: 'chest:123:inventory' });
-        const inventory = inventoryChannel.addEntity({
+        const inventory = {
             nid: 0,
             ntype: NType.Inventory,
             chestNid: 123,
             slots: 27
+        };
+        const inventoryChannel = new Channel_1.Channel(instance.localState, {
+            label: 'chest:123:inventory',
+            header: inventory
         });
         const item = inventoryChannel.addEntity({
             nid: 0,
@@ -217,7 +343,8 @@ describe('request/response', () => {
         const response = clientNetwork.request(openChest, { chestNid: 123 }, {
             timeoutMs: 0,
             callback: value => {
-                callbackSawInventory = !!clientNetwork.store.get(value.inventoryNid);
+                var _a;
+                callbackSawInventory = ((_a = clientNetwork.store.getChannelHeader(inventoryChannel.nid)) === null || _a === void 0 ? void 0 : _a.nid) === value.inventoryNid;
             }
         });
         deliverRequestAndResponse(instance, user, clientNetwork);
@@ -227,10 +354,18 @@ describe('request/response', () => {
             inventoryNid: inventory.nid
         });
         expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities).toEqual([
-            inventory,
             item
         ]);
         expect((_b = clientNetwork.store.get(item.nid)) === null || _b === void 0 ? void 0 : _b.inventoryNid).toBe(inventory.nid);
+        expect(clientNetwork.store.getChannelId(item.nid)).toBe(inventoryChannel.nid);
+        expect(clientNetwork.store.getChannelHeader(item.nid)).toMatchObject({
+            ntype: NType.Inventory,
+            chestNid: 123,
+            slots: 27
+        });
+        expect(clientNetwork.store.getByChannel(inventoryChannel.nid)).toEqual([
+            item
+        ]);
         expect(callbackSawInventory).toBe(true);
     }));
     it('rejects when no server endpoint is registered', () => __awaiter(void 0, void 0, void 0, function* () {
@@ -307,7 +442,7 @@ describe('request/response', () => {
         yield expect(response).rejects.toMatchObject({
             code: 'TIMEOUT'
         });
-        const responseBuffer = (0, createSnapshotBufferRefactor_1.default)(user, instance);
+        const responseBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
         expect(() => {
             clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(responseBuffer));
         }).not.toThrow();

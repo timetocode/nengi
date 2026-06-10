@@ -73,6 +73,20 @@ type RequestOptions<Response = any> = {
     prediction?: PredictionOperationOptions<Response>
 }
 
+export type TimedCommandOptions = {
+    inputTimeMs?: number
+    renderDelayMs?: number
+    viewTick?: number
+    viewServerTimeMs?: number
+}
+
+export type InterpolationDelayReportOptions = {
+    minIntervalMs?: number
+    epsilonMs?: number
+    force?: boolean
+    now?: number
+}
+
 type HandshakeResponse = {
     accepted: boolean
     reason?: any
@@ -111,6 +125,11 @@ export class ClientNetwork {
     frameTick = 1 // incremented each frame that comes from server
     maxFrameHistory = 240
     latency = 0
+    interpolationDelayMs = 0
+    interpolationDelayReportIntervalMs = 500
+    interpolationDelayReportEpsilonMs = 1
+    private lastReportedInterpolationDelayMs = Number.NaN
+    private lastInterpolationDelayReportAt = Number.NEGATIVE_INFINITY
     sendSchemaFingerprint = false
 
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
@@ -149,10 +168,51 @@ export class ClientNetwork {
         this.outbound.addCommand(command)
     }
 
+    addTimedCommand(command: any, options: TimedCommandOptions = {}) {
+        this.outbound.addTimedCommand(command, {
+            clientTimeMs: options.inputTimeMs ?? getLocalTime(),
+            renderDelayMs: options.renderDelayMs ?? 0,
+            viewTick: options.viewTick ?? -1,
+            viewServerTimeMs: options.viewServerTimeMs ?? -1
+        })
+    }
+
+    reportInterpolationDelay(delayMs: number, options: InterpolationDelayReportOptions = {}) {
+        if (!Number.isFinite(delayMs)) {
+            return false
+        }
+        const now = options.now ?? getLocalTime()
+        const minIntervalMs = options.minIntervalMs ?? this.interpolationDelayReportIntervalMs
+        const epsilonMs = options.epsilonMs ?? this.interpolationDelayReportEpsilonMs
+        const roundedDelayMs = Math.max(0, Math.round(delayMs))
+        this.interpolationDelayMs = roundedDelayMs
+
+        const changed = !Number.isFinite(this.lastReportedInterpolationDelayMs) ||
+            Math.abs(roundedDelayMs - this.lastReportedInterpolationDelayMs) >= epsilonMs
+        const intervalElapsed = now - this.lastInterpolationDelayReportAt >= minIntervalMs
+        if (!options.force && (!changed || !intervalElapsed)) {
+            return false
+        }
+
+        this.lastReportedInterpolationDelayMs = roundedDelayMs
+        this.lastInterpolationDelayReportAt = now
+        this.addEngineCommand({
+            ntype: EngineMessage.InterpolationDelay,
+            delayMs: roundedDelayMs
+        })
+        return true
+    }
+
     predictCommand(command: any, options: PredictionOperationOptions = {}) {
         const tick = this.clientTick
         this.addCommand(command)
         return this.client.predictor.addCommand?.(command, tick, options)
+    }
+
+    predictTimedCommand(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: TimedCommandOptions = {}) {
+        const tick = this.clientTick
+        this.addTimedCommand(command, timingOptions)
+        return this.client.predictor.addCommand?.(command, tick, predictionOptions)
     }
 
     predictState(payload: any, options: PredictionOperationOptions = {}) {
@@ -495,6 +555,18 @@ export class ClientNetwork {
     createOutbound<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
         const tick = this.clientTick
         this.addEngineCommand({ ntype: EngineMessage.ClientTick, tick })
+        const timedCommands = this.outbound.getCommandTiming(this.outbound.tick)
+        for (let i = 0; i < timedCommands.length; i++) {
+            const timing = timedCommands[i]
+            this.addEngineCommand({
+                ntype: EngineMessage.CommandTiming,
+                commandIndex: timing.commandIndex,
+                clientTimeMs: timing.clientTimeMs,
+                renderDelayMs: timing.renderDelayMs,
+                viewTick: timing.viewTick,
+                viewServerTimeMs: timing.viewServerTimeMs
+            })
+        }
 
         let bytes = 0
 
@@ -655,7 +727,16 @@ export class ClientNetwork {
                     }
 
                     if (engineMessage.ntype === EngineMessage.Ping) {
-                        this.addEngineCommand({ ntype: EngineMessage.Pong })
+                        const clientReceiveTimeMs = getLocalTime()
+                        this.addEngineCommand({
+                            ntype: EngineMessage.Pong,
+                            // @ts-ignore
+                            pingId: engineMessage.pingId,
+                            // @ts-ignore
+                            serverTimeMs: engineMessage.serverTimeMs,
+                            clientReceiveTimeMs,
+                            clientSendTimeMs: getLocalTime()
+                        })
                         // @ts-ignore
                         this.latency = engineMessage.latency
                     }

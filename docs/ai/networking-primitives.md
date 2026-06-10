@@ -58,6 +58,26 @@ Good fits:
 
 Commands should be validated on the server. The authoritative result should usually appear later as entity state or messages.
 
+Use `CommandRouter` on the server when a game has several command types and the
+raw `event.commands` loop becomes repetitive:
+
+```ts
+const commands = new CommandRouter()
+
+commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
+    movePlayer(user, command)
+})
+
+commands.on<GatherCommand>(NType.GatherCommand, ({ user, command }) => {
+    gatherResource(user, command)
+})
+
+commands.process(event)
+```
+
+`CommandRouter` does not change command semantics. It only dispatches received
+commands by `ntype` in their original order.
+
 ## Request/response
 
 Use request/response for client-originated interactions that need a result.
@@ -124,6 +144,19 @@ definePayloadSchema(...)
 Keep schema properties flat. Use ids or separate entities/components for relationships.
 
 ## Feature decision examples
+
+Simple private inventory counters:
+
+- If the inventory is just counts like wood, stone, gold, ammo, or berries, a private message can be enough.
+- The server owns the real counts.
+- Send the current counts to the owning user when they change.
+- Do not create an inventory channel unless the inventory needs entity lifecycle, item metadata, multiple viewers, slots, drag/drop, or container context.
+
+Open/shared inventory:
+
+- If items need create/update/delete lifecycle, use a `Channel` with a header.
+- If multiple users can view the same container, subscribe all authorized users to that channel.
+- Use request/response for item moves so the server can accept or reject the transaction.
 
 Player movement:
 

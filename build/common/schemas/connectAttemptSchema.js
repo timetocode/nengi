@@ -5,4 +5,5 @@ const defineSchema_1 = require("../binary/schema/defineSchema");
 const Binary_1 = require("../binary/Binary");
 exports.connectionAttemptSchema = (0, defineSchema_1.defineMessageSchema)({
     handshake: Binary_1.Binary.String,
+    schemaFingerprint: Binary_1.Binary.String,
 });

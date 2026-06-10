@@ -14,6 +14,7 @@ const defineSchema_1 = require("../common/binary/schema/defineSchema");
 const Context_1 = require("../common/Context");
 const Client_1 = require("./Client");
 const Interpolator_1 = require("./Interpolator");
+const BufferBinary_1 = require("../testSupport/BufferBinary");
 function waitFor(ms) {
     return new Promise((resolve, reject) => {
         setTimeout(() => { resolve(true); }, ms);
@@ -29,6 +30,12 @@ xtest('', () => __awaiter(void 0, void 0, void 0, function* () {
     ncontext.register(1, aSchema);
     class MockAdapter {
         constructor(network) {
+            this.binary = BufferBinary_1.testBinaryAdapter;
+        }
+        connect() {
+            return Promise.resolve({ accepted: true });
+        }
+        flush() {
         }
     }
     const client = new Client_1.Client(ncontext, MockAdapter, 20);

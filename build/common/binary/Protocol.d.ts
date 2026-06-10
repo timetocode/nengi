@@ -8,7 +8,7 @@ type ProtocolConfig = {
 };
 declare const DEFAULT_PROTOCOL: ProtocolConfig;
 declare function maxValueForNetworkType(type: NetworkIdType): 255 | 65535 | 4294967295;
-declare function byteSizeOfNetworkType(type: NetworkIdType): 1 | 2 | 4;
+declare function byteSizeOfNetworkType(type: NetworkIdType): 1 | 4 | 2;
 declare function networkTypeForMaxValue(maxValue: number): NetworkIdType;
 declare function nextNetworkType(type: NetworkIdType): NetworkIdType | null;
 declare function assertNetworkIdType(type: Binary): asserts type is NetworkIdType;

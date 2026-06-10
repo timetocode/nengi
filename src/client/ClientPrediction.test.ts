@@ -2,9 +2,16 @@ import { Binary } from '../common/binary/Binary'
 import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { Client } from './Client'
+import { testBinaryAdapter } from '../testSupport/BufferBinary'
 
 class MockAdapter {
+    binary = testBinaryAdapter
     constructor() {
+    }
+    connect() {
+        return Promise.resolve({ accepted: true })
+    }
+    flush() {
     }
 }
 

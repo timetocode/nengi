@@ -193,8 +193,8 @@ class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
     sends = 0
     bytes = 0
 
-    listen(port: number, ready: () => void) {
-        ready()
+    listen(port: number, ready?: () => void) {
+        ready?.()
     }
 
     send(user: User, buffer: Buffer) {

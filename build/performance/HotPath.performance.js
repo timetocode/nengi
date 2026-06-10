@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = void 0;
-const Channel_1 = require("../server/Channel");
+const Channel_1 = require("../server/channel/Channel");
 const Instance_1 = require("../server/Instance");
 const Context_1 = require("../common/Context");
 const defineSchema_1 = require("../common/binary/schema/defineSchema");

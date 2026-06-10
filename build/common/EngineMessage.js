@@ -17,4 +17,6 @@ var EngineMessage;
     EngineMessage[EngineMessage["Pong"] = 11] = "Pong";
     EngineMessage[EngineMessage["ClientTick"] = 12] = "ClientTick";
     EngineMessage[EngineMessage["Protocol"] = 13] = "Protocol";
+    EngineMessage[EngineMessage["CommandTiming"] = 14] = "CommandTiming";
+    EngineMessage[EngineMessage["InterpolationDelay"] = 15] = "InterpolationDelay";
 })(EngineMessage || (exports.EngineMessage = EngineMessage = {}));

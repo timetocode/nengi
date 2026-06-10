@@ -4,6 +4,7 @@ import { Context } from '../common/Context'
 import { Client } from './Client'
 import { Interpolator } from './Interpolator'
 import { Snapshot } from './Snapshot'
+import { testBinaryAdapter } from '../testSupport/BufferBinary'
 
 function waitFor(ms: number) : Promise<boolean>{
     return new Promise((resolve, reject) => {
@@ -22,8 +23,14 @@ xtest('', async () => {
     ncontext.register(1, aSchema)
 
     class MockAdapter {
+        binary = testBinaryAdapter
         constructor(network: any) {
 
+        }
+        connect() {
+            return Promise.resolve({ accepted: true })
+        }
+        flush() {
         }
     }
 

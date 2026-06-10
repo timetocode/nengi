@@ -56,7 +56,23 @@ Use a sphere view when the game thinks in sensor radius or engagement range.
 
 ## Private inventory or open chest
 
-Use `Channel` with a schema-backed `header`. The header is the client-visible context for the channel; `label` is only local housekeeping.
+Use a private message for simple owner-only counters. Use `Channel` with a
+schema-backed `header` when items need entity lifecycle, item metadata, slots,
+drag/drop, multiple viewers, or container context.
+
+For count-only inventory:
+
+```ts
+user.queueMessage({
+    ntype: NType.InventoryCounts,
+    wood,
+    stone,
+    gold
+})
+```
+
+For item/entity inventory, the header is the client-visible context for the
+channel; `label` is only local housekeeping.
 
 ```ts
 const inventory = new Channel(instance.localState, {

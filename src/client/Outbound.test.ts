@@ -90,6 +90,37 @@ test('getCurrentFrame returns current frame commands', () => {
     expect(frame.outboundEngineCommands[0]).toBe(engineCommand)
 })
 
+test('timed commands keep command index metadata', () => {
+    const firstCommand = { ntype: 1, content: 'first command' }
+    const secondCommand = { ntype: 1, content: 'second command' }
+    const thirdCommand = { ntype: 1, content: 'third command' }
+
+    const out = new Outbound()
+    out.addCommand(firstCommand)
+    out.addTimedCommand(secondCommand, {
+        clientTimeMs: 12.5,
+        renderDelayMs: 100,
+        viewTick: 3.25,
+        viewServerTimeMs: 1000.5
+    })
+    out.addTimedCommand(thirdCommand, {
+        clientTimeMs: 14,
+        renderDelayMs: 80,
+        viewTick: 4,
+        viewServerTimeMs: 1050.5
+    })
+
+    expect(out.outboundCommands.get(0)).toEqual([
+        firstCommand,
+        secondCommand,
+        thirdCommand
+    ])
+    expect(out.getCommandTiming(0)).toEqual([
+        { commandIndex: 1, clientTimeMs: 12.5, renderDelayMs: 100, viewTick: 3.25, viewServerTimeMs: 1000.5 },
+        { commandIndex: 2, clientTimeMs: 14, renderDelayMs: 80, viewTick: 4, viewServerTimeMs: 1050.5 }
+    ])
+})
+
 test('getEngineCommands returns engine commands for a given tick', () => {
     const engineCommand = { ntype: 2, content: 'engine command' }
 
@@ -124,5 +155,3 @@ test('getUnconfirmedCommands returns all unconfirmed commands', () => {
     expect(unconfirmed.get(0)?.[0]).toBe(command1)
     expect(unconfirmed.get(1)?.[0]).toBe(command2)
 })
-
-

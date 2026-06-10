@@ -8,6 +8,7 @@ class Outbound {
         this.unconfirmedCommands = new Map();
         this.outboundEngineCommands = new Map();
         this.outboundCommands = new Map();
+        this.outboundCommandTiming = new Map();
         this.tick = 0;
         this.currentFrame = null;
         this.confirmedTick = -1;
@@ -45,6 +46,26 @@ class Outbound {
             this.unconfirmedCommands.get(tick).push(command);
         }
     }
+    addTimedCommand(command, metadata) {
+        const tick = this.tick;
+        const commands = this.outboundCommands.get(tick);
+        const commandIndex = commands ? commands.length : 0;
+        this.addCommand(command);
+        const timing = this.outboundCommandTiming.get(tick);
+        const entry = {
+            commandIndex,
+            clientTimeMs: metadata.clientTimeMs,
+            renderDelayMs: metadata.renderDelayMs,
+            viewTick: metadata.viewTick,
+            viewServerTimeMs: metadata.viewServerTimeMs
+        };
+        if (timing) {
+            timing.push(entry);
+        }
+        else {
+            this.outboundCommandTiming.set(tick, [entry]);
+        }
+    }
     getEngineCommands(tick) {
         if (this.outboundEngineCommands.has(tick)) {
             return this.outboundEngineCommands.get(tick);
@@ -56,6 +77,14 @@ class Outbound {
     getCommands(tick) {
         if (this.outboundCommands.has(tick)) {
             return this.outboundCommands.get(tick);
+        }
+        else {
+            return emptyArr;
+        }
+    }
+    getCommandTiming(tick) {
+        if (this.outboundCommandTiming.has(tick)) {
+            return this.outboundCommandTiming.get(tick);
         }
         else {
             return emptyArr;
@@ -75,6 +104,7 @@ class Outbound {
     flush() {
         this.outboundEngineCommands.clear();
         this.outboundCommands.clear();
+        this.outboundCommandTiming.clear();
     }
 }
 exports.Outbound = Outbound;

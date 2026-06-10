@@ -1,5 +1,5 @@
 import { IEntity } from '../../IEntity';
-import { Schema } from './Schema';
+import { Schema, SchemaUpdateGroup } from './Schema';
 /**
  * Copies an object based on an nschema, copies only the properties listed in the nschema
  * @param entity
@@ -20,6 +20,16 @@ export type EntityChange = {
     prop: string;
     value: any;
 };
+export type EntityUpdateGroup = {
+    nid: number;
+    nschema: Schema;
+    group: SchemaUpdateGroup;
+    values: any[];
+};
+export type EntityDiffResult = {
+    changes: EntityChange[];
+    groups: EntityUpdateGroup[];
+};
 /**
  * Compares two IEntities looking only at the properties in the nschema and returns any changes
  * @param current
@@ -28,4 +38,13 @@ export type EntityChange = {
  * @returns
  */
 export declare function compareAndUpdateNObject(current: IEntity, previous: IEntity, nschema: Schema): EntityChange[];
+/**
+ * Diff variant for grouped entity updates. The default group mode is "any":
+ * the first changed property in a group emits the whole group and the remaining
+ * properties in that group are skipped for this entity. That is deliberately a
+ * CPU optimization for transform-like data where x/y/z/rotation usually move
+ * together and checking every field before deciding to bundle would lose much
+ * of the benefit.
+ */
+export declare function compareAndUpdateNObjectGrouped(current: IEntity, previous: IEntity, nschema: Schema): EntityDiffResult;
 //# sourceMappingURL=util.d.ts.map

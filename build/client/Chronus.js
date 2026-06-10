@@ -6,8 +6,8 @@ class Chronus {
         this.timeDifferences = [];
         this.averageTimeDifference = 0;
     }
-    register(timestamp) {
-        this.timeDifferences.push(Date.now() - timestamp);
+    register(timestamp, now = Date.now()) {
+        this.timeDifferences.push(now - timestamp);
         while (this.timeDifferences.length > 20) {
             this.timeDifferences.shift();
         }

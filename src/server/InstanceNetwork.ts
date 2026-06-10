@@ -1,6 +1,7 @@
 import { Instance } from './Instance'
 import { NetworkEvent } from '../common/binary/NetworkEvent'
 import { User, UserConnectionState } from './User'
+import type { CommandTimingEstimate, CommandTimingInput } from './User'
 import { BinarySection } from '../common/binary/BinarySection'
 import { EngineMessage } from '../common/EngineMessage'
 import readEngineMessage from '../binary/message/readEngineMessage'
@@ -21,6 +22,8 @@ export interface INetworkEvent {
     user: User
     commands?: any
     clientTick?: number
+    commandTimings?: Array<CommandTimingEstimate | undefined>
+    serverReceivedTimeMs?: number
     payload?: any
 }
 
@@ -552,14 +555,18 @@ export class InstanceNetwork {
     onMessage(user: User, buffer: BinaryPayload) {
 
         try {
+            const serverReceivedTimeMs = performance.now()
             const binaryReader = user.networkAdapter.binary.createReader(buffer)
             const commands: any[] = []
+            const commandTimingInputs: CommandTimingInput[] = []
 
             const commandSet = {
                 type: NetworkEvent.CommandSet,
                 user,
                 commands,
-                clientTick: -1
+                clientTick: -1,
+                commandTimings: [] as Array<CommandTimingEstimate | undefined>,
+                serverReceivedTimeMs
             }
 
             while (binaryReader.offset < binaryReader.byteLength) {
@@ -583,7 +590,26 @@ export class InstanceNetwork {
                         }
 
                         if (msg.ntype === EngineMessage.Pong) {
-                            user.calculateLatency()
+                            user.recordClockSyncPong({
+                                pingId: msg.pingId,
+                                serverTimeMs: msg.serverTimeMs,
+                                clientReceiveTimeMs: msg.clientReceiveTimeMs,
+                                clientSendTimeMs: msg.clientSendTimeMs
+                            }, serverReceivedTimeMs)
+                        }
+
+                        if (msg.ntype === EngineMessage.CommandTiming) {
+                            commandTimingInputs.push({
+                                commandIndex: msg.commandIndex,
+                                clientTimeMs: msg.clientTimeMs,
+                                renderDelayMs: msg.renderDelayMs,
+                                viewTick: msg.viewTick,
+                                viewServerTimeMs: msg.viewServerTimeMs
+                            })
+                        }
+
+                        if (msg.ntype === EngineMessage.InterpolationDelay) {
+                            user.recordInterpolationDelay(msg.delayMs, serverReceivedTimeMs)
                         }
                     }
 
@@ -621,6 +647,12 @@ export class InstanceNetwork {
                 }
             }
 
+            for (let i = 0; i < commandTimingInputs.length; i++) {
+                const input = commandTimingInputs[i]
+                if (input.commandIndex >= 0 && input.commandIndex < commands.length) {
+                    commandSet.commandTimings[input.commandIndex] = user.estimateCommandTiming(input, serverReceivedTimeMs)
+                }
+            }
             this.instance.queue.enqueue(commandSet)
         } catch (err) {
             // TODO there should be a way for a user to capture this error, perhaps a handler

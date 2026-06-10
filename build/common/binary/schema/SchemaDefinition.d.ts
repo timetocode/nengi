@@ -2,11 +2,24 @@ import { Binary } from '../Binary';
 type ShorthandBinarySpecification = Binary;
 type LonghandBinarySpecification = {
     type: Binary;
-    interp: boolean;
-    groups?: [[string]];
+    interp?: boolean;
+};
+type UpdateGroupDefinition = string[] | {
+    name?: string;
+    props: string[];
+    mode?: 'any' | 'full';
+};
+type SchemaOptions = {
+    updateGroups?: {
+        [name: string]: string[] | {
+            props: string[];
+            mode?: 'any' | 'full';
+        };
+    } | UpdateGroupDefinition[];
 };
 type SchemaDefinition = {
-    [key: string]: ShorthandBinarySpecification | LonghandBinarySpecification;
+    [key: string]: ShorthandBinarySpecification | LonghandBinarySpecification | SchemaOptions | undefined;
+    $options?: SchemaOptions;
 };
-export { SchemaDefinition };
+export { SchemaDefinition, SchemaOptions, UpdateGroupDefinition };
 //# sourceMappingURL=SchemaDefinition.d.ts.map

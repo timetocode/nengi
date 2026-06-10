@@ -3,6 +3,14 @@ import { NQueue } from '../NQueue'
 type Tick = number
 type Command = any
 
+export type TimedCommandMetadata = {
+    commandIndex: number
+    clientTimeMs: number
+    renderDelayMs: number
+    viewTick: number
+    viewServerTimeMs: number
+}
+
 type ClientFrame = {
     tick: number,
     outboundCommands: NQueue<Command>
@@ -17,6 +25,7 @@ export class Outbound {
     unconfirmedCommands: Map<Tick, Command[]>
     outboundEngineCommands: Map<Tick, Command[]>
     outboundCommands: Map<Tick, Command[]>
+    outboundCommandTiming: Map<Tick, TimedCommandMetadata[]>
     tick: number
     confirmedTick: number
     lastSentTick: number
@@ -27,6 +36,7 @@ export class Outbound {
         this.unconfirmedCommands = new Map()
         this.outboundEngineCommands = new Map()
         this.outboundCommands = new Map()
+        this.outboundCommandTiming = new Map()
         this.tick = 0
         this.currentFrame = null
         this.confirmedTick = -1
@@ -66,6 +76,26 @@ export class Outbound {
         }
     }
 
+    addTimedCommand(command: Command, metadata: Omit<TimedCommandMetadata, 'commandIndex'>) {
+        const tick = this.tick
+        const commands = this.outboundCommands.get(tick)
+        const commandIndex = commands ? commands.length : 0
+        this.addCommand(command)
+        const timing = this.outboundCommandTiming.get(tick)
+        const entry = {
+            commandIndex,
+            clientTimeMs: metadata.clientTimeMs,
+            renderDelayMs: metadata.renderDelayMs,
+            viewTick: metadata.viewTick,
+            viewServerTimeMs: metadata.viewServerTimeMs
+        }
+        if (timing) {
+            timing.push(entry)
+        } else {
+            this.outboundCommandTiming.set(tick, [entry])
+        }
+    }
+
     getEngineCommands(tick: Tick) {
         if (this.outboundEngineCommands.has(tick)) {
             return this.outboundEngineCommands.get(tick)!
@@ -77,6 +107,14 @@ export class Outbound {
     getCommands(tick: Tick) {
         if (this.outboundCommands.has(tick)) {
             return this.outboundCommands.get(tick)!
+        } else {
+            return emptyArr
+        }
+    }
+
+    getCommandTiming(tick: Tick) {
+        if (this.outboundCommandTiming.has(tick)) {
+            return this.outboundCommandTiming.get(tick)!
         } else {
             return emptyArr
         }
@@ -98,5 +136,6 @@ export class Outbound {
     flush() {
         this.outboundEngineCommands.clear()
         this.outboundCommands.clear()
+        this.outboundCommandTiming.clear()
     }
 }

@@ -1,8 +1,10 @@
 import { Context } from '../common/Context'
 import { Endpoint, RequestPolicy } from '../common/Endpoint'
 import { ClientNetwork } from './ClientNetwork'
+import type { InterpolationDelayReportOptions, TimedCommandOptions } from './ClientNetwork'
 import { Predictor } from './prediction/Predictor'
 import type { PredictionOperationOptions } from './prediction/Predictor'
+import type { ClientAdapterConstructor, IClientNetworkAdapter } from './adapter/IClientNetworkAdapter'
 
 type StringOrParsedJSON = string | object
 type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
@@ -15,16 +17,16 @@ type RequestOptions<Response = any> = {
     prediction?: PredictionOperationOptions<Response>
 }
 
-class Client {
+class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
     context: Context
     network: ClientNetwork
-    adapter: any
+    adapter: Adapter
     serverTickRate: number
     predictor: Predictor
     disconnectHandler: DisconnectHandler
     websocketErrorHandler: WebsocketErrorHandler
 
-    constructor(context: Context, adapterCtor: any, serverTickRate: number, adapterConfig?: any) {
+    constructor(context: Context, adapterCtor: ClientAdapterConstructor<Adapter>, serverTickRate: number, adapterConfig?: any) {
         this.context = context
         this.network = new ClientNetwork(this)
         this.adapter = new adapterCtor(this.network, adapterConfig)
@@ -39,8 +41,12 @@ class Client {
         }
     }
 
-    connect(wsUrl: string, handshake: any): Promise<any> {
-        return this.adapter.connect(wsUrl, handshake)
+    connect(target: Parameters<Adapter['connect']>[0], handshake: any): Promise<any> {
+        return this.adapter.connect(target, handshake)
+    }
+
+    disconnect(reason?: any) {
+        this.adapter.disconnect?.(reason)
     }
 
     setDisconnectHandler(handler: DisconnectHandler) {
@@ -60,8 +66,20 @@ class Client {
         this.network.addCommand(command)
     }
 
+    addTimedCommand(command: any, options: TimedCommandOptions = {}) {
+        this.network.addTimedCommand(command, options)
+    }
+
+    reportInterpolationDelay(delayMs: number, options: InterpolationDelayReportOptions = {}) {
+        return this.network.reportInterpolationDelay(delayMs, options)
+    }
+
     predictCommand(command: any, options: PredictionOperationOptions = {}) {
         return this.network.predictCommand(command, options)
+    }
+
+    predictTimedCommand(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: TimedCommandOptions = {}) {
+        return this.network.predictTimedCommand(command, predictionOptions, timingOptions)
     }
 
     predictState(payload: any, options: PredictionOperationOptions = {}) {

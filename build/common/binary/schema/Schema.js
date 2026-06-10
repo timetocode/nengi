@@ -5,6 +5,8 @@ class Schema {
     constructor(kind = 'payload') {
         this.keys = [];
         this.props = {};
+        this.updateGroups = [];
+        this.updateGroupGeneration = 0;
         this.kind = kind;
     }
 }

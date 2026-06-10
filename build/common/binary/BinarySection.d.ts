@@ -8,7 +8,16 @@ declare enum BinarySection {
     Commands = 6,
     Requests = 7,
     Responses = 8,
-    ClientTick = 9
+    ClientTick = 9,
+    UpdateEntityGroups = 10,
+    EcsCreateEntities = 11,
+    EcsCreateComponents = 12,
+    EcsDeleteEntities = 13,
+    EcsUpdateComponentGroups = 14,
+    ChannelEntityCreates = 15,
+    ChannelHeaderCreates = 16,
+    ChannelHeaderUpdates = 17,
+    ChannelHeaderDeletes = 18
 }
 export { BinarySection };
 //# sourceMappingURL=BinarySection.d.ts.map

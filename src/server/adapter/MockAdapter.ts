@@ -11,11 +11,14 @@ type MockAdapterConfig<InboundPayload extends BinaryPayload = BinaryPayload, Out
 }
 
 /**
- * Not a real network adapter, data is passed without using a real socket.
- * Used for mixing a server and client together in one application
- * such as for a single player mode or automated testing
+ * Dependency-free in-memory transport.
+ * Useful for single-player modes, embedded simulations, and tests where a real
+ * socket would add environment-specific noise without changing nengi behavior.
  */
-class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IServerNetworkAdapter<InboundPayload, OutboundPayload> {
+class LocalInstanceAdapter<
+    InboundPayload extends BinaryPayload = BinaryPayload,
+    OutboundPayload extends BinaryPayload = InboundPayload
+> implements IServerNetworkAdapter<InboundPayload, OutboundPayload, void | { ready?: () => void }> {
     network: InstanceNetwork
     serverSockets: MockServerSocket[]
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
@@ -25,14 +28,15 @@ class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, 
         this.serverSockets = []
 
         if (!config?.binary) {
-            throw new Error('MockAdapter requires a config.binary to be created.')
+            throw new Error('LocalInstanceAdapter requires a config.binary to be created.')
         }
 
         this.binary = config.binary
     }
 
-    listen(port: number, ready: () => void) {
-        console.log('MockAdapter listen is fake! No need to invoke it.')
+    listen(options?: void | { ready?: () => void }, ready?: () => void) {
+        ready?.()
+        options?.ready?.()
     }
 
     createMockConnect() {
@@ -60,7 +64,7 @@ class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, 
     }
 
     disconnect(user: User, reason: any): void {
-        user.socket.end(1000, JSON.stringify(reason))
+        user.socket.end(reason)
     }
 
     send(user: User, buffer: OutboundPayload): void {
@@ -68,31 +72,71 @@ class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, 
     }
 }
 
-class MockClientAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IClientNetworkAdapter {
+class LocalClientAdapter<
+    InboundPayload extends BinaryPayload = BinaryPayload,
+    OutboundPayload extends BinaryPayload = InboundPayload
+> implements IClientNetworkAdapter<InboundPayload, OutboundPayload, void | MockClientSocket> {
     network: ClientNetwork
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
+    socket: MockClientSocket | null = null
+    connected = false
+    pendingConnect: {
+        resolve: (value: any) => void
+        reject: (reason: any) => void
+    } | null = null
 
     constructor(network: ClientNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
         this.network = network
         if (!config?.binary) {
-            throw new Error('MockAdapter requires a config.binary to be created.')
+            throw new Error('LocalClientAdapter requires a config.binary to be created.')
         }
         this.binary = config.binary
     }
 
     onMessage(buffer: InboundPayload) {
+        if (!this.connected) {
+            const result = this.network.readHandshakeResponse(this.binary.createReader(buffer))
+            if (result.accepted) {
+                this.connected = true
+                this.pendingConnect?.resolve(result)
+            } else {
+                this.pendingConnect?.reject(result.reason)
+            }
+            this.pendingConnect = null
+            return
+        }
         const br = this.binary.createReader(buffer)
         this.network.readSnapshot(br)
     }
 
-    connect(wsUrl: string, handshake: any) {
+    connect(target?: void | MockClientSocket, handshake?: any) {
+        this.socket = target || null
+        if (!this.socket) {
+            this.connected = true
+            return Promise.resolve({ accepted: true })
+        }
+
+        this.socket.adapter = this
         return new Promise((resolve, reject) => {
-            resolve(true)
+            this.pendingConnect = { resolve, reject }
+            this.socket!.send(this.network.createHandshake(handshake, this.binary))
         })
     }
 
     flush() {
+        if (!this.socket) {
+            return
+        }
+        if (!this.connected) {
+            return
+        }
+        this.socket.send(this.network.createOutbound(this.binary))
+    }
 
+    disconnect(reason?: any) {
+        this.socket?.close(reason)
+        this.socket = null
+        this.connected = false
     }
 }
 
@@ -120,8 +164,9 @@ class MockServerSocket {
         this.readyState = MockSocketReadyState.OPEN
     }
 
-    end() {
-
+    end(reason?: any) {
+        this.readyState = MockSocketReadyState.CLOSED
+        this.clientSocket.close(reason)
     }
 
     receive(buffer: BinaryPayload) {
@@ -140,6 +185,7 @@ class MockClientSocket {
     inboundQueue: NQueue<any>
     readyState: MockSocketReadyState
     serverSocket: MockServerSocket
+    adapter: LocalClientAdapter<any, any> | null = null
 
     constructor(serverSocket: MockServerSocket) {
         this.inboundQueue = new NQueue()
@@ -148,8 +194,11 @@ class MockClientSocket {
         this.readyState = MockSocketReadyState.OPEN
     }
 
-    close() {
+    close(reason?: any) {
         this.readyState = MockSocketReadyState.CLOSED
+        if (this.serverSocket.user) {
+            this.serverSocket.network.onClose(this.serverSocket.user)
+        }
     }
 
     send(buffer: BinaryPayload) {
@@ -157,8 +206,22 @@ class MockClientSocket {
     }
 
     receive(buffer: BinaryPayload) {
+        if (this.adapter) {
+            this.adapter.onMessage(buffer)
+            return
+        }
         this.inboundQueue.enqueue(buffer)
     }
 }
 
-export { MockInstanceAdapter, MockClientAdapter, MockClientSocket, MockServerSocket }
+const MockInstanceAdapter = LocalInstanceAdapter
+const MockClientAdapter = LocalClientAdapter
+
+export {
+    LocalInstanceAdapter,
+    LocalClientAdapter,
+    MockInstanceAdapter,
+    MockClientAdapter,
+    MockClientSocket,
+    MockServerSocket
+}

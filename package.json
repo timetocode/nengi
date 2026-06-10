@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-alpha.client-store.0",
+  "version": "2.0.0-rc.120",
   "description": "nengi2 alpha branch",
   "main": "./build/index.js",
   "scripts": {
@@ -23,5 +23,8 @@
     "ts-jest": "^29.1.1",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "minimatch": "^9.0.7"
   }
 }

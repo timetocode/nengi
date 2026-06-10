@@ -7,7 +7,7 @@ exports.Instance = void 0;
 const LocalState_1 = require("./LocalState");
 const InstanceNetwork_1 = require("./InstanceNetwork");
 const EntityCache_1 = require("./EntityCache");
-const createSnapshotBufferRefactor_1 = __importDefault(require("../binary/snapshot/createSnapshotBufferRefactor"));
+const createSnapshotBuffer_1 = __importDefault(require("../binary/snapshot/createSnapshotBuffer"));
 const NQueue_1 = require("../NQueue");
 const EngineMessage_1 = require("../common/EngineMessage");
 const Endpoint_1 = require("../common/Endpoint");
@@ -30,11 +30,14 @@ class Instance {
         };
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
     }
-    attachEntity(parentNid, child) {
-        this.localState.addChild(parentNid, child);
+    attachChild(parent, child) {
+        return this.localState.addChild(parent, child);
     }
-    detachEntity(parentNid, child) {
-        this.localState.removeChild(parentNid, child);
+    detachChild(parent, child) {
+        this.localState.removeChild(parent, child);
+    }
+    markDirty(entity) {
+        return this.localState.markDirty(entity);
     }
     respond(endpoint, callback) {
         this.responseEndPoints.set((0, Endpoint_1.getEndpointId)(endpoint), {
@@ -51,21 +54,17 @@ class Instance {
         this.tick++;
         this.localState.tick(this.tick);
         this.cache.createCachesForTick(this.tick);
+        this.network.resetSharedUpdateFragments();
         this.users.forEach(user => {
-            if (user.lastSentInstanceTick === 0) {
-                // this is the first frame connected!
-                user.queueEngineMessage(timeSyncEngineMessage);
-            }
-            else {
-                // send timeSyncs every 20 ticks
-                if (user.lastSentInstanceTick % 20 === 0) {
-                    user.queueEngineMessage(timeSyncEngineMessage);
-                }
-            }
+            user.queueEngineMessage(timeSyncEngineMessage);
             if (user.lastSentPingTimestamp < timestamp - this.pingIntervalMs) {
+                const serverTimeMs = performance.now();
+                user.lastSentPingTimeMs = serverTimeMs;
                 user.queueEngineMessage({
                     ntype: EngineMessage_1.EngineMessage.Ping,
-                    latency: user.latency
+                    latency: Math.max(0, Math.min(65535, Math.round(user.roundTripMs))),
+                    pingId: user.nextPing(),
+                    serverTimeMs
                 });
                 user.lastSentPingTimestamp = timestamp;
             }
@@ -73,12 +72,33 @@ class Instance {
                 ntype: EngineMessage_1.EngineMessage.ClientTick,
                 tick: user.lastReceivedClientTick
             });
-            const buffer = (0, createSnapshotBufferRefactor_1.default)(user, this);
-            user.send(buffer);
+            const buffer = (0, createSnapshotBuffer_1.default)(user, this);
+            if (this.network.snapshotPerformanceEnabled) {
+                // Keep adapter send timing separate from snapshot construction:
+                // WebSocket implementations may queue synchronously while OS I/O
+                // continues outside this measured server tick.
+                const sendStart = performance.now();
+                user.send(buffer);
+                this.network.recordSnapshotSend(performance.now() - sendStart);
+            }
+            else {
+                user.send(buffer);
+            }
             user.lastSentInstanceTick = this.tick;
         });
         this.cache.deleteCachesForTick(this.tick);
+        this.localState.channels.forEach(channel => {
+            const clearBroadcastMessages = channel.clearBroadcastMessages;
+            if (typeof clearBroadcastMessages === 'function') {
+                clearBroadcastMessages.call(channel);
+            }
+            const clearSnapshotDeltas = channel.clearSnapshotDeltas;
+            if (typeof clearSnapshotDeltas === 'function') {
+                clearSnapshotDeltas.call(channel);
+            }
+        });
         this.localState.releaseDeferredIds();
+        this.localState.clearDirty();
     }
 }
 exports.Instance = Instance;

@@ -102,9 +102,13 @@ export class Instance {
             user.queueEngineMessage(timeSyncEngineMessage)
 
             if (user.lastSentPingTimestamp < timestamp - this.pingIntervalMs) {
+                const serverTimeMs = performance.now()
+                user.lastSentPingTimeMs = serverTimeMs
                 user.queueEngineMessage({
                     ntype: EngineMessage.Ping,
-                    latency: user.latency
+                    latency: Math.max(0, Math.min(65535, Math.round(user.roundTripMs))),
+                    pingId: user.nextPing(),
+                    serverTimeMs
                 })
                 user.lastSentPingTimestamp = timestamp
             }

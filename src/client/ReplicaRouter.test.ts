@@ -5,9 +5,16 @@ import { Client } from './Client'
 import { ClientEntityMode, ReplicaRouter } from './ReplicaRouter'
 import { AdaptiveInterpolator, InterpolationStatus } from './FixedStepInterpolator'
 import { Snapshot } from './Snapshot'
+import { testBinaryAdapter } from '../testSupport/BufferBinary'
 
 class MockAdapter {
+    binary = testBinaryAdapter
     constructor() {
+    }
+    connect() {
+        return Promise.resolve({ accepted: true })
+    }
+    flush() {
     }
 }
 

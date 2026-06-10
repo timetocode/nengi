@@ -3,7 +3,7 @@ import { NetworkIdType } from '../../common/binary/Protocol';
 import { Context } from '../../common/Context';
 declare function readDiff(reader: IBinaryReader, context: Context, ntypes: Map<number, number>, nidType?: NetworkIdType): {
     nid: number;
-    prop: any;
+    prop: string;
     value: any;
 };
 export default readDiff;

@@ -45,4 +45,23 @@ describe('defineSchema helpers', () => {
             { key: 1, prop: 'open', type: Binary_1.Binary.Boolean, interp: false }
         ]);
     });
+    it('compiles entity update groups with any as the default mode', () => {
+        const schema = (0, defineSchema_1.defineEntitySchema)({
+            x: Binary_1.Binary.Float32,
+            y: Binary_1.Binary.Float32,
+            color: Binary_1.Binary.String,
+            $options: {
+                updateGroups: {
+                    position: ['x', 'y']
+                }
+            }
+        });
+        expect(schema.updateGroups).toHaveLength(1);
+        expect(schema.updateGroups[0].key).toBe(0);
+        expect(schema.updateGroups[0].name).toBe('position');
+        expect(schema.updateGroups[0].mode).toBe('any');
+        expect(schema.updateGroups[0].props).toEqual([schema.props.x, schema.props.y]);
+        expect(schema.props.x.updateGroup).toBe(schema.updateGroups[0]);
+        expect(schema.props.y.updateGroup).toBe(schema.updateGroups[0]);
+    });
 });

@@ -10,7 +10,8 @@ import { Outbound } from './Outbound';
 import { Frame } from './Frame';
 import { EntityStore } from './EntityStore';
 import { EndpointPayload } from '../binary/endpoint/EndpointPayload';
-import { Endpoint, EndpointDefinition, RequestPolicy } from '../common/Endpoint';
+import { Endpoint, EndpointDefinition, RequestError, RequestPolicy, ResponseStatus } from '../common/Endpoint';
+import type { PredictionOperationOptions } from './prediction/Predictor';
 export type RequestBacklogInfo = {
     queued: number;
     sent: number;
@@ -34,10 +35,37 @@ type RequestOptions<Response = any> = {
     key?: string;
     policy?: RequestPolicy;
     callback?: (response: Response) => any;
+    prediction?: PredictionOperationOptions<Response>;
+};
+export type TimedCommandOptions = {
+    inputTimeMs?: number;
+    renderDelayMs?: number;
+    viewTick?: number;
+    viewServerTimeMs?: number;
+};
+export type InterpolationDelayReportOptions = {
+    minIntervalMs?: number;
+    epsilonMs?: number;
+    force?: boolean;
+    now?: number;
 };
 type HandshakeResponse = {
     accepted: boolean;
     reason?: any;
+};
+type PendingResponse = {
+    request: ClientRequest;
+    status: ResponseStatus.Ok;
+    response: any;
+} | {
+    request: ClientRequest;
+    status: ResponseStatus.Error;
+    error: RequestError;
+};
+type PendingServerFrame = {
+    snapshot: Snapshot;
+    receivedAt: number;
+    pendingResponses: PendingResponse[];
 };
 export declare class ClientNetwork {
     client: Client;
@@ -45,6 +73,7 @@ export declare class ClientNetwork {
     entityNTypes: Map<number, number>;
     frames: Frame[];
     rawFrames: Frame[];
+    pendingFrames: PendingServerFrame[];
     latestFrame: Frame | null;
     messages: any[];
     predictionErrorFrames: any[];
@@ -59,7 +88,14 @@ export declare class ClientNetwork {
     previousSnapshot: Snapshot | null;
     chronus: Chronus;
     frameTick: number;
+    maxFrameHistory: number;
     latency: number;
+    interpolationDelayMs: number;
+    interpolationDelayReportIntervalMs: number;
+    interpolationDelayReportEpsilonMs: number;
+    private lastReportedInterpolationDelayMs;
+    private lastInterpolationDelayReportAt;
+    sendSchemaFingerprint: boolean;
     onDisconnect: (reason: any, event?: any) => void;
     onSocketError: (event: any) => void;
     onRequestBacklog: (info: RequestBacklogInfo) => void;
@@ -67,6 +103,11 @@ export declare class ClientNetwork {
     incrementClientTick(): void;
     addEngineCommand(command: any): void;
     addCommand(command: any): void;
+    addTimedCommand(command: any, options?: TimedCommandOptions): void;
+    reportInterpolationDelay(delayMs: number, options?: InterpolationDelayReportOptions): boolean;
+    predictCommand(command: any, options?: PredictionOperationOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
+    predictTimedCommand(command: any, predictionOptions?: PredictionOperationOptions, timingOptions?: TimedCommandOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
+    predictState(payload: any, options?: PredictionOperationOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
     flush(): void;
     request<Request = any, Response = any>(endpoint: Endpoint<Request, Response>, payload: Request, callbackOrOptions?: ((response: Response) => any) | RequestOptions<Response>): Promise<Response>;
     nextRequestId(): number;
@@ -74,7 +115,12 @@ export declare class ClientNetwork {
     rejectRequest(request: ClientRequest, reason: any): void;
     resolveRequest(request: ClientRequest, response: any): void;
     rejectPendingRequests(reason: any): void;
-    drainFrames(): Frame[];
+    drainFrames(maxFrames?: number): Frame[];
+    processNextFrame(): Frame | null;
+    getPendingFrameCount(): number;
+    queueSnapshot(snapshot: Snapshot, receivedAt?: number): void;
+    resolveSnapshotTimestamp(snapshot: Snapshot, receivedAtEpoch?: number): void;
+    shiftInterpolationTimestamps(shift: number): void;
     getRequestsForNextFrame(): ClientRequest[];
     markRequestsSent(requests: ClientRequest[]): void;
     reportRequestBacklog(info: RequestBacklogInfo): void;

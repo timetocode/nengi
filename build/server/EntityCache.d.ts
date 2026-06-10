@@ -1,4 +1,5 @@
 import { Schema } from '../common/binary/schema/Schema';
+import { EntityDiffResult } from '../common/binary/schema/util';
 import { IEntity } from '../common/IEntity';
 export declare class EntityCache {
     cache: {
@@ -9,10 +10,16 @@ export declare class EntityCache {
             [nid: number]: any[];
         };
     };
+    groupedDiffCache: {
+        [tick: number]: {
+            [nid: number]: EntityDiffResult;
+        };
+    };
     constructor();
     cacheContains(nid: number): boolean;
     createCachesForTick(tick: number): void;
     deleteCachesForTick(tick: number): void;
+    getAndDiffGrouped(tick: number, entity: IEntity, nschema: Schema): EntityDiffResult;
     getAndDiff(tick: number, entity: IEntity, nschema: Schema): any[];
     cacheify(tick: number, entity: IEntity, nschema: Schema): void;
     updateCache(tick: number, entity: IEntity, nschema: Schema): void;

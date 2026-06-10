@@ -1,4 +1,4 @@
-import { IChannel } from '../server/IChannel';
+import { IChannel } from '../server/channel/IChannel';
 import { LocalState } from '../server/LocalState';
 type nid = number;
 type tick = number;

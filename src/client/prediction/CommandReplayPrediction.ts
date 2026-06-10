@@ -1,4 +1,5 @@
 import { Client } from '../Client'
+import type { TimedCommandOptions } from '../ClientNetwork'
 import { PredictionOperationKind } from './PredictionLog'
 import type { PredictionOperation, PredictionOperationOptions } from './PredictionLog'
 
@@ -21,6 +22,7 @@ export type CommandReplayPredictionOptions<TLocal = any, TAuthority = any, TStat
     shouldCorrect?: (error: number, context: { local: TLocal, replayState: TState, authoritative: TAuthority }) => boolean
     affectedProps?: string[]
     predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'applyLocal'>
+    timingOptions?: TimedCommandOptions | ((command: TCommand) => TimedCommandOptions)
 }
 
 function defaultReplayState<TState>(authority: any): TState {
@@ -64,6 +66,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
     private shouldCorrect: (error: number, context: { local: TLocal, replayState: TState, authoritative: TAuthority }) => boolean
     private affectedProps?: string[]
     private predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'applyLocal'>
+    private timingOptions?: TimedCommandOptions | ((command: TCommand) => TimedCommandOptions)
 
     constructor(options: CommandReplayPredictionOptions<TLocal, TAuthority, TState, TCommand>) {
         this.client = options.client
@@ -77,6 +80,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
         this.shouldCorrect = options.shouldCorrect || defaultShouldCorrect
         this.affectedProps = options.affectedProps
         this.predictionOptions = options.predictionOptions
+        this.timingOptions = options.timingOptions
     }
 
     predict(command: TCommand): PredictionOperation | undefined {
@@ -86,13 +90,22 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
             return undefined
         }
 
-        return this.client.predictCommand(command, {
+        const predictionOptions = {
             ...this.predictionOptions,
             affected: [{ nid, props: this.affectedProps }],
             applyLocal: () => {
                 this.applyCommand(local, command)
             }
-        })
+        }
+
+        if (this.timingOptions) {
+            const timingOptions = typeof this.timingOptions === 'function'
+                ? this.timingOptions(command)
+                : this.timingOptions
+            return this.client.predictTimedCommand(command, predictionOptions, timingOptions)
+        }
+
+        return this.client.predictCommand(command, predictionOptions)
     }
 
     reconcile(): CommandReplayCorrection<TState> | null {

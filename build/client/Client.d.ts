@@ -1,7 +1,10 @@
 import { Context } from '../common/Context';
 import { Endpoint, RequestPolicy } from '../common/Endpoint';
 import { ClientNetwork } from './ClientNetwork';
+import type { InterpolationDelayReportOptions, TimedCommandOptions } from './ClientNetwork';
 import { Predictor } from './prediction/Predictor';
+import type { PredictionOperationOptions } from './prediction/Predictor';
+import type { ClientAdapterConstructor, IClientNetworkAdapter } from './adapter/IClientNetworkAdapter';
 type StringOrParsedJSON = string | object;
 type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void;
 type WebsocketErrorHandler = (event: any) => void;
@@ -10,21 +13,28 @@ type RequestOptions<Response = any> = {
     key?: string;
     policy?: RequestPolicy;
     callback?: (response: Response) => any;
+    prediction?: PredictionOperationOptions<Response>;
 };
-declare class Client {
+declare class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
     context: Context;
     network: ClientNetwork;
-    adapter: any;
+    adapter: Adapter;
     serverTickRate: number;
     predictor: Predictor;
     disconnectHandler: DisconnectHandler;
     websocketErrorHandler: WebsocketErrorHandler;
-    constructor(context: Context, adapterCtor: any, serverTickRate: number, adapterConfig?: any);
-    connect(wsUrl: string, handshake: any): Promise<any>;
+    constructor(context: Context, adapterCtor: ClientAdapterConstructor<Adapter>, serverTickRate: number, adapterConfig?: any);
+    connect(target: Parameters<Adapter['connect']>[0], handshake: any): Promise<any>;
+    disconnect(reason?: any): void;
     setDisconnectHandler(handler: DisconnectHandler): void;
     setWebsocketErrorHandler(handler: WebsocketErrorHandler): void;
     flush(): void;
     addCommand(command: any): void;
+    addTimedCommand(command: any, options?: TimedCommandOptions): void;
+    reportInterpolationDelay(delayMs: number, options?: InterpolationDelayReportOptions): boolean;
+    predictCommand(command: any, options?: PredictionOperationOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
+    predictTimedCommand(command: any, predictionOptions?: PredictionOperationOptions, timingOptions?: TimedCommandOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
+    predictState(payload: any, options?: PredictionOperationOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
     request<Request = any, Response = any>(endpoint: Endpoint<Request, Response>, payload: Request, callbackOrOptions?: ((response: Response) => any) | RequestOptions<Response>): Promise<Response>;
 }
 export { Client };

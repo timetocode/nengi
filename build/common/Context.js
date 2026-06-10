@@ -11,6 +11,8 @@ const timeSyncSchema_1 = require("./schemas/timeSyncSchema");
 const pingSchema_1 = require("./schemas/pingSchema");
 const pongSchema_1 = require("./schemas/pongSchema");
 const protocolSchema_1 = require("./schemas/protocolSchema");
+const commandTimingSchema_1 = require("./schemas/commandTimingSchema");
+const interpolationDelaySchema_1 = require("./schemas/interpolationDelaySchema");
 const Binary_1 = require("./binary/Binary");
 const Protocol_1 = require("./binary/Protocol");
 class Context {
@@ -28,6 +30,8 @@ class Context {
         this.engineSchemas.set(EngineMessage_1.EngineMessage.Ping, pingSchema_1.pingSchema);
         this.engineSchemas.set(EngineMessage_1.EngineMessage.Pong, pongSchema_1.pongSchema);
         this.engineSchemas.set(EngineMessage_1.EngineMessage.Protocol, protocolSchema_1.protocolSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.CommandTiming, commandTimingSchema_1.commandTimingSchema);
+        this.engineSchemas.set(EngineMessage_1.EngineMessage.InterpolationDelay, interpolationDelaySchema_1.interpolationDelaySchema);
     }
     register(ntype, schema) {
         this.schemas.set(ntype, schema);

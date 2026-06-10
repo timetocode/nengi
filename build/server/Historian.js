@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Historian = void 0;
-const BinaryExt_1 = require("../common/binary/BinaryExt");
 const util_1 = require("../common/binary/schema/util");
 class Historian {
     constructor(context, tickRatePerSecond, ticksToStore) {
@@ -70,14 +69,13 @@ class Historian {
                     const computed = { nid, ntype: entityA.ntype };
                     const nschema = this.context.getSchema(computed.ntype);
                     for (let i = 0; i < nschema.keys.length; i++) {
-                        const { prop } = nschema.keys[i];
-                        const binarySpec = nschema.props[prop];
-                        const binaryUtil = (0, BinaryExt_1.binaryGet)(binarySpec.type);
+                        const binarySpec = nschema.keys[i];
+                        const { prop } = binarySpec;
                         const valueA = entityA[prop];
                         const valueB = entityB[prop];
                         if (binarySpec.interp) {
                             // interpolated
-                            const value = binaryUtil.interp(valueA, valueB, portion);
+                            const value = binarySpec.binary.interp(valueA, valueB, portion);
                             computed[prop] = value;
                         }
                         else {

@@ -17,6 +17,7 @@ declare class TestBufferWriter implements IBinaryWriter<Buffer> {
     writeFloat32(value: number): void;
     writeFloat64(value: number): void;
     writeString(value: string): void;
+    writeBytes(value: Uint8Array): void;
     writeUInt8Array(value: Uint8Array): void;
     writeInt8Array(value: Int8Array): void;
     writeUInt16Array(value: Uint16Array): void;

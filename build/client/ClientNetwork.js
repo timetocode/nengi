@@ -9,6 +9,7 @@ const writeMessage_1 = require("../binary/message/writeMessage");
 const connectAttemptSchema_1 = require("../common/schemas/connectAttemptSchema");
 const readMessage_1 = __importDefault(require("../binary/message/readMessage"));
 const readDiff_1 = __importDefault(require("../binary/entity/readDiff"));
+const readUpdateGroup_1 = __importDefault(require("../binary/entity/readUpdateGroup"));
 const Protocol_1 = require("../common/binary/Protocol");
 const EngineMessage_1 = require("../common/EngineMessage");
 const BinarySection_1 = require("../common/binary/BinarySection");
@@ -20,11 +21,14 @@ const EntityStore_1 = require("./EntityStore");
 const readEntity_1 = __importDefault(require("../binary/entity/readEntity"));
 const EndpointPayload_1 = require("../binary/endpoint/EndpointPayload");
 const Endpoint_1 = require("../common/Endpoint");
+const time_1 = require("./time");
+const schemaFingerprint_1 = require("../common/binary/schema/schemaFingerprint");
 const MAX_REQUESTS_PER_FRAME = 255;
 class ClientNetwork {
     constructor(client) {
         this.frames = [];
         this.rawFrames = [];
+        this.pendingFrames = [];
         this.latestFrame = null;
         this.messages = [];
         this.predictionErrorFrames = [];
@@ -39,7 +43,14 @@ class ClientNetwork {
         this.previousSnapshot = null;
         this.chronus = new Chronus_1.Chronus();
         this.frameTick = 1; // incremented each frame that comes from server
+        this.maxFrameHistory = 240;
         this.latency = 0;
+        this.interpolationDelayMs = 0;
+        this.interpolationDelayReportIntervalMs = 500;
+        this.interpolationDelayReportEpsilonMs = 1;
+        this.lastReportedInterpolationDelayMs = Number.NaN;
+        this.lastInterpolationDelayReportAt = Number.NEGATIVE_INFINITY;
+        this.sendSchemaFingerprint = false;
         this.onDisconnect = (reason, event) => {
             this.rejectPendingRequests(new Endpoint_1.RequestError('Disconnected before request completed.', 'DISCONNECTED', {
                 payload: reason
@@ -54,7 +65,7 @@ class ClientNetwork {
         };
         this.client = client;
         this.store = new EntityStore_1.EntityStore(client.context);
-        this.entityNTypes = this.store.ntypes;
+        this.entityNTypes = new Map();
     }
     incrementClientTick() {
         this.clientTick++;
@@ -68,11 +79,60 @@ class ClientNetwork {
     addCommand(command) {
         this.outbound.addCommand(command);
     }
+    addTimedCommand(command, options = {}) {
+        var _a, _b, _c, _d;
+        this.outbound.addTimedCommand(command, {
+            clientTimeMs: (_a = options.inputTimeMs) !== null && _a !== void 0 ? _a : (0, time_1.getLocalTime)(),
+            renderDelayMs: (_b = options.renderDelayMs) !== null && _b !== void 0 ? _b : 0,
+            viewTick: (_c = options.viewTick) !== null && _c !== void 0 ? _c : -1,
+            viewServerTimeMs: (_d = options.viewServerTimeMs) !== null && _d !== void 0 ? _d : -1
+        });
+    }
+    reportInterpolationDelay(delayMs, options = {}) {
+        var _a, _b, _c;
+        if (!Number.isFinite(delayMs)) {
+            return false;
+        }
+        const now = (_a = options.now) !== null && _a !== void 0 ? _a : (0, time_1.getLocalTime)();
+        const minIntervalMs = (_b = options.minIntervalMs) !== null && _b !== void 0 ? _b : this.interpolationDelayReportIntervalMs;
+        const epsilonMs = (_c = options.epsilonMs) !== null && _c !== void 0 ? _c : this.interpolationDelayReportEpsilonMs;
+        const roundedDelayMs = Math.max(0, Math.round(delayMs));
+        this.interpolationDelayMs = roundedDelayMs;
+        const changed = !Number.isFinite(this.lastReportedInterpolationDelayMs) ||
+            Math.abs(roundedDelayMs - this.lastReportedInterpolationDelayMs) >= epsilonMs;
+        const intervalElapsed = now - this.lastInterpolationDelayReportAt >= minIntervalMs;
+        if (!options.force && (!changed || !intervalElapsed)) {
+            return false;
+        }
+        this.lastReportedInterpolationDelayMs = roundedDelayMs;
+        this.lastInterpolationDelayReportAt = now;
+        this.addEngineCommand({
+            ntype: EngineMessage_1.EngineMessage.InterpolationDelay,
+            delayMs: roundedDelayMs
+        });
+        return true;
+    }
+    predictCommand(command, options = {}) {
+        var _a, _b;
+        const tick = this.clientTick;
+        this.addCommand(command);
+        return (_b = (_a = this.client.predictor).addCommand) === null || _b === void 0 ? void 0 : _b.call(_a, command, tick, options);
+    }
+    predictTimedCommand(command, predictionOptions = {}, timingOptions = {}) {
+        var _a, _b;
+        const tick = this.clientTick;
+        this.addTimedCommand(command, timingOptions);
+        return (_b = (_a = this.client.predictor).addCommand) === null || _b === void 0 ? void 0 : _b.call(_a, command, tick, predictionOptions);
+    }
+    predictState(payload, options = {}) {
+        var _a, _b;
+        return (_b = (_a = this.client.predictor).addState) === null || _b === void 0 ? void 0 : _b.call(_a, payload, this.clientTick, options);
+    }
     flush() {
         this.outbound.flush();
     }
     request(endpoint, payload, callbackOrOptions) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         const options = typeof callbackOrOptions === 'function' ? { callback: callbackOrOptions } : (callbackOrOptions || {});
         const endpointDefinition = (0, Endpoint_1.getEndpointDefinition)(endpoint);
         const endpointId = (0, Endpoint_1.getEndpointId)(endpoint);
@@ -126,6 +186,9 @@ class ClientNetwork {
         }
         this.requestQueue.enqueue(obj);
         this.requests.set(obj.requestId, obj);
+        if (options.prediction) {
+            (_d = (_c = this.client.predictor).addRequest) === null || _d === void 0 ? void 0 : _d.call(_c, obj.requestId, obj.endpointId, payload, this.clientTick, options.prediction);
+        }
         return promise;
     }
     nextRequestId() {
@@ -152,6 +215,7 @@ class ClientNetwork {
         return Array.from(this.requests.values()).find(request => request.key === key);
     }
     rejectRequest(request, reason) {
+        var _a, _b;
         if (request.timeout) {
             clearTimeout(request.timeout);
             request.timeout = null;
@@ -164,14 +228,17 @@ class ClientNetwork {
         if (this.requestQueue.length === 0) {
             this.requestBacklogActive = false;
         }
+        (_b = (_a = this.client.predictor).rejectRequest) === null || _b === void 0 ? void 0 : _b.call(_a, request.requestId, reason, this.latestFrame || undefined, this.store);
         request.reject(reason);
     }
     resolveRequest(request, response) {
+        var _a, _b;
         if (request.timeout) {
             clearTimeout(request.timeout);
             request.timeout = null;
         }
         this.requests.delete(request.requestId);
+        (_b = (_a = this.client.predictor).resolveRequest) === null || _b === void 0 ? void 0 : _b.call(_a, request.requestId, response, this.latestFrame || undefined, this.store);
         request.resolve(response);
         request.callback(response);
     }
@@ -180,10 +247,99 @@ class ClientNetwork {
             this.rejectRequest(request, reason);
         });
     }
-    drainFrames() {
-        const frames = this.rawFrames;
-        this.rawFrames = [];
+    drainFrames(maxFrames = Number.POSITIVE_INFINITY) {
+        const frames = [];
+        while (frames.length < maxFrames) {
+            const frame = this.processNextFrame();
+            if (!frame) {
+                break;
+            }
+            frames.push(frame);
+        }
         return frames;
+    }
+    processNextFrame() {
+        var _a, _b;
+        const pending = this.pendingFrames.shift();
+        if (!pending) {
+            return null;
+        }
+        const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAt);
+        frame.deleteEntities.forEach(nid => {
+            this.entityNTypes.delete(nid);
+        });
+        frame.closedChannels.forEach(closed => {
+            closed.entityNids.forEach(nid => this.entityNTypes.delete(nid));
+        });
+        this.frameTick++;
+        this.frames.push(frame);
+        while (this.frames.length > this.maxFrameHistory) {
+            this.frames.shift();
+        }
+        if (this.frames.length > 0) {
+            this.store.history.pruneBefore(this.frames[0].tick);
+        }
+        this.latestFrame = frame;
+        pending.snapshot.messages.forEach(message => this.messages.push(message));
+        const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities);
+        if (predictionErrorFrame.entities.size > 0) {
+            this.client.network.predictionErrorFrames.push(predictionErrorFrame);
+        }
+        (_b = (_a = this.client.predictor).resolveFrame) === null || _b === void 0 ? void 0 : _b.call(_a, frame, this.store);
+        this.client.predictor.cleanUp(frame.confirmedClientTick);
+        this.outbound.confirmCommands(pending.snapshot.confirmedClientTick);
+        pending.pendingResponses.forEach(pendingResponse => {
+            if (pendingResponse.status === Endpoint_1.ResponseStatus.Ok) {
+                this.resolveRequest(pendingResponse.request, pendingResponse.response);
+            }
+            else {
+                this.rejectRequest(pendingResponse.request, pendingResponse.error);
+            }
+        });
+        return frame;
+    }
+    getPendingFrameCount() {
+        return this.pendingFrames.length;
+    }
+    queueSnapshot(snapshot, receivedAt = (0, time_1.getLocalTime)()) {
+        this.pendingFrames.push({
+            snapshot,
+            receivedAt,
+            pendingResponses: []
+        });
+    }
+    resolveSnapshotTimestamp(snapshot, receivedAtEpoch = Date.now()) {
+        const tickMs = 1000 / this.client.serverTickRate;
+        const actualTimestamp = snapshot.timestamp;
+        if (actualTimestamp !== -1) {
+            this.chronus.register(actualTimestamp, receivedAtEpoch);
+            snapshot.timestamp = actualTimestamp;
+            return;
+        }
+        if (!this.previousSnapshot || this.previousSnapshot.timestamp === -1) {
+            return;
+        }
+        const expectedTimestamp = this.previousSnapshot.timestamp + tickMs;
+        snapshot.timestamp = expectedTimestamp;
+    }
+    shiftInterpolationTimestamps(shift) {
+        const shifted = new Set();
+        this.frames.forEach(frame => {
+            if (frame.timestamp !== -1) {
+                frame.timestamp += shift;
+                shifted.add(frame);
+            }
+        });
+        this.rawFrames.forEach(frame => {
+            if (!shifted.has(frame) && frame.timestamp !== -1) {
+                frame.timestamp += shift;
+            }
+        });
+        this.pendingFrames.forEach(frame => {
+            if (frame.snapshot.timestamp !== -1) {
+                frame.snapshot.timestamp += shift;
+            }
+        });
     }
     getRequestsForNextFrame() {
         const start = Math.max(0, this.requestQueue.arr.length - MAX_REQUESTS_PER_FRAME);
@@ -210,7 +366,8 @@ class ClientNetwork {
     createHandshake(handshake, binary) {
         const handshakeMessage = {
             ntype: EngineMessage_1.EngineMessage.ConnectionAttempt,
-            handshake: JSON.stringify(handshake)
+            handshake: JSON.stringify(handshake),
+            schemaFingerprint: this.sendSchemaFingerprint ? (0, schemaFingerprint_1.createSchemaFingerprint)(this.client.context) : ''
         };
         const handshakeByteLength = (0, count_1.default)(connectAttemptSchema_1.connectionAttemptSchema, handshakeMessage);
         const dw = binary.createWriter(handshakeByteLength + 2);
@@ -270,6 +427,18 @@ class ClientNetwork {
     createOutbound(binary) {
         const tick = this.clientTick;
         this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.ClientTick, tick });
+        const timedCommands = this.outbound.getCommandTiming(this.outbound.tick);
+        for (let i = 0; i < timedCommands.length; i++) {
+            const timing = timedCommands[i];
+            this.addEngineCommand({
+                ntype: EngineMessage_1.EngineMessage.CommandTiming,
+                commandIndex: timing.commandIndex,
+                clientTimeMs: timing.clientTimeMs,
+                renderDelayMs: timing.renderDelayMs,
+                viewTick: timing.viewTick,
+                viewServerTimeMs: timing.viewServerTimeMs
+            });
+        }
         let bytes = 0;
         const isDebug = false;
         const debug = {};
@@ -365,10 +534,19 @@ class ClientNetwork {
     }
     readSnapshot(dr) {
         var _a;
+        const receivedAt = (0, time_1.getLocalTime)();
+        const receivedAtEpoch = Date.now();
         const snapshot = {
             timestamp: -1,
             confirmedClientTick: -1,
             messages: [],
+            channelEntityCreates: [],
+            channelHeaderCreates: [],
+            channelHeaderUpdates: [],
+            channelHeaderDeletes: [],
+            ecsCreateEntities: [],
+            ecsCreateComponents: [],
+            ecsDeleteEntities: [],
             createEntities: [],
             updateEntities: [],
             deleteEntities: []
@@ -398,7 +576,16 @@ class ClientNetwork {
                             this.setProtocol(engineMessage.nidType, engineMessage.ntypeType);
                         }
                         if (engineMessage.ntype === EngineMessage_1.EngineMessage.Ping) {
-                            this.addEngineCommand({ ntype: EngineMessage_1.EngineMessage.Pong });
+                            const clientReceiveTimeMs = (0, time_1.getLocalTime)();
+                            this.addEngineCommand({
+                                ntype: EngineMessage_1.EngineMessage.Pong,
+                                // @ts-ignore
+                                pingId: engineMessage.pingId,
+                                // @ts-ignore
+                                serverTimeMs: engineMessage.serverTimeMs,
+                                clientReceiveTimeMs,
+                                clientSendTimeMs: (0, time_1.getLocalTime)()
+                            });
                             // @ts-ignore
                             this.latency = engineMessage.latency;
                         }
@@ -446,12 +633,88 @@ class ClientNetwork {
                     }
                     break;
                 }
+                case BinarySection_1.BinarySection.ChannelEntityCreates: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        snapshot.channelEntityCreates.push({
+                            nid: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr),
+                            channelId: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr)
+                        });
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.ChannelHeaderCreates: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        const channelId = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                        const header = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
+                        this.entityNTypes.set(header.nid, header.ntype);
+                        snapshot.channelHeaderCreates.push({
+                            channelId,
+                            header,
+                            version: 0
+                        });
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.ChannelHeaderUpdates: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        const channelId = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                        const propCount = dr.readUInt32();
+                        const changes = [];
+                        for (let j = 0; j < propCount; j++) {
+                            changes.push((0, readDiff_1.default)(dr, this.client.context, this.entityNTypes, this.protocol.nidType));
+                        }
+                        const groupCount = dr.readUInt32();
+                        for (let j = 0; j < groupCount; j++) {
+                            const diffs = (0, readUpdateGroup_1.default)(dr, this.client.context, this.entityNTypes, this.protocol.nidType);
+                            for (let k = 0; k < diffs.length; k++) {
+                                changes.push(diffs[k]);
+                            }
+                        }
+                        snapshot.channelHeaderUpdates.push({
+                            channelId,
+                            changes,
+                            groups: [],
+                            version: 0
+                        });
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.ChannelHeaderDeletes: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        snapshot.channelHeaderDeletes.push({
+                            channelId: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr)
+                        });
+                    }
+                    break;
+                }
                 case BinarySection_1.BinarySection.CreateEntities: {
                     const count = dr.readUInt32();
                     for (let i = 0; i < count; i++) {
                         const entity = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
-                        this.store.ntypes.set(entity.nid, entity.ntype);
+                        this.entityNTypes.set(entity.nid, entity.ntype);
                         snapshot.createEntities.push(entity);
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.EcsCreateEntities: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        snapshot.ecsCreateEntities.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.EcsCreateComponents: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        const pid = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                        const component = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
+                        component.pid = pid;
+                        this.entityNTypes.set(component.nid, component.ntype);
+                        snapshot.ecsCreateComponents.push(component);
                     }
                     break;
                 }
@@ -463,11 +726,48 @@ class ClientNetwork {
                     }
                     break;
                 }
+                case BinarySection_1.BinarySection.UpdateEntityGroups: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        const diffs = (0, readUpdateGroup_1.default)(dr, this.client.context, this.entityNTypes, this.protocol.nidType);
+                        for (let j = 0; j < diffs.length; j++) {
+                            snapshot.updateEntities.push(diffs[j]);
+                        }
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.EcsUpdateComponentGroups: {
+                    const ntype = (0, Protocol_1.readNetworkId)(this.protocol.ntypeType, dr);
+                    const groupKey = dr.readUInt8();
+                    const count = dr.readUInt32();
+                    const schema = this.client.context.getSchema(ntype);
+                    const group = schema.updateGroups[groupKey];
+                    for (let i = 0; i < count; i++) {
+                        const nid = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                        for (let j = 0; j < group.props.length; j++) {
+                            const prop = group.props[j];
+                            snapshot.updateEntities.push({
+                                nid,
+                                prop: prop.prop,
+                                value: prop.binary.read(dr)
+                            });
+                        }
+                    }
+                    break;
+                }
                 case BinarySection_1.BinarySection.DeleteEntities: {
                     const count = dr.readUInt32();
                     for (let i = 0; i < count; i++) {
                         const nid = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                        this.entityNTypes.delete(nid);
                         snapshot.deleteEntities.push(nid);
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.EcsDeleteEntities: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        snapshot.ecsDeleteEntities.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
                     }
                     break;
                 }
@@ -478,38 +778,9 @@ class ClientNetwork {
             }
         }
         // client engine level state
-        // timing
-        if (snapshot.timestamp !== -1) {
-            this.client.network.chronus.register(snapshot.timestamp);
-        }
-        else {
-            if (this.previousSnapshot) {
-                snapshot.timestamp = this.previousSnapshot.timestamp + (1000 / this.client.serverTickRate);
-            }
-        }
-        // apply authoritative state once, then expose compact frame events
-        const frame = this.store.applySnapshot(snapshot, this.frameTick);
-        this.frameTick++;
-        this.frames.push(frame);
-        this.rawFrames.push(frame);
-        this.latestFrame = frame;
-        snapshot.messages.forEach(message => this.messages.push(message));
-        const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities);
-        if (predictionErrorFrame.entities.size > 0) {
-            this.client.network.predictionErrorFrames.push(predictionErrorFrame);
-        }
-        this.client.predictor.cleanUp(frame.confirmedClientTick);
-        // commands/prediction
-        this.outbound.confirmCommands(snapshot.confirmedClientTick);
+        this.resolveSnapshotTimestamp(snapshot, receivedAtEpoch);
+        this.pendingFrames.push({ snapshot, receivedAt, pendingResponses });
         this.previousSnapshot = snapshot;
-        pendingResponses.forEach(pending => {
-            if (pending.status === Endpoint_1.ResponseStatus.Ok) {
-                this.resolveRequest(pending.request, pending.response);
-            }
-            else {
-                this.rejectRequest(pending.request, pending.error);
-            }
-        });
     }
 }
 exports.ClientNetwork = ClientNetwork;

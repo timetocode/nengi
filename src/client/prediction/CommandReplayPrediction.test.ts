@@ -3,9 +3,16 @@ import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
 import { Client } from '../Client'
 import { CommandReplayPrediction } from './CommandReplayPrediction'
+import { testBinaryAdapter } from '../../testSupport/BufferBinary'
 
 class MockAdapter {
+    binary = testBinaryAdapter
     constructor() {
+    }
+    connect() {
+        return Promise.resolve({ accepted: true })
+    }
+    flush() {
     }
 }
 

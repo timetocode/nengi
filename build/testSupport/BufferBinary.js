@@ -51,6 +51,10 @@ class TestBufferWriter {
         this.buffer.write(value, this.offset, 'utf8');
         this.offset += length;
     }
+    writeBytes(value) {
+        this.buffer.set(value, this.offset);
+        this.offset += value.byteLength;
+    }
     writeUInt8Array(value) {
         this.writeUInt32(value.length);
         for (let i = 0; i < value.length; i++) {

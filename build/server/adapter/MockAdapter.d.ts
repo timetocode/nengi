@@ -9,16 +9,20 @@ type MockAdapterConfig<InboundPayload extends BinaryPayload = BinaryPayload, Out
     binary: BinaryAdapter<InboundPayload, OutboundPayload>;
 };
 /**
- * Not a real network adapter, data is passed without using a real socket.
- * Used for mixing a server and client together in one application
- * such as for a single player mode or automated testing
+ * Dependency-free in-memory transport.
+ * Useful for single-player modes, embedded simulations, and tests where a real
+ * socket would add environment-specific noise without changing nengi behavior.
  */
-declare class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IServerNetworkAdapter<InboundPayload, OutboundPayload> {
+declare class LocalInstanceAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IServerNetworkAdapter<InboundPayload, OutboundPayload, void | {
+    ready?: () => void;
+}> {
     network: InstanceNetwork;
     serverSockets: MockServerSocket[];
     binary: BinaryAdapter<InboundPayload, OutboundPayload>;
     constructor(network: InstanceNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>);
-    listen(port: number, ready: () => void): void;
+    listen(options?: void | {
+        ready?: () => void;
+    }, ready?: () => void): void;
     createMockConnect(): MockServerSocket;
     open(socket: MockServerSocket): void;
     message(socket: MockServerSocket, message: any): void;
@@ -26,13 +30,20 @@ declare class MockInstanceAdapter<InboundPayload extends BinaryPayload = BinaryP
     disconnect(user: User, reason: any): void;
     send(user: User, buffer: OutboundPayload): void;
 }
-declare class MockClientAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IClientNetworkAdapter {
+declare class LocalClientAdapter<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> implements IClientNetworkAdapter<InboundPayload, OutboundPayload, void | MockClientSocket> {
     network: ClientNetwork;
     binary: BinaryAdapter<InboundPayload, OutboundPayload>;
+    socket: MockClientSocket | null;
+    connected: boolean;
+    pendingConnect: {
+        resolve: (value: any) => void;
+        reject: (reason: any) => void;
+    } | null;
     constructor(network: ClientNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>);
     onMessage(buffer: InboundPayload): void;
-    connect(wsUrl: string, handshake: any): Promise<unknown>;
+    connect(target?: void | MockClientSocket, handshake?: any): Promise<unknown>;
     flush(): void;
+    disconnect(reason?: any): void;
 }
 declare enum MockSocketReadyState {
     CONNECTING = 0,
@@ -47,7 +58,7 @@ declare class MockServerSocket {
     user: User | null;
     network: InstanceNetwork;
     constructor(network: InstanceNetwork);
-    end(): void;
+    end(reason?: any): void;
     receive(buffer: BinaryPayload): void;
     send(buffer: BinaryPayload): void;
 }
@@ -55,10 +66,13 @@ declare class MockClientSocket {
     inboundQueue: NQueue<any>;
     readyState: MockSocketReadyState;
     serverSocket: MockServerSocket;
+    adapter: LocalClientAdapter<any, any> | null;
     constructor(serverSocket: MockServerSocket);
-    close(): void;
+    close(reason?: any): void;
     send(buffer: BinaryPayload): void;
     receive(buffer: BinaryPayload): void;
 }
-export { MockInstanceAdapter, MockClientAdapter, MockClientSocket, MockServerSocket };
+declare const MockInstanceAdapter: typeof LocalInstanceAdapter;
+declare const MockClientAdapter: typeof LocalClientAdapter;
+export { LocalInstanceAdapter, LocalClientAdapter, MockInstanceAdapter, MockClientAdapter, MockClientSocket, MockServerSocket };
 //# sourceMappingURL=MockAdapter.d.ts.map

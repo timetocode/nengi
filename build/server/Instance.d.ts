@@ -38,8 +38,9 @@ export declare class Instance {
      */
     onConnect: (handshake: any) => Promise<any>;
     constructor(context: Context);
-    attachEntity(parentNid: number, child: IEntity): void;
-    detachEntity(parentNid: number, child: IEntity): void;
+    attachChild(parent: IEntity, child: IEntity): IEntity;
+    detachChild(parent: IEntity, child: IEntity): void;
+    markDirty(entity: IEntity): boolean;
     respond<Request = any, Response = any>(endpoint: Endpoint<Request, Response>, callback: ResponseHandler<Request, Response>): void;
     step(): void;
 }

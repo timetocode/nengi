@@ -12,6 +12,8 @@ export declare enum EngineMessage {
     Ping = 10,
     Pong = 11,
     ClientTick = 12,
-    Protocol = 13
+    Protocol = 13,
+    CommandTiming = 14,
+    InterpolationDelay = 15
 }
 //# sourceMappingURL=EngineMessage.d.ts.map

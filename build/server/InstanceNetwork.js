@@ -25,15 +25,95 @@ const BinaryExt_1 = require("../common/binary/BinaryExt");
 const Binary_1 = require("../common/binary/Binary");
 const EndpointPayload_1 = require("../binary/endpoint/EndpointPayload");
 const Endpoint_1 = require("../common/Endpoint");
+const schemaFingerprint_1 = require("../common/binary/schema/schemaFingerprint");
+function createSnapshotPerformanceWindow() {
+    return {
+        snapshots: 0,
+        sharedSnapshots: 0,
+        collectTotalMs: 0,
+        collectMaxMs: 0,
+        countTotalMs: 0,
+        countMaxMs: 0,
+        writeTotalMs: 0,
+        writeMaxMs: 0,
+        commitTotalMs: 0,
+        commitMaxMs: 0,
+        sendTotalMs: 0,
+        sendMaxMs: 0,
+        bytesTotal: 0,
+        bytesMax: 0,
+        createsTotal: 0,
+        updatePropsTotal: 0,
+        updateGroupsTotal: 0,
+        groupedUpdatePropsTotal: 0,
+        deletesTotal: 0,
+        messagesTotal: 0,
+        messagesMax: 0,
+        engineMessagesTotal: 0,
+        engineMessagesMax: 0,
+        responsesTotal: 0,
+        responsesMax: 0,
+        sharedMessageFragmentBuilds: 0,
+        sharedMessageFragmentHits: 0,
+        sharedMessageFragmentCountTotalMs: 0,
+        sharedMessageFragmentCountMaxMs: 0,
+        sharedMessageFragmentWriteTotalMs: 0,
+        sharedMessageFragmentWriteMaxMs: 0,
+        sharedMessageFragmentBytesTotal: 0,
+        sharedMessageFragmentBytesMax: 0,
+        sharedMessageFragmentCopyTotalMs: 0,
+        sharedMessageFragmentCopyMaxMs: 0,
+        sharedMessageFragmentCopyBytesTotal: 0,
+        sharedMessageFragmentMessagesTotal: 0,
+        sharedFragmentBuilds: 0,
+        sharedFragmentHits: 0,
+        sharedFragmentCollectTotalMs: 0,
+        sharedFragmentCollectMaxMs: 0,
+        sharedFragmentCountTotalMs: 0,
+        sharedFragmentCountMaxMs: 0,
+        sharedFragmentWriteTotalMs: 0,
+        sharedFragmentWriteMaxMs: 0,
+        sharedFragmentBytesTotal: 0,
+        sharedFragmentBytesMax: 0,
+        sharedFragmentCopyTotalMs: 0,
+        sharedFragmentCopyMaxMs: 0,
+        sharedFragmentCopyBytesTotal: 0
+    };
+}
 function countStringBytes(value) {
     return (0, BinaryExt_1.binaryGet)(Binary_1.Binary.String).byteSize(value);
 }
 function errorPayload(code, message) {
     return { code, message };
 }
+function serializeConnectionError(err) {
+    if (err instanceof Error) {
+        return JSON.stringify({
+            name: err.name,
+            message: err.message
+        });
+    }
+    return JSON.stringify(err);
+}
 class InstanceNetwork {
     constructor(instance) {
         this.responseBacklogUsers = new Set();
+        this.requireSchemaFingerprint = false;
+        this.debugBinaryWrites = false;
+        this.sharedUpdateFragmentsEnabled = false;
+        this.sharedUpdateFragments = new Map();
+        this.sharedCreateFragments = new Map();
+        this.sharedDeleteFragments = new Map();
+        this.sharedMessageFragments = new Map();
+        /**
+         * Disabled by default because each sample takes several high-resolution
+         * clock reads per user. The fields intentionally mirror the snapshot
+         * pipeline so stress tests can tell whether time is going to visibility
+         * and plan collection, exact byte counting, binary writing, commit work,
+         * or the adapter send call.
+         */
+        this.snapshotPerformanceEnabled = false;
+        this.snapshotPerformance = createSnapshotPerformanceWindow();
         this.onResponseBacklog = (info) => {
             console.warn(`nengi response backlog: ${info.remaining} responses remain queued for user ${info.user.id} after sending ${info.sent} of ${info.queued} on server tick ${info.tick}.`);
         };
@@ -41,6 +121,118 @@ class InstanceNetwork {
     }
     onRequest() {
         // TODO
+    }
+    recordSnapshotPerformance(sample) {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        const metrics = this.snapshotPerformance;
+        metrics.snapshots++;
+        metrics.collectTotalMs += sample.collectMs;
+        metrics.collectMaxMs = Math.max(metrics.collectMaxMs, sample.collectMs);
+        metrics.countTotalMs += sample.countMs;
+        metrics.countMaxMs = Math.max(metrics.countMaxMs, sample.countMs);
+        metrics.writeTotalMs += sample.writeMs;
+        metrics.writeMaxMs = Math.max(metrics.writeMaxMs, sample.writeMs);
+        metrics.commitTotalMs += sample.commitMs;
+        metrics.commitMaxMs = Math.max(metrics.commitMaxMs, sample.commitMs);
+        metrics.sendTotalMs += sample.sendMs;
+        metrics.sendMaxMs = Math.max(metrics.sendMaxMs, sample.sendMs);
+        metrics.bytesTotal += sample.bytes;
+        metrics.bytesMax = Math.max(metrics.bytesMax, sample.bytes);
+        metrics.createsTotal += sample.creates;
+        metrics.updatePropsTotal += sample.updateProps;
+        metrics.updateGroupsTotal += sample.updateGroups;
+        metrics.groupedUpdatePropsTotal += sample.groupedUpdateProps;
+        metrics.deletesTotal += sample.deletes;
+        metrics.messagesTotal += sample.messages;
+        metrics.messagesMax = Math.max(metrics.messagesMax, sample.messages);
+        metrics.engineMessagesTotal += sample.engineMessages;
+        metrics.engineMessagesMax = Math.max(metrics.engineMessagesMax, sample.engineMessages);
+        metrics.responsesTotal += sample.responses;
+        metrics.responsesMax = Math.max(metrics.responsesMax, sample.responses);
+    }
+    recordSharedSnapshot() {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        this.snapshotPerformance.sharedSnapshots++;
+    }
+    recordSharedFragmentHit() {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        this.snapshotPerformance.sharedFragmentHits++;
+    }
+    recordSharedFragmentBuild(sample) {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        const metrics = this.snapshotPerformance;
+        metrics.sharedFragmentBuilds++;
+        metrics.sharedFragmentCollectTotalMs += sample.collectMs;
+        metrics.sharedFragmentCollectMaxMs = Math.max(metrics.sharedFragmentCollectMaxMs, sample.collectMs);
+        metrics.sharedFragmentCountTotalMs += sample.countMs;
+        metrics.sharedFragmentCountMaxMs = Math.max(metrics.sharedFragmentCountMaxMs, sample.countMs);
+        metrics.sharedFragmentWriteTotalMs += sample.writeMs;
+        metrics.sharedFragmentWriteMaxMs = Math.max(metrics.sharedFragmentWriteMaxMs, sample.writeMs);
+        metrics.sharedFragmentBytesTotal += sample.bytes;
+        metrics.sharedFragmentBytesMax = Math.max(metrics.sharedFragmentBytesMax, sample.bytes);
+    }
+    recordSharedFragmentCopy(copyMs, bytes) {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        const metrics = this.snapshotPerformance;
+        metrics.sharedFragmentCopyTotalMs += copyMs;
+        metrics.sharedFragmentCopyMaxMs = Math.max(metrics.sharedFragmentCopyMaxMs, copyMs);
+        metrics.sharedFragmentCopyBytesTotal += bytes;
+    }
+    recordSharedMessageFragmentHit() {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        this.snapshotPerformance.sharedMessageFragmentHits++;
+    }
+    recordSharedMessageFragmentBuild(sample) {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        const metrics = this.snapshotPerformance;
+        metrics.sharedMessageFragmentBuilds++;
+        metrics.sharedMessageFragmentCountTotalMs += sample.countMs;
+        metrics.sharedMessageFragmentCountMaxMs = Math.max(metrics.sharedMessageFragmentCountMaxMs, sample.countMs);
+        metrics.sharedMessageFragmentWriteTotalMs += sample.writeMs;
+        metrics.sharedMessageFragmentWriteMaxMs = Math.max(metrics.sharedMessageFragmentWriteMaxMs, sample.writeMs);
+        metrics.sharedMessageFragmentBytesTotal += sample.bytes;
+        metrics.sharedMessageFragmentBytesMax = Math.max(metrics.sharedMessageFragmentBytesMax, sample.bytes);
+        metrics.sharedMessageFragmentMessagesTotal += sample.messages;
+    }
+    recordSharedMessageFragmentCopy(copyMs, bytes) {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        const metrics = this.snapshotPerformance;
+        metrics.sharedMessageFragmentCopyTotalMs += copyMs;
+        metrics.sharedMessageFragmentCopyMaxMs = Math.max(metrics.sharedMessageFragmentCopyMaxMs, copyMs);
+        metrics.sharedMessageFragmentCopyBytesTotal += bytes;
+    }
+    recordSnapshotSend(sendMs) {
+        if (!this.snapshotPerformanceEnabled) {
+            return;
+        }
+        const metrics = this.snapshotPerformance;
+        metrics.sendTotalMs += sendMs;
+        metrics.sendMaxMs = Math.max(metrics.sendMaxMs, sendMs);
+    }
+    resetSnapshotPerformance() {
+        this.snapshotPerformance = createSnapshotPerformanceWindow();
+    }
+    resetSharedUpdateFragments() {
+        this.sharedUpdateFragments.clear();
+        this.sharedCreateFragments.clear();
+        this.sharedDeleteFragments.clear();
+        this.sharedMessageFragments.clear();
     }
     getProtocol() {
         return {
@@ -134,10 +326,19 @@ class InstanceNetwork {
         user.connectionState = User_1.UserConnectionState.OpenPreHandshake;
         user.network = this;
     }
-    onHandshake(user, handshake) {
-        return __awaiter(this, void 0, void 0, function* () {
+    onHandshake(user_1, handshake_1) {
+        return __awaiter(this, arguments, void 0, function* (user, handshake, clientSchemaFingerprint = '') {
             try {
                 user.connectionState = User_1.UserConnectionState.OpenAwaitingHandshake;
+                if (this.requireSchemaFingerprint) {
+                    const serverSchemaFingerprint = (0, schemaFingerprint_1.createSchemaFingerprint)(this.instance.context);
+                    if (!clientSchemaFingerprint) {
+                        throw new Error(`Schema fingerprint required. Server fingerprint ${serverSchemaFingerprint}.`);
+                    }
+                    if (clientSchemaFingerprint !== serverSchemaFingerprint) {
+                        throw new Error(`Schema fingerprint mismatch. Client ${clientSchemaFingerprint}, server ${serverSchemaFingerprint}.`);
+                    }
+                }
                 const connectionAccepted = yield this.instance.onConnect(handshake);
                 if (connectionAccepted === false) {
                     throw new Error('Connection denied.');
@@ -168,7 +369,7 @@ class InstanceNetwork {
                 // in each of these later
                 if (user.connectionState === User_1.UserConnectionState.OpenAwaitingHandshake) {
                     // developer's code decided to reject this connection (rejected promise)
-                    const jsonErr = JSON.stringify(err);
+                    const jsonErr = serializeConnectionError(err);
                     const denyReasonByteLength = countStringBytes(jsonErr);
                     // deny and send reason
                     const bw = user.networkAdapter.binary.createWriter(3 + denyReasonByteLength);
@@ -180,7 +381,7 @@ class InstanceNetwork {
                 }
                 if (user.connectionState === User_1.UserConnectionState.Open) {
                     // a loss of connection after handshake is complete
-                    const jsonErr = JSON.stringify(err);
+                    const jsonErr = serializeConnectionError(err);
                     const denyReasonByteLength = countStringBytes(jsonErr);
                     // deny and send reason
                     const bw = user.networkAdapter.binary.createWriter(3 + denyReasonByteLength);
@@ -196,13 +397,17 @@ class InstanceNetwork {
     onMessage(user, buffer) {
         var _a;
         try {
+            const serverReceivedTimeMs = performance.now();
             const binaryReader = user.networkAdapter.binary.createReader(buffer);
             const commands = [];
+            const commandTimingInputs = [];
             const commandSet = {
                 type: NetworkEvent_1.NetworkEvent.CommandSet,
                 user,
                 commands,
-                clientTick: -1
+                clientTick: -1,
+                commandTimings: [],
+                serverReceivedTimeMs
             };
             while (binaryReader.offset < binaryReader.byteLength) {
                 const section = binaryReader.readUInt8();
@@ -213,7 +418,7 @@ class InstanceNetwork {
                             const msg = (0, readEngineMessage_1.default)(binaryReader, this.instance.context);
                             if (msg.ntype === EngineMessage_1.EngineMessage.ConnectionAttempt) {
                                 const handshake = JSON.parse(msg.handshake);
-                                this.onHandshake(user, handshake);
+                                this.onHandshake(user, handshake, msg.schemaFingerprint || '');
                             }
                             if (msg.ntype === EngineMessage_1.EngineMessage.ClientTick) {
                                 const clientTick = msg.tick;
@@ -221,7 +426,24 @@ class InstanceNetwork {
                                 commandSet.clientTick = clientTick;
                             }
                             if (msg.ntype === EngineMessage_1.EngineMessage.Pong) {
-                                user.calculateLatency();
+                                user.recordClockSyncPong({
+                                    pingId: msg.pingId,
+                                    serverTimeMs: msg.serverTimeMs,
+                                    clientReceiveTimeMs: msg.clientReceiveTimeMs,
+                                    clientSendTimeMs: msg.clientSendTimeMs
+                                }, serverReceivedTimeMs);
+                            }
+                            if (msg.ntype === EngineMessage_1.EngineMessage.CommandTiming) {
+                                commandTimingInputs.push({
+                                    commandIndex: msg.commandIndex,
+                                    clientTimeMs: msg.clientTimeMs,
+                                    renderDelayMs: msg.renderDelayMs,
+                                    viewTick: msg.viewTick,
+                                    viewServerTimeMs: msg.viewServerTimeMs
+                                });
+                            }
+                            if (msg.ntype === EngineMessage_1.EngineMessage.InterpolationDelay) {
+                                user.recordInterpolationDelay(msg.delayMs, serverReceivedTimeMs);
                             }
                         }
                         break;
@@ -256,6 +478,12 @@ class InstanceNetwork {
                         console.log('network hit default case while reading');
                         break;
                     }
+                }
+            }
+            for (let i = 0; i < commandTimingInputs.length; i++) {
+                const input = commandTimingInputs[i];
+                if (input.commandIndex >= 0 && input.commandIndex < commands.length) {
+                    commandSet.commandTimings[input.commandIndex] = user.estimateCommandTiming(input, serverReceivedTimeMs);
                 }
             }
             this.instance.queue.enqueue(commandSet);

@@ -9,6 +9,8 @@ import { timeSyncSchema } from './schemas/timeSyncSchema'
 import { pingSchema } from './schemas/pingSchema'
 import { pongSchema } from './schemas/pongSchema'
 import { protocolSchema } from './schemas/protocolSchema'
+import { commandTimingSchema } from './schemas/commandTimingSchema'
+import { interpolationDelaySchema } from './schemas/interpolationDelaySchema'
 import { Binary } from './binary/Binary'
 import { NetworkIdType, networkTypeForMaxValue } from './binary/Protocol'
 
@@ -39,6 +41,8 @@ export class Context {
         this.engineSchemas.set(EngineMessage.Ping, pingSchema)
         this.engineSchemas.set(EngineMessage.Pong, pongSchema)
         this.engineSchemas.set(EngineMessage.Protocol, protocolSchema)
+        this.engineSchemas.set(EngineMessage.CommandTiming, commandTimingSchema)
+        this.engineSchemas.set(EngineMessage.InterpolationDelay, interpolationDelaySchema)
     }
 
     register(ntype: number, schema: Schema) {

@@ -14,6 +14,7 @@ class EntityCache {
     constructor() {
         this.cache = {};
         this.diffCache = {};
+        this.groupedDiffCache = {};
         //this.binaryDiffCache = {}
     }
     cacheContains(nid) {
@@ -21,11 +22,24 @@ class EntityCache {
     }
     createCachesForTick(tick) {
         this.diffCache[tick] = {};
+        this.groupedDiffCache[tick] = {};
         //this.binaryDiffCache[tick] = {}
     }
     deleteCachesForTick(tick) {
         delete this.diffCache[tick];
+        delete this.groupedDiffCache[tick];
         //delete this.binaryDiffCache[tick]
+    }
+    getAndDiffGrouped(tick, entity, nschema) {
+        if (this.groupedDiffCache[tick][entity.nid]) {
+            return this.groupedDiffCache[tick][entity.nid];
+        }
+        else {
+            const cacheObject = this.cache[entity.nid];
+            const diffs = (0, util_1.compareAndUpdateNObjectGrouped)(entity, cacheObject, nschema);
+            this.groupedDiffCache[tick][entity.nid] = diffs;
+            return diffs;
+        }
     }
     getAndDiff(tick, entity, nschema) {
         if (this.diffCache[tick][entity.nid]) {
