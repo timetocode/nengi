@@ -213,9 +213,10 @@ class FixedStepInterpolator {
         }
         const entitiesB = this.getEntityRefsAtFrame(diagnostics.frameB);
         const entities = new Map();
+        const frameB = diagnostics.frameB;
         entitiesA.forEach((entityA, nid) => {
             const entityB = entitiesB.get(nid);
-            entities.set(nid, this.interpolateEntity(entityA, entityB || null, diagnostics.alpha));
+            entities.set(nid, this.interpolateEntityForFrame(nid, entityA, entityB || null, frameB, diagnostics.alpha));
         });
         return Object.assign(Object.assign({}, diagnostics), { entities });
     }
@@ -240,7 +241,7 @@ class FixedStepInterpolator {
             return this.cloneEntity(entityA);
         }
         const entityB = this.getEntityRefAtFrame(nid, bounds.frameB);
-        return this.interpolateEntity(entityA, entityB, bounds.alpha);
+        return this.interpolateEntityForFrame(nid, entityA, entityB, bounds.frameB, bounds.alpha);
     }
     getEntities(nids, interpDelay, now = Date.now()) {
         const bounds = this.getBounds(interpDelay, now);
@@ -261,7 +262,7 @@ class FixedStepInterpolator {
                 continue;
             }
             const entityB = this.getEntityRefAtFrame(nid, frameB);
-            entities.set(nid, this.interpolateEntity(entityA, entityB, alpha));
+            entities.set(nid, this.interpolateEntityForFrame(nid, entityA, entityB, frameB, alpha));
         }
         return entities;
     }
@@ -320,6 +321,12 @@ class FixedStepInterpolator {
             }
         });
         return interpolated;
+    }
+    interpolateEntityForFrame(nid, entityA, entityB, frameB, alpha) {
+        if (entityB && frameB.skipInterpolationNids.has(nid)) {
+            return this.cloneEntity(entityB);
+        }
+        return this.interpolateEntity(entityA, entityB, alpha);
     }
     cloneEntity(entity) {
         const clone = {

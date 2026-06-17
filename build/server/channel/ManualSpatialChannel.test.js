@@ -124,7 +124,7 @@ describe('manual and spatial channels', () => {
         expect(channel.removeEntity(Object.assign({}, entity))).toBe(0);
         expect(channel.entities.get(nid)).toBe(entity);
         expect(channel.getVisibleEntities(user.id)).toEqual([nid]);
-        expect(localState.sources.has(nid)).toBe(true);
+        expect(localState.ownerByNid.has(nid)).toBe(true);
         expect(entity.nid).toBe(nid);
     });
     it('ignores stale ManualSpatialChannel2D remove objects without mutating grid membership', () => {
@@ -137,21 +137,21 @@ describe('manual and spatial channels', () => {
         expect(channel.removeEntity(Object.assign({}, entity))).toBe(0);
         expect(channel.entities.get(nid)).toBe(entity);
         expect(channel.getVisibleEntities(user.id)).toEqual([nid]);
-        expect(localState.sources.has(nid)).toBe(true);
+        expect(localState.ownerByNid.has(nid)).toBe(true);
         expect(entity.nid).toBe(nid);
     });
-    it('clears automatic spatial inner channel deltas at the snapshot boundary', () => {
+    it('clears automatic spatial channel deltas at the snapshot boundary', () => {
         const localState = new LocalState_1.LocalState();
         const channel = new SpatialChannel2D_1.SpatialChannel2D(localState, 10);
         const entity = channel.addEntity(createEntity(1, 1));
-        expect(channel.channel.createdRoots.length).toBe(1);
+        expect(channel.createdRoots.length).toBe(1);
         channel.clearSnapshotDeltas();
-        expect(channel.channel.createdRoots).toEqual([]);
+        expect(channel.createdRoots).toEqual([]);
         channel.removeEntity(entity);
-        expect(channel.channel.deletedNids.length).toBe(1);
+        expect(channel.deletedNids.length).toBe(1);
         channel.clearSnapshotDeltas();
-        expect(channel.channel.createdRoots).toEqual([]);
-        expect(channel.channel.deletedNids).toEqual([]);
+        expect(channel.createdRoots).toEqual([]);
+        expect(channel.deletedNids).toEqual([]);
     });
     it('uses SpatialChannel3D views and vertical culling for direct visibility', () => {
         const localState = new LocalState_1.LocalState();
@@ -177,7 +177,7 @@ describe('manual and spatial channels', () => {
         expect(channel.entities.size).toBe(0);
         expect(user.subscriptions.has(channel.nid)).toBe(false);
         expect(localState.channels.has(channel)).toBe(false);
-        expect(localState.sources.has(nid)).toBe(false);
+        expect(localState.ownerByNid.has(nid)).toBe(false);
         expect(entity.nid).toBe(0);
     });
     it('destroys ManualChannel entities, subscriptions, and pending manual logs', () => {
@@ -194,7 +194,7 @@ describe('manual and spatial channels', () => {
         expect(channel.entities.size).toBe(0);
         expect(user.subscriptions.has(channel.nid)).toBe(false);
         expect(localState.channels.has(channel)).toBe(false);
-        expect(localState.sources.has(nid)).toBe(false);
+        expect(localState.ownerByNid.has(nid)).toBe(false);
         expect(entity.nid).toBe(0);
         expect(channel.manualPropNids).toEqual([]);
         expect(channel.manualGroupNids).toEqual([]);
@@ -212,7 +212,7 @@ describe('manual and spatial channels', () => {
         expect(channel.entities.size).toBe(0);
         expect(user.subscriptions.has(channel.nid)).toBe(false);
         expect(localState.channels.has(channel)).toBe(false);
-        expect(localState.sources.has(nid)).toBe(false);
+        expect(localState.ownerByNid.has(nid)).toBe(false);
         expect(entity.nid).toBe(0);
     });
     it('destroys ManualSpatialChannel2D subscriptions, entities, local registration, and manual logs', () => {
@@ -229,7 +229,7 @@ describe('manual and spatial channels', () => {
         expect(channel.entities.size).toBe(0);
         expect(user.subscriptions.has(channel.nid)).toBe(false);
         expect(localState.channels.has(channel)).toBe(false);
-        expect(localState.sources.has(nid)).toBe(false);
+        expect(localState.ownerByNid.has(nid)).toBe(false);
         expect(entity.nid).toBe(0);
         expect(channel.dirtyCells.size).toBe(0);
     });
@@ -247,7 +247,7 @@ describe('manual and spatial channels', () => {
         expect(channel.entities.size).toBe(0);
         expect(user.subscriptions.has(channel.nid)).toBe(false);
         expect(localState.channels.has(channel)).toBe(false);
-        expect(localState.sources.has(nid)).toBe(false);
+        expect(localState.ownerByNid.has(nid)).toBe(false);
         expect(entity.nid).toBe(0);
         expect(channel.dirtyCells.size).toBe(0);
     });

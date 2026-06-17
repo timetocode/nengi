@@ -28,11 +28,11 @@ export declare class Instance {
     pingIntervalMs: number;
     responseEndPoints: Map<number, ResponseEndpoint>;
     /**
+     * Override this to accept or reject incoming connections.
      *
-     * @param handshake test test
      * ```ts
      * instance.onConnect = async (handshake: any) => {
-     *      return await authenticateUser(handshake)
+     *     return await authenticateUser(handshake)
      * }
      * ```
      */

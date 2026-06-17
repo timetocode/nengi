@@ -284,10 +284,11 @@ export class FixedStepInterpolator {
 
         const entitiesB = this.getEntityRefsAtFrame(diagnostics.frameB)
         const entities = new Map<number, IEntity>()
+        const frameB = diagnostics.frameB
 
         entitiesA.forEach((entityA, nid) => {
             const entityB = entitiesB.get(nid)
-            entities.set(nid, this.interpolateEntity(entityA, entityB || null, diagnostics.alpha))
+            entities.set(nid, this.interpolateEntityForFrame(nid, entityA, entityB || null, frameB, diagnostics.alpha))
         })
 
         return {
@@ -327,7 +328,7 @@ export class FixedStepInterpolator {
             return this.cloneEntity(entityA)
         }
         const entityB = this.getEntityRefAtFrame(nid, bounds.frameB)
-        return this.interpolateEntity(entityA, entityB, bounds.alpha)
+        return this.interpolateEntityForFrame(nid, entityA, entityB, bounds.frameB, bounds.alpha)
     }
 
     getEntities(nids: Iterable<number>, interpDelay: number, now = Date.now()): Map<number, IEntity> {
@@ -354,7 +355,7 @@ export class FixedStepInterpolator {
             }
 
             const entityB = this.getEntityRefAtFrame(nid, frameB)
-            entities.set(nid, this.interpolateEntity(entityA, entityB, alpha))
+            entities.set(nid, this.interpolateEntityForFrame(nid, entityA, entityB, frameB, alpha))
         }
 
         return entities
@@ -421,6 +422,13 @@ export class FixedStepInterpolator {
         })
 
         return interpolated
+    }
+
+    private interpolateEntityForFrame(nid: number, entityA: IEntity, entityB: IEntity | null, frameB: Frame, alpha: number): IEntity {
+        if (entityB && frameB.skipInterpolationNids.has(nid)) {
+            return this.cloneEntity(entityB)
+        }
+        return this.interpolateEntity(entityA, entityB, alpha)
     }
 
     private cloneEntity(entity: IEntity): IEntity {

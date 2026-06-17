@@ -59,7 +59,7 @@ Channels are server-side visibility/subscription containers. A user subscribed t
 
 Channels are not replicated entities. Do not turn channels into entities. Do not turn entities into channels.
 
-Channels can have an optional `label` for developer tooling, debugging, logs, or tests. Nengi does not interpret the label or send it over the network.
+Channels can have an optional `name` for simple client-visible context. The name is carried on the default channel header.
 
 Channel helpers:
 
@@ -86,7 +86,7 @@ Spatial circle/sphere views are coarse cell queries. They include occupied cells
 
 Users can be subscribed to multiple channels. The snapshot writer appends per-channel streams; it should not globally merge visibility or dedupe entities across channels in the hot path. Putting the same entity in multiple channels is treated as a userland mistake, not a production-path validation case.
 
-Channel headers are optional schema-backed client context sent before normal channel entities. Use headers when the client needs to route scoped CRUD, such as inventories, team state, or remote map views. `label` stays local housekeeping and is not client context. When a known headered channel closes, the client treats it as a channel close and purges contained entities instead of requiring individual delete events.
+Channel headers are client context sent before normal channel entities. Use `name` for simple named channels, and use schema-backed headers when the client needs to route scoped CRUD, such as inventories, team state, or remote map views. When a known channel closes, the client treats it as a channel close and purges contained entities instead of requiring individual delete events.
 
 Channel messages have two delivery styles. Plain, manual, and non-spatial ECS channels store broadcast messages until the snapshot boundary and can share cached message fragments. Spatial channels evaluate the message against each subscribed user's current view immediately and queue the message directly on matching users.
 

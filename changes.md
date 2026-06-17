@@ -39,10 +39,10 @@ channel.removeAllEntities()
 channel.destroy()
 ```
 
-Channels may also have an optional `label` for game tooling, debugging, logs, or tests. Nengi does not interpret it or send it over the network.
+Channels may also have an optional `name` for simple client-visible context. Structured channel context belongs in a schema-backed header.
 
 ```ts
-const inventory = new Channel(instance.localState, { label: 'chest:123:inventory' })
+const inventory = new Channel(instance.localState, { name: 'chest:123:inventory' })
 ```
 
 ## Entity children

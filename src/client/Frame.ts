@@ -1,5 +1,6 @@
 import { IEntity } from '../common/IEntity'
-import type { ChannelEntityCreate, ChannelHeaderCreate, ChannelHeaderDelete, ChannelHeaderUpdate } from '../binary/snapshot/SnapshotPlan'
+import { ChannelHeader } from '../common/ChannelHeader'
+import type { ChannelEntityCreate, ChannelClose, ChannelHeaderUpdate, ChannelOpen } from '../binary/snapshot/SnapshotPlan'
 
 export type AppliedEntityChange = {
     nid: number
@@ -16,8 +17,26 @@ export type DeletedEntity = {
 
 export type ClosedChannel = {
     channelId: number
-    header?: IEntity
+    header: ChannelHeader
     entityNids: number[]
+}
+
+export type OpenedChannel = {
+    channelId: number
+    header: ChannelHeader
+}
+
+export type ChannelFrame = {
+    channelId: number
+    ecsCreateEntities: number[]
+    ecsCreateComponents: IEntity[]
+    ecsDeleteEntities: number[]
+    createEntities: IEntity[]
+    updateEntities: AppliedEntityChange[]
+    deleteEntities: number[]
+    deletedEntities: DeletedEntity[]
+    messages: any[]
+    interpolatedMessages: any[]
 }
 
 export interface IEntityFrame {
@@ -27,16 +46,20 @@ export interface IEntityFrame {
     ecsCreateEntities?: number[]
     ecsCreateComponents?: IEntity[]
     ecsDeleteEntities?: number[]
+    channelOpens?: ChannelOpen[]
     channelEntityCreates?: ChannelEntityCreate[]
-    channelHeaderCreates?: ChannelHeaderCreate[]
     channelHeaderUpdates?: ChannelHeaderUpdate[]
-    channelHeaderDeletes?: ChannelHeaderDelete[]
+    channelCloses?: ChannelClose[]
+    skipInterpolationNids?: number[] | Set<number>
+    openedChannels?: OpenedChannel[]
     closedChannels?: ClosedChannel[]
     createEntities: IEntity[]
     updateEntities: AppliedEntityChange[]
     deleteEntities: number[]
     deletedEntities: DeletedEntity[]
     messages: any[]
+    interpolatedMessages?: any[]
+    channels?: ChannelFrame[]
     confirmedClientTick: number
 }
 
@@ -48,16 +71,20 @@ export class Frame implements IEntityFrame {
     ecsCreateEntities: number[]
     ecsCreateComponents: IEntity[]
     ecsDeleteEntities: number[]
+    channelOpens: ChannelOpen[]
     channelEntityCreates: ChannelEntityCreate[]
-    channelHeaderCreates: ChannelHeaderCreate[]
     channelHeaderUpdates: ChannelHeaderUpdate[]
-    channelHeaderDeletes: ChannelHeaderDelete[]
+    channelCloses: ChannelClose[]
+    skipInterpolationNids: Set<number>
+    openedChannels: OpenedChannel[]
     closedChannels: ClosedChannel[]
     createEntities: IEntity[]
     updateEntities: AppliedEntityChange[]
     deleteEntities: number[]
     deletedEntities: DeletedEntity[]
     messages: any[]
+    interpolatedMessages: any[]
+    channels: ChannelFrame[]
 
     constructor(args: IEntityFrame) {
         this.tick = args.tick
@@ -67,15 +94,19 @@ export class Frame implements IEntityFrame {
         this.ecsCreateEntities = args.ecsCreateEntities || []
         this.ecsCreateComponents = args.ecsCreateComponents || []
         this.ecsDeleteEntities = args.ecsDeleteEntities || []
+        this.channelOpens = args.channelOpens || []
         this.channelEntityCreates = args.channelEntityCreates || []
-        this.channelHeaderCreates = args.channelHeaderCreates || []
         this.channelHeaderUpdates = args.channelHeaderUpdates || []
-        this.channelHeaderDeletes = args.channelHeaderDeletes || []
+        this.channelCloses = args.channelCloses || []
+        this.skipInterpolationNids = new Set(args.skipInterpolationNids || [])
+        this.openedChannels = args.openedChannels || []
         this.closedChannels = args.closedChannels || []
         this.createEntities = args.createEntities
         this.updateEntities = args.updateEntities
         this.deleteEntities = args.deleteEntities
         this.deletedEntities = args.deletedEntities
         this.messages = args.messages
+        this.interpolatedMessages = args.interpolatedMessages || []
+        this.channels = args.channels || []
     }
 }

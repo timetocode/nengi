@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientNetwork = void 0;
+const ChannelHeader_1 = require("../common/ChannelHeader");
 const NQueue_1 = require("../NQueue");
 const writeMessage_1 = require("../binary/message/writeMessage");
 const connectAttemptSchema_1 = require("../common/schemas/connectAttemptSchema");
@@ -79,9 +80,9 @@ class ClientNetwork {
     addCommand(command) {
         this.outbound.addCommand(command);
     }
-    addTimedCommand(command, options = {}) {
+    addCommandWithTiming(command, options = {}) {
         var _a, _b, _c, _d;
-        this.outbound.addTimedCommand(command, {
+        this.outbound.addCommandWithTiming(command, {
             clientTimeMs: (_a = options.inputTimeMs) !== null && _a !== void 0 ? _a : (0, time_1.getLocalTime)(),
             renderDelayMs: (_b = options.renderDelayMs) !== null && _b !== void 0 ? _b : 0,
             viewTick: (_c = options.viewTick) !== null && _c !== void 0 ? _c : -1,
@@ -118,10 +119,10 @@ class ClientNetwork {
         this.addCommand(command);
         return (_b = (_a = this.client.predictor).addCommand) === null || _b === void 0 ? void 0 : _b.call(_a, command, tick, options);
     }
-    predictTimedCommand(command, predictionOptions = {}, timingOptions = {}) {
+    predictCommandWithTiming(command, predictionOptions = {}, timingOptions = {}) {
         var _a, _b;
         const tick = this.clientTick;
-        this.addTimedCommand(command, timingOptions);
+        this.addCommandWithTiming(command, timingOptions);
         return (_b = (_a = this.client.predictor).addCommand) === null || _b === void 0 ? void 0 : _b.call(_a, command, tick, predictionOptions);
     }
     predictState(payload, options = {}) {
@@ -269,6 +270,7 @@ class ClientNetwork {
             this.entityNTypes.delete(nid);
         });
         frame.closedChannels.forEach(closed => {
+            this.entityNTypes.delete(closed.channelId);
             closed.entityNids.forEach(nid => this.entityNTypes.delete(nid));
         });
         this.frameTick++;
@@ -540,10 +542,13 @@ class ClientNetwork {
             timestamp: -1,
             confirmedClientTick: -1,
             messages: [],
+            interpolatedMessages: [],
+            channels: [],
+            channelOpens: [],
             channelEntityCreates: [],
-            channelHeaderCreates: [],
             channelHeaderUpdates: [],
-            channelHeaderDeletes: [],
+            channelCloses: [],
+            skipInterpolationNids: [],
             ecsCreateEntities: [],
             ecsCreateComponents: [],
             ecsDeleteEntities: [],
@@ -552,9 +557,36 @@ class ClientNetwork {
             deleteEntities: []
         };
         const pendingResponses = [];
+        let currentChannelId = 0;
+        const channelSnapshots = new Map();
+        const getCurrentChannel = () => {
+            let channel = channelSnapshots.get(currentChannelId);
+            if (!channel) {
+                channel = {
+                    channelId: currentChannelId,
+                    messages: [],
+                    interpolatedMessages: [],
+                    ecsCreateEntities: [],
+                    ecsCreateComponents: [],
+                    ecsDeleteEntities: [],
+                    createEntities: [],
+                    updateEntities: [],
+                    updateEntityGroups: [],
+                    deleteEntities: []
+                };
+                channelSnapshots.set(currentChannelId, channel);
+                snapshot.channels.push(channel);
+            }
+            return channel;
+        };
+        const target = () => currentChannelId === 0 ? snapshot : getCurrentChannel();
         while (dr.offset < dr.byteLength) {
             const section = dr.readUInt8();
             switch (section) {
+                case BinarySection_1.BinarySection.ChannelScope: {
+                    currentChannelId = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                    break;
+                }
                 case BinarySection_1.BinarySection.EngineMessages: {
                     const count = dr.readUInt8();
                     for (let i = 0; i < count; i++) {
@@ -594,9 +626,19 @@ class ClientNetwork {
                 }
                 case BinarySection_1.BinarySection.Messages: {
                     const count = dr.readUInt32();
+                    const output = target().messages;
                     for (let i = 0; i < count; i++) {
                         const message = (0, readMessage_1.default)(dr, this.client.context, this.protocol.ntypeType);
-                        snapshot.messages.push(message);
+                        output.push(message);
+                    }
+                    break;
+                }
+                case BinarySection_1.BinarySection.InterpolatedMessages: {
+                    const count = dr.readUInt32();
+                    const output = target().interpolatedMessages;
+                    for (let i = 0; i < count; i++) {
+                        const message = (0, readMessage_1.default)(dr, this.client.context, this.protocol.ntypeType);
+                        output.push(message);
                     }
                     break;
                 }
@@ -633,26 +675,31 @@ class ClientNetwork {
                     }
                     break;
                 }
+                case BinarySection_1.BinarySection.ChannelOpens: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        const channelId = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
+                        const channelType = dr.readUInt8();
+                        const name = dr.readString();
+                        let header = (0, ChannelHeader_1.createChannelHeader)(channelId, channelType, undefined, name || undefined);
+                        if (dr.readUInt8() === 1) {
+                            const headerData = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
+                            this.entityNTypes.set(headerData.nid, headerData.ntype);
+                            header = (0, ChannelHeader_1.mergeChannelHeaderData)(header, headerData);
+                        }
+                        snapshot.channelOpens.push({
+                            channelId,
+                            header
+                        });
+                    }
+                    break;
+                }
                 case BinarySection_1.BinarySection.ChannelEntityCreates: {
                     const count = dr.readUInt32();
                     for (let i = 0; i < count; i++) {
                         snapshot.channelEntityCreates.push({
                             nid: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr),
                             channelId: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr)
-                        });
-                    }
-                    break;
-                }
-                case BinarySection_1.BinarySection.ChannelHeaderCreates: {
-                    const count = dr.readUInt32();
-                    for (let i = 0; i < count; i++) {
-                        const channelId = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
-                        const header = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
-                        this.entityNTypes.set(header.nid, header.ntype);
-                        snapshot.channelHeaderCreates.push({
-                            channelId,
-                            header,
-                            version: 0
                         });
                     }
                     break;
@@ -676,67 +723,79 @@ class ClientNetwork {
                         snapshot.channelHeaderUpdates.push({
                             channelId,
                             changes,
-                            groups: [],
-                            version: 0
+                            groups: []
                         });
                     }
                     break;
                 }
-                case BinarySection_1.BinarySection.ChannelHeaderDeletes: {
+                case BinarySection_1.BinarySection.ChannelCloses: {
                     const count = dr.readUInt32();
                     for (let i = 0; i < count; i++) {
-                        snapshot.channelHeaderDeletes.push({
+                        snapshot.channelCloses.push({
                             channelId: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr)
                         });
                     }
                     break;
                 }
+                case BinarySection_1.BinarySection.SkipInterpolation: {
+                    const count = dr.readUInt32();
+                    for (let i = 0; i < count; i++) {
+                        snapshot.skipInterpolationNids.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
+                    }
+                    break;
+                }
                 case BinarySection_1.BinarySection.CreateEntities: {
                     const count = dr.readUInt32();
+                    const output = target().createEntities;
                     for (let i = 0; i < count; i++) {
                         const entity = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
                         this.entityNTypes.set(entity.nid, entity.ntype);
-                        snapshot.createEntities.push(entity);
+                        output.push(entity);
                     }
                     break;
                 }
                 case BinarySection_1.BinarySection.EcsCreateEntities: {
                     const count = dr.readUInt32();
+                    const output = target().ecsCreateEntities;
                     for (let i = 0; i < count; i++) {
-                        snapshot.ecsCreateEntities.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
+                        output.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
                     }
                     break;
                 }
                 case BinarySection_1.BinarySection.EcsCreateComponents: {
                     const count = dr.readUInt32();
+                    const output = target().ecsCreateComponents;
                     for (let i = 0; i < count; i++) {
                         const pid = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
                         const component = (0, readEntity_1.default)(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType);
                         component.pid = pid;
                         this.entityNTypes.set(component.nid, component.ntype);
-                        snapshot.ecsCreateComponents.push(component);
+                        output.push(component);
                     }
                     break;
                 }
                 case BinarySection_1.BinarySection.UpdateEntities: {
                     const count = dr.readUInt32();
+                    const output = target().updateEntities;
                     for (let i = 0; i < count; i++) {
                         const diff = (0, readDiff_1.default)(dr, this.client.context, this.entityNTypes, this.protocol.nidType);
-                        snapshot.updateEntities.push(diff);
+                        output.push(diff);
                     }
                     break;
                 }
                 case BinarySection_1.BinarySection.UpdateEntityGroups: {
                     const count = dr.readUInt32();
+                    const output = target().updateEntities;
                     for (let i = 0; i < count; i++) {
                         const diffs = (0, readUpdateGroup_1.default)(dr, this.client.context, this.entityNTypes, this.protocol.nidType);
                         for (let j = 0; j < diffs.length; j++) {
-                            snapshot.updateEntities.push(diffs[j]);
+                            output.push(diffs[j]);
                         }
                     }
                     break;
                 }
                 case BinarySection_1.BinarySection.EcsUpdateComponentGroups: {
+                    const output = target().updateEntities;
                     const ntype = (0, Protocol_1.readNetworkId)(this.protocol.ntypeType, dr);
                     const groupKey = dr.readUInt8();
                     const count = dr.readUInt32();
@@ -746,7 +805,7 @@ class ClientNetwork {
                         const nid = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
                         for (let j = 0; j < group.props.length; j++) {
                             const prop = group.props[j];
-                            snapshot.updateEntities.push({
+                            output.push({
                                 nid,
                                 prop: prop.prop,
                                 value: prop.binary.read(dr)
@@ -757,17 +816,19 @@ class ClientNetwork {
                 }
                 case BinarySection_1.BinarySection.DeleteEntities: {
                     const count = dr.readUInt32();
+                    const output = target().deleteEntities;
                     for (let i = 0; i < count; i++) {
                         const nid = (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr);
                         this.entityNTypes.delete(nid);
-                        snapshot.deleteEntities.push(nid);
+                        output.push(nid);
                     }
                     break;
                 }
                 case BinarySection_1.BinarySection.EcsDeleteEntities: {
                     const count = dr.readUInt32();
+                    const output = target().ecsDeleteEntities;
                     for (let i = 0; i < count; i++) {
-                        snapshot.ecsDeleteEntities.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
+                        output.push((0, Protocol_1.readNetworkId)(this.protocol.nidType, dr));
                     }
                     break;
                 }

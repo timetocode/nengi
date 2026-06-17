@@ -3,7 +3,8 @@ import { User } from '../../server/User'
 import { IChannel } from '../../server/channel/IChannel'
 import { BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
-import { collectSnapshotPlan, MAX_RESPONSES_PER_FRAME } from './collectSnapshotPlan'
+import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
+import { collectSkipInterpolationNids, collectSnapshotPlan, MAX_RESPONSES_PER_FRAME } from './collectSnapshotPlan'
 import { commitSnapshotPlan } from './commitSnapshotPlan'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { writeSnapshot } from './writeSnapshot'
@@ -34,6 +35,7 @@ import {
     getSingleManualUpdateChannel,
     getSingleSharedChannel,
     isEcsSnapshotChannel,
+    isCellFragmentChannel,
     isManualUpdateChannel,
     isManualSpatialCellFragmentChannel,
     ManualSpatialCellFragmentChannel,
@@ -41,13 +43,39 @@ import {
     SharedUpdateChannel
 } from './channelModes'
 import {
-    collectBroadcastMessages,
     getSharedMessageFragments,
     sumSharedMessageFragmentBytes,
     sumSharedMessageFragmentMessages,
     writeSharedMessageFragments
 } from './messageFragments'
+import { addEcsChannelEntityCreate, addEcsVisibilityCrud } from './ecsSnapshotCrud'
+import {
+    countPlanMessages,
+    sumPlanCreates,
+    sumPlanDeletes,
+    sumPlanGroupedUpdateProps,
+    sumPlanMessages,
+    sumPlanUpdateGroups,
+    sumPlanUpdateProps
+} from './snapshotPlanStats'
+import {
+    CellEntityFragment,
+    sumCellFragmentCreates,
+    sumCellFragmentDeletes,
+    sumCellFragmentGroupedProps,
+    sumCellFragmentUpdateGroups,
+    sumCellFragmentUpdateProps
+} from './cellEntityFragments'
+import {
+    createCellFragmentChunk,
+    createChannelScopeChunk,
+    createPayloadCopyChunk,
+    createProtocolPreludeChunk,
+    createSharedMessageFragmentChunk
+} from './snapshotChunkBuilders'
+import { addChannelMessages } from './channelMessages'
 import { writePayload } from './snapshotPayload'
+import { ProtocolConfig } from '../../common/binary/Protocol'
 
 type EntityDeltaFragments = {
     creates: {
@@ -64,17 +92,6 @@ type EntityDeltaFragments = {
     } | null
 }
 
-type CellEntityFragment = {
-    payload: BinaryPayload
-    bytes: number
-    nids: Set<number>
-    creates: number
-    deletes: number
-    updateProps: number
-    updateGroups: number
-    groupedUpdateProps: number
-}
-
 function collectEnvelopePlan(user: User) {
     const plan = createEmptySnapshotPlan()
     const queuedResponses = user.responseQueue.length
@@ -83,41 +100,30 @@ function collectEnvelopePlan(user: User) {
 }
 
 function addEnvelopeQueues(plan: SnapshotPlan, user: User) {
+    const channelOpens = user.consumePendingChannelOpens()
+    for (let i = 0; i < channelOpens.length; i++) {
+        const channel = user.subscriptions.get(channelOpens[i])
+        if (channel) {
+            plan.channelOpens.push({ channelId: channel.nid, header: channel.header })
+        }
+    }
+    const channelCloses = user.consumePendingChannelCloses()
+    for (let i = 0; i < channelCloses.length; i++) {
+        plan.channelCloses.push({ channelId: channelCloses[i] })
+    }
     plan.engineMessages = user.engineMessageQueue
     user.engineMessageQueue = []
+    plan.skipInterpolationNids = collectSkipInterpolationNids(user)
     plan.messages = user.messageQueue
     user.messageQueue = []
+    plan.interpolatedMessages = user.interpolatedMessageQueue
+    user.interpolatedMessageQueue = []
     plan.responses = user.responseQueue.slice(0, MAX_RESPONSES_PER_FRAME)
 }
 
-function createPayloadCopyChunk(label: string, instance: Instance, payload: BinaryPayload, bytes: number): SnapshotChunk {
-    return createSnapshotChunk(label, bytes, writer => {
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0
-        writePayload(writer, payload)
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, bytes)
-        }
-    })
-}
-
-function createSharedMessageFragmentChunk(instance: Instance, messageFragments: ReturnType<typeof getSharedMessageFragments>) {
-    const bytes = sumSharedMessageFragmentBytes(messageFragments)
-    if (bytes === 0) {
-        return null
-    }
-    return createSnapshotChunk('MessageFragments', bytes, writer => {
-        writeSharedMessageFragments(writer, instance, messageFragments)
-    })
-}
-
-function createCellFragmentChunk(label: string, instance: Instance, fragments: CellEntityFragment[]) {
-    const bytes = sumCellFragmentBytes(fragments)
-    if (bytes === 0) {
-        return null
-    }
-    return createSnapshotChunk(label, bytes, writer => {
-        writeCellFragments(writer, instance, fragments)
-    })
+function protocolWillChange(user: User, instance: Instance) {
+    const protocol = instance.network.getProtocol()
+    return user.protocol.nidType !== protocol.nidType || user.protocol.ntypeType !== protocol.ntypeType
 }
 
 function canUseSharedUpdateFragment(user: User, channel: SharedUpdateChannel) {
@@ -125,10 +131,10 @@ function canUseSharedUpdateFragment(user: User, channel: SharedUpdateChannel) {
         user.currentlyVisible.length === countChannelVisibleEntities(user.instance!, channel)
 }
 
-function channelHasHeaderPending(user: User, channel: { nid: number, header?: any, headerVersion?: number, getHeader?: () => any }) {
-    const header = channel.header || channel.getHeader?.()
+function channelHasHeaderPending(user: User, channel: { nid: number, header: any, headerVersion?: number }) {
+    const header = channel.header
     const headerVersion = channel.headerVersion || 0
-    if (!header || headerVersion <= 0) {
+    if (!header || !hasSchemaBackedChannelHeader(header) || headerVersion <= 0) {
         return false
     }
     return user.knownChannelHeaderVersions.get(channel.nid) !== headerVersion
@@ -148,6 +154,14 @@ function canUseSharedDeltaFragments(user: User, channel: SharedUpdateChannel) {
 
 function hasChannelDeltas(channel: SharedUpdateChannel) {
     return channel.deltaBaseVersion !== channel.membershipVersion
+}
+
+function rememberCellFragmentChannelVisibility(user: User) {
+    for (const channel of user.subscriptions.values()) {
+        if (isCellFragmentChannel(channel)) {
+            channel.rememberVisibleCells(user.id)
+        }
+    }
 }
 
 function writeEntityDeltaFragments(writer: IBinaryWriter, instance: Instance, fragments: EntityDeltaFragments) {
@@ -202,6 +216,31 @@ function applySharedChannelDeltasToUser(user: User, channel: SharedUpdateChannel
 
     user.lastVisibleCount = user.currentlyVisible.length
     user.sharedChannelVersions.set(channel.nid, channel.membershipVersion)
+}
+
+function applyCellEntityFragmentsToUser(user: User, tick: number, createFragments: CellEntityFragment[], deleteFragments: CellEntityFragment[]) {
+    if (deleteFragments.length > 0) {
+        const deletedNids = new Set<number>()
+        for (let i = 0; i < deleteFragments.length; i++) {
+            for (const nid of deleteFragments[i].nids) {
+                deletedNids.add(nid)
+                user.tickLastSeen.delete(nid)
+            }
+        }
+        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid))
+    }
+
+    for (let i = 0; i < user.currentlyVisible.length; i++) {
+        user.tickLastSeen.set(user.currentlyVisible[i], tick)
+    }
+
+    for (let i = 0; i < createFragments.length; i++) {
+        for (const nid of createFragments[i].nids) {
+            user.markVisible(nid, tick, [], [], null, [])
+        }
+    }
+
+    user.lastVisibleCount = user.currentlyVisible.length
 }
 
 function rememberSharedChannelVersion(user: User) {
@@ -279,70 +318,11 @@ function collectEntityUpdatePlan(instance: Instance, entity: any, plan: Snapshot
 
 }
 
-function writeCellFragments(writer: IBinaryWriter, instance: Instance, fragments: CellEntityFragment[]) {
-    for (let i = 0; i < fragments.length; i++) {
-        const fragment = fragments[i]
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0
-        writePayload(writer, fragment.payload)
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, fragment.bytes)
-        }
-    }
-}
-
-function sumCellFragmentBytes(fragments: CellEntityFragment[]) {
-    let bytes = 0
-    for (let i = 0; i < fragments.length; i++) {
-        bytes += fragments[i].bytes
-    }
-    return bytes
-}
-
-function sumCellFragmentCreates(fragments: CellEntityFragment[]) {
-    let creates = 0
-    for (let i = 0; i < fragments.length; i++) {
-        creates += fragments[i].creates
-    }
-    return creates
-}
-
-function sumCellFragmentDeletes(fragments: CellEntityFragment[]) {
-    let deletes = 0
-    for (let i = 0; i < fragments.length; i++) {
-        deletes += fragments[i].deletes
-    }
-    return deletes
-}
-
-function sumCellFragmentUpdateProps(fragments: CellEntityFragment[]) {
-    let props = 0
-    for (let i = 0; i < fragments.length; i++) {
-        props += fragments[i].updateProps
-    }
-    return props
-}
-
-function sumCellFragmentUpdateGroups(fragments: CellEntityFragment[]) {
-    let groups = 0
-    for (let i = 0; i < fragments.length; i++) {
-        groups += fragments[i].updateGroups
-    }
-    return groups
-}
-
-function sumCellFragmentGroupedProps(fragments: CellEntityFragment[]) {
-    let props = 0
-    for (let i = 0; i < fragments.length; i++) {
-        props += fragments[i].groupedUpdateProps
-    }
-    return props
-}
-
 function hasSnapshotPlanContent(plan: SnapshotPlan) {
-    return plan.channelEntityCreates.length > 0 ||
-        plan.channelHeaderCreates.length > 0 ||
+    return plan.channelOpens.length > 0 ||
+        plan.channelEntityCreates.length > 0 ||
         plan.channelHeaderUpdates.length > 0 ||
-        plan.channelHeaderDeletes.length > 0 ||
+        plan.channelCloses.length > 0 ||
         plan.ecsCreateEntities.length > 0 ||
         plan.ecsCreateComponents.length > 0 ||
         plan.ecsDeleteEntities.length > 0 ||
@@ -352,47 +332,8 @@ function hasSnapshotPlanContent(plan: SnapshotPlan) {
         plan.deleteEntities.length > 0 ||
         plan.engineMessages.length > 0 ||
         plan.messages.length > 0 ||
+        plan.interpolatedMessages.length > 0 ||
         plan.responses.length > 0
-}
-
-function sumPlanCreates(plans: SnapshotPlan[]) {
-    let creates = 0
-    for (let i = 0; i < plans.length; i++) {
-        creates += plans[i].ecsCreateEntities.length + plans[i].ecsCreateComponents.length + plans[i].createEntities.length
-    }
-    return creates
-}
-
-function sumPlanDeletes(plans: SnapshotPlan[]) {
-    let deletes = 0
-    for (let i = 0; i < plans.length; i++) {
-        deletes += plans[i].ecsDeleteEntities.length + plans[i].deleteEntities.length
-    }
-    return deletes
-}
-
-function sumPlanUpdateProps(plans: SnapshotPlan[]) {
-    let updates = 0
-    for (let i = 0; i < plans.length; i++) {
-        updates += plans[i].updateEntities.length
-    }
-    return updates
-}
-
-function sumPlanUpdateGroups(plans: SnapshotPlan[]) {
-    let updates = 0
-    for (let i = 0; i < plans.length; i++) {
-        updates += plans[i].updateEntityGroups.length
-    }
-    return updates
-}
-
-function sumPlanGroupedUpdateProps(plans: SnapshotPlan[]) {
-    let props = 0
-    for (let i = 0; i < plans.length; i++) {
-        props += plans[i].updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
-    }
-    return props
 }
 
 function collectCreateEntitiesForRoots(instance: Instance, roots: any[]) {
@@ -754,20 +695,6 @@ function getEntityDeltaFragments(user: User, instance: Instance, channel: Shared
     }
 }
 
-function removeFragmentCreatesFromPlan(plan: SnapshotPlan, fragment: EntityDeltaFragments['creates']) {
-    if (!fragment) {
-        return
-    }
-    plan.createEntities = plan.createEntities.filter(entity => !fragment.nids.has(entity.nid))
-}
-
-function removeFragmentDeletesFromPlan(plan: SnapshotPlan, fragment: EntityDeltaFragments['deletes']) {
-    if (!fragment) {
-        return
-    }
-    plan.deleteEntities = plan.deleteEntities.filter(nid => !fragment.nids.has(nid))
-}
-
 function getSharedUpdateFragment(user: User, instance: Instance, channel: SharedUpdateChannel, excludedNids?: Set<number>) {
     const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:${protocol.nidType}:${protocol.ntypeType}:${excludedNids ? 'delta' : 'steady'}`
@@ -840,9 +767,9 @@ function addRegularUpdate(plan: SnapshotPlan, instance: Instance, nid: number) {
 }
 
 function addChannelHeader(plan: SnapshotPlan, user: User, instance: Instance, channel: IChannel) {
-    const header = channel.header || channel.getHeader?.()
+    const header = channel.header
     const headerVersion = channel.headerVersion || 0
-    if (!header || headerVersion <= 0) {
+    if (!hasSchemaBackedChannelHeader(header) || headerVersion <= 0) {
         return
     }
 
@@ -856,11 +783,6 @@ function addChannelHeader(plan: SnapshotPlan, user: User, instance: Instance, ch
         if (!instance.cache.cacheContains(header.nid)) {
             instance.cache.cacheify(instance.tick, header, nschema)
         }
-        plan.channelHeaderCreates.push({
-            channelId: channel.nid,
-            header,
-            version: headerVersion
-        })
         plan.channelHeaderVersions.push({
             channelId: channel.nid,
             version: headerVersion
@@ -877,8 +799,7 @@ function addChannelHeader(plan: SnapshotPlan, user: User, instance: Instance, ch
         plan.channelHeaderUpdates.push({
             channelId: channel.nid,
             changes: diffs.changes,
-            groups: diffs.groups,
-            version: headerVersion
+            groups: diffs.groups
         })
     }
     plan.channelHeaderVersions.push({
@@ -1010,20 +931,6 @@ function ecsHasManualUpdates(channel: EcsSnapshotChannel) {
     return channel.manualPropNids.length > 0 || channel.manualGroupNids.length > 0
 }
 
-function channelHasHeader(channel: { header?: any, getHeader?: () => any }) {
-    return !!(channel.header || channel.getHeader?.())
-}
-
-function addChannelEntityCreate(plan: SnapshotPlan, channel: { nid: number, header?: any, getHeader?: () => any }, nid: number) {
-    if (!channelHasHeader(channel)) {
-        return
-    }
-    plan.channelEntityCreates.push({
-        nid,
-        channelId: channel.nid
-    })
-}
-
 function collectSubscribedChannelSnapshotPlan(user: User, instance: Instance, channel: IChannel) {
     const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
     const plan = createEmptySnapshotPlan()
@@ -1031,40 +938,9 @@ function collectSubscribedChannelSnapshotPlan(user: User, instance: Instance, ch
     plan.channelEntityCreates = channelEntityCreates
 
     if (isEcsSnapshotChannel(channel)) {
-        for (let i = 0; i < toCreate.length; i++) {
-            const nid = toCreate[i]
-            if (channel.isRootNid(nid)) {
-                plan.ecsCreateEntities.push(nid)
-            } else if (channel.isComponentNid(nid)) {
-                const component = channel.getComponent(nid)
-                if (component) {
-                    plan.ecsCreateComponents.push(component)
-                }
-            }
-        }
-
-        const deletingRoots = new Set<number>()
-        for (let i = 0; i < toDelete.length; i++) {
-            const nid = toDelete[i]
-            if (channel.isRootNid(nid)) {
-                deletingRoots.add(nid)
-                plan.ecsDeleteEntities.push(nid)
-            }
-        }
-
-        for (let i = 0; i < toDelete.length; i++) {
-            const nid = toDelete[i]
-            if (channel.isRootNid(nid)) {
-                continue
-            }
-            const component = channel.getComponent(nid)
-            if (channel.isRootDeletedComponentNid(nid) || (component && deletingRoots.has(component.pid))) {
-                continue
-            }
-            plan.deleteEntities.push(nid)
-        }
-
+        addEcsVisibilityCrud(plan, channel, toCreate, toDelete)
         addEcsManualUpdates(plan, instance, channel, new Set(toUpdate))
+        addChannelMessages(plan, user, channel, instance.network.debugBinaryWrites)
         return plan
     }
 
@@ -1085,20 +961,17 @@ function collectSubscribedChannelSnapshotPlan(user: User, instance: Instance, ch
     } else if (manualSpatialChannel) {
         addManualSpatialUpdates(plan, instance, user, channel, visibleUpdates)
     }
+    addChannelMessages(plan, user, channel, instance.network.debugBinaryWrites)
     return plan
 }
 
 function collectPendingVisibilityDeletePlan(user: User) {
     const deletes = user.consumePendingVisibilityDeletes()
-    const headerDeletes = user.consumePendingChannelHeaderDeletes()
-    if (deletes.length === 0 && headerDeletes.length === 0) {
+    if (deletes.length === 0) {
         return null
     }
     const plan = createEmptySnapshotPlan()
     plan.deleteEntities = deletes
-    for (let i = 0; i < headerDeletes.length; i++) {
-        plan.channelHeaderDeletes.push({ channelId: headerDeletes[i] })
-    }
     return plan
 }
 
@@ -1110,6 +983,7 @@ function collectManualSpatialVisibilityPlan(user: User, instance: Instance, chan
         addRegularCreate(plan, instance, toCreate[i])
     }
     plan.deleteEntities = toDelete
+    addChannelMessages(plan, user, channel, instance.network.debugBinaryWrites)
     return plan
 }
 
@@ -1145,13 +1019,13 @@ function collectStableEcsStructuralSnapshotBase(user: User, channel: EcsSnapshot
 
     for (let i = 0; i < channel.createdRoots.length; i++) {
         const nid = channel.createdRoots[i]
-        addChannelEntityCreate(plan, channel, nid)
+        addEcsChannelEntityCreate(plan, channel, nid)
         user.currentlyVisible.push(nid)
         user.tickLastSeen.set(nid, user.instance!.tick)
     }
     for (let i = 0; i < channel.createdComponents.length; i++) {
         const nid = channel.createdComponents[i].nid
-        addChannelEntityCreate(plan, channel, nid)
+        addEcsChannelEntityCreate(plan, channel, nid)
         user.currentlyVisible.push(nid)
         user.tickLastSeen.set(nid, user.instance!.tick)
     }
@@ -1160,66 +1034,8 @@ function collectStableEcsStructuralSnapshotBase(user: User, channel: EcsSnapshot
     user.stableVisibleRefs.set(channel.nid, visibleNids)
     user.lastVisibleCount = user.currentlyVisible.length
     addEnvelopeQueues(plan, user)
+    addChannelMessages(plan, user, channel, true)
     return { plan, toUpdate: [] }
-}
-
-function removeVisibleNid(user: User, nid: number) {
-    for (let i = user.currentlyVisible.length - 1; i >= 0; i--) {
-        if (user.currentlyVisible[i] !== nid) {
-            continue
-        }
-        const last = user.currentlyVisible.pop()!
-        if (i < user.currentlyVisible.length) {
-            user.currentlyVisible[i] = last
-        }
-        user.tickLastSeen.delete(nid)
-        return
-    }
-}
-
-function addVisibleNid(user: User, nid: number, tick: number) {
-    if (user.tickLastSeen.has(nid)) {
-        user.tickLastSeen.set(nid, tick)
-        return
-    }
-    user.currentlyVisible.push(nid)
-    user.tickLastSeen.set(nid, tick)
-}
-
-function collectStableEcsSpatialMovementSnapshotBase(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel) {
-    const plan = createEmptySnapshotPlan()
-    const moves = channel.getMovedRoots()
-    for (let i = 0; i < moves.length; i++) {
-        const move = moves[i]
-        const wasVisible = channel.isCellVisible(user.id, move.fromCell)
-        const isVisible = channel.isCellVisible(user.id, move.toCell)
-        if (wasVisible === isVisible) {
-            continue
-        }
-
-        if (isVisible) {
-            plan.ecsCreateEntities.push(move.pid)
-            addChannelEntityCreate(plan, channel, move.pid)
-            addVisibleNid(user, move.pid, instance.tick)
-            const components = channel.getRootComponents(move.pid)
-            for (let j = 0; j < components.length; j++) {
-                plan.ecsCreateComponents.push(components[j])
-                addChannelEntityCreate(plan, channel, components[j].nid)
-                addVisibleNid(user, components[j].nid, instance.tick)
-            }
-        } else {
-            plan.ecsDeleteEntities.push(move.pid)
-            removeVisibleNid(user, move.pid)
-            const components = channel.getRootComponents(move.pid)
-            for (let j = 0; j < components.length; j++) {
-                removeVisibleNid(user, components[j].nid)
-            }
-        }
-    }
-
-    user.lastVisibleCount = user.currentlyVisible.length
-    addEnvelopeQueues(plan, user)
-    return plan
 }
 
 function collectEcsSnapshotBase(user: User, instance: Instance, channel: EcsSnapshotChannel) {
@@ -1233,6 +1049,7 @@ function collectEcsSnapshotBase(user: User, instance: Instance, channel: EcsSnap
         ) {
             user.lastVisibleCount = user.currentlyVisible.length
             addEnvelopeQueues(plan, user)
+            addChannelMessages(plan, user, channel, true)
             return { plan, toUpdate: [] }
         }
     }
@@ -1246,50 +1063,12 @@ function collectEcsSnapshotBase(user: User, instance: Instance, channel: EcsSnap
 
     const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
     plan.channelEntityCreates = channelEntityCreates
-
-    for (let i = 0; i < toCreate.length; i++) {
-        const nid = toCreate[i]
-        if (channel.isRootNid(nid)) {
-            plan.ecsCreateEntities.push(nid)
-        } else if (channel.isComponentNid(nid)) {
-            const component = channel.getComponent(nid)
-            if (component) {
-                plan.ecsCreateComponents.push(component)
-            }
-        }
-    }
-
-    const deletingRoots = new Set<number>()
-    for (let i = 0; i < toDelete.length; i++) {
-        const nid = toDelete[i]
-        if (channel.isRootNid(nid)) {
-            deletingRoots.add(nid)
-            plan.ecsDeleteEntities.push(nid)
-        }
-    }
-
-    for (let i = 0; i < toDelete.length; i++) {
-        const nid = toDelete[i]
-        if (channel.isRootNid(nid)) {
-            continue
-        }
-        const component = channel.getComponent(nid)
-        if (channel.isRootDeletedComponentNid(nid) || (component && deletingRoots.has(component.pid))) {
-            continue
-        } else {
-            plan.deleteEntities.push(nid)
-        }
-    }
+    addEcsVisibilityCrud(plan, channel, toCreate, toDelete)
 
     addEnvelopeQueues(plan, user)
+    addChannelMessages(plan, user, channel, true)
 
     return { plan, toUpdate }
-}
-
-function collectEcsSnapshotPlan(user: User, instance: Instance, channel: EcsSnapshotChannel) {
-    const { plan, toUpdate } = collectEcsSnapshotBase(user, instance, channel)
-    addEcsManualUpdates(plan, instance, channel, new Set(toUpdate))
-    return plan
 }
 
 function hasEcsSnapshotCrud(plan: SnapshotPlan) {
@@ -1315,14 +1094,12 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
         collectStart = performance.now()
     }
 
+    const needsProtocolPrelude = protocolWillChange(user, instance)
     instance.network.queueProtocolIfChanged(user)
     const queuedResponses = user.responseQueue.length
     const base = collectEcsSnapshotBase(user, instance, channel)
     const plan = base.plan
     const protocol = instance.network.getProtocol()
-    if (instance.network.debugBinaryWrites) {
-        plan.messages.push(...collectBroadcastMessages(user))
-    }
     const writeManualLogDirectly = !hasEcsSnapshotCrud(plan)
     if (!writeManualLogDirectly) {
         addEcsManualUpdates(plan, instance, channel, new Set(base.toUpdate))
@@ -1338,9 +1115,14 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
         countStart = performance.now()
     }
 
-    const chunks: SnapshotChunk[] = [
+    const chunks: SnapshotChunk[] = []
+    if (needsProtocolPrelude) {
+        chunks.push(createProtocolPreludeChunk(instance, protocol))
+    }
+    chunks.push(
+        createChannelScopeChunk(channel.nid, protocol),
         createSnapshotPlanChunk('EcsSnapshotPlan', plan, instance.context, protocol)
-    ]
+    )
     if (manualFragment) {
         chunks.push(createSnapshotChunk('EcsManualUpdateFragment', manualFragment.bytes, writer => {
             const copyStart = measure ? performance.now() : 0
@@ -1396,7 +1178,7 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
                 writeManualLogDirectly ? countManualGroupedProps(channel) :
                 plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
             deletes: plan.ecsDeleteEntities.length + plan.deleteEntities.length,
-            messages: plan.messages.length,
+            messages: countPlanMessages(plan),
             engineMessages: plan.engineMessages.length,
             responses: plan.responses.length
         })
@@ -1407,52 +1189,12 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
 
 function collectEcsSpatialSnapshotBase(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel) {
     const plan = createEmptySnapshotPlan()
-    if (!channel.hasStructuralDeltas() && user.stableVisibleRefs.has(channel.nid)) {
-        user.lastVisibleCount = user.currentlyVisible.length
-        addEnvelopeQueues(plan, user)
-        return plan
-    }
-    if (channel.hasOnlyMovementDeltas() && user.stableVisibleRefs.has(channel.nid)) {
-        return collectStableEcsSpatialMovementSnapshotBase(user, instance, channel)
-    }
-
     const { toCreate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
     plan.channelEntityCreates = channelEntityCreates
-    for (let i = 0; i < toCreate.length; i++) {
-        const nid = toCreate[i]
-        if (channel.isRootNid(nid)) {
-            plan.ecsCreateEntities.push(nid)
-        } else if (channel.isComponentNid(nid)) {
-            const component = channel.getComponent(nid)
-            if (component) {
-                plan.ecsCreateComponents.push(component)
-            }
-        }
-    }
-
-    const deletingRoots = new Set<number>()
-    for (let i = 0; i < toDelete.length; i++) {
-        const nid = toDelete[i]
-        if (channel.isRootNid(nid)) {
-            deletingRoots.add(nid)
-            plan.ecsDeleteEntities.push(nid)
-        }
-    }
-
-    for (let i = 0; i < toDelete.length; i++) {
-        const nid = toDelete[i]
-        if (channel.isRootNid(nid)) {
-            continue
-        }
-        const component = channel.getComponent(nid)
-        if (channel.isRootDeletedComponentNid(nid) || (component && deletingRoots.has(component.pid))) {
-            continue
-        } else {
-            plan.deleteEntities.push(nid)
-        }
-    }
+    addEcsVisibilityCrud(plan, channel, toCreate, toDelete)
 
     addEnvelopeQueues(plan, user)
+    addChannelMessages(plan, user, channel, true)
     return plan
 }
 
@@ -1479,14 +1221,11 @@ function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel:
         collectStart = performance.now()
     }
 
+    const needsProtocolPrelude = protocolWillChange(user, instance)
     instance.network.queueProtocolIfChanged(user)
     const queuedResponses = user.responseQueue.length
     const plan = collectEcsSpatialSnapshotBase(user, instance, channel)
     const protocol = instance.network.getProtocol()
-    if (instance.network.debugBinaryWrites) {
-        plan.messages.push(...collectBroadcastMessages(user))
-    }
-
     const updateFragments: ManualUpdateFragment[] = []
     const visibleCellKeys = channel.getVisibleCellKeys(user.id)
     for (let i = 0; i < visibleCellKeys.length; i++) {
@@ -1505,9 +1244,14 @@ function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel:
         countStart = performance.now()
     }
 
-    const chunks: SnapshotChunk[] = [
+    const chunks: SnapshotChunk[] = []
+    if (needsProtocolPrelude) {
+        chunks.push(createProtocolPreludeChunk(instance, protocol))
+    }
+    chunks.push(
+        createChannelScopeChunk(channel.nid, protocol),
         createSnapshotPlanChunk('EcsSpatialSnapshotPlan', plan, instance.context, protocol)
-    ]
+    )
     for (let i = 0; i < updateFragments.length; i++) {
         chunks.push(createPayloadCopyChunk('EcsSpatialUpdateFragment', instance, updateFragments[i].payload, updateFragments[i].bytes))
     }
@@ -1549,7 +1293,7 @@ function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel:
             updateGroups: updateFragments.reduce((total, fragment) => total + fragment.updateGroups, 0),
             groupedUpdateProps: updateFragments.reduce((total, fragment) => total + fragment.groupedUpdateProps, 0),
             deletes: plan.ecsDeleteEntities.length + plan.deleteEntities.length,
-            messages: plan.messages.length,
+            messages: countPlanMessages(plan),
             engineMessages: plan.engineMessages.length,
             responses: plan.responses.length
         })
@@ -1624,6 +1368,8 @@ function createSharedUpdateSnapshotBuffer(user: User, instance: Instance, channe
     }
 
     const messageFragments = getSharedMessageFragments(user, instance)
+    const scopedMessagePlan = createEmptySnapshotPlan()
+    addChannelMessages(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites)
     const fragment = getSharedUpdateFragment(user, instance, channel)
 
     if (measure) {
@@ -1637,6 +1383,11 @@ function createSharedUpdateSnapshotBuffer(user: User, instance: Instance, channe
     if (messageChunk) {
         chunks.push(messageChunk)
     }
+    if (hasSnapshotPlanContent(scopedMessagePlan)) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
+        chunks.push(createSnapshotPlanChunk('SharedUpdateMessages', scopedMessagePlan, instance.context, protocol))
+    }
+    chunks.push(createChannelScopeChunk(channel.nid, protocol))
     chunks.push(createPayloadCopyChunk('SharedUpdateFragment', instance, fragment.payload, fragment.bytes))
     const bytes = sumSnapshotChunkBytes(chunks)
     const writer = user.networkAdapter.binary.createWriter(bytes)
@@ -1671,7 +1422,7 @@ function createSharedUpdateSnapshotBuffer(user: User, instance: Instance, channe
             updateGroups: fragment.updateGroups,
             groupedUpdateProps: fragment.groupedUpdateProps,
             deletes: 0,
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(envelope) + countPlanMessages(scopedMessagePlan) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
         })
@@ -1705,6 +1456,8 @@ function createManualUpdateSnapshotBuffer(user: User, instance: Instance, channe
     }
 
     const messageFragments = getSharedMessageFragments(user, instance)
+    const scopedMessagePlan = createEmptySnapshotPlan()
+    addChannelMessages(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites)
     const fragment = getManualUpdateChannelFragment(user, instance, channel)
 
     if (measure) {
@@ -1718,6 +1471,11 @@ function createManualUpdateSnapshotBuffer(user: User, instance: Instance, channe
     if (messageChunk) {
         chunks.push(messageChunk)
     }
+    if (hasSnapshotPlanContent(scopedMessagePlan)) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
+        chunks.push(createSnapshotPlanChunk('ManualUpdateMessages', scopedMessagePlan, instance.context, protocol))
+    }
+    chunks.push(createChannelScopeChunk(channel.nid, protocol))
     chunks.push(createPayloadCopyChunk('ManualUpdateFragment', instance, fragment.payload, fragment.bytes))
     const bytes = sumSnapshotChunkBytes(chunks)
     const writer = user.networkAdapter.binary.createWriter(bytes)
@@ -1752,7 +1510,7 @@ function createManualUpdateSnapshotBuffer(user: User, instance: Instance, channe
             updateGroups: fragment.updateGroups,
             groupedUpdateProps: fragment.groupedUpdateProps,
             deletes: 0,
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(envelope) + countPlanMessages(scopedMessagePlan) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
         })
@@ -1782,8 +1540,10 @@ function createSharedDeltaSnapshotBuffer(user: User, instance: Instance, channel
 
     const entityDeltaFragments = getEntityDeltaFragments(user, instance, channel)
     const messageFragments = getSharedMessageFragments(user, instance)
+    const scopedMessagePlan = createEmptySnapshotPlan()
+    addChannelMessages(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites)
     const updateFragment = getSharedUpdateFragment(user, instance, channel, entityDeltaFragments.creates?.nids)
-    if (entityDeltaFragments.creates && channelHasHeader(channel)) {
+    if (entityDeltaFragments.creates) {
         for (const nid of entityDeltaFragments.creates.nids) {
             envelope.channelEntityCreates.push({ nid, channelId: channel.nid })
         }
@@ -1799,6 +1559,7 @@ function createSharedDeltaSnapshotBuffer(user: User, instance: Instance, channel
     ]
     const entityDeltaFragmentBytes = countEntityDeltaFragmentBytes(entityDeltaFragments)
     if (entityDeltaFragmentBytes > 0) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
         chunks.push(createSnapshotChunk('EntityDeltaFragments', entityDeltaFragmentBytes, writer => {
             writeEntityDeltaFragments(writer, instance, entityDeltaFragments)
         }))
@@ -1807,6 +1568,11 @@ function createSharedDeltaSnapshotBuffer(user: User, instance: Instance, channel
     if (messageChunk) {
         chunks.push(messageChunk)
     }
+    if (hasSnapshotPlanContent(scopedMessagePlan)) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
+        chunks.push(createSnapshotPlanChunk('SharedDeltaMessages', scopedMessagePlan, instance.context, protocol))
+    }
+    chunks.push(createChannelScopeChunk(channel.nid, protocol))
     chunks.push(createPayloadCopyChunk('SharedDeltaUpdateFragment', instance, updateFragment.payload, updateFragment.bytes))
     const bytes = sumSnapshotChunkBytes(chunks)
     const writer = user.networkAdapter.binary.createWriter(bytes)
@@ -1840,7 +1606,7 @@ function createSharedDeltaSnapshotBuffer(user: User, instance: Instance, channel
             updateGroups: updateFragment.updateGroups,
             groupedUpdateProps: updateFragment.groupedUpdateProps,
             deletes: countEntityDeltaFragmentDeletes(entityDeltaFragments),
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(envelope) + countPlanMessages(scopedMessagePlan) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
         })
@@ -2019,7 +1785,7 @@ function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Insta
             addManualSpatialDeletes(instance, plan, move.entity.nid, deleteNids)
         }
     }
-    if (plan.createEntities.length > 0 && channelHasHeader(channel)) {
+    if (plan.createEntities.length > 0) {
         for (let i = 0; i < plan.createEntities.length; i++) {
             envelope.channelEntityCreates.push({
                 nid: plan.createEntities[i].nid,
@@ -2027,6 +1793,7 @@ function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Insta
             })
         }
     }
+    addChannelMessages(plan, user, channel, instance.network.debugBinaryWrites)
 
     const updateFragments: CellEntityFragment[] = []
     for (let i = 0; i < currentCellKeys.length; i++) {
@@ -2048,6 +1815,7 @@ function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Insta
 
     const chunks: SnapshotChunk[] = [
         createSnapshotPlanChunk('Envelope', envelope, instance.context, protocol),
+        createChannelScopeChunk(channel.nid, protocol),
         createSnapshotPlanChunk('ManualSpatialMovementPlan', plan, instance.context, protocol)
     ]
     const messageChunk = createSharedMessageFragmentChunk(instance, messageFragments)
@@ -2056,6 +1824,7 @@ function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Insta
     }
     const updateChunk = createCellFragmentChunk('ManualSpatialUpdateFragments', instance, updateFragments)
     if (updateChunk) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
         chunks.push(updateChunk)
     }
     const bytes = sumSnapshotChunkBytes(chunks)
@@ -2092,7 +1861,7 @@ function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Insta
             updateGroups: sumCellFragmentUpdateGroups(updateFragments),
             groupedUpdateProps: sumCellFragmentGroupedProps(updateFragments),
             deletes: plan.deleteEntities.length,
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(envelope) + countPlanMessages(plan) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
         })
@@ -2119,6 +1888,8 @@ function createStableCellFragmentSnapshotBuffer(user: User, instance: Instance, 
     instance.network.queueProtocolIfChanged(user)
     const protocol = instance.network.getProtocol()
     const { plan: envelope, queuedResponses } = collectEnvelopePlan(user)
+    const scopedMessagePlan = createEmptySnapshotPlan()
+    addChannelMessages(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites)
 
     const updateFragments: CellEntityFragment[] = []
     for (let i = 0; i < currentCellKeys.length; i++) {
@@ -2144,8 +1915,13 @@ function createStableCellFragmentSnapshotBuffer(user: User, instance: Instance, 
     if (messageChunk) {
         chunks.push(messageChunk)
     }
+    if (hasSnapshotPlanContent(scopedMessagePlan)) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
+        chunks.push(createSnapshotPlanChunk('StableCellMessages', scopedMessagePlan, instance.context, protocol))
+    }
     const updateChunk = createCellFragmentChunk('StableCellUpdateFragments', instance, updateFragments)
     if (updateChunk) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
         chunks.push(updateChunk)
     }
     const bytes = sumSnapshotChunkBytes(chunks)
@@ -2182,7 +1958,7 @@ function createStableCellFragmentSnapshotBuffer(user: User, instance: Instance, 
             updateGroups: sumCellFragmentUpdateGroups(updateFragments),
             groupedUpdateProps: sumCellFragmentGroupedProps(updateFragments),
             deletes: 0,
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(envelope) + countPlanMessages(scopedMessagePlan) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
         })
@@ -2231,13 +2007,12 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
     const plan = isManualSpatialCellFragmentChannel(channel)
         ? collectManualSpatialVisibilityPlan(user, instance, channel)
         : collectSnapshotPlan(user, instance)
+    if (!isManualSpatialCellFragmentChannel(channel)) {
+        addChannelMessages(plan, user, channel, instance.network.debugBinaryWrites)
+    }
     const currentCellKeys = channel.getVisibleCellKeys(user.id)
     const currentCellKeySet = new Set(currentCellKeys)
     const protocol = instance.network.getProtocol()
-    if (instance.network.debugBinaryWrites) {
-        plan.messages.push(...collectBroadcastMessages(user))
-    }
-
     const createFragments: CellEntityFragment[] = []
     const deleteFragments: CellEntityFragment[] = []
     const updateFragments: CellEntityFragment[] = []
@@ -2294,6 +2069,7 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
     }
 
     const chunks: SnapshotChunk[] = [
+        createChannelScopeChunk(channel.nid, protocol),
         createSnapshotPlanChunk('CellFragmentSnapshotPlan', plan, instance.context, protocol)
     ]
     const createChunk = createCellFragmentChunk('CellCreateFragments', instance, createFragments)
@@ -2310,6 +2086,7 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
     }
     const updateChunk = createCellFragmentChunk('CellUpdateFragments', instance, updateFragments)
     if (updateChunk) {
+        chunks.push(createChannelScopeChunk(channel.nid, protocol))
         chunks.push(updateChunk)
     }
     const bytes = sumSnapshotChunkBytes(chunks)
@@ -2331,6 +2108,7 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
     }
 
     commitSnapshotPlan(user, plan)
+    applyCellEntityFragmentsToUser(user, instance.tick, createFragments, deleteFragments)
     instance.network.reportResponseBacklog(user, queuedResponses, plan.responses.length)
     channel.rememberVisibleCells(user.id)
 
@@ -2350,7 +2128,7 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
             groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0) +
                 sumCellFragmentGroupedProps(updateFragments),
             deletes: plan.deleteEntities.length + sumCellFragmentDeletes(deleteFragments),
-            messages: plan.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(plan) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: plan.engineMessages.length,
             responses: plan.responses.length
         })
@@ -2360,19 +2138,22 @@ function createCellFragmentSnapshotBuffer(user: User, instance: Instance, channe
 }
 
 const createSnapshotBuffer = (user: User, instance: Instance) => {
-    const hasPendingVisibilityDeletes = user.hasPendingVisibilityDeletes() || user.hasPendingChannelHeaderDeletes()
+    const hasPendingLifecycleWork =
+        user.hasPendingVisibilityDeletes() ||
+        user.hasPendingChannelOpens() ||
+        user.hasPendingChannelCloses()
     const ecsSpatialChannel = getSingleEcsSpatialSnapshotChannel(user)
     const ecsChannel = getSingleEcsSnapshotChannel(user)
     const manualUpdateChannel = getSingleManualUpdateChannel(user)
     const sharedChannel = getSingleSharedChannel(user)
     const cellFragmentChannel = getSingleCellFragmentChannel(user)
-    if (!hasPendingVisibilityDeletes && ecsSpatialChannel && !channelHasHeaderPending(user, ecsSpatialChannel)) {
+    if (!hasPendingLifecycleWork && ecsSpatialChannel && !channelHasHeaderPending(user, ecsSpatialChannel)) {
         return user.withChannelVisibilityState(ecsSpatialChannel.nid, () =>
             createEcsSpatialSnapshotBuffer(user, instance, ecsSpatialChannel)
         )
     }
 
-    if (!hasPendingVisibilityDeletes && ecsChannel && !channelHasHeaderPending(user, ecsChannel)) {
+    if (!hasPendingLifecycleWork && ecsChannel && !channelHasHeaderPending(user, ecsChannel)) {
         return user.withChannelVisibilityState(ecsChannel.nid, () =>
             createEcsSnapshotBuffer(user, instance, ecsChannel)
         )
@@ -2380,7 +2161,7 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
 
     if (instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.debugBinaryWrites &&
-        !hasPendingVisibilityDeletes &&
+        !hasPendingLifecycleWork &&
         sharedChannel &&
         !channelHasHeaderPending(user, sharedChannel) &&
         hasChannelDeltas(sharedChannel) &&
@@ -2392,7 +2173,7 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
 
     if (instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.debugBinaryWrites &&
-        !hasPendingVisibilityDeletes &&
+        !hasPendingLifecycleWork &&
         manualUpdateChannel &&
         !channelHasHeaderPending(user, manualUpdateChannel) &&
         user.withChannelVisibilityState(manualUpdateChannel.nid, () => canUseSharedUpdateFragment(user, manualUpdateChannel))) {
@@ -2403,7 +2184,7 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
 
     if (instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.debugBinaryWrites &&
-        !hasPendingVisibilityDeletes &&
+        !hasPendingLifecycleWork &&
         sharedChannel &&
         !channelHasHeaderPending(user, sharedChannel) &&
         user.withChannelVisibilityState(sharedChannel.nid, () => canUseSharedUpdateFragment(user, sharedChannel))) {
@@ -2414,7 +2195,7 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
 
     if (instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.debugBinaryWrites &&
-        !hasPendingVisibilityDeletes &&
+        !hasPendingLifecycleWork &&
         cellFragmentChannel &&
         !channelHasHeaderPending(user, cellFragmentChannel) &&
         canUseCellFragments(cellFragmentChannel, user.id)) {
@@ -2440,22 +2221,15 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
     instance.network.queueProtocolIfChanged(user)
     const protocol = instance.network.getProtocol()
     const { plan: envelope, queuedResponses } = collectEnvelopePlan(user)
-    if (instance.network.debugBinaryWrites) {
-        envelope.messages.push(...collectBroadcastMessages(user))
-    }
-
-    const channelPlans: SnapshotPlan[] = []
+    const channelPlans: { channelId: number, plan: SnapshotPlan }[] = []
     const pendingDeletePlan = collectPendingVisibilityDeletePlan(user)
-    if (pendingDeletePlan) {
-        channelPlans.push(pendingDeletePlan)
-    }
     // Multi-channel users receive an appended stream per subscribed channel.
     // Do not reintroduce a global visibility union here; channel-specific state
     // is what preserves manual/spatial/ECS fast paths and client identities.
     for (const channel of user.subscriptions.values()) {
         const channelPlan = collectSubscribedChannelSnapshotPlan(user, instance, channel)
         if (hasSnapshotPlanContent(channelPlan)) {
-            channelPlans.push(channelPlan)
+            channelPlans.push({ channelId: channel.nid, plan: channelPlan })
         }
     }
 
@@ -2476,10 +2250,14 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
     const chunks: SnapshotChunk[] = [
         createSnapshotPlanChunk('Envelope', envelope, instance.context, protocol)
     ]
-    for (let i = 0; i < channelPlans.length; i++) {
-        chunks.push(createSnapshotPlanChunk('ChannelSnapshotPlan', channelPlans[i], instance.context, protocol))
+    if (pendingDeletePlan) {
+        chunks.push(createSnapshotPlanChunk('PendingVisibilityDeletes', pendingDeletePlan, instance.context, protocol))
     }
-    const messageFragmentBytes = sumSharedMessageFragmentBytes(messageFragments)
+    for (let i = 0; i < channelPlans.length; i++) {
+        chunks.push(createChannelScopeChunk(channelPlans[i].channelId, protocol))
+        chunks.push(createSnapshotPlanChunk('ChannelSnapshotPlan', channelPlans[i].plan, instance.context, protocol))
+    }
+    const messageFragmentBytes = sumSharedMessageFragmentBytes(messageFragments, protocol)
     if (messageFragmentBytes > 0) {
         chunks.push(createSnapshotChunk('MessageFragments', messageFragmentBytes, writer => {
             writeSharedMessageFragments(writer, instance, messageFragments)
@@ -2504,10 +2282,14 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
     }
 
     commitSnapshotPlan(user, envelope)
+    if (pendingDeletePlan) {
+        commitSnapshotPlan(user, pendingDeletePlan)
+    }
     for (let i = 0; i < channelPlans.length; i++) {
-        commitSnapshotPlan(user, channelPlans[i])
+        commitSnapshotPlan(user, channelPlans[i].plan)
     }
     instance.network.reportResponseBacklog(user, queuedResponses, envelope.responses.length)
+    rememberCellFragmentChannelVisibility(user)
     if (sharedChannel) {
         user.withChannelVisibilityState(sharedChannel.nid, () => rememberSharedChannelVersion(user))
     }
@@ -2528,7 +2310,7 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
             updateGroups: sumPlanUpdateGroups(channelPlans),
             groupedUpdateProps: sumPlanGroupedUpdateProps(channelPlans),
             deletes: sumPlanDeletes(channelPlans),
-            messages: envelope.messages.length + sumSharedMessageFragmentMessages(messageFragments),
+            messages: countPlanMessages(envelope) + sumPlanMessages(channelPlans) + sumSharedMessageFragmentMessages(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
         })

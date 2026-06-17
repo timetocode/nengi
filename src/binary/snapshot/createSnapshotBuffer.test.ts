@@ -146,6 +146,38 @@ function lastSentBuffer(user: User) {
     return send.mock.calls[send.mock.calls.length - 1][1] as Buffer
 }
 
+function stepClient(instance: Instance, user: User, clientNetwork: ClientNetwork) {
+    instance.step()
+    clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+    clientNetwork.processNextFrame()
+    return clientNetwork.latestFrame!
+}
+
+function createEcsSpatial2DTest(view: AABB2D) {
+    const context = createEcsContext()
+    const instance = new Instance(context)
+    const user = createUser(instance)
+    const clientNetwork = createClientNetwork(context)
+    const channel = new EcsSpatialChannel2D(instance.localState, 10)
+    const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+    instance.users.set(user.id, user)
+    channel.subscribe(user, view)
+
+    return { context, instance, user, clientNetwork, channel, Transform, view }
+}
+
+function addEcsSpatialRoot(channel: EcsSpatialChannel2D, x: number, y: number) {
+    const pid = channel.createEntity()
+    const transform = channel.addSpatialComponent(pid, {
+        nid: 0,
+        ntype: NType.Transform,
+        x,
+        y
+    })
+    return { pid, transform }
+}
+
 describe('server snapshot pipeline', () => {
     it('collects visible create, update, delete, queued message, and response state', () => {
         const context = createContext()
@@ -163,20 +195,26 @@ describe('server snapshot pipeline', () => {
         })
         const nid = entity.nid
         const message = { ntype: NType.Message, text: 'hello' }
+        const interpolatedMessage = { ntype: NType.Message, text: 'fx' }
         user.queueMessage(message)
+        user.queueInterpolatedMessage(interpolatedMessage)
         user.responseQueue.push({ requestId: 77, status: ResponseStatus.Ok, payload: createEndpointPayload({ ok: true }) })
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
         const first = collectSnapshotPlan(user, instance)
 
+        expect(first.channelOpens).toEqual([{ channelId: channel.nid, header: channel.header }])
         expect(first.createEntities).toEqual([entity])
         expect(first.updateEntities).toEqual([])
         expect(first.deleteEntities).toEqual([])
         expect(first.messages).toEqual([message])
+        expect(first.interpolatedMessages).toEqual([interpolatedMessage])
         expect(first.responses).toEqual([{ requestId: 77, status: ResponseStatus.Ok, payload: createEndpointPayload({ ok: true }) }])
         expect(user.messageQueue).toEqual([])
+        expect(user.interpolatedMessageQueue).toEqual([])
         expect(user.responseQueue).toEqual([{ requestId: 77, status: ResponseStatus.Ok, payload: createEndpointPayload({ ok: true }) }])
+        commitSnapshotPlan(user, first)
 
         entity.x = 9
         instance.tick = 2
@@ -196,7 +234,8 @@ describe('server snapshot pipeline', () => {
 
         expect(third.createEntities).toEqual([])
         expect(third.updateEntities).toEqual([])
-        expect(third.deleteEntities).toEqual([nid])
+        expect(third.deleteEntities).toEqual([])
+        expect(third.channelCloses).toEqual([{ channelId: channel.nid }])
     })
 
     it('does not miss a same-length all-visible channel membership replacement', () => {
@@ -238,6 +277,37 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([replacement.nid])
         expect(clientNetwork.store.entities.has(firstNid)).toBe(false)
         expect(clientNetwork.store.get(replacement.nid)?.label).toBe('replacement')
+    })
+
+    it('sends one-frame no-interpolation markers through the binary snapshot pipeline', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new Channel(instance.localState)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 1,
+            y: 2,
+            label: 'teleporting'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        entity.x = 400
+        channel.skipInterpolation(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        const frame = clientNetwork.processNextFrame()
+
+        expect(frame?.skipInterpolationNids.has(entity.nid)).toBe(true)
+        expect(channel.skipInterpolationNids).toEqual([])
     })
 
     it('collects hierarchy creates and updates parent-first, then deletes child-first', () => {
@@ -889,6 +959,10 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
         expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
         expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([transform.nid, regular.nid])
+        expect(clientNetwork.latestFrame?.channels.map(channel => channel.channelId)).toEqual([ecsChannel.nid, regularChannel.nid])
+        expect(clientNetwork.latestFrame?.channels[0].ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.channels[0].ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(clientNetwork.latestFrame?.channels[1].createEntities.map(entity => entity.nid)).toEqual([regular.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(1)
         expect(clientNetwork.store.get(regular.nid)?.label).toBe('regular')
@@ -905,6 +979,8 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
         expect(clientNetwork.store.get(transform.nid)?.y).toBe(6)
         expect(clientNetwork.store.get(regular.nid)?.x).toBe(7)
+        expect(clientNetwork.latestFrame?.channels[0].updateEntities.map(update => update.nid)).toEqual([transform.nid, transform.nid])
+        expect(clientNetwork.latestFrame?.channels[1].updateEntities.map(update => update.nid)).toEqual([regular.nid])
 
         const transformNid = transform.nid
         const regularNid = regular.nid
@@ -919,6 +995,8 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
         expect(clientNetwork.latestFrame?.deleteEntities).toHaveLength(2)
         expect(clientNetwork.latestFrame?.deleteEntities).toEqual(expect.arrayContaining([transformNid, regularNid]))
+        expect(clientNetwork.latestFrame?.channels[0].ecsDeleteEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.channels[1].deleteEntities).toEqual([regularNid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transformNid)).toBe(false)
         expect(clientNetwork.store.entities.has(regularNid)).toBe(false)
@@ -963,7 +1041,14 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([itemNid])
+        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
+        expect(clientNetwork.latestFrame?.closedChannels).toEqual([
+            {
+                channelId: inventoryChannel.nid,
+                header: inventoryChannel.header,
+                entityNids: [itemNid]
+            }
+        ])
         expect(clientNetwork.store.get(worldEntity.nid)?.x).toBe(10)
         expect(clientNetwork.store.entities.has(itemNid)).toBe(false)
     })
@@ -1018,6 +1103,138 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
+    })
+
+    it('decodes same-snapshot ECS spatial creates and manual updates', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel2D(instance.localState, 10)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(5, 5, 10, 10))
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5
+        })
+        transform.x = 6
+        transform.y = 7
+        Transform.position(transform, 6, 7)
+
+        instance.step()
+        expect(() => {
+            clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        }).not.toThrow()
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(6)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(7)
+    })
+
+    describe('ECS spatial visibility transitions', () => {
+        it('creates roots when the subscriber view moves into them', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(500, 500, 10, 10))
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            game.view.x = 5
+            game.view.y = 5
+            game.channel.updateView(game.user, game.view)
+            const frame = stepClient(game.instance, game.user, game.clientNetwork)
+
+            expect(frame.ecsCreateEntities).toEqual([pid])
+            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+            expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+            expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        })
+
+        it('creates roots when they move into the subscriber view', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 10, 10))
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 500, 500)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            transform.x = 5
+            transform.y = 5
+            game.Transform.position(transform, 5, 5)
+            const frame = stepClient(game.instance, game.user, game.clientNetwork)
+
+            expect(frame.ecsCreateEntities).toEqual([pid])
+            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+            expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+            expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        })
+
+        it('creates roots when game logic spawns them inside the subscriber view', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 10, 10))
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+            const frame = stepClient(game.instance, game.user, game.clientNetwork)
+
+            expect(frame.ecsCreateEntities).toEqual([pid])
+            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+            expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+            expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        })
+
+        it('deletes roots when the subscriber view moves away from them', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 10, 10))
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            game.view.x = 500
+            game.view.y = 500
+            game.channel.updateView(game.user, game.view)
+            const frame = stepClient(game.instance, game.user, game.clientNetwork)
+
+            expect(frame.ecsDeleteEntities).toEqual([pid])
+            expect(frame.deleteEntities).toEqual([transform.nid])
+            expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+            expect(game.clientNetwork.store.entities.has(transform.nid)).toBe(false)
+        })
+
+        it('deletes roots when they move out of the subscriber view', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 10, 10))
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            transform.x = 500
+            transform.y = 500
+            game.Transform.position(transform, 500, 500)
+            const frame = stepClient(game.instance, game.user, game.clientNetwork)
+
+            expect(frame.ecsDeleteEntities).toEqual([pid])
+            expect(frame.deleteEntities).toEqual([transform.nid])
+            expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+            expect(game.clientNetwork.store.entities.has(transform.nid)).toBe(false)
+        })
+
+        it('deletes roots when game logic removes them from the channel', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 10, 10))
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+            const transformNid = transform.nid
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            game.channel.removeEntity(pid)
+            const frame = stepClient(game.instance, game.user, game.clientNetwork)
+
+            expect(frame.ecsDeleteEntities).toEqual([pid])
+            expect(frame.deleteEntities).toEqual([transformNid])
+            expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false)
+            expect(game.clientNetwork.store.entities.has(transformNid)).toBe(false)
+        })
     })
 
     it('does not scan ECS spatial components without manual writer calls', () => {
@@ -1112,6 +1329,113 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
+    })
+
+    it('spatially replicates existing ECS roots when a user subscribes after creation', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel2D(instance.localState, 10)
+
+        instance.users.set(user.id, user)
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5
+        })
+        instance.step()
+
+        channel.subscribe(user, new AABB2D(5, 5, 10, 10))
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
+    })
+
+    it('spatially replicates existing composed ECS roots when a user subscribes after creation', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel2D(instance.localState, 10)
+
+        instance.users.set(user.id, user)
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5
+        })
+        const body = channel.addComponent(pid, {
+            nid: 0,
+            ntype: NType.Entity,
+            x: 0,
+            y: 0,
+            label: 'npc'
+        })
+        instance.step()
+
+        channel.subscribe(user, new AABB2D(5, 5, 10, 10))
+        instance.step()
+
+        expect(() => {
+            clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        }).not.toThrow()
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid, body.nid])
+        expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
+        expect(clientNetwork.store.get(body.nid)?.label).toBe('npc')
+    })
+
+    it('spatially replicates many existing composed ECS roots after nid width grows', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel2D(instance.localState, 10)
+        const createdBodies: any[] = []
+
+        for (let i = 0; i < 130; i++) {
+            const pid = channel.createEntity()
+            channel.addSpatialComponent(pid, {
+                nid: 0,
+                ntype: NType.Transform,
+                x: 5 + i,
+                y: 5
+            })
+            createdBodies.push(channel.addComponent(pid, {
+                nid: 0,
+                ntype: NType.Entity,
+                x: 0,
+                y: 0,
+                label: `npc-${i}`
+            }))
+        }
+        instance.step()
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(70, 5, 100, 10))
+        instance.step()
+
+        expect(() => {
+            clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        }).not.toThrow()
+        clientNetwork.processNextFrame()
+
+        expect(clientNetwork.latestFrame?.ecsCreateEntities).toHaveLength(130)
+        expect(clientNetwork.latestFrame?.ecsCreateComponents).toHaveLength(260)
+        expect(clientNetwork.store.get(createdBodies[129].nid)?.label).toBe('npc-129')
     })
 
     it('spatially replicates ECS roots on the xz plane without copying z into y', () => {
@@ -1468,6 +1792,7 @@ describe('server snapshot pipeline', () => {
             label: 'door'
         })
         channel.addMessage({ ntype: NType.Message, text: 'broadcast' })
+        channel.addInterpolatedMessage({ ntype: NType.Message, text: 'broadcast-fx' })
         firstUser.queueMessage({ ntype: NType.Message, text: 'private' })
 
         instance.step()
@@ -1483,10 +1808,24 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.messages).toEqual([
             { ntype: NType.Message, text: 'broadcast' }
         ])
+        expect(firstClient.latestFrame?.interpolatedMessages).toEqual([
+            { ntype: NType.Message, text: 'broadcast-fx' }
+        ])
+        expect(secondClient.latestFrame?.interpolatedMessages).toEqual([
+            { ntype: NType.Message, text: 'broadcast-fx' }
+        ])
+        expect(firstClient.latestFrame?.channels).toEqual([
+            expect.objectContaining({
+                channelId: channel.nid,
+                messages: [{ ntype: NType.Message, text: 'broadcast' }],
+                interpolatedMessages: [{ ntype: NType.Message, text: 'broadcast-fx' }]
+            })
+        ])
         expect(channel.broadcastMessages).toEqual([])
+        expect(channel.interpolatedBroadcastMessages).toEqual([])
         expect(instance.network.snapshotPerformance.sharedMessageFragmentBuilds).toBe(1)
         expect(instance.network.snapshotPerformance.sharedMessageFragmentHits).toBe(1)
-        expect(instance.network.snapshotPerformance.messagesTotal).toBe(3)
+        expect(instance.network.snapshotPerformance.messagesTotal).toBe(5)
     })
 
     it('can use reusable cell update fragments without userland updateEntity calls', () => {
@@ -2251,6 +2590,7 @@ describe('server snapshot pipeline', () => {
         })
         const nid = entity.nid
         user.queueMessage({ ntype: NType.Message, text: 'created' })
+        user.queueInterpolatedMessage({ ntype: NType.Message, text: 'shot' })
 
         instance.tick = 1
         instance.cache.createCachesForTick(instance.tick)
@@ -2260,6 +2600,9 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.messages).toEqual([
             { ntype: NType.Message, text: 'created' }
+        ])
+        expect(clientNetwork.latestFrame?.interpolatedMessages).toEqual([
+            { ntype: NType.Message, text: 'shot' }
         ])
         expect(clientNetwork.latestFrame?.createEntities).toEqual([
             { nid, ntype: NType.Entity, x: 5, y: 6, label: 'door' }
@@ -2326,23 +2669,16 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createBuffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.channelHeaderCreates).toEqual([
+        expect(clientNetwork.latestFrame?.channelOpens).toEqual([
             {
                 channelId: channel.nid,
-                version: 0,
-                header: { nid: header.nid, ntype: NType.Entity, x: 0, y: 0, label: 'inventory' }
+                header: channel.header
             }
         ])
         expect(clientNetwork.latestFrame?.createEntities).toEqual([
             { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
         ])
-        expect(clientNetwork.store.getChannelHeader(channel.nid)).toEqual({
-            nid: header.nid,
-            ntype: NType.Entity,
-            x: 0,
-            y: 0,
-            label: 'inventory'
-        })
+        expect(clientNetwork.store.getChannelHeader(channel.nid)).toEqual(channel.header)
 
         header.label = 'renamed'
         channel.markHeaderDirty()
@@ -2362,7 +2698,7 @@ describe('server snapshot pipeline', () => {
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        const world = new Channel(instance.localState, { label: 'world' })
+        const world = new Channel(instance.localState, { name: 'world' })
         const inventoryHeader = {
             nid: 0,
             ntype: NType.Entity,
@@ -2371,7 +2707,6 @@ describe('server snapshot pipeline', () => {
             label: 'inventory'
         }
         const inventory = new Channel(instance.localState, {
-            label: 'inventory',
             header: inventoryHeader
         })
         world.subscribe(user)
@@ -2388,6 +2723,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
         clientNetwork.processNextFrame()
         expect(clientNetwork.store.get(player.nid)).toBeDefined()
+        expect(clientNetwork.store.getChannelHeader(world.nid)?.name).toBe('world')
 
         inventory.subscribe(user)
         const item = inventory.addEntity({
@@ -2403,20 +2739,14 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.channelHeaderCreates.map(create => create.channelId)).toEqual([inventory.nid])
+        expect(clientNetwork.latestFrame?.channelOpens.map(open => open.channelId)).toEqual([inventory.nid])
         expect(clientNetwork.latestFrame?.channelEntityCreates).toEqual([
             { nid: item.nid, channelId: inventory.nid }
         ])
         expect(clientNetwork.latestFrame?.createEntities).toEqual([
             { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
         ])
-        expect(clientNetwork.store.getChannelHeader(item.nid)).toEqual({
-            nid: inventoryHeader.nid,
-            ntype: NType.Entity,
-            x: 0,
-            y: 0,
-            label: 'inventory'
-        })
+        expect(clientNetwork.store.getChannelHeader(item.nid)).toEqual(inventory.header)
     })
 
     it('closes a known headered channel without sending each contained entity delete', () => {
@@ -2455,17 +2785,16 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createSnapshotBuffer(user, instance) as Buffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.channelHeaderDeletes).toEqual([
+        expect(clientNetwork.latestFrame?.channelCloses).toEqual([
             {
-                channelId: channel.nid,
-                header: { nid: header.nid, ntype: NType.Entity, x: 0, y: 0, label: 'inventory' }
+                channelId: channel.nid
             }
         ])
         expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
         expect(clientNetwork.latestFrame?.closedChannels).toEqual([
             {
                 channelId: channel.nid,
-                header: { nid: header.nid, ntype: NType.Entity, x: 0, y: 0, label: 'inventory' },
+                header: channel.header,
                 entityNids: [itemNid]
             }
         ])

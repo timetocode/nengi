@@ -307,7 +307,7 @@ describe('request/response', () => {
             slots: 27
         };
         const inventoryChannel = new Channel_1.Channel(instance.localState, {
-            label: 'chest:123:inventory',
+            name: 'chest:123:inventory',
             header: inventory
         });
         const item = inventoryChannel.addEntity({

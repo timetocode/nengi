@@ -352,6 +352,31 @@ describe('FixedStepInterpolator', () => {
         expect(state!.entities.get(2)!.label).toBe('changed')
     })
 
+    it('snaps to frameB when the entity is marked no-interpolation for that frame only', () => {
+        const harness = new InterpolationTestHarness()
+
+        harness.receive({
+            timestamp: 1000,
+            createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
+        }, 1000)
+        harness.receive({
+            timestamp: 1050,
+            skipInterpolationNids: [1],
+            updateEntities: [{ nid: 1, prop: 'x', value: 100 }]
+        }, 1050)
+        harness.receive({
+            timestamp: 1100,
+            updateEntities: [{ nid: 1, prop: 'x', value: 150 }]
+        }, 1100)
+
+        const snapped = harness.interpolator.getEntity(1, 75, 1100)
+        const freshInterpolator = new FixedStepInterpolator(harness.client)
+        const resumed = freshInterpolator.getEntity(1, 25, 1100)
+
+        expect(snapped!.x).toBe(100)
+        expect(resumed!.x).toBe(125)
+    })
+
     it('keeps deleted entities alive until the delete frame becomes the lower interpolation bound', () => {
         const harness = new InterpolationTestHarness()
 

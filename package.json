@@ -3,6 +3,7 @@
   "version": "2.0.0-rc.120",
   "description": "nengi2 alpha branch",
   "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "scripts": {
     "test": "npx jest",
     "build": "npx tsc",

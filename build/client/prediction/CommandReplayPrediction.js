@@ -53,15 +53,19 @@ class CommandReplayPrediction {
             const timingOptions = typeof this.timingOptions === 'function'
                 ? this.timingOptions(command)
                 : this.timingOptions;
-            return this.client.predictTimedCommand(command, predictionOptions, timingOptions);
+            return this.client.predictCommandWithTiming(command, predictionOptions, timingOptions);
         }
         return this.client.predictCommand(command, predictionOptions);
     }
     reconcile() {
+        var _a, _b;
         const nid = this.resolveNid();
         const local = this.getLocal();
-        const authoritative = this.getAuthoritative();
-        if (nid === undefined || !local || !authoritative) {
+        if (nid === undefined || !local) {
+            return null;
+        }
+        const authoritative = (_b = (_a = this.getAuthoritative) === null || _a === void 0 ? void 0 : _a.call(this)) !== null && _b !== void 0 ? _b : this.getAuthoritativeFromStore(nid);
+        if (!authoritative) {
             return null;
         }
         const replayState = this.createReplayState(authoritative);
@@ -93,6 +97,9 @@ class CommandReplayPrediction {
     resolveNid() {
         const nid = typeof this.nid === 'function' ? this.nid() : this.nid;
         return typeof nid === 'number' ? nid : undefined;
+    }
+    getAuthoritativeFromStore(nid) {
+        return this.client.network.store.get(nid);
     }
 }
 exports.CommandReplayPrediction = CommandReplayPrediction;

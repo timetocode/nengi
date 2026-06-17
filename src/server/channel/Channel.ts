@@ -1,23 +1,18 @@
 import { IEntity } from '../../common/IEntity'
-import { Historian } from '../Historian'
+import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { LocalState } from '../LocalState'
 import { NDictionary } from '../NDictionary'
 import { User } from '../User'
 import { IObjectChannel } from './IChannel'
 
 export type ChannelOptions = {
-    historian?: Historian
-    header?: IEntity
-    /**
-     * Developer-defined label for debugging, logs, tests, or game tooling.
-     * Nengi does not interpret this value or send it over the network.
-     */
-    label?: string
+    header?: ChannelHeaderInput
+    name?: string
+    channelType?: ChannelType
 }
 
 export class Channel implements IObjectChannel {
     nid: number
-    label?: string
     localState: LocalState
     entities = new NDictionary()
     entityNids: number[] = []
@@ -25,30 +20,22 @@ export class Channel implements IObjectChannel {
     deltaBaseVersion = 0
     createdRoots: IEntity[] = []
     deletedNids: number[] = []
+    skipInterpolationNids: number[] = []
     broadcastMessages: any[] = []
+    interpolatedBroadcastMessages: any[] = []
     users: Map<number, User> = new Map()
-    historian: Historian | null = null
-    header: IEntity | null = null
+    header: ChannelHeader
     headerVersion = 0
+    channelType: ChannelType
     private visibleNetworkedNidsCache: { membershipVersion: number, entityTreeVersion: number, nids: number[] } | null = null
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
         this.localState = localState
         this.nid = localState.nextNetworkId()
-        this.label = options.label
-        if (options.historian) {
-            this.historian = options.historian
-        }
+        this.channelType = options.channelType ?? ChannelType.Channel
+        this.header = createChannelHeader(this.nid, this.channelType, options.header, options.name)
+        this.headerVersion = hasSchemaBackedChannelHeader(this.header) ? 1 : 0
         this.localState.channels.add(this)
-        if (options.header) {
-            this.setHeader(options.header)
-        }
-    }
-
-    tick(tick: number) {
-        if (this.historian !== null) {
-            this.historian.record(tick, this.entities)
-        }
     }
 
     private beginDelta() {
@@ -67,25 +54,8 @@ export class Channel implements IObjectChannel {
         return entity
     }
 
-    setHeader(header: IEntity) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().')
-        }
-        if (this.header === header) {
-            return header
-        }
-        this.localState.registerEntity(header, this.nid)
-        this.header = header
-        this.headerVersion++
-        return header
-    }
-
-    getHeader() {
-        return this.header
-    }
-
     markHeaderDirty() {
-        if (!this.header) {
+        if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
         this.headerVersion++
@@ -118,17 +88,33 @@ export class Channel implements IObjectChannel {
         return this.localState.markDirty(entity)
     }
 
+    // One-frame interpolation skip for teleports, respawns, wraparound, or
+    // pooled entities moved discontinuously to a new position.
+    skipInterpolation(entity: IEntity) {
+        if (!entity || entity.nid === 0 || this.entities.get(entity.nid) !== entity) {
+            return false
+        }
+        this.skipInterpolationNids.push(entity.nid)
+        return true
+    }
+
     addMessage(message: any) {
         this.broadcastMessages.push(message)
     }
 
+    addInterpolatedMessage(message: any) {
+        this.interpolatedBroadcastMessages.push(message)
+    }
+
     clearBroadcastMessages() {
         this.broadcastMessages.length = 0
+        this.interpolatedBroadcastMessages.length = 0
     }
 
     clearSnapshotDeltas() {
         this.createdRoots.length = 0
         this.deletedNids.length = 0
+        this.skipInterpolationNids.length = 0
         this.deltaBaseVersion = this.membershipVersion
     }
 
@@ -192,11 +178,6 @@ export class Channel implements IObjectChannel {
     destroy() {
         this.unsubscribeAll()
         this.removeAllEntities()
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid)
-            this.header = null
-            this.headerVersion++
-        }
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this)
     }

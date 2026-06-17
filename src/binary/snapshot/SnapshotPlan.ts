@@ -1,4 +1,5 @@
 import { IEntity } from '../../common/IEntity'
+import { ChannelHeader } from '../../common/ChannelHeader'
 import { EntityChange, EntityUpdateGroup } from '../../common/binary/schema/util'
 import { ResponseStatus } from '../../common/Endpoint'
 import { EndpointPayload } from '../endpoint/EndpointPayload'
@@ -14,22 +15,20 @@ export type ChannelEntityCreate = {
     channelId: number
 }
 
-export type ChannelHeaderCreate = {
+export type ChannelOpen = {
     channelId: number
-    header: IEntity
-    version: number
+    header: ChannelHeader
 }
 
 export type ChannelHeaderUpdate = {
     channelId: number
     changes: EntityChange[]
     groups: EntityUpdateGroup[]
-    version: number
 }
 
-export type ChannelHeaderDelete = {
+export type ChannelClose = {
     channelId: number
-    header?: IEntity
+    header?: ChannelHeader
 }
 
 export type ChannelHeaderVersion = {
@@ -37,15 +36,31 @@ export type ChannelHeaderVersion = {
     version: number
 }
 
+export type SnapshotChannel = {
+    channelId: number
+    messages: any[],
+    interpolatedMessages: any[],
+    ecsCreateEntities: number[],
+    ecsCreateComponents: IEntity[],
+    ecsDeleteEntities: number[],
+    createEntities: IEntity[],
+    updateEntities: any[],
+    updateEntityGroups: EntityUpdateGroup[],
+    deleteEntities: number[]
+}
+
 export type SnapshotPlan = {
     engineMessages: any[],
     messages: any[],
+    interpolatedMessages: any[],
+    channels: SnapshotChannel[],
     responses: SnapshotResponse[],
+    channelOpens: ChannelOpen[],
     channelEntityCreates: ChannelEntityCreate[],
-    channelHeaderCreates: ChannelHeaderCreate[],
     channelHeaderUpdates: ChannelHeaderUpdate[],
-    channelHeaderDeletes: ChannelHeaderDelete[],
+    channelCloses: ChannelClose[],
     channelHeaderVersions: ChannelHeaderVersion[],
+    skipInterpolationNids: number[],
     ecsCreateEntities: number[],
     ecsCreateComponents: IEntity[],
     ecsDeleteEntities: number[],
@@ -59,12 +74,15 @@ export function createEmptySnapshotPlan(): SnapshotPlan {
     return {
         engineMessages: [],
         messages: [],
+        interpolatedMessages: [],
+        channels: [],
         responses: [],
+        channelOpens: [],
         channelEntityCreates: [],
-        channelHeaderCreates: [],
         channelHeaderUpdates: [],
-        channelHeaderDeletes: [],
+        channelCloses: [],
         channelHeaderVersions: [],
+        skipInterpolationNids: [],
         ecsCreateEntities: [],
         ecsCreateComponents: [],
         ecsDeleteEntities: [],

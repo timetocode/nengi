@@ -1,10 +1,33 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MAX_RESPONSES_PER_FRAME = void 0;
+exports.collectSkipInterpolationNids = collectSkipInterpolationNids;
 exports.collectSnapshotPlan = collectSnapshotPlan;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const SnapshotPlan_1 = require("./SnapshotPlan");
+const messageFragments_1 = require("./messageFragments");
 const MAX_RESPONSES_PER_FRAME = 255;
 exports.MAX_RESPONSES_PER_FRAME = MAX_RESPONSES_PER_FRAME;
+function collectSkipInterpolationNids(user) {
+    const nids = [];
+    const seen = new Set();
+    for (const channel of user.subscriptions.values()) {
+        const skipInterpolationNids = channel.skipInterpolationNids;
+        if (!skipInterpolationNids || skipInterpolationNids.length === 0) {
+            continue;
+        }
+        const state = user.getChannelVisibilityState(channel.nid);
+        for (let i = 0; i < skipInterpolationNids.length; i++) {
+            const nid = skipInterpolationNids[i];
+            if (seen.has(nid) || !state.tickLastSeen.has(nid)) {
+                continue;
+            }
+            seen.add(nid);
+            nids.push(nid);
+        }
+    }
+    return nids;
+}
 function collectCreateEntities(instance, toCreate) {
     const createEntities = [];
     for (let i = 0; i < toCreate.length; i++) {
@@ -41,18 +64,25 @@ function collectUpdateEntities(instance, toUpdate) {
     return { updates: updateEntities, groups: updateEntityGroups };
 }
 function collectSnapshotPlan(user, instance) {
-    var _a;
     const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkVisibility(instance.tick);
     const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    const headerDeletes = user.consumePendingChannelHeaderDeletes();
-    for (let i = 0; i < headerDeletes.length; i++) {
-        plan.channelHeaderDeletes.push({ channelId: headerDeletes[i] });
+    const channelOpens = user.consumePendingChannelOpens();
+    for (let i = 0; i < channelOpens.length; i++) {
+        const channel = user.subscriptions.get(channelOpens[i]);
+        if (channel) {
+            plan.channelOpens.push({ channelId: channel.nid, header: channel.header });
+        }
+    }
+    const channelCloses = user.consumePendingChannelCloses();
+    for (let i = 0; i < channelCloses.length; i++) {
+        plan.channelCloses.push({ channelId: channelCloses[i] });
     }
     plan.channelEntityCreates = channelEntityCreates;
+    plan.skipInterpolationNids = collectSkipInterpolationNids(user);
     for (const channel of user.subscriptions.values()) {
-        const header = channel.header || ((_a = channel.getHeader) === null || _a === void 0 ? void 0 : _a.call(channel));
+        const header = channel.header;
         const headerVersion = channel.headerVersion || 0;
-        if (!header || headerVersion <= 0) {
+        if (!(0, ChannelHeader_1.hasSchemaBackedChannelHeader)(header) || headerVersion <= 0) {
             continue;
         }
         const knownVersion = user.knownChannelHeaderVersions.get(channel.nid);
@@ -61,7 +91,6 @@ function collectSnapshotPlan(user, instance) {
             if (!instance.cache.cacheContains(header.nid)) {
                 instance.cache.cacheify(instance.tick, header, nschema);
             }
-            plan.channelHeaderCreates.push({ channelId: channel.nid, header, version: headerVersion });
             plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion });
         }
         else if (knownVersion < headerVersion) {
@@ -70,8 +99,7 @@ function collectSnapshotPlan(user, instance) {
                 plan.channelHeaderUpdates.push({
                     channelId: channel.nid,
                     changes: diffs.changes,
-                    groups: diffs.groups,
-                    version: headerVersion
+                    groups: diffs.groups
                 });
             }
             plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion });
@@ -86,6 +114,9 @@ function collectSnapshotPlan(user, instance) {
     user.engineMessageQueue = [];
     plan.messages = user.messageQueue;
     user.messageQueue = [];
+    plan.interpolatedMessages = user.interpolatedMessageQueue;
+    user.interpolatedMessageQueue = [];
+    plan.interpolatedMessages.push(...(0, messageFragments_1.collectInterpolatedBroadcastMessages)(user));
     plan.responses = user.responseQueue.slice(0, MAX_RESPONSES_PER_FRAME);
     return plan;
 }

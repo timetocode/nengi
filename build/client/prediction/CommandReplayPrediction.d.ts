@@ -1,5 +1,5 @@
 import { Client } from '../Client';
-import type { TimedCommandOptions } from '../ClientNetwork';
+import type { CommandTimingOptions } from '../ClientNetwork';
 import type { PredictionOperation, PredictionOperationOptions } from './PredictionLog';
 export type CommandReplayCorrection<TState = any> = {
     corrected: boolean;
@@ -11,7 +11,7 @@ export type CommandReplayPredictionOptions<TLocal = any, TAuthority = any, TStat
     client: Client;
     nid: number | (() => number | null | undefined);
     getLocal: () => TLocal | undefined;
-    getAuthoritative: () => TAuthority | undefined;
+    getAuthoritative?: () => TAuthority | undefined;
     createReplayState?: (authority: TAuthority) => TState;
     applyCommand: (state: TLocal | TState, command: TCommand) => void;
     applyReplayState?: (local: TLocal, replayState: TState) => void;
@@ -23,7 +23,7 @@ export type CommandReplayPredictionOptions<TLocal = any, TAuthority = any, TStat
     }) => boolean;
     affectedProps?: string[];
     predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'applyLocal'>;
-    timingOptions?: TimedCommandOptions | ((command: TCommand) => TimedCommandOptions);
+    timingOptions?: CommandTimingOptions | ((command: TCommand) => CommandTimingOptions);
 };
 /**
  * Small movement-style helper over PredictionLog. It predicts commands
@@ -34,7 +34,7 @@ export declare class CommandReplayPrediction<TLocal = any, TAuthority = any, TSt
     private client;
     private nid;
     private getLocal;
-    private getAuthoritative;
+    private getAuthoritative?;
     private createReplayState;
     private applyCommand;
     private applyReplayState;
@@ -48,5 +48,6 @@ export declare class CommandReplayPrediction<TLocal = any, TAuthority = any, TSt
     reconcile(): CommandReplayCorrection<TState> | null;
     getPendingCommands(): PredictionOperation<any>[];
     private resolveNid;
+    private getAuthoritativeFromStore;
 }
 //# sourceMappingURL=CommandReplayPrediction.d.ts.map

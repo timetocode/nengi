@@ -1,6 +1,7 @@
 import { Channel } from '../../server/channel/Channel'
 import { User } from '../../server/User'
 import { EcsManualUpdateLog, ManualUpdateLog } from './manualUpdates'
+import { ChannelHeader } from '../../common/ChannelHeader'
 
 // Snapshot mode checks are intentionally structural. Channel classes expose a
 // small set of hot-path marker fields and arrays, and the snapshot writer uses
@@ -17,6 +18,7 @@ export type SharedUpdateChannel = Channel & {
 export type SharedMessageChannel = {
     nid: number
     broadcastMessages: any[]
+    interpolatedBroadcastMessages?: any[]
 }
 
 export type ManualUpdateChannel = SharedUpdateChannel & {
@@ -26,8 +28,9 @@ export type ManualUpdateChannel = SharedUpdateChannel & {
 export type EcsSnapshotChannel = EcsManualUpdateLog & {
     ecsChannelMode: true
     nid: number
-    header?: any
+    header: ChannelHeader
     broadcastMessages: any[]
+    interpolatedBroadcastMessages?: any[]
     createdRoots: number[]
     deletedRoots: number[]
     createdComponents: any[]
@@ -48,10 +51,6 @@ export type EcsSpatialSnapshotChannel = EcsSnapshotChannel & {
     getVisibleCellKeys(userId: number): string[]
     getManualCellUpdateLog(cellKey: string): EcsManualUpdateLog | null
     cellHasManualUpdates(cellKey: string): boolean
-    getMovedRoots(): { pid: number, fromCell: string, toCell: string }[]
-    hasOnlyMovementDeltas(): boolean
-    isCellVisible(userId: number, key: string): boolean
-    getRootComponents(pid: number): any[]
 }
 
 export type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
@@ -65,7 +64,7 @@ export type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
 
 export type CellFragmentChannel = {
     nid: number
-    header?: any
+    header: ChannelHeader
     cellFragmentMode: true
     membershipVersion: number
     fragmentCellLimit: number
@@ -84,7 +83,8 @@ export type CellFragmentChannel = {
 }
 
 export function isSharedUpdateChannel(channel: any): channel is SharedUpdateChannel {
-    return Array.isArray(channel.entityNids) &&
+    return channel?.cellFragmentMode !== true &&
+        Array.isArray(channel.entityNids) &&
         typeof channel.membershipVersion === 'number' &&
         typeof channel.deltaBaseVersion === 'number' &&
         Array.isArray(channel.createdRoots) &&
@@ -93,7 +93,7 @@ export function isSharedUpdateChannel(channel: any): channel is SharedUpdateChan
 }
 
 export function isSharedMessageChannel(channel: any): channel is SharedMessageChannel {
-    return Array.isArray(channel.broadcastMessages)
+    return channel?.cellFragmentMode !== true && Array.isArray(channel.broadcastMessages)
 }
 
 export function isManualUpdateChannel(channel: any): channel is ManualUpdateChannel {
@@ -142,11 +142,7 @@ export function isEcsSpatialSnapshotChannel(channel: any): channel is EcsSpatial
         candidate.dirtyCells instanceof Set &&
         typeof candidate.getVisibleCellKeys === 'function' &&
         typeof candidate.getManualCellUpdateLog === 'function' &&
-        typeof candidate.cellHasManualUpdates === 'function' &&
-        typeof candidate.getMovedRoots === 'function' &&
-        typeof candidate.hasOnlyMovementDeltas === 'function' &&
-        typeof candidate.isCellVisible === 'function' &&
-        typeof candidate.getRootComponents === 'function'
+        typeof candidate.cellHasManualUpdates === 'function'
 }
 
 export function getSingleEcsSpatialSnapshotChannel(user: User): EcsSpatialSnapshotChannel | null {

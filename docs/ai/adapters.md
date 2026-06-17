@@ -67,6 +67,13 @@ AI sees duplicate private-field TypeScript errors involving `User`,
 different nengi copies or is mixing `nengi/src` imports with adapter package
 types from `nengi/build`.
 
+For local R&D examples that use official adapter packages, prefer importing
+nengi through package `nengi` everywhere. Do not re-export from
+`../../../nengi/src` in `shared/nengi.ts` while also importing
+`nengi-ws-instance-adapter`, `nengi-websocket-client-adapter`, or other adapter
+packages. The adapter packages compile against package `nengi`; the game should
+use the same package-facing type identity.
+
 ## Current Packages
 
 The workspace contains these adapter-related packages:

@@ -1,7 +1,13 @@
 export type HistorianValue = boolean | number | string
 
+export type Historian2DSpatialIndexOptions = 'none' | {
+    type: 'grid'
+    cellSize: number
+}
+
 export type Historian2DOptions = {
     retentionMs: number
+    spatialIndex?: Historian2DSpatialIndexOptions
 }
 
 type ValueSource<T, TValue> = keyof T | TValue | ((target: T) => TValue)
@@ -16,6 +22,8 @@ export type HistorianSpatialTrackOptions<T extends object> = {
     flags?: ValueSource<T, number>
 }
 
+export type HistorianSpatialSourceOptions<T extends object> = Omit<HistorianSpatialTrackOptions<T>, 'nid'>
+
 export type HistorianSpatialSample2D = {
     nid: number
     tick: number
@@ -27,6 +35,8 @@ export type HistorianSpatialSample2D = {
     halfHeight?: number
     flags?: number
 }
+
+export type HistorianSpatialSampleInput2D = Omit<HistorianSpatialSample2D, 'tick' | 'timeMs'>
 
 export type HistorianRayHit2D = {
     sample: HistorianSpatialSample2D
@@ -44,6 +54,21 @@ type SpatialFrame2D = {
     timeMs: number
     samples: Map<number, HistorianSpatialSample2D>
     sampleList: HistorianSpatialSample2D[]
+    index: SpatialFrameIndex2D | null
+}
+
+type SpatialFrameIndex2D = {
+    type: 'grid'
+    cellSize: number
+    cells: Map<string, HistorianSpatialSample2D[]>
+    cellCount: number
+}
+
+type Bounds2D = {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
 }
 
 type ValueInterval = {
@@ -56,47 +81,105 @@ type ValueInterval = {
  * Historian2D stores compact authoritative facts for gameplay rewind queries.
  * It intentionally does not decide fairness policy: game code chooses which
  * timestamp and facts matter for shots, shields, trades, or other resolution.
+ *
+ * Historical existence and current game existence are different concepts. A
+ * query may return a copied sample for an object that userland has already
+ * deleted from current authoritative state. Games that need death trades,
+ * delayed cleanup, revive windows, or corpse interactions should model those as
+ * game state and delete later; the historian should not keep entities alive.
  */
 export class Historian2D {
     retentionMs: number
     private spatialTrackers = new Map<number, SpatialTracker<any>>()
+    private pendingSpatialSamples: HistorianSpatialSampleInput2D[] = []
     private frames: SpatialFrame2D[] = []
     private values = new Map<number, Map<string, ValueInterval[]>>()
     private existence = new Map<number, ValueInterval[]>()
     private latestTimeMs = 0
     private latestTick = 0
+    private spatialIndex: Historian2DSpatialIndexOptions = 'none'
 
     constructor(options: Historian2DOptions) {
         this.retentionMs = Math.max(0, options.retentionMs)
+        if (options.spatialIndex && options.spatialIndex !== 'none') {
+            this.spatialIndex = {
+                type: 'grid',
+                cellSize: Math.max(1, options.spatialIndex.cellSize)
+            }
+        }
     }
 
+    /**
+     * Track a normal spatial object whose gameplay identity and position live
+     * on the same object.
+     *
+     * This is the basic/plain-channel shape:
+     *
+     *     history.trackSpatial(player, { nid: 'nid', x: 'x', y: 'y' })
+     *
+     * Query results return `sample.nid`, so choose `nid` as the id that later
+     * gameplay should act on.
+     */
     trackSpatial<T extends object>(target: T, options: HistorianSpatialTrackOptions<T>, timeMs?: number) {
         const nid = this.readNumber(target, options.nid)
         this.spatialTrackers.set(nid, { target, options })
-        if (timeMs !== undefined) {
-            this.setExists(nid, true, timeMs)
-        }
+        this.setExists(nid, true, this.resolveTime(timeMs))
         return nid
+    }
+
+    /**
+     * Track a spatial source under an explicit gameplay identity.
+     *
+     * This is useful for ECS or other composed models where the thing hit by a
+     * query is not the same object that owns position. For example, an NPC may
+     * be the damageable component while a Transform component supplies x/y:
+     *
+     *     history.trackSpatialTarget(npc.nid, transform, { x: 'x', y: 'y' })
+     *
+     * Query results return the explicit target nid (`npc.nid` above), while
+     * recorded spatial values are read from `source`.
+     */
+    trackSpatialTarget<T extends object>(nid: number, source: T, options: HistorianSpatialSourceOptions<T>, timeMs?: number) {
+        return this.trackSpatial(source, { ...options, nid }, timeMs)
     }
 
     untrackSpatial(nid: number, timeMs?: number) {
         this.spatialTrackers.delete(nid)
-        if (timeMs !== undefined) {
-            this.setExists(nid, false, timeMs)
+        this.setExists(nid, false, this.resolveTime(timeMs))
+    }
+
+    recordSpatialSample(sample: HistorianSpatialSampleInput2D) {
+        this.pendingSpatialSamples.push(this.copySpatialSampleInput(sample))
+    }
+
+    recordSpatialSamples(samples: HistorianSpatialSampleInput2D[]) {
+        for (let i = 0; i < samples.length; i++) {
+            this.recordSpatialSample(samples[i])
         }
     }
 
     record(tick: number, timeMs: number) {
         const samples = new Map<number, HistorianSpatialSample2D>()
-        const sampleList: HistorianSpatialSample2D[] = []
 
         this.spatialTrackers.forEach(tracker => {
             const sample = this.createSample(tracker, tick, timeMs)
             samples.set(sample.nid, sample)
-            sampleList.push(sample)
         })
 
-        this.frames.push({ tick, timeMs, samples, sampleList })
+        for (let i = 0; i < this.pendingSpatialSamples.length; i++) {
+            const sample = this.completeSpatialSample(this.pendingSpatialSamples[i], tick, timeMs)
+            samples.set(sample.nid, sample)
+        }
+        this.pendingSpatialSamples.length = 0
+
+        const sampleList = Array.from(samples.values())
+        this.frames.push({
+            tick,
+            timeMs,
+            samples,
+            sampleList,
+            index: this.createFrameIndex(sampleList)
+        })
         this.latestTick = tick
         this.latestTimeMs = timeMs
         this.prune(timeMs)
@@ -178,8 +261,14 @@ export class Historian2D {
             return []
         }
         const results: HistorianSpatialSample2D[] = []
-        for (let i = 0; i < frame.sampleList.length; i++) {
-            const sample = frame.sampleList[i]
+        const candidates = this.getFrameCandidates(frame, {
+            minX: x - radius,
+            minY: y - radius,
+            maxX: x + radius,
+            maxY: y + radius
+        })
+        for (let i = 0; i < candidates.length; i++) {
+            const sample = candidates[i]
             if (this.isExistingAt(sample.nid, timeMs) && this.circleIntersectsSample(x, y, radius, sample)) {
                 results.push(sample)
             }
@@ -193,8 +282,14 @@ export class Historian2D {
             return []
         }
         const results: HistorianSpatialSample2D[] = []
-        for (let i = 0; i < frame.sampleList.length; i++) {
-            const sample = frame.sampleList[i]
+        const candidates = this.getFrameCandidates(frame, {
+            minX: x - halfWidth,
+            minY: y - halfHeight,
+            maxX: x + halfWidth,
+            maxY: y + halfHeight
+        })
+        for (let i = 0; i < candidates.length; i++) {
+            const sample = candidates[i]
             if (this.isExistingAt(sample.nid, timeMs) && this.aabbIntersectsSample(x, y, halfWidth, halfHeight, sample)) {
                 results.push(sample)
             }
@@ -208,10 +303,14 @@ export class Historian2D {
             return []
         }
         const results: HistorianRayHit2D[] = []
-        // This is intentionally a full-frame scan for now. If this path gains
-        // a spatial broadphase, the query must cover the whole ray segment A->B.
-        for (let i = 0; i < frame.sampleList.length; i++) {
-            const sample = frame.sampleList[i]
+        const candidates = this.getFrameCandidates(frame, {
+            minX: Math.min(fromX, toX),
+            minY: Math.min(fromY, toY),
+            maxX: Math.max(fromX, toX),
+            maxY: Math.max(fromY, toY)
+        })
+        for (let i = 0; i < candidates.length; i++) {
+            const sample = candidates[i]
             if (!this.isExistingAt(sample.nid, timeMs)) {
                 continue
             }
@@ -293,10 +392,42 @@ export class Historian2D {
             latestTick: this.latestTick,
             latestTimeMs: this.latestTimeMs,
             trackedSpatial: this.spatialTrackers.size,
+            pendingSpatialSamples: this.pendingSpatialSamples.length,
+            spatialIndex: this.spatialIndex === 'none' ? 'none' : this.spatialIndex.type,
             frames: this.frames.length,
             retainedSamples,
             retainedValueIntervals,
-            retainedExistenceIntervals
+            retainedExistenceIntervals,
+            retainedIndexCells: this.countRetainedIndexCells()
+        }
+    }
+
+    private copySpatialSampleInput(input: HistorianSpatialSampleInput2D): HistorianSpatialSampleInput2D {
+        const sample: HistorianSpatialSampleInput2D = {
+            nid: input.nid,
+            x: input.x,
+            y: input.y
+        }
+        if (input.radius !== undefined) {
+            sample.radius = Math.max(0, input.radius)
+        }
+        if (input.halfWidth !== undefined) {
+            sample.halfWidth = Math.max(0, input.halfWidth)
+        }
+        if (input.halfHeight !== undefined) {
+            sample.halfHeight = Math.max(0, input.halfHeight)
+        }
+        if (input.flags !== undefined) {
+            sample.flags = input.flags
+        }
+        return sample
+    }
+
+    private completeSpatialSample(input: HistorianSpatialSampleInput2D, tick: number, timeMs: number): HistorianSpatialSample2D {
+        return {
+            ...this.copySpatialSampleInput(input),
+            tick,
+            timeMs
         }
     }
 
@@ -324,6 +455,96 @@ export class Historian2D {
         }
 
         return sample
+    }
+
+    private createFrameIndex(samples: HistorianSpatialSample2D[]): SpatialFrameIndex2D | null {
+        if (this.spatialIndex === 'none') {
+            return null
+        }
+        const cellSize = this.spatialIndex.cellSize
+        const cells = new Map<string, HistorianSpatialSample2D[]>()
+        for (let i = 0; i < samples.length; i++) {
+            const sample = samples[i]
+            const bounds = this.getSampleBounds(sample)
+            const minCellX = Math.floor(bounds.minX / cellSize)
+            const maxCellX = Math.floor(bounds.maxX / cellSize)
+            const minCellY = Math.floor(bounds.minY / cellSize)
+            const maxCellY = Math.floor(bounds.maxY / cellSize)
+            for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+                for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+                    const key = `${cellX},${cellY}`
+                    let bucket = cells.get(key)
+                    if (!bucket) {
+                        bucket = []
+                        cells.set(key, bucket)
+                    }
+                    bucket.push(sample)
+                }
+            }
+        }
+        return {
+            type: 'grid',
+            cellSize,
+            cells,
+            cellCount: cells.size
+        }
+    }
+
+    private getFrameCandidates(frame: SpatialFrame2D, bounds: Bounds2D) {
+        if (!frame.index) {
+            return frame.sampleList
+        }
+
+        const cellSize = frame.index.cellSize
+        const minCellX = Math.floor(bounds.minX / cellSize)
+        const maxCellX = Math.floor(bounds.maxX / cellSize)
+        const minCellY = Math.floor(bounds.minY / cellSize)
+        const maxCellY = Math.floor(bounds.maxY / cellSize)
+        const results: HistorianSpatialSample2D[] = []
+        const seen = new Set<number>()
+
+        for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+            for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+                const bucket = frame.index.cells.get(`${cellX},${cellY}`)
+                if (!bucket) {
+                    continue
+                }
+                for (let i = 0; i < bucket.length; i++) {
+                    const sample = bucket[i]
+                    if (!seen.has(sample.nid)) {
+                        seen.add(sample.nid)
+                        results.push(sample)
+                    }
+                }
+            }
+        }
+        return results
+    }
+
+    private getSampleBounds(sample: HistorianSpatialSample2D): Bounds2D {
+        if (sample.halfWidth !== undefined && sample.halfHeight !== undefined) {
+            return {
+                minX: sample.x - sample.halfWidth,
+                minY: sample.y - sample.halfHeight,
+                maxX: sample.x + sample.halfWidth,
+                maxY: sample.y + sample.halfHeight
+            }
+        }
+        const radius = sample.radius ?? 0
+        return {
+            minX: sample.x - radius,
+            minY: sample.y - radius,
+            maxX: sample.x + radius,
+            maxY: sample.y + radius
+        }
+    }
+
+    private countRetainedIndexCells() {
+        let count = 0
+        for (let i = 0; i < this.frames.length; i++) {
+            count += this.frames[i].index?.cellCount ?? 0
+        }
+        return count
     }
 
     private interpolateSample(a: HistorianSpatialSample2D, b: HistorianSpatialSample2D, timeMs: number, t: number): HistorianSpatialSample2D {
@@ -508,6 +729,10 @@ export class Historian2D {
             return rayHitsAabb(fromX, fromY, toX, toY, sample.x, sample.y, sample.halfWidth, sample.halfHeight)
         }
         return rayHitsCircle(fromX, fromY, toX, toY, sample.x, sample.y, sample.radius ?? 0)
+    }
+
+    private resolveTime(timeMs?: number) {
+        return timeMs ?? this.latestTimeMs
     }
 }
 

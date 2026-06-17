@@ -29,7 +29,6 @@ function createMovement(client, local) {
         client,
         nid: 1,
         getLocal: () => local,
-        getAuthoritative: () => client.network.store.get(1),
         createReplayState: authoritative => ({ x: authoritative.x, y: authoritative.y }),
         applyCommand: (state, command) => {
             state.x += command.dx;

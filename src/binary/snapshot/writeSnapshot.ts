@@ -11,6 +11,12 @@ import { SnapshotPlan } from './SnapshotPlan'
 import { createBinaryDebugError, BinaryDebugFields } from '../BinaryDebugError'
 import { Schema } from '../../common/binary/schema/Schema'
 import { IEntity } from '../../common/IEntity'
+import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
+
+export function writeChannelScope(channelId: number, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
+    writer.writeUInt8(BinarySection.ChannelScope)
+    writeNetworkId(channelId, protocol.nidType, writer)
+}
 
 function writeEngineMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter) {
     if (plan.engineMessages.length === 0) {
@@ -35,6 +41,20 @@ function writeMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWrit
     writer.writeUInt32(plan.messages.length)
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i]
+        const nschema = context.getSchema(message.ntype)!
+        writeMessage(message, nschema, writer, protocol.ntypeType)
+    }
+}
+
+function writeInterpolatedMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    if (plan.interpolatedMessages.length === 0) {
+        return
+    }
+
+    writer.writeUInt8(BinarySection.InterpolatedMessages)
+    writer.writeUInt32(plan.interpolatedMessages.length)
+    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
+        const message = plan.interpolatedMessages[i]
         const nschema = context.getSchema(message.ntype)!
         writeMessage(message, nschema, writer, protocol.ntypeType)
     }
@@ -68,17 +88,24 @@ function writeChannelEntityCreates(plan: SnapshotPlan, writer: IBinaryWriter, pr
     }
 }
 
-function writeChannelHeaderCreates(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.channelHeaderCreates.length === 0) {
+function writeChannelOpens(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    if (plan.channelOpens.length === 0) {
         return
     }
 
-    writer.writeUInt8(BinarySection.ChannelHeaderCreates)
-    writer.writeUInt32(plan.channelHeaderCreates.length)
-    for (let i = 0; i < plan.channelHeaderCreates.length; i++) {
-        const create = plan.channelHeaderCreates[i]
-        writeNetworkId(create.channelId, protocol.nidType, writer)
-        writeEntity(create.header, context.getSchema(create.header.ntype)!, writer, protocol.ntypeType, protocol.nidType)
+    writer.writeUInt8(BinarySection.ChannelOpens)
+    writer.writeUInt32(plan.channelOpens.length)
+    for (let i = 0; i < plan.channelOpens.length; i++) {
+        const open = plan.channelOpens[i]
+        writeNetworkId(open.channelId, protocol.nidType, writer)
+        writer.writeUInt8(open.header.channelType)
+        writer.writeString(open.header.name || '')
+        if (hasSchemaBackedChannelHeader(open.header)) {
+            writer.writeUInt8(1)
+            writeEntity(open.header, context.getSchema(open.header.ntype)!, writer, protocol.ntypeType, protocol.nidType)
+        } else {
+            writer.writeUInt8(0)
+        }
     }
 }
 
@@ -104,15 +131,27 @@ function writeChannelHeaderUpdates(plan: SnapshotPlan, writer: IBinaryWriter, pr
     }
 }
 
-function writeChannelHeaderDeletes(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.channelHeaderDeletes.length === 0) {
+function writeChannelCloses(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    if (plan.channelCloses.length === 0) {
         return
     }
 
-    writer.writeUInt8(BinarySection.ChannelHeaderDeletes)
-    writer.writeUInt32(plan.channelHeaderDeletes.length)
-    for (let i = 0; i < plan.channelHeaderDeletes.length; i++) {
-        writeNetworkId(plan.channelHeaderDeletes[i].channelId, protocol.nidType, writer)
+    writer.writeUInt8(BinarySection.ChannelCloses)
+    writer.writeUInt32(plan.channelCloses.length)
+    for (let i = 0; i < plan.channelCloses.length; i++) {
+        writeNetworkId(plan.channelCloses[i].channelId, protocol.nidType, writer)
+    }
+}
+
+function writeSkipInterpolation(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    if (plan.skipInterpolationNids.length === 0) {
+        return
+    }
+
+    writer.writeUInt8(BinarySection.SkipInterpolation)
+    writer.writeUInt32(plan.skipInterpolationNids.length)
+    for (let i = 0; i < plan.skipInterpolationNids.length; i++) {
+        writeNetworkId(plan.skipInterpolationNids[i], protocol.nidType, writer)
     }
 }
 
@@ -209,10 +248,12 @@ function writeDeleteEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol
 export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
     writeEngineMessages(plan, context, writer)
     writeMessages(plan, context, writer, protocol)
+    writeInterpolatedMessages(plan, context, writer, protocol)
     writeResponses(plan, writer)
-    writeChannelHeaderCreates(plan, context, writer, protocol)
+    writeChannelOpens(plan, context, writer, protocol)
     writeChannelHeaderUpdates(plan, writer, protocol)
-    writeChannelHeaderDeletes(plan, writer, protocol)
+    writeChannelCloses(plan, writer, protocol)
+    writeSkipInterpolation(plan, writer, protocol)
     writeChannelEntityCreates(plan, writer, protocol)
     writeEcsCreateEntities(plan, writer, protocol)
     writeEcsCreateComponents(plan, context, writer, protocol)
@@ -226,10 +267,12 @@ export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBin
 export function writeSnapshotDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
     writeEngineMessagesDebug(plan, context, writer)
     writeMessagesDebug(plan, context, writer, protocol)
+    writeInterpolatedMessagesDebug(plan, context, writer, protocol)
     writeResponsesDebug(plan, writer)
-    writeChannelHeaderCreates(plan, context, writer, protocol)
+    writeChannelOpens(plan, context, writer, protocol)
     writeChannelHeaderUpdates(plan, writer, protocol)
-    writeChannelHeaderDeletes(plan, writer, protocol)
+    writeChannelCloses(plan, writer, protocol)
+    writeSkipInterpolation(plan, writer, protocol)
     writeChannelEntityCreates(plan, writer, protocol)
     writeEcsCreateEntitiesDebug(plan, writer, protocol)
     writeEcsCreateComponentsDebug(plan, context, writer, protocol)
@@ -332,6 +375,18 @@ function writeMessagesDebug(plan: SnapshotPlan, context: Context, writer: IBinar
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i]
         writeMessageDebug(message, context.getSchema(message.ntype)!, writer, 'Messages', i, protocol.ntypeType)
+    }
+}
+
+function writeInterpolatedMessagesDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    if (plan.interpolatedMessages.length === 0) {
+        return
+    }
+    writer.writeUInt8(BinarySection.InterpolatedMessages)
+    writer.writeUInt32(plan.interpolatedMessages.length)
+    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
+        const message = plan.interpolatedMessages[i]
+        writeMessageDebug(message, context.getSchema(message.ntype)!, writer, 'InterpolatedMessages', i, protocol.ntypeType)
     }
 }
 

@@ -1,6 +1,9 @@
 # Spatial channels
 
-Spatial channels use grid cells to avoid processing entities outside a user's view. They win by skipping work.
+Spatial channels model worlds where visibility is tied to position. They use
+grid cells so nengi can process only the entities in or near a user's view.
+Performance comes from skipping irrelevant space, but the API choice starts from
+the game's visibility rule.
 
 ## 2D, 3D, and projected planes
 
@@ -75,18 +78,21 @@ Start with a cell size near the size of meaningful interest areas, then benchmar
 
 Spatial channel messages are culled immediately. When you call `addMessage(message)`, the channel checks current subscribed user views and queues the message directly to matching users.
 
+Use `addInterpolatedMessage(message)` for spatial effects that should be culled
+by the same view and delivered on the client interpolation timeline.
+
 This differs from non-spatial channels, which store broadcast messages until the snapshot boundary.
 
-## When spatial helps
+## When spatial is the right model
 
-Spatial channels help when:
+Use spatial channels when:
 
 - The world has many entities.
 - Each user sees a small fraction of the world.
 - Users are spread out or clustered into limited areas.
 - Visibility is naturally position-based.
 
-Spatial channels help less when:
+Spatial channels are usually the wrong model when:
 
 - Everyone sees almost everything.
 - Entity counts are small.
@@ -95,4 +101,6 @@ Spatial channels help less when:
 
 ## Manual spatial
 
-Use `ManualSpatialChannel2D/3D` after profiling if spatial culling is useful and hot mutations are explicit. This is often the highest-performance path for large worlds with low mutation fractions.
+Use `ManualSpatialChannel2D/3D` when spatial culling is the right visibility
+model and hot mutations are explicit. This is often the highest-performance path
+for large worlds with low mutation fractions.

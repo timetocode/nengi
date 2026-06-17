@@ -1,37 +1,33 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SpatialChannel3D = void 0;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const Channel_1 = require("./Channel");
 const SpatialGrid_1 = require("./SpatialGrid");
 const SpatialView_1 = require("./SpatialView");
 // SpatialChannel3D intentionally mirrors SpatialChannel2D instead of using a
 // dimension-generic wrapper; this is snapshot hot-path code, so benchmark
 // before collapsing the parallel implementations.
-class SpatialChannel3D {
+class SpatialChannel3D extends Channel_1.Channel {
     constructor(localState, cellSize, options = {}) {
-        this.cellFragmentMode = true;
-        this.views = new Map();
-        this.viewVersions = new Map();
-        this.visibleCellKeyCache = new Map();
-        this.visibleEntityCache = new Map();
-        this.visibleNetworkedNidsCache = new Map();
-        this.rememberedCells = new Map();
-        this.rememberedCellSignatures = new Map();
-        this.movedRoots = [];
-        this.structuralDeltas = false;
-        this.membershipVersion = 0;
-        this.users = new Map();
-        this.visibilityResolver = SpatialView_1.objectInSpatialView3D;
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
             throw new Error('SpatialChannel3D requires a positive finite cell size.');
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
             throw new Error('SpatialChannel3D queryPadding must be a non-negative finite number.');
         }
-        this.localState = localState;
-        this.channel = new Channel_1.Channel(localState, options);
-        localState.channels.delete(this.channel);
-        localState.channels.add(this);
+        super(localState, Object.assign(Object.assign({}, options), { channelType: ChannelHeader_1.ChannelType.SpatialChannel3D }));
+        this.cellFragmentMode = true;
+        this.views = new Map();
+        this.viewVersions = new Map();
+        this.visibleCellKeyCache = new Map();
+        this.visibleEntityCache = new Map();
+        this.spatialVisibleNetworkedNidsCache = new Map();
+        this.rememberedCells = new Map();
+        this.rememberedCellSignatures = new Map();
+        this.movedRoots = [];
+        this.structuralDeltas = false;
+        this.visibilityResolver = SpatialView_1.objectInSpatialView3D;
         this.cellSize = cellSize;
         this.queryPadding = options.queryPadding || 0;
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16));
@@ -43,33 +39,9 @@ class SpatialChannel3D {
             getZ: entity => entity.z
         });
     }
-    get nid() {
-        return this.channel.nid;
-    }
-    get label() {
-        return this.channel.label;
-    }
-    get header() {
-        return this.channel.header;
-    }
-    get headerVersion() {
-        return this.channel.headerVersion;
-    }
-    get entities() {
-        return this.channel.entities;
-    }
-    setHeader(header) {
-        return this.channel.setHeader(header);
-    }
-    getHeader() {
-        return this.channel.getHeader();
-    }
-    markHeaderDirty() {
-        return this.channel.markHeaderDirty();
-    }
     invalidateVisibleEntityCache() {
         this.visibleEntityCache.clear();
-        this.visibleNetworkedNidsCache.clear();
+        this.spatialVisibleNetworkedNidsCache.clear();
     }
     invalidateVisibleCellKeyCache() {
         this.visibleCellKeyCache.clear();
@@ -125,13 +97,9 @@ class SpatialChannel3D {
         }
         return nids;
     }
-    tick(tick) {
-        this.channel.tick(tick);
-    }
     addEntity(entity) {
-        this.channel.addEntity(entity);
+        super.addEntity(entity);
         this.grid.add(entity.nid, entity);
-        this.membershipVersion++;
         this.structuralDeltas = true;
         this.invalidateVisibleCellKeyCache();
         return entity;
@@ -151,12 +119,11 @@ class SpatialChannel3D {
         }
     }
     removeEntity(entity) {
-        const removedNid = this.channel.removeEntity(entity);
+        const removedNid = super.removeEntity(entity);
         if (removedNid === 0) {
             return 0;
         }
         const removed = this.grid.remove(removedNid);
-        this.membershipVersion++;
         this.structuralDeltas = true;
         if (removed === null || removed === void 0 ? void 0 : removed.removedCell) {
             this.invalidateVisibleCellKeyCache();
@@ -167,10 +134,13 @@ class SpatialChannel3D {
         return removedNid;
     }
     removeAllEntities() {
-        Array.from(this.channel.entities.array).forEach(entity => this.removeEntity(entity));
+        Array.from(this.entities.array).forEach(entity => this.removeEntity(entity));
     }
     markDirty(entity) {
         return this.localState.markDirty(entity);
+    }
+    skipInterpolation(entity) {
+        return super.skipInterpolation(entity);
     }
     getDirtyCellKeys() {
         const keys = new Set();
@@ -188,18 +158,29 @@ class SpatialChannel3D {
         this.users.forEach((user, userId) => {
             const view = this.views.get(userId);
             if (view && this.visibilityResolver(message, view)) {
-                user.queueMessage(message);
+                user.queueChannelMessage(this.nid, message);
+            }
+        });
+    }
+    addInterpolatedMessage(message) {
+        this.users.forEach((user, userId) => {
+            const view = this.views.get(userId);
+            if (view && this.visibilityResolver(message, view)) {
+                user.queueChannelInterpolatedMessage(this.nid, message);
             }
         });
     }
     clearBroadcastMessages() {
     }
     clearSnapshotDeltas() {
-        this.channel.clearSnapshotDeltas();
+        super.clearSnapshotDeltas();
         this.movedRoots.length = 0;
         this.structuralDeltas = false;
     }
     subscribe(user, view) {
+        if (!view) {
+            throw new Error('SpatialChannel3D requires a view when subscribing.');
+        }
         this.views.set(user.id, view);
         this.viewVersions.set(user.id, 1);
         this.users.set(user.id, user);
@@ -213,14 +194,14 @@ class SpatialChannel3D {
         this.viewVersions.set(user.id, (this.viewVersions.get(user.id) || 0) + 1);
         this.visibleCellKeyCache.delete(user.id);
         this.visibleEntityCache.delete(user.id);
-        this.visibleNetworkedNidsCache.delete(user.id);
+        this.spatialVisibleNetworkedNidsCache.delete(user.id);
     }
     unsubscribe(user) {
         this.views.delete(user.id);
         this.viewVersions.delete(user.id);
         this.visibleCellKeyCache.delete(user.id);
         this.visibleEntityCache.delete(user.id);
-        this.visibleNetworkedNidsCache.delete(user.id);
+        this.spatialVisibleNetworkedNidsCache.delete(user.id);
         this.rememberedCells.delete(user.id);
         this.rememberedCellSignatures.delete(user.id);
         this.users.delete(user.id);
@@ -263,7 +244,7 @@ class SpatialChannel3D {
             return roots;
         }
         const viewVersion = this.viewVersions.get(userId) || 0;
-        const cached = this.visibleNetworkedNidsCache.get(userId);
+        const cached = this.spatialVisibleNetworkedNidsCache.get(userId);
         if (cached &&
             cached.viewVersion === viewVersion &&
             cached.membershipVersion === this.membershipVersion &&
@@ -274,7 +255,7 @@ class SpatialChannel3D {
         for (let i = 0; i < roots.length; i++) {
             this.localState.collectEntityTree(roots[i], nids);
         }
-        this.visibleNetworkedNidsCache.set(userId, {
+        this.spatialVisibleNetworkedNidsCache.set(userId, {
             viewVersion,
             membershipVersion: this.membershipVersion,
             entityTreeVersion,
@@ -346,14 +327,12 @@ class SpatialChannel3D {
         this.rememberedCellSignatures.set(userId, this.getVisibleCellVersionSignature(userId));
     }
     destroy() {
-        this.unsubscribeAll();
-        this.localState.channels.delete(this);
-        this.channel.destroy();
+        super.destroy();
         this.views.clear();
         this.viewVersions.clear();
         this.visibleCellKeyCache.clear();
         this.visibleEntityCache.clear();
-        this.visibleNetworkedNidsCache.clear();
+        this.spatialVisibleNetworkedNidsCache.clear();
         this.rememberedCells.clear();
         this.rememberedCellSignatures.clear();
         this.grid.cells.clear();

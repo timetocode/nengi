@@ -19,7 +19,7 @@ That guide links to focused notes on:
 
 - choosing channels
 - choosing entities, messages, commands, and requests
-- using `ReplicaRouter` on the client
+- using `ClientReplica` on the client
 - building a minimal spatial game
 - wiring adapters/transports
 - spatial channels for 2D and 3D worlds

@@ -1,4 +1,5 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
 import { LocalState } from '../LocalState'
 import { NDictionary } from '../NDictionary'
@@ -36,7 +37,7 @@ export type ManualSpatialChannel3DOptions = ChannelOptions & {
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
     spatialProps?: { x?: string, y?: string, z?: string }
-    debugManualWrites?: boolean
+    strictManualWrites?: boolean
 }
 
 function initializeManualSpatialCell(cell: SpatialGridCell<SpatialEntity>) {
@@ -57,12 +58,12 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
     readonly manualSpatialChannelMode = true
     readonly cellFragmentMode = true
     nid: number
-    label?: string
     localState: LocalState
     entities = new NDictionary()
     users: Map<number, User> = new Map()
-    header: IEntity | null = null
+    header: ChannelHeader
     headerVersion = 0
+    channelType = ChannelType.ManualSpatialChannel3D
     visibilityResolver = objectInSpatialView3D
     cellSize: number
     queryPadding: number
@@ -81,9 +82,10 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
     private spatialXProp: string
     private spatialYProp: string
     private spatialZProp: string
-    private debugManualWrites: boolean
+    private strictManualWrites: boolean
     private movedRoots: ManualSpatial3DMove[] = []
     private structuralDeltas = false
+    skipInterpolationNids: number[] = []
 
     constructor(localState: LocalState, cellSize: number, options: ManualSpatialChannel3DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -94,7 +96,8 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         }
         this.localState = localState
         this.nid = localState.nextNetworkId()
-        this.label = options.label
+        this.header = createChannelHeader(this.nid, this.channelType, options.header, options.name)
+        this.headerVersion = hasSchemaBackedChannelHeader(this.header) ? 1 : 0
         this.cellSize = cellSize
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
@@ -102,7 +105,7 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         this.spatialXProp = options.spatialProps?.x || 'x'
         this.spatialYProp = options.spatialProps?.y || 'y'
         this.spatialZProp = options.spatialProps?.z || 'z'
-        this.debugManualWrites = options.debugManualWrites === true
+        this.strictManualWrites = options.strictManualWrites === true
         this.grid = new SpatialGrid3D({
             cellSize,
             getX: entity => entity[this.spatialXProp],
@@ -111,9 +114,6 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
             initializeCell: initializeManualSpatialCell
         })
         this.localState.channels.add(this as any)
-        if (options.header) {
-            this.setHeader(options.header)
-        }
     }
 
     private getOrCreateCellForEntity(entity: SpatialEntity) {
@@ -172,7 +172,7 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
             }
         }
 
-        if (this.debugManualWrites) {
+        if (this.strictManualWrites) {
             throw new Error(`ManualSpatialChannel3D cannot write mutation for nid ${entity.nid}; no spatial cell was found for the entity or its root.`)
         }
         return null
@@ -350,9 +350,6 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         return writers
     }
 
-    tick(tick: number) {
-    }
-
     addEntity(entity: SpatialEntity) {
         this.localState.registerEntity(entity, this.nid)
         this.entities.add(entity)
@@ -363,25 +360,8 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         return entity
     }
 
-    setHeader(header: IEntity) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().')
-        }
-        if (this.header === header) {
-            return header
-        }
-        this.localState.registerEntity(header, this.nid)
-        this.header = header
-        this.headerVersion++
-        return header
-    }
-
-    getHeader() {
-        return this.header
-    }
-
     markHeaderDirty() {
-        if (!this.header) {
+        if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
         this.headerVersion++
@@ -414,13 +394,36 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         Array.from(this.entities.array).forEach(entity => this.removeEntity(entity as SpatialEntity))
     }
 
+    markDirty(entity: SpatialEntity) {
+        return this.localState.markDirty(entity)
+    }
+
+    // One-frame interpolation skip for teleports, respawns, wraparound, or
+    // pooled entities moved discontinuously to a new position.
+    skipInterpolation(entity: SpatialEntity) {
+        if (!entity || entity.nid === 0 || this.entities.get(entity.nid) !== entity) {
+            return false
+        }
+        this.skipInterpolationNids.push(entity.nid)
+        return true
+    }
+
     addMessage(message: any) {
         // Spatial messages are culled immediately against the current user
         // views instead of being stored as channel broadcast fragments.
         this.users.forEach((user, userId) => {
             const view = this.views.get(userId)
             if (view && this.visibilityResolver(message, view)) {
-                user.queueMessage(message)
+                user.queueChannelMessage(this.nid, message)
+            }
+        })
+    }
+
+    addInterpolatedMessage(message: any) {
+        this.users.forEach((user, userId) => {
+            const view = this.views.get(userId)
+            if (view && this.visibilityResolver(message, view)) {
+                user.queueChannelInterpolatedMessage(this.nid, message)
             }
         })
     }
@@ -443,6 +446,7 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
             cell.manualGroupValues.length = 0
         }
         this.dirtyCells.clear()
+        this.skipInterpolationNids.length = 0
         this.movedRoots.length = 0
         this.structuralDeltas = false
     }
@@ -630,11 +634,6 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
     destroy() {
         this.unsubscribeAll()
         this.removeAllEntities()
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid)
-            this.header = null
-            this.headerVersion++
-        }
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this as any)
         this.views.clear()

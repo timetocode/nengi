@@ -1,4 +1,5 @@
 import { IEntity } from '../../common/IEntity'
+import { ChannelType } from '../../common/ChannelHeader'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
@@ -19,26 +20,22 @@ export type SpatialChannel3DOptions = ChannelOptions & {
 // SpatialChannel3D intentionally mirrors SpatialChannel2D instead of using a
 // dimension-generic wrapper; this is snapshot hot-path code, so benchmark
 // before collapsing the parallel implementations.
-export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, SpatialView3D> {
+export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialEntity3D, SpatialView3D> {
     readonly cellFragmentMode = true
-    private channel: Channel
-    protected localState: LocalState
     private views: Map<number, SpatialView3D> = new Map()
     private viewVersions: Map<number, number> = new Map()
     private grid: SpatialGrid3D<SpatialEntity3D>
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
-    private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
+    private spatialVisibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
     private rememberedCells: Map<number, Map<string, number[]>> = new Map()
     private rememberedCellSignatures: Map<number, string> = new Map()
     private movedRoots: SpatialMove3D[] = []
     private structuralDeltas = false
     cellSize: number
     queryPadding: number
-    membershipVersion = 0
     fragmentCellLimit: number
     stableFragmentCellLimit: number
-    users: Map<number, User> = new Map()
     visibilityResolver = objectInSpatialView3D
 
     constructor(localState: LocalState, cellSize: number, options: SpatialChannel3DOptions = {}) {
@@ -48,10 +45,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
             throw new Error('SpatialChannel3D queryPadding must be a non-negative finite number.')
         }
-        this.localState = localState
-        this.channel = new Channel(localState, options)
-        localState.channels.delete(this.channel)
-        localState.channels.add(this as any)
+        super(localState, { ...options, channelType: ChannelType.SpatialChannel3D })
         this.cellSize = cellSize
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
@@ -64,41 +58,9 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         })
     }
 
-    get nid() {
-        return this.channel.nid
-    }
-
-    get label() {
-        return this.channel.label
-    }
-
-    get header() {
-        return this.channel.header
-    }
-
-    get headerVersion() {
-        return this.channel.headerVersion
-    }
-
-    get entities() {
-        return this.channel.entities
-    }
-
-    setHeader(header: IEntity) {
-        return this.channel.setHeader(header)
-    }
-
-    getHeader() {
-        return this.channel.getHeader()
-    }
-
-    markHeaderDirty() {
-        return this.channel.markHeaderDirty()
-    }
-
     private invalidateVisibleEntityCache() {
         this.visibleEntityCache.clear()
-        this.visibleNetworkedNidsCache.clear()
+        this.spatialVisibleNetworkedNidsCache.clear()
     }
 
     private invalidateVisibleCellKeyCache() {
@@ -163,14 +125,9 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         return nids
     }
 
-    tick(tick: number) {
-        this.channel.tick(tick)
-    }
-
     addEntity(entity: SpatialEntity3D) {
-        this.channel.addEntity(entity)
+        super.addEntity(entity)
         this.grid.add(entity.nid, entity)
-        this.membershipVersion++
         this.structuralDeltas = true
         this.invalidateVisibleCellKeyCache()
         return entity
@@ -191,12 +148,11 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
     }
 
     removeEntity(entity: SpatialEntity3D) {
-        const removedNid = this.channel.removeEntity(entity)
+        const removedNid = super.removeEntity(entity)
         if (removedNid === 0) {
             return 0
         }
         const removed = this.grid.remove(removedNid)
-        this.membershipVersion++
         this.structuralDeltas = true
         if (removed?.removedCell) {
             this.invalidateVisibleCellKeyCache()
@@ -207,11 +163,15 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
     }
 
     removeAllEntities() {
-        Array.from(this.channel.entities.array).forEach(entity => this.removeEntity(entity as SpatialEntity3D))
+        Array.from(this.entities.array).forEach(entity => this.removeEntity(entity as SpatialEntity3D))
     }
 
     markDirty(entity: SpatialEntity3D) {
         return this.localState.markDirty(entity)
+    }
+
+    skipInterpolation(entity: SpatialEntity3D) {
+        return super.skipInterpolation(entity)
     }
 
     getDirtyCellKeys() {
@@ -231,7 +191,16 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         this.users.forEach((user, userId) => {
             const view = this.views.get(userId)
             if (view && this.visibilityResolver(message, view)) {
-                user.queueMessage(message)
+                user.queueChannelMessage(this.nid, message)
+            }
+        })
+    }
+
+    addInterpolatedMessage(message: any) {
+        this.users.forEach((user, userId) => {
+            const view = this.views.get(userId)
+            if (view && this.visibilityResolver(message, view)) {
+                user.queueChannelInterpolatedMessage(this.nid, message)
             }
         })
     }
@@ -240,12 +209,15 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
     }
 
     clearSnapshotDeltas() {
-        this.channel.clearSnapshotDeltas()
+        super.clearSnapshotDeltas()
         this.movedRoots.length = 0
         this.structuralDeltas = false
     }
 
-    subscribe(user: User, view: SpatialView3D) {
+    subscribe(user: User, view?: SpatialView3D) {
+        if (!view) {
+            throw new Error('SpatialChannel3D requires a view when subscribing.')
+        }
         this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
@@ -260,7 +232,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         this.viewVersions.set(user.id, (this.viewVersions.get(user.id) || 0) + 1)
         this.visibleCellKeyCache.delete(user.id)
         this.visibleEntityCache.delete(user.id)
-        this.visibleNetworkedNidsCache.delete(user.id)
+        this.spatialVisibleNetworkedNidsCache.delete(user.id)
     }
 
     unsubscribe(user: User) {
@@ -268,7 +240,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         this.viewVersions.delete(user.id)
         this.visibleCellKeyCache.delete(user.id)
         this.visibleEntityCache.delete(user.id)
-        this.visibleNetworkedNidsCache.delete(user.id)
+        this.spatialVisibleNetworkedNidsCache.delete(user.id)
         this.rememberedCells.delete(user.id)
         this.rememberedCellSignatures.delete(user.id)
         this.users.delete(user.id)
@@ -318,7 +290,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         }
 
         const viewVersion = this.viewVersions.get(userId) || 0
-        const cached = this.visibleNetworkedNidsCache.get(userId)
+        const cached = this.spatialVisibleNetworkedNidsCache.get(userId)
         if (
             cached &&
             cached.viewVersion === viewVersion &&
@@ -332,7 +304,7 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
         for (let i = 0; i < roots.length; i++) {
             this.localState.collectEntityTree(roots[i], nids)
         }
-        this.visibleNetworkedNidsCache.set(userId, {
+        this.spatialVisibleNetworkedNidsCache.set(userId, {
             viewVersion,
             membershipVersion: this.membershipVersion,
             entityTreeVersion,
@@ -411,14 +383,12 @@ export class SpatialChannel3D implements ICulledChannel<SpatialEntity3D, Spatial
     }
 
     destroy() {
-        this.unsubscribeAll()
-        this.localState.channels.delete(this as any)
-        this.channel.destroy()
+        super.destroy()
         this.views.clear()
         this.viewVersions.clear()
         this.visibleCellKeyCache.clear()
         this.visibleEntityCache.clear()
-        this.visibleNetworkedNidsCache.clear()
+        this.spatialVisibleNetworkedNidsCache.clear()
         this.rememberedCells.clear()
         this.rememberedCellSignatures.clear()
         this.grid.cells.clear()

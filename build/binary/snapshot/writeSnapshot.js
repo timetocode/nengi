@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.writeChannelScope = writeChannelScope;
 exports.writeSnapshot = writeSnapshot;
 exports.writeSnapshotDebug = writeSnapshotDebug;
 const BinarySection_1 = require("../../common/binary/BinarySection");
@@ -13,6 +14,11 @@ const writeDiff_1 = __importDefault(require("../entity/writeDiff"));
 const writeUpdateGroup_1 = __importDefault(require("../entity/writeUpdateGroup"));
 const writeMessage_1 = require("../message/writeMessage");
 const BinaryDebugError_1 = require("../BinaryDebugError");
+const ChannelHeader_1 = require("../../common/ChannelHeader");
+function writeChannelScope(channelId, writer, protocol = Protocol_1.DEFAULT_PROTOCOL) {
+    writer.writeUInt8(BinarySection_1.BinarySection.ChannelScope);
+    (0, Protocol_1.writeNetworkId)(channelId, protocol.nidType, writer);
+}
 function writeEngineMessages(plan, context, writer) {
     if (plan.engineMessages.length === 0) {
         return;
@@ -33,6 +39,18 @@ function writeMessages(plan, context, writer, protocol) {
     writer.writeUInt32(plan.messages.length);
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i];
+        const nschema = context.getSchema(message.ntype);
+        (0, writeMessage_1.writeMessage)(message, nschema, writer, protocol.ntypeType);
+    }
+}
+function writeInterpolatedMessages(plan, context, writer, protocol) {
+    if (plan.interpolatedMessages.length === 0) {
+        return;
+    }
+    writer.writeUInt8(BinarySection_1.BinarySection.InterpolatedMessages);
+    writer.writeUInt32(plan.interpolatedMessages.length);
+    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
+        const message = plan.interpolatedMessages[i];
         const nschema = context.getSchema(message.ntype);
         (0, writeMessage_1.writeMessage)(message, nschema, writer, protocol.ntypeType);
     }
@@ -61,16 +79,24 @@ function writeChannelEntityCreates(plan, writer, protocol) {
         (0, Protocol_1.writeNetworkId)(plan.channelEntityCreates[i].channelId, protocol.nidType, writer);
     }
 }
-function writeChannelHeaderCreates(plan, context, writer, protocol) {
-    if (plan.channelHeaderCreates.length === 0) {
+function writeChannelOpens(plan, context, writer, protocol) {
+    if (plan.channelOpens.length === 0) {
         return;
     }
-    writer.writeUInt8(BinarySection_1.BinarySection.ChannelHeaderCreates);
-    writer.writeUInt32(plan.channelHeaderCreates.length);
-    for (let i = 0; i < plan.channelHeaderCreates.length; i++) {
-        const create = plan.channelHeaderCreates[i];
-        (0, Protocol_1.writeNetworkId)(create.channelId, protocol.nidType, writer);
-        (0, writeEntity_1.writeEntity)(create.header, context.getSchema(create.header.ntype), writer, protocol.ntypeType, protocol.nidType);
+    writer.writeUInt8(BinarySection_1.BinarySection.ChannelOpens);
+    writer.writeUInt32(plan.channelOpens.length);
+    for (let i = 0; i < plan.channelOpens.length; i++) {
+        const open = plan.channelOpens[i];
+        (0, Protocol_1.writeNetworkId)(open.channelId, protocol.nidType, writer);
+        writer.writeUInt8(open.header.channelType);
+        writer.writeString(open.header.name || '');
+        if ((0, ChannelHeader_1.hasSchemaBackedChannelHeader)(open.header)) {
+            writer.writeUInt8(1);
+            (0, writeEntity_1.writeEntity)(open.header, context.getSchema(open.header.ntype), writer, protocol.ntypeType, protocol.nidType);
+        }
+        else {
+            writer.writeUInt8(0);
+        }
     }
 }
 function writeChannelHeaderUpdates(plan, writer, protocol) {
@@ -93,14 +119,24 @@ function writeChannelHeaderUpdates(plan, writer, protocol) {
         }
     }
 }
-function writeChannelHeaderDeletes(plan, writer, protocol) {
-    if (plan.channelHeaderDeletes.length === 0) {
+function writeChannelCloses(plan, writer, protocol) {
+    if (plan.channelCloses.length === 0) {
         return;
     }
-    writer.writeUInt8(BinarySection_1.BinarySection.ChannelHeaderDeletes);
-    writer.writeUInt32(plan.channelHeaderDeletes.length);
-    for (let i = 0; i < plan.channelHeaderDeletes.length; i++) {
-        (0, Protocol_1.writeNetworkId)(plan.channelHeaderDeletes[i].channelId, protocol.nidType, writer);
+    writer.writeUInt8(BinarySection_1.BinarySection.ChannelCloses);
+    writer.writeUInt32(plan.channelCloses.length);
+    for (let i = 0; i < plan.channelCloses.length; i++) {
+        (0, Protocol_1.writeNetworkId)(plan.channelCloses[i].channelId, protocol.nidType, writer);
+    }
+}
+function writeSkipInterpolation(plan, writer, protocol) {
+    if (plan.skipInterpolationNids.length === 0) {
+        return;
+    }
+    writer.writeUInt8(BinarySection_1.BinarySection.SkipInterpolation);
+    writer.writeUInt32(plan.skipInterpolationNids.length);
+    for (let i = 0; i < plan.skipInterpolationNids.length; i++) {
+        (0, Protocol_1.writeNetworkId)(plan.skipInterpolationNids[i], protocol.nidType, writer);
     }
 }
 function writeCreateEntities(plan, context, writer, protocol) {
@@ -182,10 +218,12 @@ function writeDeleteEntities(plan, writer, protocol) {
 function writeSnapshot(plan, context, writer, protocol = Protocol_1.DEFAULT_PROTOCOL) {
     writeEngineMessages(plan, context, writer);
     writeMessages(plan, context, writer, protocol);
+    writeInterpolatedMessages(plan, context, writer, protocol);
     writeResponses(plan, writer);
-    writeChannelHeaderCreates(plan, context, writer, protocol);
+    writeChannelOpens(plan, context, writer, protocol);
     writeChannelHeaderUpdates(plan, writer, protocol);
-    writeChannelHeaderDeletes(plan, writer, protocol);
+    writeChannelCloses(plan, writer, protocol);
+    writeSkipInterpolation(plan, writer, protocol);
     writeChannelEntityCreates(plan, writer, protocol);
     writeEcsCreateEntities(plan, writer, protocol);
     writeEcsCreateComponents(plan, context, writer, protocol);
@@ -198,10 +236,12 @@ function writeSnapshot(plan, context, writer, protocol = Protocol_1.DEFAULT_PROT
 function writeSnapshotDebug(plan, context, writer, protocol = Protocol_1.DEFAULT_PROTOCOL) {
     writeEngineMessagesDebug(plan, context, writer);
     writeMessagesDebug(plan, context, writer, protocol);
+    writeInterpolatedMessagesDebug(plan, context, writer, protocol);
     writeResponsesDebug(plan, writer);
-    writeChannelHeaderCreates(plan, context, writer, protocol);
+    writeChannelOpens(plan, context, writer, protocol);
     writeChannelHeaderUpdates(plan, writer, protocol);
-    writeChannelHeaderDeletes(plan, writer, protocol);
+    writeChannelCloses(plan, writer, protocol);
+    writeSkipInterpolation(plan, writer, protocol);
     writeChannelEntityCreates(plan, writer, protocol);
     writeEcsCreateEntitiesDebug(plan, writer, protocol);
     writeEcsCreateComponentsDebug(plan, context, writer, protocol);
@@ -297,6 +337,17 @@ function writeMessagesDebug(plan, context, writer, protocol) {
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i];
         writeMessageDebug(message, context.getSchema(message.ntype), writer, 'Messages', i, protocol.ntypeType);
+    }
+}
+function writeInterpolatedMessagesDebug(plan, context, writer, protocol) {
+    if (plan.interpolatedMessages.length === 0) {
+        return;
+    }
+    writer.writeUInt8(BinarySection_1.BinarySection.InterpolatedMessages);
+    writer.writeUInt32(plan.interpolatedMessages.length);
+    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
+        const message = plan.interpolatedMessages[i];
+        writeMessageDebug(message, context.getSchema(message.ntype), writer, 'InterpolatedMessages', i, protocol.ntypeType);
     }
 }
 function writeResponsesDebug(plan, writer) {

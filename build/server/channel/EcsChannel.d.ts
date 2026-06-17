@@ -1,4 +1,5 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema';
+import { ChannelHeader, ChannelHeaderInput, ChannelType } from '../../common/ChannelHeader';
 import { IEntity } from '../../common/IEntity';
 import { LocalState } from '../LocalState';
 import { User } from '../User';
@@ -18,17 +19,17 @@ export type EcsTypeWriters = {
     };
 };
 export type EcsChannelOptions = {
-    label?: string;
-    header?: IEntity;
+    name?: string;
+    header?: ChannelHeaderInput;
 };
 export declare class EcsChannel implements IChannel {
     readonly ecsChannelMode = true;
     nid: number;
-    label?: string;
     localState: LocalState;
     users: Map<number, User>;
-    header: IEntity | null;
+    header: ChannelHeader;
     headerVersion: number;
+    channelType: ChannelType;
     rootNids: number[];
     componentNids: number[];
     membershipVersion: number;
@@ -45,18 +46,17 @@ export declare class EcsChannel implements IChannel {
     manualGroupSchemas: SchemaUpdateGroup[];
     manualGroupValueOffsets: number[];
     manualGroupValues: any[];
+    skipInterpolationNids: number[];
     broadcastMessages: any[];
+    interpolatedBroadcastMessages: any[];
     private rootSet;
     private componentSet;
     private componentsByRoot;
     private componentByNid;
     private visibleNetworkedNidsCache;
     constructor(localState: LocalState, options?: EcsChannelOptions);
-    tick(tick: number): void;
     createEntity(): number;
     addEntity(): number;
-    setHeader(header: IEntity): IEntity;
-    getHeader(): IEntity | null;
     markHeaderDirty(): boolean;
     removeEntity(pidOrEntity: number | IEntity): number;
     removeAllEntities(): void;
@@ -74,6 +74,8 @@ export declare class EcsChannel implements IChannel {
     unsubscribeAll(): void;
     destroy(): void;
     addMessage(message: any): void;
+    addInterpolatedMessage(message: any): void;
+    skipInterpolation(pidOrComponent: number | IEntity): boolean;
     clearBroadcastMessages(): void;
     hasStructuralDeltas(): boolean;
     clearSnapshotDeltas(): void;

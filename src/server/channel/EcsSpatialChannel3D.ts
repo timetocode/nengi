@@ -1,13 +1,12 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
-import { IChannel } from './IChannel'
 import { SpatialGrid3D, SpatialGridCell } from './SpatialGrid'
 import { normalizeSpatialView3D, objectInSpatialView3D, SpatialView3D } from './SpatialView'
 
 export type EcsSpatial3DComponent = IEntity & { pid: number }
-export type EcsSpatial3DMove = { pid: number, fromCell: string, toCell: string }
 
 export type EcsSpatial3DUpdateLog = {
     manualPropNids: number[]
@@ -31,13 +30,13 @@ export type EcsSpatial3DTypeWriters = {
 }
 
 export type EcsSpatialChannel3DOptions = {
-    label?: string
-    header?: IEntity
+    name?: string
+    header?: ChannelHeaderInput
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
     spatialProps?: { x?: string, y?: string, z?: string }
-    debugManualWrites?: boolean
+    strictManualWrites?: boolean
 }
 
 function createUpdateLog(): EcsSpatial3DUpdateLog {
@@ -60,15 +59,15 @@ function initializeEcsSpatialCell(cell: SpatialGridCell<EcsSpatial3DComponent>) 
 // EcsSpatialChannel3D intentionally mirrors EcsSpatialChannel2D instead of
 // using a dimension-generic wrapper; this is snapshot hot-path code, so
 // benchmark before collapsing the parallel implementations.
-export class EcsSpatialChannel3D implements IChannel {
+export class EcsSpatialChannel3D {
     readonly ecsSpatialChannelMode = true
     readonly ecsChannelMode = true
     nid: number
-    label?: string
     localState: LocalState
     users: Map<number, User> = new Map()
-    header: IEntity | null = null
+    header: ChannelHeader
     headerVersion = 0
+    channelType = ChannelType.EcsSpatialChannel3D
     visibilityResolver = objectInSpatialView3D
     cellSize: number
     queryPadding: number
@@ -90,8 +89,10 @@ export class EcsSpatialChannel3D implements IChannel {
     manualGroupSchemas: SchemaUpdateGroup[] = []
     manualGroupValueOffsets: number[] = []
     manualGroupValues: any[] = []
+    skipInterpolationNids: number[] = []
     dirtyCells: Set<string> = new Set()
     broadcastMessages: any[] = []
+    interpolatedBroadcastMessages: any[] = []
     private rootSet: Set<number> = new Set()
     private componentSet: Set<number> = new Set()
     private componentsByRoot: Map<number, EcsSpatial3DComponent[]> = new Map()
@@ -102,12 +103,11 @@ export class EcsSpatialChannel3D implements IChannel {
     private grid: SpatialGrid3D<EcsSpatial3DComponent>
     private visibleCellKeyCache: Map<number, { viewVersion: number, membershipVersion: number, keys: string[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
-    private movedRoots: EcsSpatial3DMove[] = []
     private structuralDeltas = false
     private spatialXProp: string
     private spatialYProp: string
     private spatialZProp: string
-    private debugManualWrites: boolean
+    private strictManualWrites: boolean
 
     constructor(localState: LocalState, cellSize: number, options: EcsSpatialChannel3DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -118,7 +118,8 @@ export class EcsSpatialChannel3D implements IChannel {
         }
         this.localState = localState
         this.nid = localState.nextNetworkId()
-        this.label = options.label
+        this.header = createChannelHeader(this.nid, this.channelType, options.header, options.name)
+        this.headerVersion = hasSchemaBackedChannelHeader(this.header) ? 1 : 0
         this.cellSize = cellSize
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
@@ -126,7 +127,7 @@ export class EcsSpatialChannel3D implements IChannel {
         this.spatialXProp = options.spatialProps?.x || 'x'
         this.spatialYProp = options.spatialProps?.y || 'y'
         this.spatialZProp = options.spatialProps?.z || 'z'
-        this.debugManualWrites = options.debugManualWrites === true
+        this.strictManualWrites = options.strictManualWrites === true
         this.grid = new SpatialGrid3D({
             cellSize,
             getX: component => component[this.spatialXProp],
@@ -135,9 +136,6 @@ export class EcsSpatialChannel3D implements IChannel {
             initializeCell: initializeEcsSpatialCell
         })
         this.localState.channels.add(this as any)
-        if (options.header) {
-            this.setHeader(options.header)
-        }
     }
 
     private addRootToCell(pid: number, component: EcsSpatial3DComponent) {
@@ -158,7 +156,6 @@ export class EcsSpatialChannel3D implements IChannel {
         if (!move) {
             return
         }
-        this.movedRoots.push({ pid, fromCell: move.fromCell, toCell: move.toCell })
         this.membershipVersion++
         this.structuralDeltas = true
         if (move.removedCell || move.createdCell) {
@@ -192,53 +189,6 @@ export class EcsSpatialChannel3D implements IChannel {
         }
     }
 
-    private defaultView(): SpatialView3D {
-        // Plain ECS channels can subscribe without a view. Spatial ECS keeps
-        // that ergonomic path by treating omitted views as all-visible; games
-        // that need culling should updateView/subscribe with a real view.
-        return {
-            x: 0,
-            y: 0,
-            z: 0,
-            halfWidth: Number.MAX_SAFE_INTEGER,
-            halfHeight: Number.MAX_SAFE_INTEGER,
-            halfDepth: Number.MAX_SAFE_INTEGER
-        }
-    }
-
-    isCellVisible(userId: number, key: string) {
-        const view = this.views.get(userId)
-        if (!view) {
-            return false
-        }
-        const firstSeparator = key.indexOf(':')
-        const secondSeparator = key.indexOf(':', firstSeparator + 1)
-        const x = Number(key.slice(0, firstSeparator))
-        const y = Number(key.slice(firstSeparator + 1, secondSeparator))
-        const z = Number(key.slice(secondSeparator + 1))
-        const spatialView = normalizeSpatialView3D(view)
-        if (spatialView.radius !== undefined) {
-            const cellMinX = x * this.cellSize
-            const cellMaxX = cellMinX + this.cellSize
-            const cellMinY = y * this.cellSize
-            const cellMaxY = cellMinY + this.cellSize
-            const cellMinZ = z * this.cellSize
-            const cellMaxZ = cellMinZ + this.cellSize
-            const nearestX = spatialView.x < cellMinX ? cellMinX : spatialView.x > cellMaxX ? cellMaxX : spatialView.x
-            const nearestY = spatialView.y < cellMinY ? cellMinY : spatialView.y > cellMaxY ? cellMaxY : spatialView.y
-            const nearestZ = spatialView.z < cellMinZ ? cellMinZ : spatialView.z > cellMaxZ ? cellMaxZ : spatialView.z
-            const dx = spatialView.x - nearestX
-            const dy = spatialView.y - nearestY
-            const dz = spatialView.z - nearestZ
-            const radius = spatialView.radius + this.queryPadding
-            return dx * dx + dy * dy + dz * dz <= radius * radius
-        }
-        const range = this.viewRange(view)
-        return x >= range.minX && x <= range.maxX &&
-            y >= range.minY && y <= range.maxY &&
-            z >= range.minZ && z <= range.maxZ
-    }
-
     private getComponentCell(component: EcsSpatial3DComponent) {
         const pid = component.pid
         const spatial = this.spatialComponentByRoot.get(pid)
@@ -252,7 +202,7 @@ export class EcsSpatialChannel3D implements IChannel {
     private markCellDirtyForComponent(component: EcsSpatial3DComponent) {
         const cell = this.getComponentCell(component)
         if (!cell) {
-            if (this.debugManualWrites) {
+            if (this.strictManualWrites) {
                 throw new Error(`EcsSpatialChannel3D cannot write mutation for component nid ${component.nid}; no spatial cell was found for pid ${component.pid}.`)
             }
             return null
@@ -285,9 +235,6 @@ export class EcsSpatialChannel3D implements IChannel {
         }
     }
 
-    tick(tick: number) {
-    }
-
     createEntity() {
         const nid = this.localState.nextNetworkId()
         this.rootNids.push(nid)
@@ -304,25 +251,8 @@ export class EcsSpatialChannel3D implements IChannel {
         return this.createEntity()
     }
 
-    setHeader(header: IEntity) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().')
-        }
-        if (this.header === header) {
-            return header
-        }
-        this.localState.registerEntity(header, this.nid)
-        this.header = header
-        this.headerVersion++
-        return header
-    }
-
-    getHeader() {
-        return this.header
-    }
-
     markHeaderDirty() {
-        if (!this.header) {
+        if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
         this.headerVersion++
@@ -485,10 +415,6 @@ export class EcsSpatialChannel3D implements IChannel {
         return this.componentByNid.get(nid)
     }
 
-    getRootComponents(pid: number) {
-        return this.componentsByRoot.get(pid) || []
-    }
-
     getVisibleEntities(userId: number) {
         const roots: number[] = []
         const keys = this.getVisibleCellKeys(userId)
@@ -555,29 +481,16 @@ export class EcsSpatialChannel3D implements IChannel {
         return this.getManualCellUpdateLog(key) !== null
     }
 
-    getMovedRoots() {
-        return this.movedRoots
-    }
-
     hasStructuralDeltas() {
         return this.structuralDeltas
-    }
-
-    hasOnlyMovementDeltas() {
-        return this.movedRoots.length > 0 &&
-            this.createdRoots.length === 0 &&
-            this.deletedRoots.length === 0 &&
-            this.createdComponents.length === 0 &&
-            this.deletedComponents.length === 0 &&
-            this.rootDeletedComponents.length === 0
     }
 
     hasManualUpdates() {
         return this.manualPropNids.length > 0 || this.manualGroupNids.length > 0 || this.dirtyCells.size > 0
     }
 
-    subscribe(user: User, view?: SpatialView3D) {
-        this.views.set(user.id, view || this.defaultView())
+    subscribe(user: User, view: SpatialView3D) {
+        this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
         user.subscribe(this as any)
@@ -612,12 +525,33 @@ export class EcsSpatialChannel3D implements IChannel {
         this.users.forEach((user, userId) => {
             const view = this.views.get(userId)
             if (view && this.visibilityResolver(message, view)) {
-                user.queueMessage(message)
+                user.queueChannelMessage(this.nid, message)
             }
         })
     }
 
+    addInterpolatedMessage(message: any) {
+        this.users.forEach((user, userId) => {
+            const view = this.views.get(userId)
+            if (view && this.visibilityResolver(message, view)) {
+                user.queueChannelInterpolatedMessage(this.nid, message)
+            }
+        })
+    }
+
+    // ECS roots are ids only; skip interpolation is meaningful for stateful
+    // components that the client interpolates, such as transform components.
+    skipInterpolation(pidOrComponent: number | IEntity) {
+        const nid = typeof pidOrComponent === 'number' ? pidOrComponent : pidOrComponent.nid
+        if (!this.componentSet.has(nid)) {
+            return false
+        }
+        this.skipInterpolationNids.push(nid)
+        return true
+    }
+
     clearBroadcastMessages() {
+        this.interpolatedBroadcastMessages.length = 0
     }
 
     clearSnapshotDeltas() {
@@ -643,19 +577,14 @@ export class EcsSpatialChannel3D implements IChannel {
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
         this.rootDeletedComponents.length = 0
+        this.skipInterpolationNids.length = 0
         this.dirtyCells.clear()
-        this.movedRoots.length = 0
         this.structuralDeltas = false
     }
 
     destroy() {
         this.unsubscribeAll()
         this.removeAllEntities()
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid)
-            this.header = null
-            this.headerVersion++
-        }
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this as any)
         this.rootNids.length = 0
@@ -675,6 +604,7 @@ export class EcsSpatialChannel3D implements IChannel {
         this.manualGroupValues.length = 0
         this.dirtyCells.clear()
         this.broadcastMessages.length = 0
+        this.interpolatedBroadcastMessages.length = 0
         this.rootSet.clear()
         this.componentSet.clear()
         this.componentsByRoot.clear()
@@ -686,7 +616,6 @@ export class EcsSpatialChannel3D implements IChannel {
         this.visibleNetworkedNidsCache.clear()
         this.grid.cells.clear()
         this.grid.objectCells.clear()
-        this.movedRoots.length = 0
         this.structuralDeltas = false
     }
 

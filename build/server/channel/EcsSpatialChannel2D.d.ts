@@ -1,17 +1,12 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema';
+import { ChannelHeader, ChannelHeaderInput, ChannelType } from '../../common/ChannelHeader';
 import { IEntity } from '../../common/IEntity';
 import { LocalState } from '../LocalState';
 import { User } from '../User';
-import { IChannel } from './IChannel';
 import { SpatialGridCell } from './SpatialGrid';
 import { SpatialPlane, SpatialView } from './SpatialView';
 export type EcsSpatial2DComponent = IEntity & {
     pid: number;
-};
-export type EcsSpatial2DMove = {
-    pid: number;
-    fromCell: string;
-    toCell: string;
 };
 export type EcsSpatial2DUpdateLog = {
     manualPropNids: number[];
@@ -36,8 +31,8 @@ export type EcsSpatial2DTypeWriters = {
     };
 };
 export type EcsSpatialChannel2DOptions = {
-    label?: string;
-    header?: IEntity;
+    name?: string;
+    header?: ChannelHeaderInput;
     queryPadding?: number;
     fragmentCellLimit?: number;
     stableFragmentCellLimit?: number;
@@ -46,17 +41,17 @@ export type EcsSpatialChannel2DOptions = {
         x?: string;
         y?: string;
     };
-    debugManualWrites?: boolean;
+    strictManualWrites?: boolean;
 };
-export declare class EcsSpatialChannel2D implements IChannel {
+export declare class EcsSpatialChannel2D {
     readonly ecsSpatialChannelMode = true;
     readonly ecsChannelMode = true;
     nid: number;
-    label?: string;
     localState: LocalState;
     users: Map<number, User>;
-    header: IEntity | null;
+    header: ChannelHeader;
     headerVersion: number;
+    channelType: ChannelType;
     visibilityResolver: (obj: any, view: SpatialView) => boolean;
     cellSize: number;
     queryPadding: number;
@@ -78,8 +73,10 @@ export declare class EcsSpatialChannel2D implements IChannel {
     manualGroupSchemas: SchemaUpdateGroup[];
     manualGroupValueOffsets: number[];
     manualGroupValues: any[];
+    skipInterpolationNids: number[];
     dirtyCells: Set<string>;
     broadcastMessages: any[];
+    interpolatedBroadcastMessages: any[];
     private rootSet;
     private componentSet;
     private componentsByRoot;
@@ -90,11 +87,10 @@ export declare class EcsSpatialChannel2D implements IChannel {
     private grid;
     private visibleCellKeyCache;
     private visibleNetworkedNidsCache;
-    private movedRoots;
     private structuralDeltas;
     private spatialXProp;
     private spatialYProp;
-    private debugManualWrites;
+    private strictManualWrites;
     plane: SpatialPlane;
     private axes;
     constructor(localState: LocalState, cellSize: number, options?: EcsSpatialChannel2DOptions);
@@ -104,17 +100,12 @@ export declare class EcsSpatialChannel2D implements IChannel {
     private invalidateVisibleNetworkedNidsCache;
     private invalidateVisibleCellKeyCache;
     private viewRange;
-    private defaultView;
-    isCellVisible(userId: number, key: string): boolean;
     private getComponentCell;
     private markCellDirtyForComponent;
     private buildVisibleCellKeys;
     private appendRootNetworkedNids;
-    tick(tick: number): void;
     createEntity(): number;
     addEntity(): number;
-    setHeader(header: IEntity): IEntity;
-    getHeader(): IEntity | null;
     markHeaderDirty(): boolean;
     removeEntity(pidOrEntity: number | IEntity): number;
     removeAllEntities(): void;
@@ -132,22 +123,21 @@ export declare class EcsSpatialChannel2D implements IChannel {
     isComponentNid(nid: number): boolean;
     isRootDeletedComponentNid(nid: number): boolean;
     getComponent(nid: number): EcsSpatial2DComponent | undefined;
-    getRootComponents(pid: number): EcsSpatial2DComponent[];
     getVisibleEntities(userId: number): number[];
     getVisibleNetworkedNids(userId: number): number[];
     getVisibleCellKeys(userId: number): string[];
     getCellRootNids(key: string): number[];
     getManualCellUpdateLog(key: string): Cell | null;
     cellHasManualUpdates(key: string): boolean;
-    getMovedRoots(): EcsSpatial2DMove[];
     hasStructuralDeltas(): boolean;
-    hasOnlyMovementDeltas(): boolean;
     hasManualUpdates(): boolean;
-    subscribe(user: User, view?: SpatialView): void;
+    subscribe(user: User, view: SpatialView): void;
     updateView(user: User, view: SpatialView): void;
     unsubscribe(user: User): void;
     unsubscribeAll(): void;
     addMessage(message: any): void;
+    addInterpolatedMessage(message: any): void;
+    skipInterpolation(pidOrComponent: number | IEntity): boolean;
     clearBroadcastMessages(): void;
     clearSnapshotDeltas(): void;
     destroy(): void;

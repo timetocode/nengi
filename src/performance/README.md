@@ -21,7 +21,7 @@ npm run profile:snapshot
 Useful knobs:
 
 ```bash
-PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel-2d | spatial-channel-3d | manual-channel | manual-spatial-channel-2d | manual-spatial-channel-3d | ecs-channel | ecs-spatial-channel-2d | ecs-spatial-channel-3d
+PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel-2d | spatial-channel-3d | manual-channel | manual-spatial-channel-2d | manual-spatial-channel-3d | ecs-channel | ecs-spatial-channel-2d | ecs-spatial-clump | ecs-spatial-channel-3d
 PROFILE_USERS=20
 PROFILE_ENTITIES=1000
 PROFILE_VISIBLE=1000
@@ -120,6 +120,12 @@ Scenarios:
 - `ecs-spatial-channel-2d`: dedicated spatial ECS 2D/projected channel. Root visibility comes
   from the spatial component, while transform/vitals/loadout component updates
   are written as typed ECS component group sections per visible dirty cell.
+- `ecs-spatial-clump`: worst-case 2D spatial ECS fanout profile. Defaults to
+  350 users controlling 350 ECS roots in one visible cell, with every root
+  moving every tick. Spatial culling intentionally provides no benefit here;
+  this profile exists to watch cell-fragment reuse under clumped CCU pressure.
+  Override `PROFILE_USERS` and `PROFILE_ENTITIES` together for 250-450 player
+  variants.
 - `ecs-spatial-channel-3d`: true 3D spatial ECS channel. Root visibility comes
   from the spatial component using AABB or sphere views and `x:y:z` cell keys.
 
@@ -154,6 +160,8 @@ PROFILE_SCENARIO=wide-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PRO
 PROFILE_SCENARIO=ecs-manual-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_MOVE_FRACTION=1 PROFILE_SHARED_UPDATES=0 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-channel-churn PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFILE_CHURN=100 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=ecs-spatial-clump npm run profile:snapshot
+PROFILE_SCENARIO=ecs-spatial-clump PROFILE_USERS=450 PROFILE_ENTITIES=450 PROFILE_VISIBLE=450 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=manual-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 ```

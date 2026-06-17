@@ -1,21 +1,16 @@
 import { IEntity } from '../../common/IEntity';
-import { Historian } from '../Historian';
+import { ChannelHeader, ChannelHeaderInput, ChannelType } from '../../common/ChannelHeader';
 import { LocalState } from '../LocalState';
 import { NDictionary } from '../NDictionary';
 import { User } from '../User';
 import { IObjectChannel } from './IChannel';
 export type ChannelOptions = {
-    historian?: Historian;
-    header?: IEntity;
-    /**
-     * Developer-defined label for debugging, logs, tests, or game tooling.
-     * Nengi does not interpret this value or send it over the network.
-     */
-    label?: string;
+    header?: ChannelHeaderInput;
+    name?: string;
+    channelType?: ChannelType;
 };
 export declare class Channel implements IObjectChannel {
     nid: number;
-    label?: string;
     localState: LocalState;
     entities: NDictionary;
     entityNids: number[];
@@ -23,22 +18,23 @@ export declare class Channel implements IObjectChannel {
     deltaBaseVersion: number;
     createdRoots: IEntity[];
     deletedNids: number[];
+    skipInterpolationNids: number[];
     broadcastMessages: any[];
+    interpolatedBroadcastMessages: any[];
     users: Map<number, User>;
-    historian: Historian | null;
-    header: IEntity | null;
+    header: ChannelHeader;
     headerVersion: number;
+    channelType: ChannelType;
     private visibleNetworkedNidsCache;
     constructor(localState: LocalState, options?: ChannelOptions);
-    tick(tick: number): void;
     private beginDelta;
     addEntity(entity: IEntity): IEntity;
-    setHeader(header: IEntity): IEntity;
-    getHeader(): IEntity | null;
     markHeaderDirty(): boolean;
     removeEntity(entity: IEntity): number;
     markDirty(entity: IEntity): boolean;
+    skipInterpolation(entity: IEntity): boolean;
     addMessage(message: any): void;
+    addInterpolatedMessage(message: any): void;
     clearBroadcastMessages(): void;
     clearSnapshotDeltas(): void;
     subscribe(user: User): void;

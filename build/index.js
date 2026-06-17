@@ -32,15 +32,18 @@ __exportStar(require("./server/channel/ManualSpatialChannel3D"), exports);
 __exportStar(require("./server/channel/EcsChannel"), exports);
 __exportStar(require("./server/channel/EcsSpatialChannel2D"), exports);
 __exportStar(require("./server/channel/EcsSpatialChannel3D"), exports);
+__exportStar(require("./ecs/EcsWorld"), exports);
 __exportStar(require("./server/User"), exports);
 __exportStar(require("./server/Historian"), exports);
 __exportStar(require("./server/Historian2D"), exports);
+__exportStar(require("./server/Historian3D"), exports);
 __exportStar(require("./server/PublicPositionSmoother2D"), exports);
 __exportStar(require("./server/adapter/MockAdapter"), exports);
 // client
 __exportStar(require("./client/Client"), exports);
 __exportStar(require("./client/ClientNetwork"), exports);
-__exportStar(require("./client/ReplicaRouter"), exports);
+__exportStar(require("./client/ClientEntityMode"), exports);
+__exportStar(require("./client/ClientReplica"), exports);
 __exportStar(require("./client/EntityHistory"), exports);
 __exportStar(require("./client/EntityStore"), exports);
 __exportStar(require("./client/FixedStepInterpolator"), exports);
@@ -54,6 +57,7 @@ __exportStar(require("./client/prediction/PredictionErrorProperty"), exports);
 __exportStar(require("./client/prediction/PredictionFrame"), exports);
 __exportStar(require("./client/prediction/PredictionEntity"), exports);
 __exportStar(require("./client/prediction/CommandReplayPrediction"), exports);
+__exportStar(require("./client/prediction/StateReplayPrediction"), exports);
 // common
 __exportStar(require("./common/binary/Binary"), exports);
 __exportStar(require("./common/binary/BinarySection"), exports);
@@ -64,6 +68,7 @@ __exportStar(require("./common/binary/schema/defineSchema"), exports);
 __exportStar(require("./common/binary/schema/schemaFingerprint"), exports);
 __exportStar(require("./common/binary/NetworkEvent"), exports);
 __exportStar(require("./common/EngineMessage"), exports);
+__exportStar(require("./common/ChannelHeader"), exports);
 __exportStar(require("./common/binary/BinaryExt"), exports);
 __exportStar(require("./common/Endpoint"), exports);
 // types for integration with adapters

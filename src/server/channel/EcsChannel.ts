@@ -1,4 +1,5 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
@@ -15,8 +16,8 @@ export type EcsTypeWriters = {
 }
 
 export type EcsChannelOptions = {
-    label?: string
-    header?: IEntity
+    name?: string
+    header?: ChannelHeaderInput
 }
 
 export class EcsChannel implements IChannel {
@@ -24,11 +25,11 @@ export class EcsChannel implements IChannel {
     // replicated state, and userland component writers append the mutation log.
     readonly ecsChannelMode = true
     nid: number
-    label?: string
     localState: LocalState
     users: Map<number, User> = new Map()
-    header: IEntity | null = null
+    header: ChannelHeader
     headerVersion = 0
+    channelType = ChannelType.EcsChannel
     rootNids: number[] = []
     componentNids: number[] = []
     membershipVersion = 0
@@ -45,7 +46,9 @@ export class EcsChannel implements IChannel {
     manualGroupSchemas: SchemaUpdateGroup[] = []
     manualGroupValueOffsets: number[] = []
     manualGroupValues: any[] = []
+    skipInterpolationNids: number[] = []
     broadcastMessages: any[] = []
+    interpolatedBroadcastMessages: any[] = []
     private rootSet: Set<number> = new Set()
     private componentSet: Set<number> = new Set()
     private componentsByRoot: Map<number, EcsComponent[]> = new Map()
@@ -55,14 +58,9 @@ export class EcsChannel implements IChannel {
     constructor(localState: LocalState, options: EcsChannelOptions = {}) {
         this.localState = localState
         this.nid = localState.nextNetworkId()
-        this.label = options.label
+        this.header = createChannelHeader(this.nid, this.channelType, options.header, options.name)
+        this.headerVersion = hasSchemaBackedChannelHeader(this.header) ? 1 : 0
         this.localState.channels.add(this)
-        if (options.header) {
-            this.setHeader(options.header)
-        }
-    }
-
-    tick(tick: number) {
     }
 
     createEntity() {
@@ -83,25 +81,8 @@ export class EcsChannel implements IChannel {
         return this.createEntity()
     }
 
-    setHeader(header: IEntity) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().')
-        }
-        if (this.header === header) {
-            return header
-        }
-        this.localState.registerEntity(header, this.nid)
-        this.header = header
-        this.headerVersion++
-        return header
-    }
-
-    getHeader() {
-        return this.header
-    }
-
     markHeaderDirty() {
-        if (!this.header) {
+        if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
         this.headerVersion++
@@ -257,11 +238,6 @@ export class EcsChannel implements IChannel {
     destroy() {
         this.unsubscribeAll()
         this.removeAllEntities()
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid)
-            this.header = null
-            this.headerVersion++
-        }
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this)
         this.rootNids.length = 0
@@ -279,7 +255,9 @@ export class EcsChannel implements IChannel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.skipInterpolationNids.length = 0
         this.broadcastMessages.length = 0
+        this.interpolatedBroadcastMessages.length = 0
         this.rootSet.clear()
         this.componentSet.clear()
         this.componentsByRoot.clear()
@@ -291,8 +269,24 @@ export class EcsChannel implements IChannel {
         this.broadcastMessages.push(message)
     }
 
+    addInterpolatedMessage(message: any) {
+        this.interpolatedBroadcastMessages.push(message)
+    }
+
+    // ECS roots are ids only; skip interpolation is meaningful for stateful
+    // components that the client interpolates, such as transform components.
+    skipInterpolation(pidOrComponent: number | IEntity) {
+        const nid = typeof pidOrComponent === 'number' ? pidOrComponent : pidOrComponent.nid
+        if (!this.componentSet.has(nid)) {
+            return false
+        }
+        this.skipInterpolationNids.push(nid)
+        return true
+    }
+
     clearBroadcastMessages() {
         this.broadcastMessages.length = 0
+        this.interpolatedBroadcastMessages.length = 0
     }
 
     hasStructuralDeltas() {
@@ -316,6 +310,7 @@ export class EcsChannel implements IChannel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.skipInterpolationNids.length = 0
     }
 
     createComponentWriter(ntype: number, schema: Schema): EcsTypeWriters {

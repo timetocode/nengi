@@ -50,12 +50,14 @@ End-to-end bot tests can be limited by bot/client performance. If bots cannot ke
 
 ## Recommended workflow
 
-1. Implement the feature with the simplest correct channel.
+1. Pick the channel that matches the game model.
 2. Add a synthetic benchmark that resembles the game.
 3. Measure the baseline.
-4. Try the likely optimization, such as spatial culling or manual mutations.
+4. Try a competing valid model or mutation path, such as automatic versus
+   manual spatial.
 5. Measure again.
-6. Only keep the added complexity if the benchmark shows a useful win.
+6. Keep the implementation that gives the right semantics with acceptable
+   performance and complexity.
 
 ## Where to look in nengi
 

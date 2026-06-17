@@ -1,5 +1,6 @@
 import { IEntity } from '../common/IEntity';
 import { Context } from '../common/Context';
+import { ChannelHeader } from '../common/ChannelHeader';
 import { Frame } from './Frame';
 import { Snapshot } from './Snapshot';
 import { EntityHistory } from './EntityHistory';
@@ -7,7 +8,8 @@ export declare class EntityStore {
     context: Context;
     entities: Map<number, IEntity>;
     ntypes: Map<number, number>;
-    channelHeaders: Map<number, IEntity>;
+    channels: Set<number>;
+    channelHeaders: Map<number, ChannelHeader>;
     entityChannels: Map<number, number>;
     ecsEntities: Set<number>;
     ecsComponentsByParent: Map<number, Set<number>>;
@@ -20,8 +22,11 @@ export declare class EntityStore {
     constructor(context: Context);
     get(nid: number): IEntity | undefined;
     getByNType(ntype: number): IEntity[];
+    getEntityChannelId(nid: number): number | undefined;
     getChannelId(nid: number): number | undefined;
-    getChannelHeader(channelOrEntityNid: number): IEntity | undefined;
+    getChannelHeaderById(channelId: number): ChannelHeader | undefined;
+    getEntityChannelHeader(nid: number): ChannelHeader | undefined;
+    getChannelHeader(channelOrEntityNid: number): ChannelHeader | undefined;
     getByChannel(channelId: number): IEntity[];
     getWhere(prop: string, value: any): IEntity[];
     applySnapshot(snapshot: Snapshot, tick: number, receivedAt?: number): Frame;

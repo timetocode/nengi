@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EcsSpatialChannel2D = void 0;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const SpatialGrid_1 = require("./SpatialGrid");
 const SpatialView_1 = require("./SpatialView");
 function createUpdateLog() {
@@ -27,8 +28,8 @@ class EcsSpatialChannel2D {
         this.ecsSpatialChannelMode = true;
         this.ecsChannelMode = true;
         this.users = new Map();
-        this.header = null;
         this.headerVersion = 0;
+        this.channelType = ChannelHeader_1.ChannelType.EcsSpatialChannel2D;
         this.visibilityResolver = (obj, view) => (0, SpatialView_1.objectInSpatialView)(obj, view, this.plane);
         this.membershipVersion = 0;
         this.rootNids = [];
@@ -46,8 +47,10 @@ class EcsSpatialChannel2D {
         this.manualGroupSchemas = [];
         this.manualGroupValueOffsets = [];
         this.manualGroupValues = [];
+        this.skipInterpolationNids = [];
         this.dirtyCells = new Set();
         this.broadcastMessages = [];
+        this.interpolatedBroadcastMessages = [];
         this.rootSet = new Set();
         this.componentSet = new Set();
         this.componentsByRoot = new Map();
@@ -57,7 +60,6 @@ class EcsSpatialChannel2D {
         this.viewVersions = new Map();
         this.visibleCellKeyCache = new Map();
         this.visibleNetworkedNidsCache = new Map();
-        this.movedRoots = [];
         this.structuralDeltas = false;
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
             throw new Error('EcsSpatialChannel2D requires a positive finite cell size.');
@@ -67,7 +69,8 @@ class EcsSpatialChannel2D {
         }
         this.localState = localState;
         this.nid = localState.nextNetworkId();
-        this.label = options.label;
+        this.header = (0, ChannelHeader_1.createChannelHeader)(this.nid, this.channelType, options.header, options.name);
+        this.headerVersion = (0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header) ? 1 : 0;
         this.cellSize = cellSize;
         this.queryPadding = options.queryPadding || 0;
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16));
@@ -76,7 +79,7 @@ class EcsSpatialChannel2D {
         this.axes = (0, SpatialView_1.getSpatialPlaneAxes)(this.plane);
         this.spatialXProp = ((_a = options.spatialProps) === null || _a === void 0 ? void 0 : _a.x) || this.axes.a;
         this.spatialYProp = ((_b = options.spatialProps) === null || _b === void 0 ? void 0 : _b.y) || this.axes.b;
-        this.debugManualWrites = options.debugManualWrites === true;
+        this.strictManualWrites = options.strictManualWrites === true;
         this.grid = new SpatialGrid_1.SpatialGrid2D({
             cellSize,
             getX: component => component[this.spatialXProp],
@@ -84,9 +87,6 @@ class EcsSpatialChannel2D {
             initializeCell: initializeEcsSpatialCell
         });
         this.localState.channels.add(this);
-        if (options.header) {
-            this.setHeader(options.header);
-        }
     }
     addRootToCell(pid, component) {
         return this.grid.add(pid, component).createdCell;
@@ -104,7 +104,6 @@ class EcsSpatialChannel2D {
         if (!move) {
             return;
         }
-        this.movedRoots.push({ pid, fromCell: move.fromCell, toCell: move.toCell });
         this.membershipVersion++;
         this.structuralDeltas = true;
         if (move.removedCell || move.createdCell) {
@@ -132,39 +131,6 @@ class EcsSpatialChannel2D {
             maxY: this.grid.cellCoordForEnd(spatialView.b + halfHeight)
         };
     }
-    defaultView() {
-        // Plain ECS channels can subscribe without a view. Spatial ECS keeps
-        // that ergonomic path by treating omitted views as all-visible; games
-        // that need culling should updateView/subscribe with a real view.
-        if (this.plane === 'xz') {
-            return { x: 0, z: 0, halfX: Number.MAX_SAFE_INTEGER, halfZ: Number.MAX_SAFE_INTEGER };
-        }
-        return { x: 0, y: 0, halfX: Number.MAX_SAFE_INTEGER, halfY: Number.MAX_SAFE_INTEGER };
-    }
-    isCellVisible(userId, key) {
-        const view = this.views.get(userId);
-        if (!view) {
-            return false;
-        }
-        const separator = key.indexOf(':');
-        const x = Number(key.slice(0, separator));
-        const y = Number(key.slice(separator + 1));
-        const spatialView = (0, SpatialView_1.normalizeSpatialView)(view, this.plane);
-        if (spatialView.radius !== undefined) {
-            const cellMinX = x * this.cellSize;
-            const cellMaxX = cellMinX + this.cellSize;
-            const cellMinY = y * this.cellSize;
-            const cellMaxY = cellMinY + this.cellSize;
-            const nearestX = spatialView.a < cellMinX ? cellMinX : spatialView.a > cellMaxX ? cellMaxX : spatialView.a;
-            const nearestY = spatialView.b < cellMinY ? cellMinY : spatialView.b > cellMaxY ? cellMaxY : spatialView.b;
-            const dx = spatialView.a - nearestX;
-            const dy = spatialView.b - nearestY;
-            const radius = spatialView.radius + this.queryPadding;
-            return dx * dx + dy * dy <= radius * radius;
-        }
-        const range = this.viewRange(view);
-        return x >= range.minX && x <= range.maxX && y >= range.minY && y <= range.maxY;
-    }
     getComponentCell(component) {
         const pid = component.pid;
         const spatial = this.spatialComponentByRoot.get(pid);
@@ -177,7 +143,7 @@ class EcsSpatialChannel2D {
     markCellDirtyForComponent(component) {
         const cell = this.getComponentCell(component);
         if (!cell) {
-            if (this.debugManualWrites) {
+            if (this.strictManualWrites) {
                 throw new Error(`EcsSpatialChannel2D cannot write mutation for component nid ${component.nid}; no spatial cell was found for pid ${component.pid}.`);
             }
             return null;
@@ -206,8 +172,6 @@ class EcsSpatialChannel2D {
             nids.push(components[i].nid);
         }
     }
-    tick(tick) {
-    }
     createEntity() {
         const nid = this.localState.nextNetworkId();
         this.rootNids.push(nid);
@@ -222,23 +186,8 @@ class EcsSpatialChannel2D {
     addEntity() {
         return this.createEntity();
     }
-    setHeader(header) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().');
-        }
-        if (this.header === header) {
-            return header;
-        }
-        this.localState.registerEntity(header, this.nid);
-        this.header = header;
-        this.headerVersion++;
-        return header;
-    }
-    getHeader() {
-        return this.header;
-    }
     markHeaderDirty() {
-        if (!this.header) {
+        if (!(0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header)) {
             return false;
         }
         this.headerVersion++;
@@ -393,9 +342,6 @@ class EcsSpatialChannel2D {
     getComponent(nid) {
         return this.componentByNid.get(nid);
     }
-    getRootComponents(pid) {
-        return this.componentsByRoot.get(pid) || [];
-    }
     getVisibleEntities(userId) {
         const roots = [];
         const keys = this.getVisibleCellKeys(userId);
@@ -455,25 +401,14 @@ class EcsSpatialChannel2D {
     cellHasManualUpdates(key) {
         return this.getManualCellUpdateLog(key) !== null;
     }
-    getMovedRoots() {
-        return this.movedRoots;
-    }
     hasStructuralDeltas() {
         return this.structuralDeltas;
-    }
-    hasOnlyMovementDeltas() {
-        return this.movedRoots.length > 0 &&
-            this.createdRoots.length === 0 &&
-            this.deletedRoots.length === 0 &&
-            this.createdComponents.length === 0 &&
-            this.deletedComponents.length === 0 &&
-            this.rootDeletedComponents.length === 0;
     }
     hasManualUpdates() {
         return this.manualPropNids.length > 0 || this.manualGroupNids.length > 0 || this.dirtyCells.size > 0;
     }
     subscribe(user, view) {
-        this.views.set(user.id, view || this.defaultView());
+        this.views.set(user.id, view);
         this.viewVersions.set(user.id, 1);
         this.users.set(user.id, user);
         user.subscribe(this);
@@ -504,11 +439,30 @@ class EcsSpatialChannel2D {
         this.users.forEach((user, userId) => {
             const view = this.views.get(userId);
             if (view && this.visibilityResolver(message, view)) {
-                user.queueMessage(message);
+                user.queueChannelMessage(this.nid, message);
             }
         });
     }
+    addInterpolatedMessage(message) {
+        this.users.forEach((user, userId) => {
+            const view = this.views.get(userId);
+            if (view && this.visibilityResolver(message, view)) {
+                user.queueChannelInterpolatedMessage(this.nid, message);
+            }
+        });
+    }
+    // ECS roots are ids only; skip interpolation is meaningful for stateful
+    // components that the client interpolates, such as transform components.
+    skipInterpolation(pidOrComponent) {
+        const nid = typeof pidOrComponent === 'number' ? pidOrComponent : pidOrComponent.nid;
+        if (!this.componentSet.has(nid)) {
+            return false;
+        }
+        this.skipInterpolationNids.push(nid);
+        return true;
+    }
     clearBroadcastMessages() {
+        this.interpolatedBroadcastMessages.length = 0;
     }
     clearSnapshotDeltas() {
         const clearLog = (log) => {
@@ -533,18 +487,13 @@ class EcsSpatialChannel2D {
         this.createdComponents.length = 0;
         this.deletedComponents.length = 0;
         this.rootDeletedComponents.length = 0;
+        this.skipInterpolationNids.length = 0;
         this.dirtyCells.clear();
-        this.movedRoots.length = 0;
         this.structuralDeltas = false;
     }
     destroy() {
         this.unsubscribeAll();
         this.removeAllEntities();
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid);
-            this.header = null;
-            this.headerVersion++;
-        }
         this.localState.nidPool.returnId(this.nid);
         this.localState.channels.delete(this);
         this.rootNids.length = 0;
@@ -564,6 +513,7 @@ class EcsSpatialChannel2D {
         this.manualGroupValues.length = 0;
         this.dirtyCells.clear();
         this.broadcastMessages.length = 0;
+        this.interpolatedBroadcastMessages.length = 0;
         this.rootSet.clear();
         this.componentSet.clear();
         this.componentsByRoot.clear();
@@ -575,7 +525,6 @@ class EcsSpatialChannel2D {
         this.visibleNetworkedNidsCache.clear();
         this.grid.cells.clear();
         this.grid.objectCells.clear();
-        this.movedRoots.length = 0;
         this.structuralDeltas = false;
     }
     createComponentWriter(ntype, schema) {

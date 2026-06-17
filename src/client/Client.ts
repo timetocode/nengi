@@ -1,7 +1,7 @@
 import { Context } from '../common/Context'
 import { Endpoint, RequestPolicy } from '../common/Endpoint'
 import { ClientNetwork } from './ClientNetwork'
-import type { InterpolationDelayReportOptions, TimedCommandOptions } from './ClientNetwork'
+import type { InterpolationDelayReportOptions, CommandTimingOptions } from './ClientNetwork'
 import { Predictor } from './prediction/Predictor'
 import type { PredictionOperationOptions } from './prediction/Predictor'
 import type { ClientAdapterConstructor, IClientNetworkAdapter } from './adapter/IClientNetworkAdapter'
@@ -66,8 +66,13 @@ class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
         this.network.addCommand(command)
     }
 
-    addTimedCommand(command: any, options: TimedCommandOptions = {}) {
-        this.network.addTimedCommand(command, options)
+    /**
+     * Sends a command with optional input/view timing metadata for server-side
+     * lag compensation. Use ordinary addCommand when the server does not need
+     * to know what the client was viewing when the input was authored.
+     */
+    addCommandWithTiming(command: any, options: CommandTimingOptions = {}) {
+        this.network.addCommandWithTiming(command, options)
     }
 
     reportInterpolationDelay(delayMs: number, options: InterpolationDelayReportOptions = {}) {
@@ -78,8 +83,13 @@ class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
         return this.network.predictCommand(command, options)
     }
 
-    predictTimedCommand(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: TimedCommandOptions = {}) {
-        return this.network.predictTimedCommand(command, predictionOptions, timingOptions)
+    /**
+     * Predicts locally and sends the command with timing metadata. This is the
+     * command-replay path for movement, shooting, dodging, and similar actions
+     * where reconciliation and lag compensation both matter.
+     */
+    predictCommandWithTiming(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: CommandTimingOptions = {}) {
+        return this.network.predictCommandWithTiming(command, predictionOptions, timingOptions)
     }
 
     predictState(payload: any, options: PredictionOperationOptions = {}) {

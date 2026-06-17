@@ -10,14 +10,13 @@ class LocalState {
         this.nidType = Binary_1.Binary.UInt8;
         this.nidPool = new IdPool_1.IdPool((0, Protocol_1.maxValueForNetworkType)(Binary_1.Binary.UInt8));
         this.dirtyNids = new Set();
-        this.dirtySources = new Map();
         this.entityTreeVersion = 0;
         /**
-         * Entity nid -> source id currently keeping that entity networked.
-         * The set shape is kept for now because the hot visibility path already
-         * understands it, but entity ownership is intentionally single-source.
+         * Entity nid -> owner nid currently keeping that entity networked.
+         * Root entities are owned by a channel. Child entities are owned by their
+         * parent entity and cascade visibility through the root.
          */
-        this.sources = new Map();
+        this.ownerByNid = new Map();
         /**
          * Parent entity nid -> child entity nids. Children cascade visibility from
          * the parent, but userland still owns object lifetime and game semantics.
@@ -41,11 +40,8 @@ class LocalState {
         }
         return this.nidPool.nextId();
     }
-    tick(tick) {
-        this.channels.forEach(channel => channel.tick(tick));
-    }
     assertRegisteredParent(parent) {
-        if (parent.nid === 0 || !this.sources.has(parent.nid)) {
+        if (parent.nid === 0 || !this.ownerByNid.has(parent.nid)) {
             throw new Error('Cannot attach a child to an entity that is not networked.');
         }
     }
@@ -100,36 +96,30 @@ class LocalState {
         children.delete(cnid);
         this.unregisterEntity(child, parent.nid);
     }
-    registerEntity(entity, sourceId) {
+    registerEntity(entity, ownerId) {
         let nid = entity.nid;
-        if (nid !== 0 && this.sources.has(nid)) {
-            const entitySources = this.sources.get(nid);
-            if (entitySources.has(sourceId)) {
+        if (nid !== 0 && this.ownerByNid.has(nid)) {
+            const ownerNid = this.ownerByNid.get(nid);
+            if (ownerNid === ownerId) {
                 return nid;
             }
             throw new Error(`Entity nid ${nid} is already networked by another source.`);
         }
-        if (!this.sources.has(nid)) {
+        if (!this.ownerByNid.has(nid)) {
             nid = this.nextNetworkId();
             entity.nid = nid;
-            this.sources.set(nid, new Set());
             this._entities.add(entity);
             this.rootByNid.set(nid, nid);
         }
-        const entitySources = this.sources.get(nid);
-        entitySources.add(sourceId);
+        this.ownerByNid.set(nid, ownerId);
         return nid;
     }
     markDirty(entity) {
-        if (entity.nid === 0 || !this.sources.has(entity.nid)) {
+        if (entity.nid === 0 || !this.ownerByNid.has(entity.nid)) {
             return false;
         }
         if (!this.dirtyNids.has(entity.nid)) {
             this.dirtyNids.add(entity.nid);
-        }
-        const sources = this.sources.get(entity.nid);
-        if (sources) {
-            this.dirtySources.set(entity.nid, new Set(sources));
         }
         return true;
     }
@@ -138,27 +128,25 @@ class LocalState {
     }
     clearDirty() {
         this.dirtyNids.clear();
-        this.dirtySources.clear();
     }
-    unregisterEntity(entity, sourceId) {
+    unregisterEntity(entity, ownerId) {
         const nid = entity.nid;
-        const entitySources = this.sources.get(nid);
-        if (!entitySources) {
+        const ownerNid = this.ownerByNid.get(nid);
+        if (ownerNid === undefined) {
             return;
         }
-        entitySources.delete(sourceId);
-        if (entitySources.size === 0) {
-            this.invalidateEntityTreeCache(nid);
-            this.unregisterChildren(nid);
-            this.sources.delete(nid);
-            this.dirtyNids.delete(nid);
-            this.dirtySources.delete(nid);
-            this.parentByNid.delete(nid);
-            this.rootByNid.delete(nid);
-            this._entities.remove(entity);
-            this.nidPool.returnId(nid);
-            entity.nid = 0;
+        if (ownerNid !== ownerId) {
+            throw new Error(`Entity nid ${nid} is owned by ${ownerNid}, not ${ownerId}.`);
         }
+        this.invalidateEntityTreeCache(nid);
+        this.unregisterChildren(nid);
+        this.ownerByNid.delete(nid);
+        this.dirtyNids.delete(nid);
+        this.parentByNid.delete(nid);
+        this.rootByNid.delete(nid);
+        this._entities.remove(entity);
+        this.nidPool.returnId(nid);
+        entity.nid = 0;
     }
     getByNid(nid) {
         return this._entities.get(nid);

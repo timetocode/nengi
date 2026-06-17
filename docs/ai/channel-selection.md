@@ -1,6 +1,9 @@
 # Channel selection
 
-Choose the simplest channel that expresses who should see what. A faster-looking channel can be worse if it adds bookkeeping the game does not need.
+Choose the channel that expresses who should see what. Visibility model comes
+first, then mutation style and performance. A faster-looking channel can be
+worse if it adds bookkeeping the game does not need, but a spatial channel is the
+right baseline when the game world is spatially partitioned.
 
 ## Quick table
 
@@ -25,11 +28,11 @@ Good fits:
 - Team data for one team channel.
 - Small arenas where every player sees every gameplay entity.
 - Inventory/container state after a user opens a container.
-- Early implementation before profiling.
 
 Avoid when:
 
 - The channel contains tens or hundreds of thousands of entities and most users only see a small area.
+- The game world is spread across space and each player has a local view.
 - The game already has clear mutation points and snapshot scanning is hot.
 
 ## `ManualChannel`
@@ -45,7 +48,7 @@ Good fits:
 Avoid when:
 
 - Mutations happen in many disconnected places and the game cannot reliably call writers.
-- Correctness is still being built and automatic diffing is safer.
+- Automatic diffing better matches the game's mutation style.
 - Very few entities/users exist and scanning cost is irrelevant.
 
 ## `SpatialChannel2D`
@@ -58,16 +61,17 @@ Good fits:
 - Side scrollers using constant `y` or simple view rectangles.
 - 3D games where horizontal culling is enough using the `xz` plane.
 - Large worlds where each user sees a small portion.
+- Any world where "near this player/view/camera" is the visibility rule.
 
 Avoid when:
 
 - Everyone sees most entities.
-- Entity counts are small.
 - Visibility is by team, ownership, quest, inventory, or permissions rather than position.
 
 ## `ManualSpatialChannel2D`
 
-Use this when spatial culling matters and game code can explicitly write mutations.
+Use this when spatial visibility is the right model and game code can explicitly
+write mutations.
 
 Good fits:
 
@@ -77,7 +81,7 @@ Good fits:
 
 Avoid when:
 
-- You are still prototyping core state and might forget writer calls.
+- The game does not have reliable mutation points and might forget writer calls.
 - Most users see most cells.
 
 ## `SpatialChannel3D`
@@ -112,6 +116,10 @@ Use `EcsSpatialChannel2D/3D` when a component, usually a transform-like componen
 
 Do not use ECS channels just because the game has objects with child data. Parent/child entity trees and nengi ECS channels are different models.
 
+Parent/child entity trees still use the plain entity model. They are not a
+separate channel type: add the root entity to a normal or spatial channel, then
+attach children when child visibility should follow the root.
+
 ## Combine channels
 
 A real game often uses multiple channels:
@@ -124,6 +132,15 @@ A real game often uses multiple channels:
 
 This is normal. Keep each channel's visibility rule clear.
 
-## Start simple, optimize later
+## If unsure
 
-When uncertain, begin with `Channel` or `SpatialChannel2D/3D`. After the feature works, benchmark the real pattern. If the benchmark shows snapshot cost is hot and game code has clear mutation points, switch to the matching manual channel.
+Choose the channel from the feature's visibility rule:
+
+- shared non-spatial state: `Channel`
+- local world view in 2D or projected 3D: `SpatialChannel2D`
+- local world view in true 3D: `SpatialChannel3D`
+- explicit mutation points: the matching manual channel
+- ECS roots/components: the matching ECS channel
+
+If two choices both model the feature correctly, benchmark the game-shaped
+workload before adding the more demanding mutation path.

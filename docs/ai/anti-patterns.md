@@ -2,9 +2,17 @@
 
 Use this file when a design feels too complex or too clever.
 
-## Starting with the most optimized channel
+## Choosing by perceived speed instead of model
 
-Do not start with manual spatial ECS just because it sounds fastest. Start with the simplest correct channel, then benchmark.
+Do not choose manual spatial ECS just because it sounds fastest. Choose by the
+game's shape:
+
+- shared visibility: `Channel`
+- position-based visibility: spatial channel
+- explicit mutation points: manual channel
+- nengi ECS roots/components: ECS channel
+
+If multiple choices are plausible, benchmark the game-shaped workload.
 
 ## Putting the same entity in multiple channels
 

@@ -50,7 +50,7 @@ describe('User channel visibility', () => {
         user.subscribe(channel)
 
         const afterResubscribe = user.checkVisibility(3)
-        expect(afterResubscribe.toDelete).toEqual([9])
+        expect(afterResubscribe.toDelete).toEqual([])
         expect(afterResubscribe.toCreate).toEqual([9])
     })
 })

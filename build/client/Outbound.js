@@ -46,7 +46,7 @@ class Outbound {
             this.unconfirmedCommands.get(tick).push(command);
         }
     }
-    addTimedCommand(command, metadata) {
+    addCommandWithTiming(command, metadata) {
         const tick = this.tick;
         const commands = this.outboundCommands.get(tick);
         const commandIndex = commands ? commands.length : 0;

@@ -37,10 +37,26 @@ type RequestOptions<Response = any> = {
     callback?: (response: Response) => any;
     prediction?: PredictionOperationOptions<Response>;
 };
-export type TimedCommandOptions = {
+export type CommandTimingOptions = {
+    /**
+     * Local client time when the input was sampled. Defaults to now.
+     * This is used by the server to estimate what the client was viewing when
+     * it authored the command.
+     */
     inputTimeMs?: number;
+    /**
+     * Client interpolation/render delay in milliseconds at input time.
+     */
     renderDelayMs?: number;
+    /**
+     * Optional server frame/blend marker for games that want explicit view
+     * frame timing. Relative-time lag compensation does not require it.
+     */
     viewTick?: number;
+    /**
+     * Optional estimated server time, in milliseconds, that the client was
+     * viewing when the command was authored.
+     */
     viewServerTimeMs?: number;
 };
 export type InterpolationDelayReportOptions = {
@@ -103,10 +119,10 @@ export declare class ClientNetwork {
     incrementClientTick(): void;
     addEngineCommand(command: any): void;
     addCommand(command: any): void;
-    addTimedCommand(command: any, options?: TimedCommandOptions): void;
+    addCommandWithTiming(command: any, options?: CommandTimingOptions): void;
     reportInterpolationDelay(delayMs: number, options?: InterpolationDelayReportOptions): boolean;
     predictCommand(command: any, options?: PredictionOperationOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
-    predictTimedCommand(command: any, predictionOptions?: PredictionOperationOptions, timingOptions?: TimedCommandOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
+    predictCommandWithTiming(command: any, predictionOptions?: PredictionOperationOptions, timingOptions?: CommandTimingOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
     predictState(payload: any, options?: PredictionOperationOptions): import("./prediction/PredictionLog").PredictionOperation<any>;
     flush(): void;
     request<Request = any, Response = any>(endpoint: Endpoint<Request, Response>, payload: Request, callbackOrOptions?: ((response: Response) => any) | RequestOptions<Response>): Promise<Response>;

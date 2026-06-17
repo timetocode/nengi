@@ -1,143 +1,139 @@
-# ReplicaRouter
+# ClientReplica
 
-`ReplicaRouter` is the normal client-side way to turn nengi snapshots into game
-client state. It processes server frames, calls CRUD/message handlers, tracks
-local renderer objects, and samples interpolated entities.
+`ClientReplica` is the normal client-side bridge from nengi snapshots to game
+client state. It processes pending server frames, calls entity/component/channel
+bindings, handles messages, and applies interpolation samples.
 
-## Basic setup
+## Basic Loop
 
 ```ts
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
-const router = new ReplicaRouter(client, { interpolator })
-```
+const replica = new ClientReplica(client, { interpolator })
+await client.connect('ws://localhost:8079', handshake)
 
-Each render frame:
-
-```ts
-const batch = router.processServerFrames()
-const sample = router.sampleInterpolated(100)
-```
-
-`processServerFrames()` applies pending authoritative snapshots in order. If a
-client may have a large backlog after tab sleep or network jitter, use
-`processServerFrames({ maxFrames })` to process a chunk without skipping frames.
-Never skip delta frames; reconnect if the client is too far behind.
-
-## Tracking entities
-
-Create local renderer/game objects in create handlers and attach them to tracked
-entities:
-
-```ts
-router.onCreate(NType.Player, entity => {
-    const sprite = createPlayerSprite(entity)
-    router.trackEntity(entity, {
-        mode: ClientEntityMode.Interpolated,
-        local: sprite
-    })
-})
-```
-
-Common modes:
-
-- `Interpolated`: remote moving objects sampled from interpolation history.
-- `Predicted`: locally controlled objects whose state is predicted/reconciled by
-  game code.
-- `Raw`: state that should be read immediately without interpolation, such as UI
-  counters or inventory items.
-- `Ignored`: userland can track but opt out of normal display flows.
-
-## Applying interpolation
-
-```ts
-const sample = router.sampleInterpolated<Sprite>(100)
-
-if (sample.state) {
-    sample.entities.forEach(({ entity, tracked }) => {
-        tracked.local.x = entity.x
-        tracked.local.y = entity.y
-    })
+function frame() {
+    const batch = replica.process({ maxFrames: 20 })
+    const sample = replica.sampleInterpolated(100)
+    replica.applyInterpolatedSample(sample)
+    client.flush()
+    requestAnimationFrame(frame)
 }
+```
 
-sample.exited.forEach(tracked => {
-    tracked.local?.destroy()
+`maxFrames` chunks catch-up work but never skips delta snapshots. If a client is
+too far behind to process the backlog, reconnect rather than skipping frames.
+
+## Flat Entities
+
+Use `bindEntity` for ordinary replicated objects where the network entity is the
+thing userland wants to track.
+
+```ts
+replica.bindEntity<PlayerEntity, PlayerView>(NType.Player, {
+    mode: ClientEntityMode.Interpolated,
+    create: entity => createPlayerView(entity),
+    update(entity, view) {
+        view.hp = entity.hp
+    },
+    sample(entity, view) {
+        view.sprite.position.set(entity.x, entity.y)
+    },
+    destroy(view) {
+        view.sprite.destroy()
+    }
 })
 ```
 
-Use `sample.exited` for interpolated entities that have left visibility or were
-deleted after their interpolation tail finishes.
+Raw and predicted bindings destroy immediately when the authoritative entity is
+deleted or its channel closes. Interpolated bindings can remain alive until the
+interpolation sample exits the entity, then `destroy` runs.
 
-## Global CRUD
+## ECS Components
 
-Global handlers see entities by type regardless of channel context:
-
-```ts
-router.onCreate(NType.Npc, entity => {})
-router.onUpdate(NType.Npc, (update, entity) => {})
-router.onDelete(NType.Npc, nid => {})
-```
-
-Use global CRUD for world objects, cross-cutting systems, and simple games with
-one main channel.
-
-## Channel-scoped CRUD
-
-Use channel-scoped CRUD when the same entity type needs channel context, such as
-inventory items, team-only state, or remote-map entities.
+Use `bindEcsComponent` for nengi ECS channels. The ECS root is a `pid`;
+replicated state lives in component records with their own `nid`.
 
 ```ts
-router.channel(ctx => ctx.header?.ntype === NType.InventoryHeader)
-    .onOpen(ctx => openInventory(ctx.header))
-    .onCreate(NType.InventoryItem, (item, tracked, ctx) => {
-        addInventoryItem(ctx.header.inventoryId, item)
-    })
-    .onUpdate(NType.InventoryItem, (update, item, tracked, ctx) => {
-        updateInventoryItem(ctx.header.inventoryId, item)
-    })
-    .onClose(ctx => {
-        closeInventory(ctx.header.inventoryId)
-    })
+replica.bindEcsComponent<TransformComponent, TransformView>(NType.Transform, {
+    mode: ClientEntityMode.Interpolated,
+    create(component, ctx) {
+        return createTransformView(ctx.pid, component)
+    },
+    sample(component, view, ctx) {
+        view.pid = ctx.pid
+        view.sprite.position.set(component.x, component.y)
+    },
+    destroy(view) {
+        view.sprite.destroy()
+    }
+})
 ```
 
-Global and channel-scoped CRUD both fire if both are registered. Do not register
-both for the same side effect unless that is deliberate.
+Use `ctx.pid` for the local ECS/root identity. Use `ctx.nid` or
+`component.nid` only when code specifically needs the replicated component id,
+such as prediction reconciliation or raw authoritative lookup.
 
-## Channel close
-
-When a known headered channel closes, nengi purges entities that arrived through
-that channel and calls `onClose`.
+Root lifecycle hooks are available when userland needs them:
 
 ```ts
-router.channel(ctx => ctx.header?.ntype === NType.InventoryHeader)
-    .onClose(ctx => {
-        removeInventoryWindow(ctx.header.inventoryId)
-        ctx.closed?.entityNids.forEach(nid => removeRendererSideTable(nid))
-    })
+replica.onEcsCreateEntity(pid => createLocalRootState(pid))
+replica.onEcsDeleteEntity(pid => destroyLocalRootState(pid))
 ```
 
-Do not depend on receiving one delete callback per contained entity on channel
-close.
+Visibility loss from a channel close destroys component bindings, but it is not
+the same event as authoritative root deletion.
+
+## Channel Context
+
+Every channel has a default header. `channel.header.nid` is the channel id,
+`channel.header.channelType` is a `ChannelType` enum value, and default header
+`ntype` is `0`. A channel created with `name` also has `channel.header.name`.
+Use schema-backed header objects when ordinary entities need richer channel
+context, such as inventory items.
+
+```ts
+replica.bindChannel<InventoryHeader>(NType.InventoryHeader, {
+    open: channel => openInventory(channel.header),
+    update: channel => refreshInventoryHeader(channel.header),
+    close: channel => closeInventory(channel.header.inventoryId)
+})
+
+replica.bindChannelEntity<InventoryHeader, InventoryItem>(NType.InventoryHeader, NType.InventoryItem, {
+    mode: ClientEntityMode.Raw,
+    create(item, ctx) {
+        upsertInventoryItem(ctx.channel.header.inventoryId, item)
+    },
+    update(item, _local, ctx) {
+        upsertInventoryItem(ctx.channel.header.inventoryId, item)
+    },
+    destroy(_local, ctx) {
+        removeInventoryItem(ctx.nid)
+    }
+})
+```
+
+Use channel headers for game meaning. Treat raw channel ids as internal
+bookkeeping.
 
 ## Messages
 
-Immediate messages run as soon as the snapshot is processed:
+Immediate messages run after the frame's authoritative state is applied:
 
 ```ts
-router.onMessage(NType.YouArePlayer, message => {
-    router.setMode(message.nid, ClientEntityMode.Predicted)
+replica.onMessage(NType.YouArePlayer, message => {
+    setControlledPlayer(message.pid, message.componentNid)
 })
 ```
 
-Interpolated messages run when the interpolation timeline reaches their frame:
+Interpolated messages are released on the interpolation timeline:
 
 ```ts
-router.onInterpolatedMessage(NType.ShotFired, message => {
+replica.onInterpolatedMessage(NType.ShotFired, message => {
     drawShot(message)
 })
 ```
 
-Use interpolated messages for effects that should line up with interpolated
-entity movement. The message payload is not interpolated; its delivery timing is
-synced to the interpolation timeline.
-
+Use immediate messages for control/UI context and notifications. Use
+interpolated messages for transient effects that should line up with
+interpolated entity motion.

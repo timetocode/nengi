@@ -4,11 +4,13 @@ import { BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { createEmptySnapshotPlan } from './SnapshotPlan'
 import { countSnapshotBytes } from './countSnapshotBytes'
-import { writeSnapshot } from './writeSnapshot'
+import { writeChannelScope, writeSnapshot } from './writeSnapshot'
 import { isSharedMessageChannel, SharedMessageChannel } from './channelModes'
 import { writePayload } from './snapshotPayload'
+import { byteSizeOfNetworkType, ProtocolConfig } from '../../common/binary/Protocol'
 
 type MessageFragment = {
+    channelId: number
     payload: BinaryPayload
     bytes: number
     messages: number
@@ -20,6 +22,22 @@ export function collectBroadcastMessages(user: User) {
         if (isSharedMessageChannel(channel) && channel.broadcastMessages.length > 0) {
             for (let i = 0; i < channel.broadcastMessages.length; i++) {
                 messages.push(channel.broadcastMessages[i])
+            }
+        }
+    })
+    return messages
+}
+
+export function collectInterpolatedBroadcastMessages(user: User) {
+    const messages: any[] = []
+    user.subscriptions.forEach((channel: any) => {
+        if (isSharedMessageChannel(channel)) {
+            const interpolated = channel.interpolatedBroadcastMessages
+            if (!interpolated || interpolated.length === 0) {
+                return
+            }
+            for (let i = 0; i < interpolated.length; i++) {
+                messages.push(interpolated[i])
             }
         }
     })
@@ -60,6 +78,7 @@ function getSharedMessageFragment(user: User, instance: Instance, channel: Share
     }
 
     const fragment = {
+        channelId: channel.nid,
         payload: writer.payload,
         bytes,
         messages: channel.broadcastMessages.length
@@ -83,10 +102,10 @@ export function getSharedMessageFragments(user: User, instance: Instance) {
     return fragments
 }
 
-export function sumSharedMessageFragmentBytes(fragments: MessageFragment[]) {
+export function sumSharedMessageFragmentBytes(fragments: MessageFragment[], protocol: ProtocolConfig) {
     let bytes = 0
     for (let i = 0; i < fragments.length; i++) {
-        bytes += fragments[i].bytes
+        bytes += 1 + byteSizeOfNetworkType(protocol.nidType) + fragments[i].bytes
     }
     return bytes
 }
@@ -100,8 +119,10 @@ export function sumSharedMessageFragmentMessages(fragments: MessageFragment[]) {
 }
 
 export function writeSharedMessageFragments(writer: IBinaryWriter, instance: Instance, fragments: MessageFragment[]) {
+    const protocol = instance.network.getProtocol()
     for (let i = 0; i < fragments.length; i++) {
         const fragment = fragments[i]
+        writeChannelScope(fragment.channelId, writer, protocol)
         const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0
         writePayload(writer, fragment.payload)
         if (instance.network.snapshotPerformanceEnabled) {

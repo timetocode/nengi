@@ -1,4 +1,5 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema';
+import { ChannelHeader, ChannelType } from '../../common/ChannelHeader';
 import { IEntity } from '../../common/IEntity';
 import { LocalState } from '../LocalState';
 import { NDictionary } from '../NDictionary';
@@ -43,18 +44,18 @@ export type ManualSpatialChannel2DOptions = ChannelOptions & {
         x?: string;
         y?: string;
     };
-    debugManualWrites?: boolean;
+    strictManualWrites?: boolean;
 };
 export declare class ManualSpatialChannel2D implements ICulledChannel<SpatialEntity, SpatialView> {
     readonly manualSpatialChannelMode = true;
     readonly cellFragmentMode = true;
     nid: number;
-    label?: string;
     localState: LocalState;
     entities: NDictionary;
     users: Map<number, User>;
-    header: IEntity | null;
+    header: ChannelHeader;
     headerVersion: number;
+    channelType: ChannelType;
     visibilityResolver: (obj: any, view: SpatialView) => boolean;
     cellSize: number;
     queryPadding: number;
@@ -74,9 +75,10 @@ export declare class ManualSpatialChannel2D implements ICulledChannel<SpatialEnt
     private spatialYProp;
     plane: SpatialPlane;
     private axes;
-    private debugManualWrites;
+    private strictManualWrites;
     private movedRoots;
     private structuralDeltas;
+    skipInterpolationNids: number[];
     constructor(localState: LocalState, cellSize: number, options?: ManualSpatialChannel2DOptions);
     private getOrCreateCellForEntity;
     private getCellForEntity;
@@ -90,15 +92,15 @@ export declare class ManualSpatialChannel2D implements ICulledChannel<SpatialEnt
     private buildVisibleCells;
     private getCellDeleteNids;
     createEntityWriter(ntype: number, schema: Schema): ManualSpatial2DTypeWriters;
-    tick(tick: number): void;
     addEntity(entity: SpatialEntity): SpatialEntity;
-    setHeader(header: IEntity): IEntity;
-    getHeader(): IEntity | null;
     markHeaderDirty(): boolean;
     updateEntity(entity: SpatialEntity): void;
     removeEntity(entity: SpatialEntity): number;
     removeAllEntities(): void;
+    markDirty(entity: SpatialEntity): boolean;
+    skipInterpolation(entity: SpatialEntity): boolean;
     addMessage(message: any): void;
+    addInterpolatedMessage(message: any): void;
     clearBroadcastMessages(): void;
     clearSnapshotDeltas(): void;
     subscribe(user: User, view: SpatialView): void;

@@ -10,16 +10,20 @@ class Frame {
         this.ecsCreateEntities = args.ecsCreateEntities || [];
         this.ecsCreateComponents = args.ecsCreateComponents || [];
         this.ecsDeleteEntities = args.ecsDeleteEntities || [];
+        this.channelOpens = args.channelOpens || [];
         this.channelEntityCreates = args.channelEntityCreates || [];
-        this.channelHeaderCreates = args.channelHeaderCreates || [];
         this.channelHeaderUpdates = args.channelHeaderUpdates || [];
-        this.channelHeaderDeletes = args.channelHeaderDeletes || [];
+        this.channelCloses = args.channelCloses || [];
+        this.skipInterpolationNids = new Set(args.skipInterpolationNids || []);
+        this.openedChannels = args.openedChannels || [];
         this.closedChannels = args.closedChannels || [];
         this.createEntities = args.createEntities;
         this.updateEntities = args.updateEntities;
         this.deleteEntities = args.deleteEntities;
         this.deletedEntities = args.deletedEntities;
         this.messages = args.messages;
+        this.interpolatedMessages = args.interpolatedMessages || [];
+        this.channels = args.channels || [];
     }
 }
 exports.Frame = Frame;

@@ -1,4 +1,6 @@
 import { Context } from '../../common/Context'
+import { Binary } from '../../common/binary/Binary'
+import { binaryGet } from '../../common/binary/BinaryExt'
 import { DEFAULT_PROTOCOL, ProtocolConfig, byteSizeOfNetworkType } from '../../common/binary/Protocol'
 import { countEndpointPayload } from '../endpoint/EndpointPayload'
 import countEntity from '../entity/countEntity'
@@ -6,6 +8,7 @@ import countDiff from '../entity/countDiff'
 import countUpdateGroup from '../entity/countUpdateGroup'
 import countMessage from '../message/count'
 import { SnapshotPlan } from './SnapshotPlan'
+import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 
 const SECTION_BYTES = 1
 const UINT8_COUNT_BYTES = 1
@@ -22,16 +25,22 @@ function countChannelEntityCreates(plan: SnapshotPlan, protocol: ProtocolConfig)
         (plan.channelEntityCreates.length * byteSizeOfNetworkType(protocol.nidType) * 2)
 }
 
-function countChannelHeaderCreates(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
-    if (plan.channelHeaderCreates.length === 0) {
+function countChannelOpens(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+    if (plan.channelOpens.length === 0) {
         return 0
     }
 
+    const stringBinary = binaryGet(Binary.String)
     let bytes = SECTION_BYTES + UINT32_COUNT_BYTES
-    for (let i = 0; i < plan.channelHeaderCreates.length; i++) {
-        const header = plan.channelHeaderCreates[i].header
+    for (let i = 0; i < plan.channelOpens.length; i++) {
         bytes += byteSizeOfNetworkType(protocol.nidType)
-        bytes += countEntity(context.getSchema(header.ntype)!, header, protocol.ntypeType, protocol.nidType)
+        bytes += 1
+        bytes += stringBinary.byteSize(plan.channelOpens[i].header.name || '')
+        bytes += 1
+        if (hasSchemaBackedChannelHeader(plan.channelOpens[i].header)) {
+            const header = plan.channelOpens[i].header
+            bytes += countEntity(context.getSchema(header.ntype)!, header, protocol.ntypeType, protocol.nidType)
+        }
     }
     return bytes
 }
@@ -58,13 +67,22 @@ function countChannelHeaderUpdates(plan: SnapshotPlan, protocol: ProtocolConfig)
     return bytes
 }
 
-function countChannelHeaderDeletes(plan: SnapshotPlan, protocol: ProtocolConfig) {
-    if (plan.channelHeaderDeletes.length === 0) {
+function countChannelCloses(plan: SnapshotPlan, protocol: ProtocolConfig) {
+    if (plan.channelCloses.length === 0) {
         return 0
     }
 
     return SECTION_BYTES + UINT32_COUNT_BYTES +
-        (plan.channelHeaderDeletes.length * byteSizeOfNetworkType(protocol.nidType))
+        (plan.channelCloses.length * byteSizeOfNetworkType(protocol.nidType))
+}
+
+function countSkipInterpolation(plan: SnapshotPlan, protocol: ProtocolConfig) {
+    if (plan.skipInterpolationNids.length === 0) {
+        return 0
+    }
+
+    return SECTION_BYTES + UINT32_COUNT_BYTES +
+        (plan.skipInterpolationNids.length * byteSizeOfNetworkType(protocol.nidType))
 }
 
 function countEngineMessages(plan: SnapshotPlan, context: Context) {
@@ -89,6 +107,20 @@ function countMessages(plan: SnapshotPlan, context: Context, protocol: ProtocolC
     let bytes = SECTION_BYTES + UINT32_COUNT_BYTES
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i]
+        const nschema = context.getSchema(message.ntype)!
+        bytes += countMessage(nschema, message, protocol.ntypeType)
+    }
+    return bytes
+}
+
+function countInterpolatedMessages(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+    if (plan.interpolatedMessages.length === 0) {
+        return 0
+    }
+
+    let bytes = SECTION_BYTES + UINT32_COUNT_BYTES
+    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
+        const message = plan.interpolatedMessages[i]
         const nschema = context.getSchema(message.ntype)!
         bytes += countMessage(nschema, message, protocol.ntypeType)
     }
@@ -191,11 +223,13 @@ function countDeleteEntities(plan: SnapshotPlan, protocol: ProtocolConfig) {
 export function countSnapshotBytes(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
     return countEngineMessages(plan, context) +
         countMessages(plan, context, protocol) +
+        countInterpolatedMessages(plan, context, protocol) +
         countResponses(plan) +
+        countChannelOpens(plan, context, protocol) +
         countChannelEntityCreates(plan, protocol) +
-        countChannelHeaderCreates(plan, context, protocol) +
         countChannelHeaderUpdates(plan, protocol) +
-        countChannelHeaderDeletes(plan, protocol) +
+        countChannelCloses(plan, protocol) +
+        countSkipInterpolation(plan, protocol) +
         countEcsCreateEntities(plan, protocol) +
         countEcsCreateComponents(plan, context, protocol) +
         countCreateEntities(plan, context, protocol) +

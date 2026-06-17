@@ -3,7 +3,7 @@ import { NQueue } from '../NQueue'
 type Tick = number
 type Command = any
 
-export type TimedCommandMetadata = {
+export type CommandTimingMetadata = {
     commandIndex: number
     clientTimeMs: number
     renderDelayMs: number
@@ -25,7 +25,7 @@ export class Outbound {
     unconfirmedCommands: Map<Tick, Command[]>
     outboundEngineCommands: Map<Tick, Command[]>
     outboundCommands: Map<Tick, Command[]>
-    outboundCommandTiming: Map<Tick, TimedCommandMetadata[]>
+    outboundCommandTiming: Map<Tick, CommandTimingMetadata[]>
     tick: number
     confirmedTick: number
     lastSentTick: number
@@ -76,7 +76,7 @@ export class Outbound {
         }
     }
 
-    addTimedCommand(command: Command, metadata: Omit<TimedCommandMetadata, 'commandIndex'>) {
+    addCommandWithTiming(command: Command, metadata: Omit<CommandTimingMetadata, 'commandIndex'>) {
         const tick = this.tick
         const commands = this.outboundCommands.get(tick)
         const commandIndex = commands ? commands.length : 0

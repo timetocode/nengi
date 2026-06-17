@@ -15,7 +15,8 @@ exports.getSingleManualUpdateChannel = getSingleManualUpdateChannel;
 exports.getSingleCellFragmentChannel = getSingleCellFragmentChannel;
 function isSharedUpdateChannel(channel) {
     var _a;
-    return Array.isArray(channel.entityNids) &&
+    return (channel === null || channel === void 0 ? void 0 : channel.cellFragmentMode) !== true &&
+        Array.isArray(channel.entityNids) &&
         typeof channel.membershipVersion === 'number' &&
         typeof channel.deltaBaseVersion === 'number' &&
         Array.isArray(channel.createdRoots) &&
@@ -23,7 +24,7 @@ function isSharedUpdateChannel(channel) {
         ((_a = channel.entities) === null || _a === void 0 ? void 0 : _a.array);
 }
 function isSharedMessageChannel(channel) {
-    return Array.isArray(channel.broadcastMessages);
+    return (channel === null || channel === void 0 ? void 0 : channel.cellFragmentMode) !== true && Array.isArray(channel.broadcastMessages);
 }
 function isManualUpdateChannel(channel) {
     const candidate = channel;
@@ -68,11 +69,7 @@ function isEcsSpatialSnapshotChannel(channel) {
         candidate.dirtyCells instanceof Set &&
         typeof candidate.getVisibleCellKeys === 'function' &&
         typeof candidate.getManualCellUpdateLog === 'function' &&
-        typeof candidate.cellHasManualUpdates === 'function' &&
-        typeof candidate.getMovedRoots === 'function' &&
-        typeof candidate.hasOnlyMovementDeltas === 'function' &&
-        typeof candidate.isCellVisible === 'function' &&
-        typeof candidate.getRootComponents === 'function';
+        typeof candidate.cellHasManualUpdates === 'function';
 }
 function getSingleEcsSpatialSnapshotChannel(user) {
     if (user.subscriptions.size !== 1) {

@@ -7,14 +7,13 @@ export declare class LocalState {
     nidType: NetworkIdType;
     nidPool: IdPool;
     dirtyNids: Set<number>;
-    dirtySources: Map<number, Set<number>>;
     entityTreeVersion: number;
     /**
-     * Entity nid -> source id currently keeping that entity networked.
-     * The set shape is kept for now because the hot visibility path already
-     * understands it, but entity ownership is intentionally single-source.
+     * Entity nid -> owner nid currently keeping that entity networked.
+     * Root entities are owned by a channel. Child entities are owned by their
+     * parent entity and cascade visibility through the root.
      */
-    sources: Map<number, Set<number>>;
+    ownerByNid: Map<number, number>;
     /**
      * Parent entity nid -> child entity nids. Children cascade visibility from
      * the parent, but userland still owns object lifetime and game semantics.
@@ -27,17 +26,16 @@ export declare class LocalState {
     private treeCache;
     private treeDeleteCache;
     nextNetworkId(): number;
-    tick(tick: number): void;
     private assertRegisteredParent;
     private invalidateEntityTreeCache;
     private invalidateEntityTreeSubtree;
     addChild(parent: IEntity, child: IEntity): IEntity;
     removeChild(parent: IEntity, child: IEntity): void;
-    registerEntity(entity: IEntity, sourceId: number): number;
+    registerEntity(entity: IEntity, ownerId: number): number;
     markDirty(entity: IEntity): boolean;
     isDirty(nid: number): boolean;
     clearDirty(): void;
-    unregisterEntity(entity: IEntity, sourceId: number): void;
+    unregisterEntity(entity: IEntity, ownerId: number): void;
     getByNid(nid: number): IEntity;
     getParentNid(nid: number): number;
     getRootNid(nid: number): number;

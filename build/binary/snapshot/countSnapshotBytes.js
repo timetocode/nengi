@@ -4,12 +4,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.countSnapshotBytes = countSnapshotBytes;
+const Binary_1 = require("../../common/binary/Binary");
+const BinaryExt_1 = require("../../common/binary/BinaryExt");
 const Protocol_1 = require("../../common/binary/Protocol");
 const EndpointPayload_1 = require("../endpoint/EndpointPayload");
 const countEntity_1 = __importDefault(require("../entity/countEntity"));
 const countDiff_1 = __importDefault(require("../entity/countDiff"));
 const countUpdateGroup_1 = __importDefault(require("../entity/countUpdateGroup"));
 const count_1 = __importDefault(require("../message/count"));
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const SECTION_BYTES = 1;
 const UINT8_COUNT_BYTES = 1;
 const UINT32_COUNT_BYTES = 4;
@@ -22,15 +25,21 @@ function countChannelEntityCreates(plan, protocol) {
     return SECTION_BYTES + UINT32_COUNT_BYTES +
         (plan.channelEntityCreates.length * (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType) * 2);
 }
-function countChannelHeaderCreates(plan, context, protocol) {
-    if (plan.channelHeaderCreates.length === 0) {
+function countChannelOpens(plan, context, protocol) {
+    if (plan.channelOpens.length === 0) {
         return 0;
     }
+    const stringBinary = (0, BinaryExt_1.binaryGet)(Binary_1.Binary.String);
     let bytes = SECTION_BYTES + UINT32_COUNT_BYTES;
-    for (let i = 0; i < plan.channelHeaderCreates.length; i++) {
-        const header = plan.channelHeaderCreates[i].header;
+    for (let i = 0; i < plan.channelOpens.length; i++) {
         bytes += (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType);
-        bytes += (0, countEntity_1.default)(context.getSchema(header.ntype), header, protocol.ntypeType, protocol.nidType);
+        bytes += 1;
+        bytes += stringBinary.byteSize(plan.channelOpens[i].header.name || '');
+        bytes += 1;
+        if ((0, ChannelHeader_1.hasSchemaBackedChannelHeader)(plan.channelOpens[i].header)) {
+            const header = plan.channelOpens[i].header;
+            bytes += (0, countEntity_1.default)(context.getSchema(header.ntype), header, protocol.ntypeType, protocol.nidType);
+        }
     }
     return bytes;
 }
@@ -54,12 +63,19 @@ function countChannelHeaderUpdates(plan, protocol) {
     }
     return bytes;
 }
-function countChannelHeaderDeletes(plan, protocol) {
-    if (plan.channelHeaderDeletes.length === 0) {
+function countChannelCloses(plan, protocol) {
+    if (plan.channelCloses.length === 0) {
         return 0;
     }
     return SECTION_BYTES + UINT32_COUNT_BYTES +
-        (plan.channelHeaderDeletes.length * (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType));
+        (plan.channelCloses.length * (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType));
+}
+function countSkipInterpolation(plan, protocol) {
+    if (plan.skipInterpolationNids.length === 0) {
+        return 0;
+    }
+    return SECTION_BYTES + UINT32_COUNT_BYTES +
+        (plan.skipInterpolationNids.length * (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType));
 }
 function countEngineMessages(plan, context) {
     if (plan.engineMessages.length === 0) {
@@ -80,6 +96,18 @@ function countMessages(plan, context, protocol) {
     let bytes = SECTION_BYTES + UINT32_COUNT_BYTES;
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i];
+        const nschema = context.getSchema(message.ntype);
+        bytes += (0, count_1.default)(nschema, message, protocol.ntypeType);
+    }
+    return bytes;
+}
+function countInterpolatedMessages(plan, context, protocol) {
+    if (plan.interpolatedMessages.length === 0) {
+        return 0;
+    }
+    let bytes = SECTION_BYTES + UINT32_COUNT_BYTES;
+    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
+        const message = plan.interpolatedMessages[i];
         const nschema = context.getSchema(message.ntype);
         bytes += (0, count_1.default)(nschema, message, protocol.ntypeType);
     }
@@ -165,11 +193,13 @@ function countDeleteEntities(plan, protocol) {
 function countSnapshotBytes(plan, context, protocol = Protocol_1.DEFAULT_PROTOCOL) {
     return countEngineMessages(plan, context) +
         countMessages(plan, context, protocol) +
+        countInterpolatedMessages(plan, context, protocol) +
         countResponses(plan) +
+        countChannelOpens(plan, context, protocol) +
         countChannelEntityCreates(plan, protocol) +
-        countChannelHeaderCreates(plan, context, protocol) +
         countChannelHeaderUpdates(plan, protocol) +
-        countChannelHeaderDeletes(plan, protocol) +
+        countChannelCloses(plan, protocol) +
+        countSkipInterpolation(plan, protocol) +
         countEcsCreateEntities(plan, protocol) +
         countEcsCreateComponents(plan, context, protocol) +
         countCreateEntities(plan, context, protocol) +

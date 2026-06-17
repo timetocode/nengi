@@ -1,4 +1,5 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ChannelType } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
 import { LocalState } from '../LocalState'
 import { Channel, ChannelOptions } from './Channel'
@@ -27,7 +28,7 @@ export class ManualChannel extends Channel {
     manualGroupValues: any[] = []
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
-        super(localState, options)
+        super(localState, { ...options, channelType: ChannelType.ManualChannel })
     }
 
     createEntityWriter(ntype: number, schema: Schema): ManualTypeWriters {

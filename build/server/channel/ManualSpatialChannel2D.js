@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ManualSpatialChannel2D = void 0;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const NDictionary_1 = require("../NDictionary");
 const SpatialGrid_1 = require("./SpatialGrid");
 const SpatialView_1 = require("./SpatialView");
@@ -24,8 +25,8 @@ class ManualSpatialChannel2D {
         this.cellFragmentMode = true;
         this.entities = new NDictionary_1.NDictionary();
         this.users = new Map();
-        this.header = null;
         this.headerVersion = 0;
+        this.channelType = ChannelHeader_1.ChannelType.ManualSpatialChannel2D;
         this.visibilityResolver = (obj, view) => (0, SpatialView_1.objectInSpatialView)(obj, view, this.plane);
         this.membershipVersion = 0;
         this.dirtyCells = new Set();
@@ -38,6 +39,7 @@ class ManualSpatialChannel2D {
         this.rememberedCellSignatures = new Map();
         this.movedRoots = [];
         this.structuralDeltas = false;
+        this.skipInterpolationNids = [];
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
             throw new Error('ManualSpatialChannel2D requires a positive finite cell size.');
         }
@@ -46,7 +48,8 @@ class ManualSpatialChannel2D {
         }
         this.localState = localState;
         this.nid = localState.nextNetworkId();
-        this.label = options.label;
+        this.header = (0, ChannelHeader_1.createChannelHeader)(this.nid, this.channelType, options.header, options.name);
+        this.headerVersion = (0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header) ? 1 : 0;
         this.cellSize = cellSize;
         this.queryPadding = options.queryPadding || 0;
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16));
@@ -55,7 +58,7 @@ class ManualSpatialChannel2D {
         this.axes = (0, SpatialView_1.getSpatialPlaneAxes)(this.plane);
         this.spatialXProp = ((_a = options.spatialProps) === null || _a === void 0 ? void 0 : _a.x) || this.axes.a;
         this.spatialYProp = ((_b = options.spatialProps) === null || _b === void 0 ? void 0 : _b.y) || this.axes.b;
-        this.debugManualWrites = options.debugManualWrites === true;
+        this.strictManualWrites = options.strictManualWrites === true;
         this.grid = new SpatialGrid_1.SpatialGrid2D({
             cellSize,
             getX: entity => entity[this.spatialXProp],
@@ -63,9 +66,6 @@ class ManualSpatialChannel2D {
             initializeCell: initializeManualSpatialCell
         });
         this.localState.channels.add(this);
-        if (options.header) {
-            this.setHeader(options.header);
-        }
     }
     getOrCreateCellForEntity(entity) {
         return this.grid.getOrCreateCellForObject(entity);
@@ -117,7 +117,7 @@ class ManualSpatialChannel2D {
                 return this.grid.cells.get(rootRef.key);
             }
         }
-        if (this.debugManualWrites) {
+        if (this.strictManualWrites) {
             throw new Error(`ManualSpatialChannel2D cannot write mutation for nid ${entity.nid}; no spatial cell was found for the entity or its root.`);
         }
         return null;
@@ -286,8 +286,6 @@ class ManualSpatialChannel2D {
         }
         return writers;
     }
-    tick(tick) {
-    }
     addEntity(entity) {
         this.localState.registerEntity(entity, this.nid);
         this.entities.add(entity);
@@ -297,23 +295,8 @@ class ManualSpatialChannel2D {
         this.invalidateVisibleCellKeyCache();
         return entity;
     }
-    setHeader(header) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().');
-        }
-        if (this.header === header) {
-            return header;
-        }
-        this.localState.registerEntity(header, this.nid);
-        this.header = header;
-        this.headerVersion++;
-        return header;
-    }
-    getHeader() {
-        return this.header;
-    }
     markHeaderDirty() {
-        if (!this.header) {
+        if (!(0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header)) {
             return false;
         }
         this.headerVersion++;
@@ -343,13 +326,33 @@ class ManualSpatialChannel2D {
     removeAllEntities() {
         Array.from(this.entities.array).forEach(entity => this.removeEntity(entity));
     }
+    markDirty(entity) {
+        return this.localState.markDirty(entity);
+    }
+    // One-frame interpolation skip for teleports, respawns, wraparound, or
+    // pooled entities moved discontinuously to a new position.
+    skipInterpolation(entity) {
+        if (!entity || entity.nid === 0 || this.entities.get(entity.nid) !== entity) {
+            return false;
+        }
+        this.skipInterpolationNids.push(entity.nid);
+        return true;
+    }
     addMessage(message) {
         // Spatial messages are culled immediately against the current user
         // views instead of being stored as channel broadcast fragments.
         this.users.forEach((user, userId) => {
             const view = this.views.get(userId);
             if (view && this.visibilityResolver(message, view)) {
-                user.queueMessage(message);
+                user.queueChannelMessage(this.nid, message);
+            }
+        });
+    }
+    addInterpolatedMessage(message) {
+        this.users.forEach((user, userId) => {
+            const view = this.views.get(userId);
+            if (view && this.visibilityResolver(message, view)) {
+                user.queueChannelInterpolatedMessage(this.nid, message);
             }
         });
     }
@@ -370,6 +373,7 @@ class ManualSpatialChannel2D {
             cell.manualGroupValues.length = 0;
         }
         this.dirtyCells.clear();
+        this.skipInterpolationNids.length = 0;
         this.movedRoots.length = 0;
         this.structuralDeltas = false;
     }
@@ -535,11 +539,6 @@ class ManualSpatialChannel2D {
     destroy() {
         this.unsubscribeAll();
         this.removeAllEntities();
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid);
-            this.header = null;
-            this.headerVersion++;
-        }
         this.localState.nidPool.returnId(this.nid);
         this.localState.channels.delete(this);
         this.views.clear();

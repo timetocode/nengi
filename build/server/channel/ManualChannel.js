@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ManualChannel = void 0;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const Channel_1 = require("./Channel");
 class ManualChannel extends Channel_1.Channel {
     constructor(localState, options = {}) {
-        super(localState, options);
+        super(localState, Object.assign(Object.assign({}, options), { channelType: ChannelHeader_1.ChannelType.ManualChannel }));
         // Snapshot writers key off this marker to use the manual mutation log
         // instead of scanning visible entities and diffing every schema property.
         this.manualUpdateChannelMode = true;

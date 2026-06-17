@@ -1,14 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EcsChannel = void 0;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 class EcsChannel {
     constructor(localState, options = {}) {
         // ECS channels are manual by design: roots are nids, components carry the
         // replicated state, and userland component writers append the mutation log.
         this.ecsChannelMode = true;
         this.users = new Map();
-        this.header = null;
         this.headerVersion = 0;
+        this.channelType = ChannelHeader_1.ChannelType.EcsChannel;
         this.rootNids = [];
         this.componentNids = [];
         this.membershipVersion = 0;
@@ -25,7 +26,9 @@ class EcsChannel {
         this.manualGroupSchemas = [];
         this.manualGroupValueOffsets = [];
         this.manualGroupValues = [];
+        this.skipInterpolationNids = [];
         this.broadcastMessages = [];
+        this.interpolatedBroadcastMessages = [];
         this.rootSet = new Set();
         this.componentSet = new Set();
         this.componentsByRoot = new Map();
@@ -33,13 +36,9 @@ class EcsChannel {
         this.visibleNetworkedNidsCache = null;
         this.localState = localState;
         this.nid = localState.nextNetworkId();
-        this.label = options.label;
+        this.header = (0, ChannelHeader_1.createChannelHeader)(this.nid, this.channelType, options.header, options.name);
+        this.headerVersion = (0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header) ? 1 : 0;
         this.localState.channels.add(this);
-        if (options.header) {
-            this.setHeader(options.header);
-        }
-    }
-    tick(tick) {
     }
     createEntity() {
         // In the ECS model a root entity is only a network id. All replicated
@@ -57,23 +56,8 @@ class EcsChannel {
     addEntity() {
         return this.createEntity();
     }
-    setHeader(header) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().');
-        }
-        if (this.header === header) {
-            return header;
-        }
-        this.localState.registerEntity(header, this.nid);
-        this.header = header;
-        this.headerVersion++;
-        return header;
-    }
-    getHeader() {
-        return this.header;
-    }
     markHeaderDirty() {
-        if (!this.header) {
+        if (!(0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header)) {
             return false;
         }
         this.headerVersion++;
@@ -214,11 +198,6 @@ class EcsChannel {
     destroy() {
         this.unsubscribeAll();
         this.removeAllEntities();
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid);
-            this.header = null;
-            this.headerVersion++;
-        }
         this.localState.nidPool.returnId(this.nid);
         this.localState.channels.delete(this);
         this.rootNids.length = 0;
@@ -236,7 +215,9 @@ class EcsChannel {
         this.manualGroupSchemas.length = 0;
         this.manualGroupValueOffsets.length = 0;
         this.manualGroupValues.length = 0;
+        this.skipInterpolationNids.length = 0;
         this.broadcastMessages.length = 0;
+        this.interpolatedBroadcastMessages.length = 0;
         this.rootSet.clear();
         this.componentSet.clear();
         this.componentsByRoot.clear();
@@ -246,8 +227,22 @@ class EcsChannel {
     addMessage(message) {
         this.broadcastMessages.push(message);
     }
+    addInterpolatedMessage(message) {
+        this.interpolatedBroadcastMessages.push(message);
+    }
+    // ECS roots are ids only; skip interpolation is meaningful for stateful
+    // components that the client interpolates, such as transform components.
+    skipInterpolation(pidOrComponent) {
+        const nid = typeof pidOrComponent === 'number' ? pidOrComponent : pidOrComponent.nid;
+        if (!this.componentSet.has(nid)) {
+            return false;
+        }
+        this.skipInterpolationNids.push(nid);
+        return true;
+    }
     clearBroadcastMessages() {
         this.broadcastMessages.length = 0;
+        this.interpolatedBroadcastMessages.length = 0;
     }
     hasStructuralDeltas() {
         return this.createdRoots.length > 0 ||
@@ -269,6 +264,7 @@ class EcsChannel {
         this.manualGroupSchemas.length = 0;
         this.manualGroupValueOffsets.length = 0;
         this.manualGroupValues.length = 0;
+        this.skipInterpolationNids.length = 0;
     }
     createComponentWriter(ntype, schema) {
         const props = Object.create(null);

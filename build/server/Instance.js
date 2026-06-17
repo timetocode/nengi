@@ -23,10 +23,8 @@ class Instance {
         this.pingIntervalMs = 10000;
         this.responseEndPoints = new Map();
         this.onConnect = (handshake) => {
-            return new Promise((resolve, reject) => {
-                console.log(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`);
-                resolve(false);
-            });
+            console.warn(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`);
+            return Promise.resolve(false);
         };
         this.network = new InstanceNetwork_1.InstanceNetwork(this);
     }
@@ -52,7 +50,6 @@ class Instance {
             timestamp
         };
         this.tick++;
-        this.localState.tick(this.tick);
         this.cache.createCachesForTick(this.tick);
         this.network.resetSharedUpdateFragments();
         this.users.forEach(user => {
@@ -88,14 +85,9 @@ class Instance {
         });
         this.cache.deleteCachesForTick(this.tick);
         this.localState.channels.forEach(channel => {
-            const clearBroadcastMessages = channel.clearBroadcastMessages;
-            if (typeof clearBroadcastMessages === 'function') {
-                clearBroadcastMessages.call(channel);
-            }
-            const clearSnapshotDeltas = channel.clearSnapshotDeltas;
-            if (typeof clearSnapshotDeltas === 'function') {
-                clearSnapshotDeltas.call(channel);
-            }
+            var _a, _b;
+            (_a = channel.clearBroadcastMessages) === null || _a === void 0 ? void 0 : _a.call(channel);
+            (_b = channel.clearSnapshotDeltas) === null || _b === void 0 ? void 0 : _b.call(channel);
         });
         this.localState.releaseDeferredIds();
         this.localState.clearDirty();

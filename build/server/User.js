@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = exports.UserConnectionState = void 0;
+exports.getCommandViewTimeMs = getCommandViewTimeMs;
 const Protocol_1 = require("../common/binary/Protocol");
 var UserConnectionState;
 (function (UserConnectionState) {
@@ -10,6 +11,24 @@ var UserConnectionState;
     UserConnectionState[UserConnectionState["Open"] = 3] = "Open";
     UserConnectionState[UserConnectionState["Closed"] = 4] = "Closed"; // closed, network.send would crash if invoked
 })(UserConnectionState || (exports.UserConnectionState = UserConnectionState = {}));
+function getCommandViewTimeMs(timing, options) {
+    var _a;
+    const nowMs = options.nowMs;
+    const fallbackRewindMs = Math.max(0, (_a = options.fallbackRewindMs) !== null && _a !== void 0 ? _a : 0);
+    let viewTimeMs = nowMs - fallbackRewindMs;
+    if (timing) {
+        if (timing.viewServerTimeMs >= 0) {
+            viewTimeMs = timing.viewServerTimeMs;
+        }
+        else if (Number.isFinite(timing.estimatedViewAgeMs)) {
+            viewTimeMs = nowMs - Math.max(0, timing.estimatedViewAgeMs);
+        }
+    }
+    if (options.maxRewindMs !== undefined && options.maxRewindMs > 0) {
+        viewTimeMs = Math.max(nowMs - options.maxRewindMs, viewTimeMs);
+    }
+    return Math.min(nowMs, viewTimeMs);
+}
 function createChannelVisibilityState() {
     return {
         tickLastSeen: new Map(),
@@ -27,6 +46,9 @@ class User {
         this.subscriptions = new Map();
         this.engineMessageQueue = [];
         this.messageQueue = [];
+        this.interpolatedMessageQueue = [];
+        this.scopedMessageQueue = [];
+        this.scopedInterpolatedMessageQueue = [];
         this.responseQueue = [];
         this.protocol = Object.assign({}, Protocol_1.DEFAULT_PROTOCOL);
         this.channelVisibilityStates = new Map();
@@ -38,8 +60,10 @@ class User {
         this.currentlyVisible = [];
         this.sharedChannelVersions = new Map();
         this.stableVisibleRefs = new Map();
+        this.knownChannelIds = new Set();
         this.knownChannelHeaderVersions = new Map();
-        this.pendingChannelHeaderDeletes = new Set();
+        this.pendingChannelOpens = new Set();
+        this.pendingChannelCloses = new Set();
         this.lastSentInstanceTick = 0;
         this.lastReceivedClientTick = 0;
         this.nextPingId = 1;
@@ -179,6 +203,7 @@ class User {
             ? input.clientTimeMs + this.clockOffsetMs
             : serverReceivedTimeMs - this.oneWayMs;
         const renderDelayMs = Number.isFinite(input.renderDelayMs) ? Math.max(0, input.renderDelayMs) : 0;
+        const estimatedViewTimeMs = estimatedInputTimeMs - renderDelayMs;
         return {
             commandIndex: input.commandIndex,
             clientTimeMs: input.clientTimeMs,
@@ -187,7 +212,9 @@ class User {
             viewServerTimeMs: Number.isFinite(input.viewServerTimeMs) ? input.viewServerTimeMs : -1,
             serverReceivedTimeMs,
             estimatedInputTimeMs,
-            estimatedViewTimeMs: estimatedInputTimeMs - renderDelayMs,
+            estimatedViewTimeMs,
+            estimatedInputAgeMs: Math.max(0, serverReceivedTimeMs - estimatedInputTimeMs),
+            estimatedViewAgeMs: Math.max(0, serverReceivedTimeMs - estimatedViewTimeMs),
             roundTripMs: this.roundTripMs,
             oneWayMs: this.oneWayMs,
             clockOffsetMs: this.clockOffsetMs,
@@ -203,19 +230,28 @@ class User {
         return true;
     }
     subscribe(channel) {
+        const alreadySubscribed = this.subscriptions.has(channel.nid);
         this.subscriptions.set(channel.nid, channel);
+        if (alreadySubscribed) {
+            return;
+        }
+        if (this.pendingChannelCloses.delete(channel.nid)) {
+            return;
+        }
+        if (!this.knownChannelIds.has(channel.nid)) {
+            this.pendingChannelOpens.add(channel.nid);
+        }
     }
     unsubscribe(channel) {
+        if (!this.subscriptions.has(channel.nid)) {
+            return;
+        }
         this.subscriptions.delete(channel.nid);
-        const knownHeader = this.knownChannelHeaderVersions.has(channel.nid);
-        if (knownHeader) {
-            this.pendingChannelHeaderDeletes.add(channel.nid);
+        const pendingOpen = this.pendingChannelOpens.delete(channel.nid);
+        if (!pendingOpen && this.knownChannelIds.has(channel.nid)) {
+            this.pendingChannelCloses.add(channel.nid);
         }
         this.knownChannelHeaderVersions.delete(channel.nid);
-        const state = this.channelVisibilityStates.get(channel.nid);
-        if (!knownHeader && state && state.currentlyVisible.length > 0) {
-            this.pendingVisibilityDeletes.set(channel.nid, state.currentlyVisible.slice());
-        }
         this.deleteChannelVisibilityState(channel.nid);
     }
     queueEngineMessage(engineMessage) {
@@ -224,12 +260,29 @@ class User {
     queueMessage(message) {
         this.messageQueue.push(message);
     }
-    hasPendingChannelHeaderDeletes() {
-        return this.pendingChannelHeaderDeletes.size > 0;
+    queueChannelMessage(channelId, message) {
+        this.scopedMessageQueue.push({ channelId, message });
     }
-    consumePendingChannelHeaderDeletes() {
-        const deletes = Array.from(this.pendingChannelHeaderDeletes);
-        this.pendingChannelHeaderDeletes.clear();
+    queueInterpolatedMessage(message) {
+        this.interpolatedMessageQueue.push(message);
+    }
+    queueChannelInterpolatedMessage(channelId, message) {
+        this.scopedInterpolatedMessageQueue.push({ channelId, message });
+    }
+    hasPendingChannelOpens() {
+        return this.pendingChannelOpens.size > 0;
+    }
+    consumePendingChannelOpens() {
+        const opens = Array.from(this.pendingChannelOpens);
+        this.pendingChannelOpens.clear();
+        return opens;
+    }
+    hasPendingChannelCloses() {
+        return this.pendingChannelCloses.size > 0;
+    }
+    consumePendingChannelCloses() {
+        const deletes = Array.from(this.pendingChannelCloses);
+        this.pendingChannelCloses.clear();
         return deletes;
     }
     send(buffer) {
@@ -250,14 +303,13 @@ class User {
         }
     }
     markVisible(nid, tick, toCreate, toUpdate, channel, channelEntityCreates) {
-        var _a;
         const lastSeenTick = this.tickLastSeen.get(nid);
         if (lastSeenTick === tick) {
             return;
         }
         if (lastSeenTick === undefined) {
             toCreate.push(nid);
-            if (channel && (channel.header || ((_a = channel.getHeader) === null || _a === void 0 ? void 0 : _a.call(channel)))) {
+            if (channel) {
                 channelEntityCreates.push({ nid, channelId: channel.nid });
             }
             this.currentlyVisible.push(nid);

@@ -15,9 +15,12 @@ enum BinarySection {
     EcsDeleteEntities,
     EcsUpdateComponentGroups,
     ChannelEntityCreates,
-    ChannelHeaderCreates,
     ChannelHeaderUpdates,
-    ChannelHeaderDeletes
+    ChannelCloses,
+    SkipInterpolation,
+    InterpolatedMessages,
+    ChannelOpens,
+    ChannelScope
 }
 
 export { BinarySection }

@@ -1,4 +1,6 @@
 import { IEntity } from '../common/IEntity'
+import { ChannelType, createChannelHeader, mergeChannelHeaderData } from '../common/ChannelHeader'
+import { SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 import { NQueue } from '../NQueue'
 import { Client } from './Client'
 import { Snapshot } from './Snapshot'
@@ -73,10 +75,26 @@ type RequestOptions<Response = any> = {
     prediction?: PredictionOperationOptions<Response>
 }
 
-export type TimedCommandOptions = {
+export type CommandTimingOptions = {
+    /**
+     * Local client time when the input was sampled. Defaults to now.
+     * This is used by the server to estimate what the client was viewing when
+     * it authored the command.
+     */
     inputTimeMs?: number
+    /**
+     * Client interpolation/render delay in milliseconds at input time.
+     */
     renderDelayMs?: number
+    /**
+     * Optional server frame/blend marker for games that want explicit view
+     * frame timing. Relative-time lag compensation does not require it.
+     */
     viewTick?: number
+    /**
+     * Optional estimated server time, in milliseconds, that the client was
+     * viewing when the command was authored.
+     */
     viewServerTimeMs?: number
 }
 
@@ -168,8 +186,8 @@ export class ClientNetwork {
         this.outbound.addCommand(command)
     }
 
-    addTimedCommand(command: any, options: TimedCommandOptions = {}) {
-        this.outbound.addTimedCommand(command, {
+    addCommandWithTiming(command: any, options: CommandTimingOptions = {}) {
+        this.outbound.addCommandWithTiming(command, {
             clientTimeMs: options.inputTimeMs ?? getLocalTime(),
             renderDelayMs: options.renderDelayMs ?? 0,
             viewTick: options.viewTick ?? -1,
@@ -209,9 +227,9 @@ export class ClientNetwork {
         return this.client.predictor.addCommand?.(command, tick, options)
     }
 
-    predictTimedCommand(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: TimedCommandOptions = {}) {
+    predictCommandWithTiming(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: CommandTimingOptions = {}) {
         const tick = this.clientTick
-        this.addTimedCommand(command, timingOptions)
+        this.addCommandWithTiming(command, timingOptions)
         return this.client.predictor.addCommand?.(command, tick, predictionOptions)
     }
 
@@ -375,6 +393,7 @@ export class ClientNetwork {
             this.entityNTypes.delete(nid)
         })
         frame.closedChannels.forEach(closed => {
+            this.entityNTypes.delete(closed.channelId)
             closed.entityNids.forEach(nid => this.entityNTypes.delete(nid))
         })
         this.frameTick++
@@ -688,10 +707,13 @@ export class ClientNetwork {
             timestamp: -1,
             confirmedClientTick: -1,
             messages: [],
+            interpolatedMessages: [],
+            channels: [],
+            channelOpens: [],
             channelEntityCreates: [],
-            channelHeaderCreates: [],
             channelHeaderUpdates: [],
-            channelHeaderDeletes: [],
+            channelCloses: [],
+            skipInterpolationNids: [],
             ecsCreateEntities: [],
             ecsCreateComponents: [],
             ecsDeleteEntities: [],
@@ -700,10 +722,37 @@ export class ClientNetwork {
             deleteEntities: []
         }
         const pendingResponses: PendingResponse[] = []
+        let currentChannelId = 0
+        const channelSnapshots = new Map<number, SnapshotChannel>()
+        const getCurrentChannel = () => {
+            let channel = channelSnapshots.get(currentChannelId)
+            if (!channel) {
+                channel = {
+                    channelId: currentChannelId,
+                    messages: [],
+                    interpolatedMessages: [],
+                    ecsCreateEntities: [],
+                    ecsCreateComponents: [],
+                    ecsDeleteEntities: [],
+                    createEntities: [],
+                    updateEntities: [],
+                    updateEntityGroups: [],
+                    deleteEntities: []
+                }
+                channelSnapshots.set(currentChannelId, channel)
+                snapshot.channels!.push(channel)
+            }
+            return channel
+        }
+        const target = () => currentChannelId === 0 ? snapshot : getCurrentChannel()
 
         while (dr.offset < dr.byteLength) {
             const section = dr.readUInt8()
             switch (section) {
+            case BinarySection.ChannelScope: {
+                currentChannelId = readNetworkId(this.protocol.nidType, dr)
+                break
+            }
             case BinarySection.EngineMessages: {
                 const count = dr.readUInt8()
                 for (let i = 0; i < count; i++) {
@@ -745,9 +794,19 @@ export class ClientNetwork {
             }
             case BinarySection.Messages: {
                 const count = dr.readUInt32()
+                const output = target().messages
                 for (let i = 0; i < count; i++) {
                     const message = readMessage(dr, this.client.context, this.protocol.ntypeType)
-                    snapshot.messages.push(message)
+                    output.push(message)
+                }
+                break
+            }
+            case BinarySection.InterpolatedMessages: {
+                const count = dr.readUInt32()
+                const output = target().interpolatedMessages!
+                for (let i = 0; i < count; i++) {
+                    const message = readMessage(dr, this.client.context, this.protocol.ntypeType)
+                    output.push(message)
                 }
                 break
             }
@@ -781,26 +840,31 @@ export class ClientNetwork {
                 }
                 break
             }
+            case BinarySection.ChannelOpens: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    const channelId = readNetworkId(this.protocol.nidType, dr)
+                    const channelType = dr.readUInt8() as ChannelType
+                    const name = dr.readString()
+                    let header = createChannelHeader(channelId, channelType, undefined, name || undefined)
+                    if (dr.readUInt8() === 1) {
+                        const headerData = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
+                        this.entityNTypes.set(headerData.nid, headerData.ntype)
+                        header = mergeChannelHeaderData(header, headerData)
+                    }
+                    snapshot.channelOpens!.push({
+                        channelId,
+                        header
+                    })
+                }
+                break
+            }
             case BinarySection.ChannelEntityCreates: {
                 const count = dr.readUInt32()
                 for (let i = 0; i < count; i++) {
                     snapshot.channelEntityCreates!.push({
                         nid: readNetworkId(this.protocol.nidType, dr),
                         channelId: readNetworkId(this.protocol.nidType, dr)
-                    })
-                }
-                break
-            }
-            case BinarySection.ChannelHeaderCreates: {
-                const count = dr.readUInt32()
-                for (let i = 0; i < count; i++) {
-                    const channelId = readNetworkId(this.protocol.nidType, dr)
-                    const header = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
-                    this.entityNTypes.set(header.nid, header.ntype)
-                    snapshot.channelHeaderCreates!.push({
-                        channelId,
-                        header,
-                        version: 0
                     })
                 }
                 break
@@ -824,67 +888,79 @@ export class ClientNetwork {
                     snapshot.channelHeaderUpdates!.push({
                         channelId,
                         changes,
-                        groups: [],
-                        version: 0
+                        groups: []
                     })
                 }
                 break
             }
-            case BinarySection.ChannelHeaderDeletes: {
+            case BinarySection.ChannelCloses: {
                 const count = dr.readUInt32()
                 for (let i = 0; i < count; i++) {
-                    snapshot.channelHeaderDeletes!.push({
+                    snapshot.channelCloses!.push({
                         channelId: readNetworkId(this.protocol.nidType, dr)
                     })
                 }
                 break
             }
+            case BinarySection.SkipInterpolation: {
+                const count = dr.readUInt32()
+                for (let i = 0; i < count; i++) {
+                    snapshot.skipInterpolationNids!.push(readNetworkId(this.protocol.nidType, dr))
+                }
+                break
+            }
             case BinarySection.CreateEntities: {
                 const count = dr.readUInt32()
+                const output = target().createEntities
                 for (let i = 0; i < count; i++) {
                     const entity = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
                     this.entityNTypes.set(entity.nid, entity.ntype)
-                    snapshot.createEntities.push(entity)
+                    output.push(entity)
                 }
                 break
             }
             case BinarySection.EcsCreateEntities: {
                 const count = dr.readUInt32()
+                const output = target().ecsCreateEntities!
                 for (let i = 0; i < count; i++) {
-                    snapshot.ecsCreateEntities!.push(readNetworkId(this.protocol.nidType, dr))
+                    output.push(readNetworkId(this.protocol.nidType, dr))
                 }
                 break
             }
             case BinarySection.EcsCreateComponents: {
                 const count = dr.readUInt32()
+                const output = target().ecsCreateComponents!
                 for (let i = 0; i < count; i++) {
                     const pid = readNetworkId(this.protocol.nidType, dr)
                     const component = readEntity(dr, this.client.context, this.protocol.ntypeType, this.protocol.nidType) as IEntity
                     ;(component as any).pid = pid
                     this.entityNTypes.set(component.nid, component.ntype)
-                    snapshot.ecsCreateComponents!.push(component)
+                    output.push(component)
                 }
                 break
             }
             case BinarySection.UpdateEntities: {
                 const count = dr.readUInt32()
+                const output = target().updateEntities
                 for (let i = 0; i < count; i++) {
                     const diff = readDiff(dr, this.client.context, this.entityNTypes, this.protocol.nidType)
-                    snapshot.updateEntities.push(diff)
+                    output.push(diff)
                 }
                 break
             }
             case BinarySection.UpdateEntityGroups: {
                 const count = dr.readUInt32()
+                const output = target().updateEntities
                 for (let i = 0; i < count; i++) {
                     const diffs = readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType)
                     for (let j = 0; j < diffs.length; j++) {
-                        snapshot.updateEntities.push(diffs[j])
+                        output.push(diffs[j])
                     }
                 }
                 break
             }
             case BinarySection.EcsUpdateComponentGroups: {
+                const output = target().updateEntities
                 const ntype = readNetworkId(this.protocol.ntypeType, dr)
                 const groupKey = dr.readUInt8()
                 const count = dr.readUInt32()
@@ -894,10 +970,10 @@ export class ClientNetwork {
                     const nid = readNetworkId(this.protocol.nidType, dr)
                     for (let j = 0; j < group.props.length; j++) {
                         const prop = group.props[j]
-                        snapshot.updateEntities.push({
-                            nid,
-                            prop: prop.prop,
-                            value: prop.binary.read(dr)
+                            output.push({
+                                nid,
+                                prop: prop.prop,
+                                value: prop.binary.read(dr)
                         })
                     }
                 }
@@ -905,17 +981,19 @@ export class ClientNetwork {
             }
             case BinarySection.DeleteEntities: {
                 const count = dr.readUInt32()
+                const output = target().deleteEntities
                 for (let i = 0; i < count; i++) {
                     const nid = readNetworkId(this.protocol.nidType, dr)
                     this.entityNTypes.delete(nid)
-                    snapshot.deleteEntities.push(nid)
+                    output.push(nid)
                 }
                 break
             }
             case BinarySection.EcsDeleteEntities: {
                 const count = dr.readUInt32()
+                const output = target().ecsDeleteEntities!
                 for (let i = 0; i < count; i++) {
-                    snapshot.ecsDeleteEntities!.push(readNetworkId(this.protocol.nidType, dr))
+                    output.push(readNetworkId(this.protocol.nidType, dr))
                 }
                 break
             }

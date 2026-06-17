@@ -1,28 +1,64 @@
 # AI guide for building games with nengi
 
-This directory is for an AI assistant helping a developer build a game with nengi. It is not the internal nengi contributor guide. Use these files to choose the right networking primitive, write code in the intended API shape, and know when to optimize.
+This directory is for an AI assistant helping a developer build a game with
+nengi. It is not the internal nengi contributor guide. Use these files to choose
+the right networking primitive, write code in the intended API shape, and reason
+about tradeoffs when a multiplayer feature can be modeled several ways.
+
+Read this file first. Then open only the topic files that match the feature you
+are building.
+
+If you are creating a new local prototype in this repository, read
+[local-prototype.md](./local-prototype.md) before writing files. That document
+is the setup source of truth for TypeScript, Vite, local imports, and workspace
+package dependencies.
+
+For a fresh AI evaluation run in this workspace, use
+[short-prototype-prompt.md](./short-prototype-prompt.md). It is intentionally
+small so the docs, not the prompt, carry most of the API guidance.
+
+To test whether an AI can self-stage a more creative game request, use
+[staged-beaver-game-prompt.md](./staged-beaver-game-prompt.md).
+
+Existing examples are validation targets and labs. Do not treat a complex
+example as the primary architecture guide for a new game. Use the docs first;
+inspect examples only when you need to resolve a concrete local workspace or
+build detail.
 
 ## First principles
 
-Start with the simplest correct networking design. Prefer automatic channels until the feature or benchmark shows a reason to optimize.
+Model the game feature first. Nengi's primitives map to different multiplayer
+facts:
 
-Use manual mutation channels when the game already knows exactly what changed, or when profiling shows snapshot construction is expensive. Do not choose manual channels only because they sound faster; they are a deliberate tradeoff that shifts responsibility to game code.
+- who can see state
+- whether visibility depends on position
+- whether data is durable state, a transient event, input, or a validated action
+- whether game code knows exact mutations or wants automatic diffing
+
+Choose the primitive that matches those facts. Performance matters, but a
+spatial channel is not only an optimization; it is the natural model for a world
+where players and entities are spread across space and most of the world is not
+in one player's view.
+
+Use manual mutation channels when the game has explicit mutation points and can
+reliably tell nengi what changed. Manual channels are not a universal upgrade;
+they trade automatic scanning for userland responsibility.
 
 Pick the channel that matches visibility:
 
-- If everyone subscribed to a channel should see everything in it, start with `Channel`.
+- If everyone subscribed to a channel should see everything in it, use `Channel`.
 - If visibility depends on 2D position or a projected 3D plane, use `SpatialChannel2D`.
 - If visibility depends on true 3D position, use `SpatialChannel3D`.
-- If the game has explicit mutation points and needs more performance, consider the matching manual channel.
+- If the game has explicit mutation points, consider the matching manual channel.
 - If the game uses nengi's ECS channel model, use `EcsChannel` or `EcsSpatialChannel2D/3D`.
 
 Nengi is a networking framework. It does not own your game objects, game loop, physics, inventory system, ECS scheduler, or renderer.
 
 ## Expected AI workflow
 
-When asked to build a game feature, do not start by inventing a full engine
-architecture. First choose the smallest networking primitive that represents the
-feature correctly, then write ordinary game code around it.
+When asked to build a game feature, identify the networking shape before writing
+the code. Avoid inventing a full engine architecture when a few nengi primitives
+and ordinary game code will express the feature clearly.
 
 Prefer primitive patterns that can be remixed:
 
@@ -33,8 +69,30 @@ Prefer primitive patterns that can be remixed:
 - validated interaction: request/response
 - one-shot visual/audio event: message
 
-Only reach for a larger game-template pattern after these primitive choices are
+Reach for a larger game-template pattern only after these primitive choices are
 clear.
+
+## If the game request is vague
+
+When the developer asks for a broad prototype such as "make a multiplayer
+survival game" or "make a small MMO," choose a coherent networking model before
+coding:
+
+- A small arena or lobby-like game usually has one shared `Channel`.
+- A world where players spread out and have local vision usually has a
+  `SpatialChannel2D` or `SpatialChannel3D`.
+- A container, inventory, terminal, party panel, or remote map is often a
+  separate headered `Channel`.
+- Repeated player controls are commands.
+- Validated interactions such as opening a chest, moving an item, buying,
+  crafting, or joining a scoped view are requests.
+- One-frame effects, sounds, hit markers, chat lines, and short notifications
+  are messages.
+
+If the game combines several spaces, use several channels. For example, a
+survival game might have a spatial world channel, one private inventory channel
+per player, and one shared headered channel per opened chest or crafting
+station.
 
 ## Before choosing an API
 
@@ -46,23 +104,60 @@ For any requested feature, answer these questions:
 4. Is the world 2D, 3D, or 3D projected onto an `xy`/`xz` plane?
 5. Does game code already know exactly which properties changed?
 6. Is the game using plain replicated objects, parent/child entities, or nengi ECS roots and components?
-7. Is this feature already known to be hot, or should it be benchmarked after the simple version works?
+7. Are mutations automatic/diffable, or does game code already have a central mutation API?
+8. Is this feature likely hot enough to need a game-shaped benchmark?
+
+## Current recommended client shape
+
+Use `ClientReplica` as the normal client-side bridge from snapshots to game
+state.
+
+- Use `bindEntity` for ordinary replicated entities.
+- Use `bindEcsComponent` for nengi ECS channels, where roots are `pid`s and
+  replicated component state has its own `nid`.
+- Use `bindChannel` and `bindChannelEntity` when channel header context matters,
+  such as inventory items, team-private state, remote maps, terminals, or other
+  scoped UI.
+- Every channel has a header with id/type metadata. Use `name` for a simple
+  named channel, and use a schema-backed header object when the client needs
+  structured channel context.
+- Use ordinary messages for control/UI context and one-shot events that should
+  run after a snapshot's authoritative state is applied.
+- Use interpolated messages for effects whose delivery should line up with
+  interpolated entity motion. The message payload is not itself interpolated.
+
+## Common mistakes to avoid
+
+- Do not put the same entity in multiple channels.
+- Do not expect stable-nid transfer between channels; model movement between
+  channels as delete plus create.
+- Do not read `entity.nid` after a successful `removeEntity`; use the returned
+  removed nid.
+- Do not use spatial channels for permission-only visibility unless position is
+  also part of the visibility rule.
+- Do not use requests for high-frequency movement input. Use commands.
+- Do not use messages for persistent state that new subscribers must reconstruct.
+- Do not choose manual channels unless game code can reliably call mutation
+  writers everywhere networked state changes.
 
 ## Read next
 
 Use this map instead of reading every file every time.
 
 - If deciding which channel to use, read [channel-selection.md](./channel-selection.md).
+- If creating a new local prototype in this workspace, read [local-prototype.md](./local-prototype.md).
 - If deciding between entities, messages, commands, and requests, read [networking-primitives.md](./networking-primitives.md).
 - If wiring client state into a renderer, read [client-router.md](./client-router.md).
 - If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).
 - If wiring sockets or local test transports, read [adapters.md](./adapters.md).
 - If adding common game features, read [channel-recipes.md](./channel-recipes.md).
+- If adding lag compensation, hit validation, rewind queries, or server-authoritative fairness rules, read [historian-lag-compensation.md](./historian-lag-compensation.md).
 - If optimizing explicit updates, read [manual-mutations.md](./manual-mutations.md).
 - If visibility depends on position, read [spatial-channels.md](./spatial-channels.md).
 - If the game uses ECS-style roots and components, read [ecs-channels.md](./ecs-channels.md).
 - If deciding whether an optimization helped, read [benchmarking.md](./benchmarking.md).
 - If the design feels suspicious or you are auditing for common bugs, read [anti-patterns.md](./anti-patterns.md).
+- If asking another AI to make a first tiny game, use [minimal-game-prompt.md](./minimal-game-prompt.md).
 
 ## Common nengi primitives
 
@@ -72,9 +167,13 @@ Use this map instead of reading every file every time.
 - Request/response: client-to-server interaction that expects a result.
 - Channel: server-side visibility/subscription container.
 - Channel header: schema-backed client context for a channel.
-- ReplicaRouter: client-side router for replicated state, channel-scoped CRUD, messages, and interpolation-aware handling.
+- ClientReplica: client-side bridge for replicated state, channel-scoped CRUD, ECS components, messages, and interpolation-aware handling.
 - Schema: binary definition of properties nengi can write over the network.
 
 ## Default recommendation
 
-Implement the feature clearly first. If all players in a match need the same state, use `Channel`. If the world is large and players only need nearby state, use `SpatialChannel2D` or `SpatialChannel3D`. Add manual mutations later when you can point to a hot update path and say exactly where game code knows the mutation occurred.
+Choose the channel from the game's visibility model. If all subscribed users see
+the same state, use `Channel`. If visibility is spatial, use
+`SpatialChannel2D` or `SpatialChannel3D`. If game code has reliable explicit
+mutation points, use the matching manual path where that responsibility is worth
+the control.

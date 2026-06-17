@@ -8,6 +8,9 @@ type PlayerBody = {
     publicY: number
     radius: number
     team: number
+    hp?: number
+    state?: string
+    deathStartedAt?: number
 }
 
 function trackRaw(history: Historian2D, player: PlayerBody, timeMs = 0) {
@@ -114,5 +117,55 @@ describe('Historian2D gameplay policy sketches', () => {
 
         expect(closestEnemyHit(rawHistory, 100, shooter, 140, 0)?.sample.nid).toBe(target.nid)
         expect(closestEnemyHit(publicHistory, 100, shooter, 140, 0)).toBeNull()
+    })
+
+    it('can return historical samples for ids that no longer exist in current game state', () => {
+        const history = new Historian2D({ retentionMs: 1000 })
+        const bodiesByNid = new Map<number, PlayerBody>()
+        const shooter = { nid: 1, rawX: 0, rawY: 0, publicX: 0, publicY: 0, radius: 12, team: 1 }
+        const target = { nid: 2, rawX: 100, rawY: 0, publicX: 100, publicY: 0, radius: 12, team: 2 }
+        bodiesByNid.set(shooter.nid, shooter)
+        bodiesByNid.set(target.nid, target)
+        trackRaw(history, shooter)
+        trackRaw(history, target)
+        history.record(1, 100)
+
+        bodiesByNid.delete(target.nid)
+        history.untrackSpatial(target.nid, 125)
+
+        const historicalHit = closestEnemyHit(history, 100, shooter, 140, 0)
+        const currentTarget = historicalHit ? bodiesByNid.get(historicalHit.sample.nid) : undefined
+
+        expect(historicalHit?.sample.nid).toBe(target.nid)
+        expect(currentTarget).toBeUndefined()
+        expect(closestEnemyHit(history, 150, shooter, 140, 0)).toBeNull()
+    })
+
+    it('supports delayed deletion as userland death lifecycle rather than historian policy', () => {
+        const history = new Historian2D({ retentionMs: 1000 })
+        const bodiesByNid = new Map<number, PlayerBody>()
+        const shooter: PlayerBody = { nid: 1, rawX: 0, rawY: 0, publicX: 0, publicY: 0, radius: 12, team: 1, hp: 100, state: 'alive' }
+        const target: PlayerBody = { nid: 2, rawX: 100, rawY: 0, publicX: 100, publicY: 0, radius: 12, team: 2, hp: 5, state: 'alive' }
+        bodiesByNid.set(shooter.nid, shooter)
+        bodiesByNid.set(target.nid, target)
+        trackRaw(history, shooter)
+        trackRaw(history, target)
+        history.record(1, 100)
+
+        target.hp = 0
+        target.state = 'dead'
+        target.deathStartedAt = 120
+        history.setValue(target.nid, 'lifeState', 'dead', 120)
+        history.record(2, 150)
+
+        const historicalHit = closestEnemyHit(history, 100, shooter, 140, 0)
+        const currentTarget = historicalHit ? bodiesByNid.get(historicalHit.sample.nid) : undefined
+        const canApplyNormalDamage = currentTarget?.state === 'alive'
+        const canApplyTradeCredit = currentTarget?.state === 'dead' && history.getValue(target.nid, 'lifeState', 100) !== 'dead'
+
+        expect(historicalHit?.sample.nid).toBe(target.nid)
+        expect(currentTarget).toBe(target)
+        expect(canApplyNormalDamage).toBe(false)
+        expect(canApplyTradeCredit).toBe(true)
     })
 })

@@ -2,6 +2,7 @@ import { Channel } from './Channel'
 import { User } from '../User'
 import { IEntity } from '../../common/IEntity'
 import { LocalState } from '../LocalState'
+import { ChannelType, DefaultChannelHeaderNType } from '../../common/ChannelHeader'
 
 enum NType {
     PlayerEntity = 1, // You may have other types here
@@ -36,10 +37,21 @@ describe('Channel', () => {
         entity = new TestEntity()
     })
 
-    it('stores an optional developer label without interpreting it', () => {
-        const labeled = new Channel(localState, { label: 'chest:inventory' })
+    it('stores an optional name on the default header', () => {
+        const named = new Channel(localState, { name: 'chest:inventory' })
 
-        expect(labeled.label).toBe('chest:inventory')
+        expect(named.header.name).toBe('chest:inventory')
+        expect(named.header.ntype).toBe(DefaultChannelHeaderNType)
+    })
+
+    it('creates a default channel header for every channel', () => {
+        expect(channel.header).toEqual({
+            nid: channel.nid,
+            ntype: DefaultChannelHeaderNType,
+            channelType: ChannelType.Channel
+        })
+        expect(channel.headerVersion).toBe(0)
+        expect(channel.markHeaderDirty()).toBe(false)
     })
 
     it('should add 10 entities', () => {
@@ -89,7 +101,7 @@ describe('Channel', () => {
 
         expect(channel.removeEntity(stale)).toBe(0)
         expect(channel.entities.get(nid)).toBe(entity)
-        expect(localState.sources.has(nid)).toBe(true)
+        expect(localState.ownerByNid.has(nid)).toBe(true)
         expect(entity.nid).toBe(nid)
     })
 
@@ -126,19 +138,20 @@ describe('Channel', () => {
         expect(channel.entities.get(entity.nid)).toBe(entity)
     })
 
-    it('registers an optional channel header separately from normal entities', () => {
+    it('uses schema-backed channel headers without registering them as normal entities', () => {
         const header = new TestEntity()
-        channel.setHeader(header)
+        const headeredChannel = new Channel(localState, { header })
 
-        expect(channel.getHeader()).toBe(header)
-        expect(channel.headerVersion).toBe(1)
-        expect(header.nid).toBeGreaterThan(0)
-        expect(channel.entities.size).toBe(0)
-        expect(localState.sources.has(header.nid)).toBe(true)
+        expect(headeredChannel.header).toBe(header)
+        expect(headeredChannel.headerVersion).toBe(1)
+        expect(header.nid).toBe(headeredChannel.nid)
+        expect(headeredChannel.header.channelType).toBe(ChannelType.Channel)
+        expect(headeredChannel.entities.size).toBe(0)
+        expect(localState.ownerByNid.has(header.nid)).toBe(false)
 
         header.x = 5
-        expect(channel.markHeaderDirty()).toBe(true)
-        expect(channel.headerVersion).toBe(2)
+        expect(headeredChannel.markHeaderDirty()).toBe(true)
+        expect(headeredChannel.headerVersion).toBe(2)
     })
 
     it('should remove an entity', () => {
@@ -186,7 +199,7 @@ describe('Channel', () => {
         expect(channel.users.size).toBe(0)
         expect(user.subscriptions.has(channel.nid)).toBe(false)
         expect(localState.channels.has(channel)).toBe(false)
-        expect(localState.sources.has(entityNid)).toBe(false)
+        expect(localState.ownerByNid.has(entityNid)).toBe(false)
     })
 
     it('can unsubscribe all users without removing entities', () => {

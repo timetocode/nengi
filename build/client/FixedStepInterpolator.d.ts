@@ -75,6 +75,7 @@ export declare class FixedStepInterpolator {
     private getEntityRefsAtFrame;
     private cloneEntities;
     private interpolateEntity;
+    private interpolateEntityForFrame;
     private cloneEntity;
     private cloneProp;
 }

@@ -5,6 +5,7 @@ import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter';
 import { BinaryPayload } from '../common/binary/BinaryAdapter';
 import type { SnapshotResponse } from '../binary/snapshot/SnapshotPlan';
 import { ProtocolConfig } from '../common/binary/Protocol';
+import { ChannelHeader } from '../common/ChannelHeader';
 export declare enum UserConnectionState {
     NULL = 0,// initial state
     OpenPreHandshake = 1,// socket open, handshake not complete
@@ -26,15 +27,22 @@ export type CommandTimingEstimate = CommandTimingInput & {
     serverReceivedTimeMs: number;
     estimatedInputTimeMs: number;
     estimatedViewTimeMs: number;
+    estimatedInputAgeMs: number;
+    estimatedViewAgeMs: number;
     roundTripMs: number;
     oneWayMs: number;
     clockOffsetMs: number;
     clockSyncSamples: number;
 };
+export type CommandViewTimeOptions = {
+    nowMs: number;
+    fallbackRewindMs?: number;
+    maxRewindMs?: number;
+};
+export declare function getCommandViewTimeMs(timing: CommandTimingEstimate | undefined, options: CommandViewTimeOptions): number;
 export type UserVisibilityChannel = {
     nid: number;
-    header?: any;
-    getHeader?(): any;
+    header: ChannelHeader;
     getVisibleEntities?(userId: number): number[];
     getVisibleNetworkedNids?(userId: number): number[];
 };
@@ -54,6 +62,15 @@ export declare class User {
     subscriptions: Map<number, IChannel>;
     engineMessageQueue: any[];
     messageQueue: any[];
+    interpolatedMessageQueue: any[];
+    scopedMessageQueue: {
+        channelId: number;
+        message: any;
+    }[];
+    scopedInterpolatedMessageQueue: {
+        channelId: number;
+        message: any;
+    }[];
     responseQueue: SnapshotResponse[];
     protocol: ProtocolConfig;
     private channelVisibilityStates;
@@ -63,8 +80,10 @@ export declare class User {
     currentlyVisible: nid[];
     sharedChannelVersions: Map<number, number>;
     stableVisibleRefs: Map<number, number[]>;
+    knownChannelIds: Set<number>;
     knownChannelHeaderVersions: Map<number, number>;
-    private pendingChannelHeaderDeletes;
+    private pendingChannelOpens;
+    private pendingChannelCloses;
     lastSentInstanceTick: number;
     lastReceivedClientTick: number;
     nextPingId: number;
@@ -104,8 +123,13 @@ export declare class User {
     unsubscribe(channel: IChannel): void;
     queueEngineMessage(engineMessage: any): void;
     queueMessage(message: any): void;
-    hasPendingChannelHeaderDeletes(): boolean;
-    consumePendingChannelHeaderDeletes(): number[];
+    queueChannelMessage(channelId: number, message: any): void;
+    queueInterpolatedMessage(message: any): void;
+    queueChannelInterpolatedMessage(channelId: number, message: any): void;
+    hasPendingChannelOpens(): boolean;
+    consumePendingChannelOpens(): number[];
+    hasPendingChannelCloses(): boolean;
+    consumePendingChannelCloses(): number[];
     send(buffer: BinaryPayload): void;
     disconnect(reason: StringOrJSONStringifiable): void;
     populateDeletions(tick: number, toDelete: number[]): void;

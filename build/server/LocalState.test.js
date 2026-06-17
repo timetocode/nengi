@@ -9,14 +9,14 @@ describe('LocalState', () => {
         localState.registerEntity(entity, 1);
         expect(entity.nid).toEqual(1);
     });
-    it('correctly associates an entity with a source', () => {
-        const source = 123; // this is how channels work, they are just a source
+    it('correctly associates an entity with an owner', () => {
+        const owner = 123; // root entities are owned by channels
         const localState = new LocalState_1.LocalState();
         const entity = { nid: 0, ntype: 1 };
-        localState.registerEntity(entity, source);
+        localState.registerEntity(entity, owner);
         expect(entity.nid).toEqual(1);
-        expect(localState.sources.get(1)).toEqual(new Set([123]));
-        expect(localState.sources.get(1)).not.toEqual(new Set([321]));
+        expect(localState.ownerByNid.get(1)).toBe(123);
+        expect(localState.ownerByNid.get(1)).not.toBe(321);
     });
     it('correctly associates parents and children', () => {
         const source = 123; // this is how channels work, they are just a source
@@ -27,7 +27,7 @@ describe('LocalState', () => {
         expect(parent.nid).toEqual(1);
         localState.addChild(parent, child);
         expect(child.nid).toEqual(2); // will be 2, now the second networked object
-        expect(localState.sources.get(1)).toEqual(new Set([123]));
+        expect(localState.ownerByNid.get(1)).toBe(123);
         expect(localState.children.get(1)).toEqual(new Set([2])); // entity 1 is now a parent, and it contains entity 2 in its Set
         expect(localState.getParentNid(child.nid)).toBe(parent.nid);
         expect(localState.getRootNid(child.nid)).toBe(parent.nid);
@@ -63,7 +63,7 @@ describe('LocalState', () => {
         localState.addChild(parent, child);
         localState.addChild(parent, child);
         expect(localState.children.get(parent.nid)).toEqual(new Set([child.nid]));
-        expect(localState.sources.get(child.nid)).toEqual(new Set([parent.nid]));
+        expect(localState.ownerByNid.get(child.nid)).toBe(parent.nid);
     });
     it('treats removing a detached child from a registered parent as idempotent', () => {
         const localState = new LocalState_1.LocalState();
@@ -72,6 +72,14 @@ describe('LocalState', () => {
         localState.registerEntity(parent, 123);
         expect(() => localState.removeChild(parent, child)).not.toThrow();
         expect(child.nid).toBe(0);
+    });
+    it('rejects unregistering an entity through the wrong owner', () => {
+        const localState = new LocalState_1.LocalState();
+        const entity = { nid: 0, ntype: 1 };
+        localState.registerEntity(entity, 123);
+        expect(() => localState.unregisterEntity(entity, 456)).toThrow('owned by 123, not 456');
+        expect(entity.nid).toBe(1);
+        expect(localState.ownerByNid.get(entity.nid)).toBe(123);
     });
     it('unregisters descendants when a parent is unregistered', () => {
         const localState = new LocalState_1.LocalState();
@@ -88,9 +96,9 @@ describe('LocalState', () => {
         expect(parent.nid).toBe(0);
         expect(child.nid).toBe(0);
         expect(grandchild.nid).toBe(0);
-        expect(localState.sources.has(parentNid)).toBe(false);
-        expect(localState.sources.has(childNid)).toBe(false);
-        expect(localState.sources.has(grandchildNid)).toBe(false);
+        expect(localState.ownerByNid.has(parentNid)).toBe(false);
+        expect(localState.ownerByNid.has(childNid)).toBe(false);
+        expect(localState.ownerByNid.has(grandchildNid)).toBe(false);
         expect(localState.children.has(parentNid)).toBe(false);
         expect(localState.children.has(childNid)).toBe(false);
     });

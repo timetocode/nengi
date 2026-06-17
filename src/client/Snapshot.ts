@@ -1,14 +1,17 @@
 import { IEntity } from '../common/IEntity'
-import type { ChannelEntityCreate, ChannelHeaderCreate, ChannelHeaderDelete, ChannelHeaderUpdate } from '../binary/snapshot/SnapshotPlan'
+import type { ChannelEntityCreate, ChannelClose, ChannelHeaderUpdate, ChannelOpen, SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 
 export type Snapshot = {
     timestamp: number
     confirmedClientTick: number,
     messages: any[],
+    interpolatedMessages?: any[],
+    channels?: SnapshotChannel[],
+    channelOpens?: ChannelOpen[],
     channelEntityCreates?: ChannelEntityCreate[],
-    channelHeaderCreates?: ChannelHeaderCreate[],
     channelHeaderUpdates?: ChannelHeaderUpdate[],
-    channelHeaderDeletes?: ChannelHeaderDelete[],
+    channelCloses?: ChannelClose[],
+    skipInterpolationNids?: number[],
     ecsCreateEntities?: number[],
     ecsCreateComponents?: IEntity[],
     ecsDeleteEntities?: number[],

@@ -37,8 +37,13 @@ class Client {
     addCommand(command) {
         this.network.addCommand(command);
     }
-    addTimedCommand(command, options = {}) {
-        this.network.addTimedCommand(command, options);
+    /**
+     * Sends a command with optional input/view timing metadata for server-side
+     * lag compensation. Use ordinary addCommand when the server does not need
+     * to know what the client was viewing when the input was authored.
+     */
+    addCommandWithTiming(command, options = {}) {
+        this.network.addCommandWithTiming(command, options);
     }
     reportInterpolationDelay(delayMs, options = {}) {
         return this.network.reportInterpolationDelay(delayMs, options);
@@ -46,8 +51,13 @@ class Client {
     predictCommand(command, options = {}) {
         return this.network.predictCommand(command, options);
     }
-    predictTimedCommand(command, predictionOptions = {}, timingOptions = {}) {
-        return this.network.predictTimedCommand(command, predictionOptions, timingOptions);
+    /**
+     * Predicts locally and sends the command with timing metadata. This is the
+     * command-replay path for movement, shooting, dodging, and similar actions
+     * where reconciliation and lag compensation both matter.
+     */
+    predictCommandWithTiming(command, predictionOptions = {}, timingOptions = {}) {
+        return this.network.predictCommandWithTiming(command, predictionOptions, timingOptions);
     }
     predictState(payload, options = {}) {
         return this.network.predictState(payload, options);

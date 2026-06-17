@@ -33,11 +33,11 @@ export class Instance {
     pingIntervalMs: number
     responseEndPoints: Map<number, ResponseEndpoint>
     /**
+     * Override this to accept or reject incoming connections.
      *
-     * @param handshake test test
      * ```ts
      * instance.onConnect = async (handshake: any) => {
-     *      return await authenticateUser(handshake)
+     *     return await authenticateUser(handshake)
      * }
      * ```
      */
@@ -55,10 +55,8 @@ export class Instance {
         this.responseEndPoints = new Map()
 
         this.onConnect = (handshake: any) => {
-            return new Promise((resolve, reject) => {
-                console.log(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`)
-                resolve(false)
-            })
+            console.warn(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`)
+            return Promise.resolve(false)
         }
 
         this.network = new InstanceNetwork(this)
@@ -94,7 +92,6 @@ export class Instance {
         }
 
         this.tick++
-        this.localState.tick(this.tick)
         this.cache.createCachesForTick(this.tick)
         this.network.resetSharedUpdateFragments()
 
@@ -134,14 +131,8 @@ export class Instance {
 
         this.cache.deleteCachesForTick(this.tick)
         this.localState.channels.forEach(channel => {
-            const clearBroadcastMessages = (channel as any).clearBroadcastMessages
-            if (typeof clearBroadcastMessages === 'function') {
-                clearBroadcastMessages.call(channel)
-            }
-            const clearSnapshotDeltas = (channel as any).clearSnapshotDeltas
-            if (typeof clearSnapshotDeltas === 'function') {
-                clearSnapshotDeltas.call(channel)
-            }
+            channel.clearBroadcastMessages?.()
+            channel.clearSnapshotDeltas?.()
         })
         this.localState.releaseDeferredIds()
         this.localState.clearDirty()

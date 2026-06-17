@@ -1,10 +1,36 @@
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { IEntity } from '../../common/IEntity'
+import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { EntityChange, EntityUpdateGroup } from '../../common/binary/schema/util'
 import { createEmptySnapshotPlan, SnapshotPlan } from './SnapshotPlan'
+import { collectInterpolatedBroadcastMessages } from './messageFragments'
 
 const MAX_RESPONSES_PER_FRAME = 255
+
+export function collectSkipInterpolationNids(user: User) {
+    const nids: number[] = []
+    const seen = new Set<number>()
+
+    for (const channel of user.subscriptions.values()) {
+        const skipInterpolationNids = (channel as any).skipInterpolationNids as number[] | undefined
+        if (!skipInterpolationNids || skipInterpolationNids.length === 0) {
+            continue
+        }
+
+        const state = user.getChannelVisibilityState(channel.nid)
+        for (let i = 0; i < skipInterpolationNids.length; i++) {
+            const nid = skipInterpolationNids[i]
+            if (seen.has(nid) || !state.tickLastSeen.has(nid)) {
+                continue
+            }
+            seen.add(nid)
+            nids.push(nid)
+        }
+    }
+
+    return nids
+}
 
 function collectCreateEntities(instance: Instance, toCreate: number[]): IEntity[] {
     const createEntities: IEntity[] = []
@@ -50,17 +76,26 @@ export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPla
     const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkVisibility(instance.tick)
     const plan = createEmptySnapshotPlan()
 
-    const headerDeletes = user.consumePendingChannelHeaderDeletes()
-    for (let i = 0; i < headerDeletes.length; i++) {
-        plan.channelHeaderDeletes.push({ channelId: headerDeletes[i] })
+    const channelOpens = user.consumePendingChannelOpens()
+    for (let i = 0; i < channelOpens.length; i++) {
+        const channel = user.subscriptions.get(channelOpens[i])
+        if (channel) {
+            plan.channelOpens.push({ channelId: channel.nid, header: channel.header })
+        }
+    }
+
+    const channelCloses = user.consumePendingChannelCloses()
+    for (let i = 0; i < channelCloses.length; i++) {
+        plan.channelCloses.push({ channelId: channelCloses[i] })
     }
 
     plan.channelEntityCreates = channelEntityCreates
+    plan.skipInterpolationNids = collectSkipInterpolationNids(user)
 
     for (const channel of user.subscriptions.values()) {
-        const header = channel.header || channel.getHeader?.()
+        const header = channel.header
         const headerVersion = channel.headerVersion || 0
-        if (!header || headerVersion <= 0) {
+        if (!hasSchemaBackedChannelHeader(header) || headerVersion <= 0) {
             continue
         }
         const knownVersion = user.knownChannelHeaderVersions.get(channel.nid)
@@ -69,7 +104,6 @@ export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPla
             if (!instance.cache.cacheContains(header.nid)) {
                 instance.cache.cacheify(instance.tick, header, nschema)
             }
-            plan.channelHeaderCreates.push({ channelId: channel.nid, header, version: headerVersion })
             plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion })
         } else if (knownVersion < headerVersion) {
             const diffs = instance.cache.getAndDiffGrouped(instance.tick, header, nschema)
@@ -77,8 +111,7 @@ export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPla
                 plan.channelHeaderUpdates.push({
                     channelId: channel.nid,
                     changes: diffs.changes,
-                    groups: diffs.groups,
-                    version: headerVersion
+                    groups: diffs.groups
                 })
             }
             plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion })
@@ -96,6 +129,10 @@ export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPla
 
     plan.messages = user.messageQueue
     user.messageQueue = []
+
+    plan.interpolatedMessages = user.interpolatedMessageQueue
+    user.interpolatedMessageQueue = []
+    plan.interpolatedMessages.push(...collectInterpolatedBroadcastMessages(user))
 
     plan.responses = user.responseQueue.slice(0, MAX_RESPONSES_PER_FRAME)
 

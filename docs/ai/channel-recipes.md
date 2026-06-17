@@ -1,25 +1,27 @@
 # Channel recipes
 
-These are starting points. Adapt the channel choice to the game's visibility and mutation pattern.
+These are model recipes. Adapt the channel choice to the game's visibility rule,
+mutation style, and client UI shape.
 
 ## Small arena where everyone sees everything
 
 Use `Channel`.
 
 ```ts
-const world = new Channel(instance.localState, { label: 'world' })
+const world = new Channel(instance.localState, { name: 'world' })
 world.subscribe(user)
 world.addEntity(player)
 ```
 
-Start here unless the game has a clear reason not to.
+Use this when the game design really is shared visibility, not merely because it
+is the smallest example.
 
 ## Large 2D world
 
 Use `SpatialChannel2D`.
 
 ```ts
-const world = new SpatialChannel2D(instance.localState, 100, { label: 'world' })
+const world = new SpatialChannel2D(instance.localState, 100, { name: 'world' })
 world.addEntity(monster)
 world.subscribe(user, { x: player.x, y: player.y, halfWidth: 800, halfHeight: 600 })
 ```
@@ -37,7 +39,7 @@ Use `SpatialChannel2D` with `plane: 'xz'`.
 ```ts
 const world = new SpatialChannel2D(instance.localState, 100, {
     plane: 'xz',
-    label: 'world-xz'
+    name: 'world-xz'
 })
 
 world.subscribe(user, { x: player.x, z: player.z, halfX: 800, halfZ: 800 })
@@ -48,7 +50,7 @@ world.subscribe(user, { x: player.x, z: player.z, halfX: 800, halfZ: 800 })
 Use `SpatialChannel3D`.
 
 ```ts
-const space = new SpatialChannel3D(instance.localState, 500, { label: 'space' })
+const space = new SpatialChannel3D(instance.localState, 500, { name: 'space' })
 space.subscribe(user, { x: ship.x, y: ship.y, z: ship.z, radius: 5000 })
 ```
 
@@ -72,11 +74,10 @@ user.queueMessage({
 ```
 
 For item/entity inventory, the header is the client-visible context for the
-channel; `label` is only local housekeeping.
+channel. Add `name` only when a simple channel name is useful.
 
 ```ts
 const inventory = new Channel(instance.localState, {
-    label: 'inventory',
     header: {
         nid: 0,
         ntype: NType.InventoryHeader,
@@ -90,19 +91,37 @@ inventory.subscribe(user)
 inventory.addEntity(item)
 ```
 
-On the client, route item CRUD by the header:
+If a channel only needs a simple name, use `name`. Use a schema-backed header
+object when scoped entity handling needs client-visible structured fields.
+Default header names are creation-time metadata. If the client needs mutable
+channel context, pass a schema-backed header object, mutate that object on the
+server, and call `channel.markHeaderDirty()`.
+
+On the client, bind item lifecycle by the schema-backed header:
 
 ```ts
-const router = new ReplicaRouter(client)
+const replica = new ClientReplica(client)
 
-router.channel(ctx => ctx.header?.ntype === NType.InventoryHeader)
-    .onOpen(ctx => openInventory(ctx.header))
-    .onCreate(NType.InventoryItem, (item, tracked, ctx) => addInventoryItem(ctx.header, item))
-    .onUpdate(NType.InventoryItem, (update, item, tracked, ctx) => updateInventoryItem(ctx.header, item))
-    .onClose(ctx => closeInventory(ctx.header))
+replica.bindChannel<InventoryHeader>(NType.InventoryHeader, {
+    open: channel => openInventory(channel.header),
+    close: channel => closeInventory(channel.header)
+})
+
+replica.bindChannelEntity<InventoryHeader, InventoryItem>(NType.InventoryHeader, NType.InventoryItem, {
+    mode: ClientEntityMode.Raw,
+    create(item, ctx) {
+        addInventoryItem(ctx.channel.header, item)
+    },
+    update(item, _local, ctx) {
+        updateInventoryItem(ctx.channel.header, item)
+    },
+    destroy(_local, ctx) {
+        removeInventoryItem(ctx.nid)
+    }
+})
 ```
 
-This lets the client know the created item arrived through inventory context instead of the main world. When the inventory channel closes, nengi purges the contained item entities on the client and calls `onClose`; do not write inventory UI cleanup that requires one delete callback per item. If the UI or renderer keeps side tables keyed by nid, use `ctx.closed.entityNids` inside `onClose`.
+This lets the client know the created item arrived through inventory context instead of the main world. A scoped binding auto-tracks the item and receives create/update/destroy with the channel header available in the binding context. When the inventory channel closes, nengi purges the contained item entities on the client and calls `onClose`; do not write inventory UI cleanup that requires one delete callback per item. If the UI or renderer keeps side tables keyed by nid, use `ctx.closed.entityNids` inside `onClose`.
 
 If an item moves between two inventory channels, model that as a delete from the source channel and a create in the target channel. Do not keep the same entity id across channels unless nengi grows an explicit transfer primitive.
 
@@ -111,16 +130,18 @@ If an item moves between two inventory channels, model that as a delete from the
 Use one `Channel` per team.
 
 ```ts
-const redTeam = new Channel(instance.localState, { label: 'team:red' })
+const redTeam = new Channel(instance.localState, { name: 'team:red' })
 redTeam.subscribe(redUser)
 redTeam.addEntity(teamObjective)
 ```
 
 Do not use spatial channels for permission-only visibility unless position also matters.
 
-## Manual transform optimization
+## Manual transform path
 
-Start with `Channel` or `SpatialChannel2D`. If transform updates become hot and game code has a central movement system, switch to the matching manual channel.
+Use a manual channel when movement or transform mutation already flows through a
+central game function. The important requirement is not that the feature is
+"advanced"; it is that every networked mutation reliably calls the writer.
 
 ```ts
 const world = new ManualSpatialChannel2D(instance.localState, 100)
@@ -130,6 +151,11 @@ player.x = nextX
 player.y = nextY
 Player.position(player, nextX, nextY)
 ```
+
+For spatial manual writers, `strictManualWrites: true` makes writer calls throw
+when the entity or component cannot be resolved to a spatial cell. This is useful
+while proving the game mutation path; missed or misrouted writer calls are
+desync bugs, not harmless debug noise.
 
 ## ECS character
 

@@ -58,6 +58,8 @@ describe('CommandRouter', () => {
             serverReceivedTimeMs: 20,
             estimatedInputTimeMs: 15,
             estimatedViewTimeMs: -85,
+            estimatedInputAgeMs: 5,
+            estimatedViewAgeMs: 105,
             roundTripMs: 8,
             oneWayMs: 4,
             clockOffsetMs: 5,

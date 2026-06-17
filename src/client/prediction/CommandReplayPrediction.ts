@@ -1,5 +1,5 @@
 import { Client } from '../Client'
-import type { TimedCommandOptions } from '../ClientNetwork'
+import type { CommandTimingOptions } from '../ClientNetwork'
 import { PredictionOperationKind } from './PredictionLog'
 import type { PredictionOperation, PredictionOperationOptions } from './PredictionLog'
 
@@ -14,7 +14,7 @@ export type CommandReplayPredictionOptions<TLocal = any, TAuthority = any, TStat
     client: Client
     nid: number | (() => number | null | undefined)
     getLocal: () => TLocal | undefined
-    getAuthoritative: () => TAuthority | undefined
+    getAuthoritative?: () => TAuthority | undefined
     createReplayState?: (authority: TAuthority) => TState
     applyCommand: (state: TLocal | TState, command: TCommand) => void
     applyReplayState?: (local: TLocal, replayState: TState) => void
@@ -22,7 +22,7 @@ export type CommandReplayPredictionOptions<TLocal = any, TAuthority = any, TStat
     shouldCorrect?: (error: number, context: { local: TLocal, replayState: TState, authoritative: TAuthority }) => boolean
     affectedProps?: string[]
     predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'applyLocal'>
-    timingOptions?: TimedCommandOptions | ((command: TCommand) => TimedCommandOptions)
+    timingOptions?: CommandTimingOptions | ((command: TCommand) => CommandTimingOptions)
 }
 
 function defaultReplayState<TState>(authority: any): TState {
@@ -58,7 +58,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
     private client: Client
     private nid: number | (() => number | null | undefined)
     private getLocal: () => TLocal | undefined
-    private getAuthoritative: () => TAuthority | undefined
+    private getAuthoritative?: () => TAuthority | undefined
     private createReplayState: (authority: TAuthority) => TState
     private applyCommand: (state: TLocal | TState, command: TCommand) => void
     private applyReplayState: (local: TLocal, replayState: TState) => void
@@ -66,7 +66,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
     private shouldCorrect: (error: number, context: { local: TLocal, replayState: TState, authoritative: TAuthority }) => boolean
     private affectedProps?: string[]
     private predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'applyLocal'>
-    private timingOptions?: TimedCommandOptions | ((command: TCommand) => TimedCommandOptions)
+    private timingOptions?: CommandTimingOptions | ((command: TCommand) => CommandTimingOptions)
 
     constructor(options: CommandReplayPredictionOptions<TLocal, TAuthority, TState, TCommand>) {
         this.client = options.client
@@ -102,7 +102,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
             const timingOptions = typeof this.timingOptions === 'function'
                 ? this.timingOptions(command)
                 : this.timingOptions
-            return this.client.predictTimedCommand(command, predictionOptions, timingOptions)
+            return this.client.predictCommandWithTiming(command, predictionOptions, timingOptions)
         }
 
         return this.client.predictCommand(command, predictionOptions)
@@ -111,8 +111,11 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
     reconcile(): CommandReplayCorrection<TState> | null {
         const nid = this.resolveNid()
         const local = this.getLocal()
-        const authoritative = this.getAuthoritative()
-        if (nid === undefined || !local || !authoritative) {
+        if (nid === undefined || !local) {
+            return null
+        }
+        const authoritative = this.getAuthoritative?.() ?? this.getAuthoritativeFromStore(nid)
+        if (!authoritative) {
             return null
         }
 
@@ -148,5 +151,9 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
     private resolveNid() {
         const nid = typeof this.nid === 'function' ? this.nid() : this.nid
         return typeof nid === 'number' ? nid : undefined
+    }
+
+    private getAuthoritativeFromStore(nid: number) {
+        return this.client.network.store.get(nid) as TAuthority | undefined
     }
 }

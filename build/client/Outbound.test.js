@@ -73,19 +73,19 @@ test('getCurrentFrame returns current frame commands', () => {
     expect(frame.outboundCommands[0]).toBe(command);
     expect(frame.outboundEngineCommands[0]).toBe(engineCommand);
 });
-test('timed commands keep command index metadata', () => {
+test('commands with timing keep command index metadata', () => {
     const firstCommand = { ntype: 1, content: 'first command' };
     const secondCommand = { ntype: 1, content: 'second command' };
     const thirdCommand = { ntype: 1, content: 'third command' };
     const out = new Outbound_1.Outbound();
     out.addCommand(firstCommand);
-    out.addTimedCommand(secondCommand, {
+    out.addCommandWithTiming(secondCommand, {
         clientTimeMs: 12.5,
         renderDelayMs: 100,
         viewTick: 3.25,
         viewServerTimeMs: 1000.5
     });
-    out.addTimedCommand(thirdCommand, {
+    out.addCommandWithTiming(thirdCommand, {
         clientTimeMs: 14,
         renderDelayMs: 80,
         viewTick: 4,

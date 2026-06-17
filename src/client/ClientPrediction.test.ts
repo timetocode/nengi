@@ -2,6 +2,7 @@ import { Binary } from '../common/binary/Binary'
 import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { Client } from './Client'
+import { StateReplayPrediction } from './prediction/StateReplayPrediction'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 
 class MockAdapter {
@@ -159,6 +160,25 @@ describe('client prediction', () => {
         const client = createClient()
         const localPlayer = { semiAmmo: 6, autoAmmo: 22 }
         const events: string[] = []
+        const ammoPrediction = new StateReplayPrediction({
+            client,
+            nid: 1,
+            getLocal: () => localPlayer,
+            createReplayState: authority => ({
+                semiAmmo: authority.semiAmmo,
+                autoAmmo: authority.autoAmmo
+            }),
+            applyPayload: (state, payload: any) => {
+                if (payload.kind === 'ammo-spend') {
+                    state.semiAmmo = Math.max(0, state.semiAmmo - 1)
+                }
+            },
+            applyReplayState: (local, replayState) => {
+                local.semiAmmo = replayState.semiAmmo
+                local.autoAmmo = replayState.autoAmmo
+            },
+            affectedProps: ['semiAmmo']
+        })
 
         client.network.queueSnapshot({
             timestamp: 1000,
@@ -171,41 +191,15 @@ describe('client prediction', () => {
         client.network.processNextFrame()
 
         client.predictor.onReconcile(event => {
-            const pending = event.pending.slice().sort((a, b) => a.clientTick - b.clientTick || a.id - b.id)
-            let semiAmmo = event.authority.semiAmmo
-            for (let i = 0; i < pending.length; i++) {
-                if (pending[i].payload?.kind === 'ammo-spend') {
-                    semiAmmo = Math.max(0, semiAmmo - 1)
-                }
-            }
-            localPlayer.semiAmmo = semiAmmo
-            events.push(`${event.mismatches.length}:${event.authority.semiAmmo}:${semiAmmo}:${pending.length}`)
-            event.dropConfirmed()
+            const correction = ammoPrediction.reconcile(event)!
+            events.push(`${correction.mismatches}:${event.authority.semiAmmo}:${localPlayer.semiAmmo}:${correction.replayed}`)
         })
 
-        client.predictState({ kind: 'ammo-spend', weapon: 1, seq: 1 }, {
-            affected: [{ nid: 1, props: ['semiAmmo'] }],
-            expected: [{ nid: 1, values: { semiAmmo: 5 } }],
-            applyLocal: () => {
-                localPlayer.semiAmmo = 5
-            }
-        })
+        ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 1 }, { semiAmmo: 5 })
         client.network.incrementClientTick()
-        client.predictState({ kind: 'ammo-spend', weapon: 1, seq: 2 }, {
-            affected: [{ nid: 1, props: ['semiAmmo'] }],
-            expected: [{ nid: 1, values: { semiAmmo: 4 } }],
-            applyLocal: () => {
-                localPlayer.semiAmmo = 4
-            }
-        })
+        ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 2 }, { semiAmmo: 4 })
         client.network.incrementClientTick()
-        client.predictState({ kind: 'ammo-spend', weapon: 1, seq: 3 }, {
-            affected: [{ nid: 1, props: ['semiAmmo'] }],
-            expected: [{ nid: 1, values: { semiAmmo: 3 } }],
-            applyLocal: () => {
-                localPlayer.semiAmmo = 3
-            }
-        })
+        ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 3 }, { semiAmmo: 3 })
 
         client.network.queueSnapshot({
             timestamp: 1050,

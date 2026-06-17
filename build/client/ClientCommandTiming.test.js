@@ -42,7 +42,7 @@ describe('client command timing', () => {
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
         const clientNetwork = createClientNetwork(context);
-        clientNetwork.addTimedCommand({ ntype: 1, value: 7 }, {
+        clientNetwork.addCommandWithTiming({ ntype: 1, value: 7 }, {
             inputTimeMs: 123,
             renderDelayMs: 50,
             viewTick: 4.5,

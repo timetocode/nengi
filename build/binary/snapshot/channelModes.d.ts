@@ -1,6 +1,7 @@
 import { Channel } from '../../server/channel/Channel';
 import { User } from '../../server/User';
 import { EcsManualUpdateLog, ManualUpdateLog } from './manualUpdates';
+import { ChannelHeader } from '../../common/ChannelHeader';
 export type SharedUpdateChannel = Channel & {
     entityNids: number[];
     membershipVersion: number;
@@ -11,6 +12,7 @@ export type SharedUpdateChannel = Channel & {
 export type SharedMessageChannel = {
     nid: number;
     broadcastMessages: any[];
+    interpolatedBroadcastMessages?: any[];
 };
 export type ManualUpdateChannel = SharedUpdateChannel & {
     manualUpdateChannelMode: true;
@@ -18,8 +20,9 @@ export type ManualUpdateChannel = SharedUpdateChannel & {
 export type EcsSnapshotChannel = EcsManualUpdateLog & {
     ecsChannelMode: true;
     nid: number;
-    header?: any;
+    header: ChannelHeader;
     broadcastMessages: any[];
+    interpolatedBroadcastMessages?: any[];
     createdRoots: number[];
     deletedRoots: number[];
     createdComponents: any[];
@@ -39,14 +42,6 @@ export type EcsSpatialSnapshotChannel = EcsSnapshotChannel & {
     getVisibleCellKeys(userId: number): string[];
     getManualCellUpdateLog(cellKey: string): EcsManualUpdateLog | null;
     cellHasManualUpdates(cellKey: string): boolean;
-    getMovedRoots(): {
-        pid: number;
-        fromCell: string;
-        toCell: string;
-    }[];
-    hasOnlyMovementDeltas(): boolean;
-    isCellVisible(userId: number, key: string): boolean;
-    getRootComponents(pid: number): any[];
 };
 export type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
     manualSpatialChannelMode: true;
@@ -62,7 +57,7 @@ export type ManualSpatialCellFragmentChannel = CellFragmentChannel & {
 };
 export type CellFragmentChannel = {
     nid: number;
-    header?: any;
+    header: ChannelHeader;
     cellFragmentMode: true;
     membershipVersion: number;
     fragmentCellLimit: number;

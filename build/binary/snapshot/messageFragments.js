@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.collectBroadcastMessages = collectBroadcastMessages;
+exports.collectInterpolatedBroadcastMessages = collectInterpolatedBroadcastMessages;
 exports.getSharedMessageFragments = getSharedMessageFragments;
 exports.sumSharedMessageFragmentBytes = sumSharedMessageFragmentBytes;
 exports.sumSharedMessageFragmentMessages = sumSharedMessageFragmentMessages;
@@ -10,12 +11,28 @@ const countSnapshotBytes_1 = require("./countSnapshotBytes");
 const writeSnapshot_1 = require("./writeSnapshot");
 const channelModes_1 = require("./channelModes");
 const snapshotPayload_1 = require("./snapshotPayload");
+const Protocol_1 = require("../../common/binary/Protocol");
 function collectBroadcastMessages(user) {
     const messages = [];
     user.subscriptions.forEach((channel) => {
         if ((0, channelModes_1.isSharedMessageChannel)(channel) && channel.broadcastMessages.length > 0) {
             for (let i = 0; i < channel.broadcastMessages.length; i++) {
                 messages.push(channel.broadcastMessages[i]);
+            }
+        }
+    });
+    return messages;
+}
+function collectInterpolatedBroadcastMessages(user) {
+    const messages = [];
+    user.subscriptions.forEach((channel) => {
+        if ((0, channelModes_1.isSharedMessageChannel)(channel)) {
+            const interpolated = channel.interpolatedBroadcastMessages;
+            if (!interpolated || interpolated.length === 0) {
+                return;
+            }
+            for (let i = 0; i < interpolated.length; i++) {
+                messages.push(interpolated[i]);
             }
         }
     });
@@ -50,6 +67,7 @@ function getSharedMessageFragment(user, instance, channel) {
         writeMs = performance.now() - writeStart;
     }
     const fragment = {
+        channelId: channel.nid,
         payload: writer.payload,
         bytes,
         messages: channel.broadcastMessages.length
@@ -70,10 +88,10 @@ function getSharedMessageFragments(user, instance) {
     });
     return fragments;
 }
-function sumSharedMessageFragmentBytes(fragments) {
+function sumSharedMessageFragmentBytes(fragments, protocol) {
     let bytes = 0;
     for (let i = 0; i < fragments.length; i++) {
-        bytes += fragments[i].bytes;
+        bytes += 1 + (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType) + fragments[i].bytes;
     }
     return bytes;
 }
@@ -85,8 +103,10 @@ function sumSharedMessageFragmentMessages(fragments) {
     return messages;
 }
 function writeSharedMessageFragments(writer, instance, fragments) {
+    const protocol = instance.network.getProtocol();
     for (let i = 0; i < fragments.length; i++) {
         const fragment = fragments[i];
+        (0, writeSnapshot_1.writeChannelScope)(fragment.channelId, writer, protocol);
         const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0;
         (0, snapshotPayload_1.writePayload)(writer, fragment.payload);
         if (instance.network.snapshotPerformanceEnabled) {

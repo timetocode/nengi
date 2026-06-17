@@ -1,36 +1,29 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Channel = void 0;
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const NDictionary_1 = require("../NDictionary");
 class Channel {
     constructor(localState, options = {}) {
+        var _a;
         this.entities = new NDictionary_1.NDictionary();
         this.entityNids = [];
         this.membershipVersion = 0;
         this.deltaBaseVersion = 0;
         this.createdRoots = [];
         this.deletedNids = [];
+        this.skipInterpolationNids = [];
         this.broadcastMessages = [];
+        this.interpolatedBroadcastMessages = [];
         this.users = new Map();
-        this.historian = null;
-        this.header = null;
         this.headerVersion = 0;
         this.visibleNetworkedNidsCache = null;
         this.localState = localState;
         this.nid = localState.nextNetworkId();
-        this.label = options.label;
-        if (options.historian) {
-            this.historian = options.historian;
-        }
+        this.channelType = (_a = options.channelType) !== null && _a !== void 0 ? _a : ChannelHeader_1.ChannelType.Channel;
+        this.header = (0, ChannelHeader_1.createChannelHeader)(this.nid, this.channelType, options.header, options.name);
+        this.headerVersion = (0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header) ? 1 : 0;
         this.localState.channels.add(this);
-        if (options.header) {
-            this.setHeader(options.header);
-        }
-    }
-    tick(tick) {
-        if (this.historian !== null) {
-            this.historian.record(tick, this.entities);
-        }
     }
     beginDelta() {
         if (this.createdRoots.length === 0 && this.deletedNids.length === 0) {
@@ -46,23 +39,8 @@ class Channel {
         this.membershipVersion++;
         return entity;
     }
-    setHeader(header) {
-        if (this.header !== null && this.header !== header) {
-            throw new Error('Channel header is already set. Mutate the existing header and call markHeaderDirty().');
-        }
-        if (this.header === header) {
-            return header;
-        }
-        this.localState.registerEntity(header, this.nid);
-        this.header = header;
-        this.headerVersion++;
-        return header;
-    }
-    getHeader() {
-        return this.header;
-    }
     markHeaderDirty() {
-        if (!this.header) {
+        if (!(0, ChannelHeader_1.hasSchemaBackedChannelHeader)(this.header)) {
             return false;
         }
         this.headerVersion++;
@@ -93,15 +71,29 @@ class Channel {
     markDirty(entity) {
         return this.localState.markDirty(entity);
     }
+    // One-frame interpolation skip for teleports, respawns, wraparound, or
+    // pooled entities moved discontinuously to a new position.
+    skipInterpolation(entity) {
+        if (!entity || entity.nid === 0 || this.entities.get(entity.nid) !== entity) {
+            return false;
+        }
+        this.skipInterpolationNids.push(entity.nid);
+        return true;
+    }
     addMessage(message) {
         this.broadcastMessages.push(message);
     }
+    addInterpolatedMessage(message) {
+        this.interpolatedBroadcastMessages.push(message);
+    }
     clearBroadcastMessages() {
         this.broadcastMessages.length = 0;
+        this.interpolatedBroadcastMessages.length = 0;
     }
     clearSnapshotDeltas() {
         this.createdRoots.length = 0;
         this.deletedNids.length = 0;
+        this.skipInterpolationNids.length = 0;
         this.deltaBaseVersion = this.membershipVersion;
     }
     subscribe(user) {
@@ -156,11 +148,6 @@ class Channel {
     destroy() {
         this.unsubscribeAll();
         this.removeAllEntities();
-        if (this.header) {
-            this.localState.unregisterEntity(this.header, this.nid);
-            this.header = null;
-            this.headerVersion++;
-        }
         this.localState.nidPool.returnId(this.nid);
         this.localState.channels.delete(this);
     }
