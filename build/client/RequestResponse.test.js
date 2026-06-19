@@ -32,6 +32,7 @@ function createUser(instance) {
     });
     user.id = 1;
     user.instance = instance;
+    user.connectionState = User_1.UserConnectionState.Open;
     return user;
 }
 function createClientNetwork(context) {
@@ -50,6 +51,7 @@ function createClientNetwork(context) {
 function deliverRequestAndResponse(instance, user, clientNetwork) {
     const outbound = clientNetwork.createOutbound(BufferBinary_1.testBinaryAdapter);
     instance.network.onMessage(user, outbound);
+    instance.processRequests();
     const responseBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
     clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(responseBuffer));
     clientNetwork.processNextFrame();
@@ -161,6 +163,40 @@ describe('request/response', () => {
         yield expect(response).resolves.toEqual({
             ok: true,
             echoed: 'cafe\u0301'
+        });
+    }));
+    it('queues request handlers until the server explicitly processes requests', () => {
+        const context = new Context_1.Context();
+        const instance = new Instance_1.Instance(context);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(context);
+        const received = [];
+        instance.respond(1, ({ body }) => {
+            received.push(body);
+            return { ok: true };
+        });
+        clientNetwork.request(1, { text: 'queued' }, { timeoutMs: 0 }).catch(() => undefined);
+        instance.network.onMessage(user, clientNetwork.createOutbound(BufferBinary_1.testBinaryAdapter));
+        expect(received).toEqual([]);
+        expect(instance.network.requestQueue.length).toBe(1);
+        expect(instance.processRequests()).toBe(1);
+        expect(received).toEqual([{ text: 'queued' }]);
+        expect(instance.network.requestQueue.length).toBe(0);
+    });
+    it('rejects requests received before the connection is open', () => __awaiter(void 0, void 0, void 0, function* () {
+        const context = new Context_1.Context();
+        const instance = new Instance_1.Instance(context);
+        const user = createUser(instance);
+        const clientNetwork = createClientNetwork(context);
+        const handler = jest.fn(() => ({ ok: true }));
+        user.connectionState = User_1.UserConnectionState.OpenAwaitingHandshake;
+        instance.respond(1, handler);
+        const response = clientNetwork.request(1, { text: 'early' });
+        deliverRequestAndResponse(instance, user, clientNetwork);
+        expect(handler).not.toHaveBeenCalled();
+        expect(instance.network.requestQueue.length).toBe(0);
+        yield expect(response).rejects.toMatchObject({
+            code: 'NOT_OPEN'
         });
     }));
     it('round trips endpoint descriptors with binary request and response schemas', () => __awaiter(void 0, void 0, void 0, function* () {
@@ -280,7 +316,7 @@ describe('request/response', () => {
         });
     }));
     it('supports request-driven subscription where snapshots deliver opened scope state', () => __awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b;
+        var _a;
         let NType;
         (function (NType) {
             NType[NType["Inventory"] = 30] = "Inventory";
@@ -353,10 +389,10 @@ describe('request/response', () => {
             chestNid: 123,
             inventoryNid: inventory.nid
         });
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities).toEqual([
+        expect(clientNetwork.latestFrame.requireChannel(inventoryChannel.nid).createEntities).toEqual([
             item
         ]);
-        expect((_b = clientNetwork.store.get(item.nid)) === null || _b === void 0 ? void 0 : _b.inventoryNid).toBe(inventory.nid);
+        expect((_a = clientNetwork.store.get(item.nid)) === null || _a === void 0 ? void 0 : _a.inventoryNid).toBe(inventory.nid);
         expect(clientNetwork.store.getChannelId(item.nid)).toBe(inventoryChannel.nid);
         expect(clientNetwork.store.getChannelHeader(item.nid)).toMatchObject({
             ntype: NType.Inventory,
@@ -442,6 +478,7 @@ describe('request/response', () => {
         yield expect(response).rejects.toMatchObject({
             code: 'TIMEOUT'
         });
+        instance.processRequests();
         const responseBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
         expect(() => {
             clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(responseBuffer));
@@ -544,10 +581,12 @@ describe('request/response', () => {
             pending.push(request);
         }
         instance.network.onMessage(user, clientNetwork.createOutbound(BufferBinary_1.testBinaryAdapter));
+        expect(instance.network.requestQueue.length).toBe(255);
+        expect(clientNetwork.requestQueue.length).toBe(1);
+        instance.processRequests();
         expect(received).toHaveLength(255);
         expect(received[0]).toBe(0);
         expect(received[254]).toBe(254);
-        expect(clientNetwork.requestQueue.length).toBe(1);
         expect(onRequestBacklog).toHaveBeenCalledWith({
             queued: 256,
             sent: 255,
@@ -555,9 +594,11 @@ describe('request/response', () => {
             frame: 1
         });
         instance.network.onMessage(user, clientNetwork.createOutbound(BufferBinary_1.testBinaryAdapter));
+        expect(instance.network.requestQueue.length).toBe(1);
+        expect(clientNetwork.requestQueue.length).toBe(0);
+        instance.processRequests();
         expect(received).toHaveLength(256);
         expect(received[255]).toBe(255);
-        expect(clientNetwork.requestQueue.length).toBe(0);
         expect(onRequestBacklog).toHaveBeenCalledTimes(1);
         clientNetwork.rejectPendingRequests(new Error('cleanup'));
     });

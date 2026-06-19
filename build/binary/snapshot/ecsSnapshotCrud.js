@@ -1,16 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addEcsVisibilityCrud = addEcsVisibilityCrud;
-exports.addEcsChannelEntityCreate = addEcsChannelEntityCreate;
 function addEcsVisibilityCrud(plan, channel, toCreate, toDelete) {
     addEcsCreates(plan, channel, toCreate);
     addEcsDeletes(plan, channel, toDelete);
-}
-function addEcsChannelEntityCreate(plan, channel, nid) {
-    plan.channelEntityCreates.push({
-        nid,
-        channelId: channel.nid
-    });
 }
 function addEcsCreates(plan, channel, toCreate) {
     for (let i = 0; i < toCreate.length; i++) {

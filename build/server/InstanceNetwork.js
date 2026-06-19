@@ -26,6 +26,7 @@ const Binary_1 = require("../common/binary/Binary");
 const EndpointPayload_1 = require("../binary/endpoint/EndpointPayload");
 const Endpoint_1 = require("../common/Endpoint");
 const schemaFingerprint_1 = require("../common/binary/schema/schemaFingerprint");
+const NQueue_1 = require("../NQueue");
 function createSnapshotPerformanceWindow() {
     return {
         snapshots: 0,
@@ -98,6 +99,7 @@ function serializeConnectionError(err) {
 class InstanceNetwork {
     constructor(instance) {
         this.responseBacklogUsers = new Set();
+        this.requestQueue = new NQueue_1.NQueue();
         this.requireSchemaFingerprint = false;
         this.debugBinaryWrites = false;
         this.sharedUpdateFragmentsEnabled = false;
@@ -322,6 +324,19 @@ class InstanceNetwork {
             }
         }
     }
+    processRequests(max = Number.POSITIVE_INFINITY) {
+        let processed = 0;
+        while (processed < max && !this.requestQueue.isEmpty()) {
+            const request = this.requestQueue.next();
+            processed++;
+            if (!request.endpoint) {
+                this.queueErrorResponse(request.user, request.requestId, 'NO_ENDPOINT', 'No response handler is registered for this endpoint.');
+                continue;
+            }
+            this.runRequestHandler(request.user, request.requestId, request.endpoint, request.body);
+        }
+        return processed;
+    }
     onOpen(user) {
         user.connectionState = User_1.UserConnectionState.OpenPreHandshake;
         user.network = this;
@@ -462,14 +477,25 @@ class InstanceNetwork {
                             const requestId = binaryReader.readUInt32();
                             const endpoint = binaryReader.readUInt32();
                             const payloadByteLength = binaryReader.readUInt32();
+                            if (user.connectionState !== User_1.UserConnectionState.Open) {
+                                (0, EndpointPayload_1.skipEndpointPayload)(binaryReader, payloadByteLength);
+                                this.queueErrorResponse(user, requestId, 'NOT_OPEN', 'Request received before the connection was open.');
+                                continue;
+                            }
                             const responseEndpoint = this.instance.responseEndPoints.get(endpoint);
                             if (!responseEndpoint) {
                                 (0, EndpointPayload_1.skipEndpointPayload)(binaryReader, payloadByteLength);
-                                this.queueErrorResponse(user, requestId, 'NO_ENDPOINT', 'No response handler is registered for this endpoint.');
+                                this.requestQueue.enqueue({ user, requestId, endpointId: endpoint });
                             }
                             else {
                                 const body = (0, EndpointPayload_1.readSizedEndpointPayload)(binaryReader, payloadByteLength, (_a = responseEndpoint.endpoint) === null || _a === void 0 ? void 0 : _a.requestSchema);
-                                this.runRequestHandler(user, requestId, responseEndpoint, body);
+                                this.requestQueue.enqueue({
+                                    user,
+                                    requestId,
+                                    endpointId: endpoint,
+                                    endpoint: responseEndpoint,
+                                    body
+                                });
                             }
                         }
                         break;

@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const createSnapshotBuffer_1 = __importStar(require("./createSnapshotBuffer"));
 const Binary_1 = require("../../common/binary/Binary");
+const Protocol_1 = require("../../common/binary/Protocol");
 const defineSchema_1 = require("../../common/binary/schema/defineSchema");
 const Context_1 = require("../../common/Context");
 const Endpoint_1 = require("../../common/Endpoint");
@@ -56,12 +57,14 @@ const BufferBinary_1 = require("../../testSupport/BufferBinary");
 const EndpointPayload_1 = require("../endpoint/EndpointPayload");
 const BinaryDebugError_1 = require("../BinaryDebugError");
 const SnapshotPlan_1 = require("./SnapshotPlan");
+const writeSnapshot_1 = require("./writeSnapshot");
 var NType;
 (function (NType) {
     NType[NType["Entity"] = 1] = "Entity";
     NType[NType["Message"] = 2] = "Message";
     NType[NType["Transform"] = 3] = "Transform";
 })(NType || (NType = {}));
+const CHANNEL_SCOPE_BYTES = 1 + (0, Protocol_1.byteSizeOfNetworkType)(Protocol_1.DEFAULT_PROTOCOL.nidType);
 function createContext() {
     const context = new Context_1.Context();
     context.register(NType.Entity, (0, defineSchema_1.defineEntitySchema)({
@@ -246,7 +249,7 @@ describe('server snapshot pipeline', () => {
         expect(third.channelCloses).toEqual([{ channelId: channel.nid }]);
     });
     it('does not miss a same-length all-visible channel membership replacement', () => {
-        var _a, _b, _c;
+        var _a;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -276,10 +279,11 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.deleteEntities).toEqual([firstNid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities.map(entity => entity.nid)).toEqual([replacement.nid]);
+        const frameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(frameChannel.deleteEntities).toEqual([firstNid]);
+        expect(frameChannel.createEntities.map(entity => entity.nid)).toEqual([replacement.nid]);
         expect(clientNetwork.store.entities.has(firstNid)).toBe(false);
-        expect((_c = clientNetwork.store.get(replacement.nid)) === null || _c === void 0 ? void 0 : _c.label).toBe('replacement');
+        expect((_a = clientNetwork.store.get(replacement.nid)) === null || _a === void 0 ? void 0 : _a.label).toBe('replacement');
     });
     it('sends one-frame no-interpolation markers through the binary snapshot pipeline', () => {
         const context = createContext();
@@ -373,7 +377,6 @@ describe('server snapshot pipeline', () => {
         expect(user.responseQueue).toEqual([{ requestId: 78, status: Endpoint_1.ResponseStatus.Ok, payload: (0, EndpointPayload_1.createEndpointPayload)({ late: true }) }]);
     });
     it('bundles grouped entity updates and expands them on the client', () => {
-        var _a;
         const context = createGroupedContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -400,12 +403,13 @@ describe('server snapshot pipeline', () => {
         expect(plan.updateEntityGroups).toHaveLength(1);
         expect(plan.updateEntityGroups[0].group.name).toBe('position');
         expect(plan.updateEntityGroups[0].values).toEqual([11, 6]);
-        const byteLength = (0, createSnapshotBuffer_1.countSnapshotBytes)(plan, context);
+        const byteLength = CHANNEL_SCOPE_BYTES + (0, createSnapshotBuffer_1.countSnapshotBytes)(plan, context);
         const writer = BufferBinary_1.TestBufferWriter.create(byteLength);
+        (0, writeSnapshot_1.writeChannelScope)(channel.nid, writer);
         (0, createSnapshotBuffer_1.writeSnapshot)(plan, context, writer);
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(writer.buffer));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.updateEntities).toEqual([
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).updateEntities).toEqual([
             { nid, prop: 'x', previous: 5, value: 11 }
         ]);
         expect(clientNetwork.store.get(nid)).toEqual({
@@ -451,9 +455,14 @@ describe('server snapshot pipeline', () => {
         const secondPlan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
         firstPlan.updateEntityGroups = [collected.updateEntityGroups[0]];
         secondPlan.updateEntityGroups = [collected.updateEntityGroups[1]];
-        const byteLength = (0, createSnapshotBuffer_1.countSnapshotBytes)(firstPlan, context) + (0, createSnapshotBuffer_1.countSnapshotBytes)(secondPlan, context);
+        const byteLength = CHANNEL_SCOPE_BYTES +
+            (0, createSnapshotBuffer_1.countSnapshotBytes)(firstPlan, context) +
+            CHANNEL_SCOPE_BYTES +
+            (0, createSnapshotBuffer_1.countSnapshotBytes)(secondPlan, context);
         const writer = BufferBinary_1.TestBufferWriter.create(byteLength);
+        (0, writeSnapshot_1.writeChannelScope)(channel.nid, writer);
         (0, createSnapshotBuffer_1.writeSnapshot)(firstPlan, context, writer);
+        (0, writeSnapshot_1.writeChannelScope)(channel.nid, writer);
         (0, createSnapshotBuffer_1.writeSnapshot)(secondPlan, context, writer);
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(writer.buffer));
         clientNetwork.processNextFrame();
@@ -510,7 +519,7 @@ describe('server snapshot pipeline', () => {
         expect((_d = secondClient.store.get(childNid)) === null || _d === void 0 ? void 0 : _d.x).toBe(21);
     });
     it('writes manual grouped mutations directly', () => {
-        var _a, _b, _c;
+        var _a, _b;
         const context = createGroupedContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -539,10 +548,10 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame();
         expect((_a = clientNetwork.store.get(entity.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(11);
         expect((_b = clientNetwork.store.get(entity.nid)) === null || _b === void 0 ? void 0 : _b.y).toBe(12);
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.updateEntities.map(update => update.prop)).toEqual(['x', 'y']);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).updateEntities.map(update => update.prop)).toEqual(['x', 'y']);
     });
     it('writes manual prop mutations directly', () => {
-        var _a, _b;
+        var _a;
         const context = createGroupedContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -569,7 +578,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
         expect((_a = clientNetwork.store.get(entity.nid)) === null || _a === void 0 ? void 0 : _a.label).toBe('gate');
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.updateEntities.map(update => update.prop)).toEqual(['label']);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).updateEntities.map(update => update.prop)).toEqual(['label']);
     });
     it('does not scan ManualChannel entities in the mixed-channel fallback', () => {
         var _a, _b, _c;
@@ -758,7 +767,7 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.sharedUpdateFragments.size).toBe(1);
     });
     it('replicates ECS roots as ids and components as pid-owned state', () => {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -778,8 +787,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+        const createFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(createFrameChannel.ecsCreateEntities).toEqual([pid]);
+        expect(createFrameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
         expect(clientNetwork.store.get(transform.nid)).toEqual({
             nid: transform.nid,
             ntype: NType.Transform,
@@ -793,16 +803,17 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(5);
-        expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.y).toBe(6);
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
+        expect((_b = clientNetwork.store.get(transform.nid)) === null || _b === void 0 ? void 0 : _b.y).toBe(6);
         const componentNid = transform.nid;
         channel.removeEntity(pid);
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_e = clientNetwork.previousSnapshot) === null || _e === void 0 ? void 0 : _e.deleteEntities).toEqual([]);
-        expect((_f = clientNetwork.latestFrame) === null || _f === void 0 ? void 0 : _f.ecsDeleteEntities).toEqual([pid]);
-        expect((_g = clientNetwork.latestFrame) === null || _g === void 0 ? void 0 : _g.deleteEntities).toEqual([componentNid]);
+        expect((_c = clientNetwork.previousSnapshot) === null || _c === void 0 ? void 0 : _c.deleteEntities).toEqual([]);
+        const deleteFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid]);
+        expect(deleteFrameChannel.deleteEntities).toEqual([componentNid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false);
         expect(clientNetwork.store.entities.has(componentNid)).toBe(false);
     });
@@ -843,7 +854,7 @@ describe('server snapshot pipeline', () => {
         expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.y).toBe(8);
     });
     it('can compose ECS and regular channels in one user snapshot', () => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -871,16 +882,19 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.createEntities.map(entity => entity.nid)).toEqual([transform.nid, regular.nid]);
-        expect((_d = clientNetwork.latestFrame) === null || _d === void 0 ? void 0 : _d.channels.map(channel => channel.channelId)).toEqual([ecsChannel.nid, regularChannel.nid]);
-        expect((_e = clientNetwork.latestFrame) === null || _e === void 0 ? void 0 : _e.channels[0].ecsCreateEntities).toEqual([pid]);
-        expect((_f = clientNetwork.latestFrame) === null || _f === void 0 ? void 0 : _f.channels[0].ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
-        expect((_g = clientNetwork.latestFrame) === null || _g === void 0 ? void 0 : _g.channels[1].createEntities.map(entity => entity.nid)).toEqual([regular.nid]);
+        const ecsCreateFrame = clientNetwork.latestFrame.requireChannel(ecsChannel.nid);
+        const regularCreateFrame = clientNetwork.latestFrame.requireChannel(regularChannel.nid);
+        expect(ecsCreateFrame.ecsCreateEntities).toEqual([pid]);
+        expect(ecsCreateFrame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+        expect(ecsCreateFrame.createEntities.map(entity => entity.nid)).toEqual([transform.nid]);
+        expect(regularCreateFrame.createEntities.map(entity => entity.nid)).toEqual([regular.nid]);
+        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.channels.map(channel => channel.channelId)).toEqual([ecsChannel.nid, regularChannel.nid]);
+        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.channels[0].ecsCreateEntities).toEqual([pid]);
+        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.channels[0].ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+        expect((_d = clientNetwork.latestFrame) === null || _d === void 0 ? void 0 : _d.channels[1].createEntities.map(entity => entity.nid)).toEqual([regular.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_h = clientNetwork.store.get(transform.nid)) === null || _h === void 0 ? void 0 : _h.x).toBe(1);
-        expect((_j = clientNetwork.store.get(regular.nid)) === null || _j === void 0 ? void 0 : _j.label).toBe('regular');
+        expect((_e = clientNetwork.store.get(transform.nid)) === null || _e === void 0 ? void 0 : _e.x).toBe(1);
+        expect((_f = clientNetwork.store.get(regular.nid)) === null || _f === void 0 ? void 0 : _f.label).toBe('regular');
         transform.x = 5;
         transform.y = 6;
         Transform.position(transform, 5, 6);
@@ -888,11 +902,11 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_k = clientNetwork.store.get(transform.nid)) === null || _k === void 0 ? void 0 : _k.x).toBe(5);
-        expect((_l = clientNetwork.store.get(transform.nid)) === null || _l === void 0 ? void 0 : _l.y).toBe(6);
-        expect((_m = clientNetwork.store.get(regular.nid)) === null || _m === void 0 ? void 0 : _m.x).toBe(7);
-        expect((_o = clientNetwork.latestFrame) === null || _o === void 0 ? void 0 : _o.channels[0].updateEntities.map(update => update.nid)).toEqual([transform.nid, transform.nid]);
-        expect((_p = clientNetwork.latestFrame) === null || _p === void 0 ? void 0 : _p.channels[1].updateEntities.map(update => update.nid)).toEqual([regular.nid]);
+        expect((_g = clientNetwork.store.get(transform.nid)) === null || _g === void 0 ? void 0 : _g.x).toBe(5);
+        expect((_h = clientNetwork.store.get(transform.nid)) === null || _h === void 0 ? void 0 : _h.y).toBe(6);
+        expect((_j = clientNetwork.store.get(regular.nid)) === null || _j === void 0 ? void 0 : _j.x).toBe(7);
+        expect((_k = clientNetwork.latestFrame) === null || _k === void 0 ? void 0 : _k.channels[0].updateEntities.map(update => update.nid)).toEqual([transform.nid, transform.nid]);
+        expect((_l = clientNetwork.latestFrame) === null || _l === void 0 ? void 0 : _l.channels[1].updateEntities.map(update => update.nid)).toEqual([regular.nid]);
         const transformNid = transform.nid;
         const regularNid = regular.nid;
         ecsChannel.removeEntity(pid);
@@ -900,18 +914,18 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_q = clientNetwork.previousSnapshot) === null || _q === void 0 ? void 0 : _q.deleteEntities).toEqual([regularNid]);
-        expect((_r = clientNetwork.latestFrame) === null || _r === void 0 ? void 0 : _r.ecsDeleteEntities).toEqual([pid]);
-        expect((_s = clientNetwork.latestFrame) === null || _s === void 0 ? void 0 : _s.deleteEntities).toHaveLength(2);
-        expect((_t = clientNetwork.latestFrame) === null || _t === void 0 ? void 0 : _t.deleteEntities).toEqual(expect.arrayContaining([transformNid, regularNid]));
-        expect((_u = clientNetwork.latestFrame) === null || _u === void 0 ? void 0 : _u.channels[0].ecsDeleteEntities).toEqual([pid]);
-        expect((_v = clientNetwork.latestFrame) === null || _v === void 0 ? void 0 : _v.channels[1].deleteEntities).toEqual([regularNid]);
+        expect((_m = clientNetwork.previousSnapshot) === null || _m === void 0 ? void 0 : _m.deleteEntities).toEqual([]);
+        const ecsDeleteFrame = clientNetwork.latestFrame.requireChannel(ecsChannel.nid);
+        const regularDeleteFrame = clientNetwork.latestFrame.requireChannel(regularChannel.nid);
+        expect(ecsDeleteFrame.ecsDeleteEntities).toEqual([pid]);
+        expect(ecsDeleteFrame.deleteEntities).toEqual([transformNid]);
+        expect(regularDeleteFrame.deleteEntities).toEqual([regularNid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false);
         expect(clientNetwork.store.entities.has(transformNid)).toBe(false);
         expect(clientNetwork.store.entities.has(regularNid)).toBe(false);
     });
     it('sends unsubscribe deletes without merging away remaining channel updates', () => {
-        var _a, _b, _c;
+        var _a, _b;
         const context = createGroupedContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -944,19 +958,18 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.deleteEntities).toEqual([]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.closedChannels).toEqual([
+        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.closedChannels).toEqual([
             {
                 channelId: inventoryChannel.nid,
                 header: inventoryChannel.header,
                 entityNids: [itemNid]
             }
         ]);
-        expect((_c = clientNetwork.store.get(worldEntity.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(10);
+        expect((_b = clientNetwork.store.get(worldEntity.nid)) === null || _b === void 0 ? void 0 : _b.x).toBe(10);
         expect(clientNetwork.store.entities.has(itemNid)).toBe(false);
     });
     it('spatially replicates ECS roots from component state', () => {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b, _c, _d;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -975,32 +988,34 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+        const createFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(createFrameChannel.ecsCreateEntities).toEqual([pid]);
+        expect(createFrameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(5);
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
         transform.x = 6;
         transform.y = 7;
         Transform.position(transform, 6, 7);
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.x).toBe(6);
-        expect((_e = clientNetwork.store.get(transform.nid)) === null || _e === void 0 ? void 0 : _e.y).toBe(7);
+        expect((_b = clientNetwork.store.get(transform.nid)) === null || _b === void 0 ? void 0 : _b.x).toBe(6);
+        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.y).toBe(7);
         transform.x = 50;
         transform.y = 50;
         Transform.position(transform, 50, 50);
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_f = clientNetwork.previousSnapshot) === null || _f === void 0 ? void 0 : _f.deleteEntities).toEqual([]);
-        expect((_g = clientNetwork.latestFrame) === null || _g === void 0 ? void 0 : _g.ecsDeleteEntities).toEqual([pid]);
-        expect((_h = clientNetwork.latestFrame) === null || _h === void 0 ? void 0 : _h.deleteEntities).toEqual([transform.nid]);
+        expect((_d = clientNetwork.previousSnapshot) === null || _d === void 0 ? void 0 : _d.deleteEntities).toEqual([]);
+        const deleteFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid]);
+        expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false);
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false);
     });
     it('decodes same-snapshot ECS spatial creates and manual updates', () => {
-        var _a, _b, _c, _d;
+        var _a, _b;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -1024,10 +1039,11 @@ describe('server snapshot pipeline', () => {
             clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         }).not.toThrow();
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
-        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(6);
-        expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.y).toBe(7);
+        const frameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(frameChannel.ecsCreateEntities).toEqual([pid]);
+        expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(6);
+        expect((_b = clientNetwork.store.get(transform.nid)) === null || _b === void 0 ? void 0 : _b.y).toBe(7);
     });
     describe('ECS spatial visibility transitions', () => {
         it('creates roots when the subscriber view moves into them', () => {
@@ -1039,8 +1055,9 @@ describe('server snapshot pipeline', () => {
             game.view.y = 5;
             game.channel.updateView(game.user, game.view);
             const frame = stepClient(game.instance, game.user, game.clientNetwork);
-            expect(frame.ecsCreateEntities).toEqual([pid]);
-            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+            const frameChannel = frame.requireChannel(game.channel.nid);
+            expect(frameChannel.ecsCreateEntities).toEqual([pid]);
+            expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true);
             expect((_a = game.clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
         });
@@ -1053,8 +1070,9 @@ describe('server snapshot pipeline', () => {
             transform.y = 5;
             game.Transform.position(transform, 5, 5);
             const frame = stepClient(game.instance, game.user, game.clientNetwork);
-            expect(frame.ecsCreateEntities).toEqual([pid]);
-            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+            const frameChannel = frame.requireChannel(game.channel.nid);
+            expect(frameChannel.ecsCreateEntities).toEqual([pid]);
+            expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true);
             expect((_a = game.clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
         });
@@ -1064,8 +1082,9 @@ describe('server snapshot pipeline', () => {
             stepClient(game.instance, game.user, game.clientNetwork);
             const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5);
             const frame = stepClient(game.instance, game.user, game.clientNetwork);
-            expect(frame.ecsCreateEntities).toEqual([pid]);
-            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+            const frameChannel = frame.requireChannel(game.channel.nid);
+            expect(frameChannel.ecsCreateEntities).toEqual([pid]);
+            expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true);
             expect((_a = game.clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
         });
@@ -1077,8 +1096,9 @@ describe('server snapshot pipeline', () => {
             game.view.y = 500;
             game.channel.updateView(game.user, game.view);
             const frame = stepClient(game.instance, game.user, game.clientNetwork);
-            expect(frame.ecsDeleteEntities).toEqual([pid]);
-            expect(frame.deleteEntities).toEqual([transform.nid]);
+            const frameChannel = frame.requireChannel(game.channel.nid);
+            expect(frameChannel.ecsDeleteEntities).toEqual([pid]);
+            expect(frameChannel.deleteEntities).toEqual([transform.nid]);
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false);
             expect(game.clientNetwork.store.entities.has(transform.nid)).toBe(false);
         });
@@ -1090,8 +1110,9 @@ describe('server snapshot pipeline', () => {
             transform.y = 500;
             game.Transform.position(transform, 500, 500);
             const frame = stepClient(game.instance, game.user, game.clientNetwork);
-            expect(frame.ecsDeleteEntities).toEqual([pid]);
-            expect(frame.deleteEntities).toEqual([transform.nid]);
+            const frameChannel = frame.requireChannel(game.channel.nid);
+            expect(frameChannel.ecsDeleteEntities).toEqual([pid]);
+            expect(frameChannel.deleteEntities).toEqual([transform.nid]);
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false);
             expect(game.clientNetwork.store.entities.has(transform.nid)).toBe(false);
         });
@@ -1102,8 +1123,9 @@ describe('server snapshot pipeline', () => {
             stepClient(game.instance, game.user, game.clientNetwork);
             game.channel.removeEntity(pid);
             const frame = stepClient(game.instance, game.user, game.clientNetwork);
-            expect(frame.ecsDeleteEntities).toEqual([pid]);
-            expect(frame.deleteEntities).toEqual([transformNid]);
+            const frameChannel = frame.requireChannel(game.channel.nid);
+            expect(frameChannel.ecsDeleteEntities).toEqual([pid]);
+            expect(frameChannel.deleteEntities).toEqual([transformNid]);
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false);
             expect(game.clientNetwork.store.entities.has(transformNid)).toBe(false);
         });
@@ -1145,7 +1167,7 @@ describe('server snapshot pipeline', () => {
         expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.y).toBe(9);
     });
     it('spatially replicates ECS roots from 3D component state', () => {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d;
         const context = createEcsContext3D();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -1165,9 +1187,9 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).ecsCreateEntities).toEqual([pid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_b = clientNetwork.store.get(transform.nid)) === null || _b === void 0 ? void 0 : _b.z).toBe(5);
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.z).toBe(5);
         transform.x = 6;
         transform.y = 7;
         transform.z = 8;
@@ -1175,21 +1197,22 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(6);
-        expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.y).toBe(7);
-        expect((_e = clientNetwork.store.get(transform.nid)) === null || _e === void 0 ? void 0 : _e.z).toBe(8);
+        expect((_b = clientNetwork.store.get(transform.nid)) === null || _b === void 0 ? void 0 : _b.x).toBe(6);
+        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.y).toBe(7);
+        expect((_d = clientNetwork.store.get(transform.nid)) === null || _d === void 0 ? void 0 : _d.z).toBe(8);
         transform.z = 50;
         Transform.position(transform, 6, 7, 50);
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_f = clientNetwork.latestFrame) === null || _f === void 0 ? void 0 : _f.ecsDeleteEntities).toEqual([pid]);
-        expect((_g = clientNetwork.latestFrame) === null || _g === void 0 ? void 0 : _g.deleteEntities).toEqual([transform.nid]);
+        const deleteFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid]);
+        expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false);
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false);
     });
     it('spatially replicates existing ECS roots when a user subscribes after creation', () => {
-        var _a, _b, _c;
+        var _a;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -1208,13 +1231,14 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
+        const frameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(frameChannel.ecsCreateEntities).toEqual([pid]);
+        expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(5);
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
     });
     it('spatially replicates existing composed ECS roots when a user subscribes after creation', () => {
-        var _a, _b, _c, _d;
+        var _a, _b;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -1242,14 +1266,15 @@ describe('server snapshot pipeline', () => {
             clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         }).not.toThrow();
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid, body.nid]);
+        const frameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(frameChannel.ecsCreateEntities).toEqual([pid]);
+        expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid, body.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_c = clientNetwork.store.get(transform.nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(5);
-        expect((_d = clientNetwork.store.get(body.nid)) === null || _d === void 0 ? void 0 : _d.label).toBe('npc');
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(5);
+        expect((_b = clientNetwork.store.get(body.nid)) === null || _b === void 0 ? void 0 : _b.label).toBe('npc');
     });
     it('spatially replicates many existing composed ECS roots after nid width grows', () => {
-        var _a, _b, _c;
+        var _a;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -1280,12 +1305,13 @@ describe('server snapshot pipeline', () => {
             clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         }).not.toThrow();
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toHaveLength(130);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.ecsCreateComponents).toHaveLength(260);
-        expect((_c = clientNetwork.store.get(createdBodies[129].nid)) === null || _c === void 0 ? void 0 : _c.label).toBe('npc-129');
+        const frameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(frameChannel.ecsCreateEntities).toHaveLength(130);
+        expect(frameChannel.ecsCreateComponents).toHaveLength(260);
+        expect((_a = clientNetwork.store.get(createdBodies[129].nid)) === null || _a === void 0 ? void 0 : _a.label).toBe('npc-129');
     });
     it('spatially replicates ECS roots on the xz plane without copying z into y', () => {
-        var _a, _b, _c, _d;
+        var _a;
         const context = createEcsContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -1305,9 +1331,9 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.ecsCreateEntities).toEqual([pid]);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).ecsCreateEntities).toEqual([pid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true);
-        expect((_b = clientNetwork.store.get(transform.nid)) === null || _b === void 0 ? void 0 : _b.y).toBe(500);
+        expect((_a = clientNetwork.store.get(transform.nid)) === null || _a === void 0 ? void 0 : _a.y).toBe(500);
         transform.x = 6;
         transform.y = 501;
         transform.z = 50;
@@ -1315,8 +1341,9 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.ecsDeleteEntities).toEqual([pid]);
-        expect((_d = clientNetwork.latestFrame) === null || _d === void 0 ? void 0 : _d.deleteEntities).toEqual([transform.nid]);
+        const deleteFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid]);
+        expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid]);
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false);
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false);
     });
@@ -1385,7 +1412,7 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(entity.nid)).toBe(false);
     });
     it('creates and deletes manual spatial movers per user-visible cell set', () => {
-        var _a, _b, _c;
+        var _a;
         const context = createGroupedContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -1429,13 +1456,13 @@ describe('server snapshot pipeline', () => {
         firstClient.processNextFrame();
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
-        expect((_a = firstClient.latestFrame) === null || _a === void 0 ? void 0 : _a.deleteEntities).toEqual([moverNid]);
+        expect(firstClient.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([moverNid]);
         expect(firstClient.store.entities.has(moverNid)).toBe(false);
-        expect((_b = secondClient.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities.map(entity => entity.nid)).toContain(moverNid);
-        expect((_c = secondClient.store.get(moverNid)) === null || _c === void 0 ? void 0 : _c.x).toBe(150);
+        expect(secondClient.latestFrame.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toContain(moverNid);
+        expect((_a = secondClient.store.get(moverNid)) === null || _a === void 0 ? void 0 : _a.x).toBe(150);
     });
     it('can use shared create and delete fragments for synchronized all-visible channel deltas', () => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -1484,10 +1511,10 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
         expect(instance.network.sharedCreateFragments.size).toBe(1);
-        expect((_a = firstClient.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid]);
-        expect((_b = secondClient.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid]);
-        expect((_c = firstClient.store.get(itemNid)) === null || _c === void 0 ? void 0 : _c.label).toBe('item');
-        expect((_d = secondClient.store.get(itemNid)) === null || _d === void 0 ? void 0 : _d.label).toBe('item');
+        expect(firstClient.latestFrame.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid]);
+        expect(secondClient.latestFrame.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid]);
+        expect((_a = firstClient.store.get(itemNid)) === null || _a === void 0 ? void 0 : _a.label).toBe('item');
+        expect((_b = secondClient.store.get(itemNid)) === null || _b === void 0 ? void 0 : _b.label).toBe('item');
         channel.removeEntity(crate);
         instance.step();
         firstClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(firstUser)));
@@ -1495,15 +1522,14 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
         expect(instance.network.sharedDeleteFragments.size).toBe(1);
-        expect((_e = firstClient.latestFrame) === null || _e === void 0 ? void 0 : _e.deleteEntities).toEqual([itemNid, crateNid]);
-        expect((_f = secondClient.latestFrame) === null || _f === void 0 ? void 0 : _f.deleteEntities).toEqual([itemNid, crateNid]);
+        expect(firstClient.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([itemNid, crateNid]);
+        expect(secondClient.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([itemNid, crateNid]);
         expect(firstClient.store.entities.has(crateNid)).toBe(false);
         expect(secondClient.store.entities.has(itemNid)).toBe(false);
         expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(4);
         expect(instance.network.snapshotPerformance.sharedFragmentHits).toBe(4);
     });
     it('keeps new all-visible channel subscribers on the full baseline create path', () => {
-        var _a, _b;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -1540,11 +1566,10 @@ describe('server snapshot pipeline', () => {
         newClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(newUser)));
         newClient.processNextFrame();
         expect(instance.network.sharedCreateFragments.size).toBe(1);
-        expect((_a = existingClient.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities.map(entity => entity.nid)).toEqual([added.nid]);
-        expect((_b = newClient.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities.map(entity => entity.nid)).toEqual([initial.nid, added.nid]);
+        expect(existingClient.latestFrame.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([added.nid]);
+        expect(newClient.latestFrame.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([initial.nid, added.nid]);
     });
     it('does not emit shared create or delete fragments for same-tick transient roots', () => {
-        var _a, _b;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -1576,8 +1601,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame();
         expect(instance.network.sharedCreateFragments.size).toBe(0);
         expect(instance.network.sharedDeleteFragments.size).toBe(0);
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities).toEqual([]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.deleteEntities).toEqual([]);
+        expect(clientNetwork.latestFrame.hasChannel(channel.nid)).toBe(false);
     });
     it('can use shared message fragments for channel broadcasts', () => {
         var _a, _b, _c;
@@ -1610,18 +1634,11 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
         expect(firstClient.messages).toEqual([
-            { ntype: NType.Message, text: 'private' },
-            { ntype: NType.Message, text: 'broadcast' }
+            { ntype: NType.Message, text: 'private' }
         ]);
-        expect(secondClient.messages).toEqual([
-            { ntype: NType.Message, text: 'broadcast' }
-        ]);
-        expect((_a = firstClient.latestFrame) === null || _a === void 0 ? void 0 : _a.interpolatedMessages).toEqual([
-            { ntype: NType.Message, text: 'broadcast-fx' }
-        ]);
-        expect((_b = secondClient.latestFrame) === null || _b === void 0 ? void 0 : _b.interpolatedMessages).toEqual([
-            { ntype: NType.Message, text: 'broadcast-fx' }
-        ]);
+        expect(secondClient.messages).toEqual([]);
+        expect((_a = firstClient.latestFrame) === null || _a === void 0 ? void 0 : _a.interpolatedMessages).toEqual([]);
+        expect((_b = secondClient.latestFrame) === null || _b === void 0 ? void 0 : _b.interpolatedMessages).toEqual([]);
         expect((_c = firstClient.latestFrame) === null || _c === void 0 ? void 0 : _c.channels).toEqual([
             expect.objectContaining({
                 channelId: channel.nid,
@@ -1840,7 +1857,8 @@ describe('server snapshot pipeline', () => {
         firstClient.processNextFrame();
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
-        expect(firstClient.messages).toEqual([{ ntype: NType.Message, text: 'near-3d' }]);
+        expect(firstClient.messages).toEqual([]);
+        expect(firstClient.latestFrame.requireChannel(channel.nid).messages).toEqual([{ ntype: NType.Message, text: 'near-3d' }]);
         expect(secondClient.messages).toEqual([]);
     });
     it('records explicit dirty hints without requiring them for implicit SpatialChannel2D updates', () => {
@@ -1992,11 +2010,12 @@ describe('server snapshot pipeline', () => {
         firstClient.processNextFrame();
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
-        expect(firstClient.messages).toEqual([{ ntype: NType.Message, text: 'near' }]);
+        expect(firstClient.messages).toEqual([]);
+        expect(firstClient.latestFrame.requireChannel(channel.nid).messages).toEqual([{ ntype: NType.Message, text: 'near' }]);
         expect(secondClient.messages).toEqual([]);
     });
     it('keeps same-cell SpatialChannel2D creates on the normal create path', () => {
-        var _a, _b;
+        var _a;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -2025,11 +2044,11 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities.map(entity => entity.nid)).toEqual([second.nid]);
-        expect((_b = clientNetwork.store.get(second.nid)) === null || _b === void 0 ? void 0 : _b.label).toBe('second');
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([second.nid]);
+        expect((_a = clientNetwork.store.get(second.nid)) === null || _a === void 0 ? void 0 : _a.label).toBe('second');
     });
     it('keeps same-cell SpatialChannel2D removes on the normal delete path', () => {
-        var _a, _b;
+        var _a;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -2060,12 +2079,12 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.deleteEntities).toEqual([firstNid]);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([firstNid]);
         expect(clientNetwork.store.entities.has(firstNid)).toBe(false);
-        expect((_b = clientNetwork.store.get(second.nid)) === null || _b === void 0 ? void 0 : _b.label).toBe('second');
+        expect((_a = clientNetwork.store.get(second.nid)) === null || _a === void 0 ? void 0 : _a.label).toBe('second');
     });
     it('updates SpatialChannel2D visibility correctly when an entity moves between cells', () => {
-        var _a, _b, _c;
+        var _a;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -2099,13 +2118,12 @@ describe('server snapshot pipeline', () => {
         firstClient.processNextFrame();
         secondClient.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(secondUser)));
         secondClient.processNextFrame();
-        expect((_a = firstClient.latestFrame) === null || _a === void 0 ? void 0 : _a.deleteEntities).toEqual([nid]);
+        expect(firstClient.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([nid]);
         expect(firstClient.store.entities.has(nid)).toBe(false);
-        expect((_b = secondClient.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities.map(created => created.nid)).toEqual([nid]);
-        expect((_c = secondClient.store.get(nid)) === null || _c === void 0 ? void 0 : _c.x).toBe(60);
+        expect(secondClient.latestFrame.requireChannel(channel.nid).createEntities.map(created => created.nid)).toEqual([nid]);
+        expect((_a = secondClient.store.get(nid)) === null || _a === void 0 ? void 0 : _a.x).toBe(60);
     });
     it('orders SpatialChannel2D leave-cell tree deletes from child to parent', () => {
-        var _a;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         instance.network.sharedUpdateFragmentsEnabled = true;
@@ -2137,7 +2155,7 @@ describe('server snapshot pipeline', () => {
         instance.step();
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(lastSentBuffer(user)));
         clientNetwork.processNextFrame();
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.deleteEntities).toEqual([childNid, parentNid]);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([childNid, parentNid]);
         expect(clientNetwork.store.entities.has(parentNid)).toBe(false);
         expect(clientNetwork.store.entities.has(childNid)).toBe(false);
     });
@@ -2257,7 +2275,6 @@ describe('server snapshot pipeline', () => {
         expect(onResponseBacklog).toHaveBeenCalledTimes(1);
     });
     it('sends a protocol update before entity sections when nid width grows', () => {
-        var _a;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -2280,7 +2297,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(buffer));
         clientNetwork.processNextFrame();
         expect(clientNetwork.protocol.nidType).toBe(Binary_1.Binary.UInt16);
-        expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.createEntities).toHaveLength(256);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).createEntities).toHaveLength(256);
         expect(clientNetwork.store.get(257)).toEqual({
             nid: 257,
             ntype: NType.Entity,
@@ -2290,7 +2307,7 @@ describe('server snapshot pipeline', () => {
         });
     });
     it('creates snapshot buffers that the client can consume as raw frames', () => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -2318,7 +2335,7 @@ describe('server snapshot pipeline', () => {
         expect((_a = clientNetwork.latestFrame) === null || _a === void 0 ? void 0 : _a.interpolatedMessages).toEqual([
             { ntype: NType.Message, text: 'shot' }
         ]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities).toEqual([
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).createEntities).toEqual([
             { nid, ntype: NType.Entity, x: 5, y: 6, label: 'door' }
         ]);
         expect(clientNetwork.store.get(nid)).toEqual({
@@ -2334,23 +2351,24 @@ describe('server snapshot pipeline', () => {
         const updateBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(updateBuffer));
         clientNetwork.processNextFrame();
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.createEntities).toEqual([]);
-        expect((_d = clientNetwork.latestFrame) === null || _d === void 0 ? void 0 : _d.updateEntities).toEqual([
+        const updateFrameChannel = clientNetwork.latestFrame.requireChannel(channel.nid);
+        expect(updateFrameChannel.createEntities).toEqual([]);
+        expect(updateFrameChannel.updateEntities).toEqual([
             { nid, prop: 'x', previous: 5, value: 11 }
         ]);
-        expect((_e = clientNetwork.store.get(nid)) === null || _e === void 0 ? void 0 : _e.x).toBe(11);
+        expect((_b = clientNetwork.store.get(nid)) === null || _b === void 0 ? void 0 : _b.x).toBe(11);
         channel.removeEntity(entity);
         instance.tick = 3;
         instance.cache.createCachesForTick(instance.tick);
         const deleteBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(deleteBuffer));
         clientNetwork.processNextFrame();
-        expect((_f = clientNetwork.latestFrame) === null || _f === void 0 ? void 0 : _f.deleteEntities).toEqual([nid]);
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).deleteEntities).toEqual([nid]);
         expect(clientNetwork.store.entities.has(nid)).toBe(false);
         expect(clientNetwork.entityNTypes.has(nid)).toBe(false);
     });
     it('sends channel headers before normal channel entities and applies header updates', () => {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -2382,7 +2400,7 @@ describe('server snapshot pipeline', () => {
                 header: channel.header
             }
         ]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.createEntities).toEqual([
+        expect(clientNetwork.latestFrame.requireChannel(channel.nid).createEntities).toEqual([
             { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
         ]);
         expect(clientNetwork.store.getChannelHeader(channel.nid)).toEqual(channel.header);
@@ -2393,12 +2411,11 @@ describe('server snapshot pipeline', () => {
         const updateBuffer = (0, createSnapshotBuffer_1.default)(user, instance);
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader(updateBuffer));
         clientNetwork.processNextFrame();
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.channelHeaderUpdates).toHaveLength(1);
-        expect((_d = clientNetwork.store.getChannelHeader(channel.nid)) === null || _d === void 0 ? void 0 : _d.label).toBe('renamed');
-        expect((_e = clientNetwork.latestFrame) === null || _e === void 0 ? void 0 : _e.createEntities).toEqual([]);
+        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.channelHeaderUpdates).toHaveLength(1);
+        expect((_c = clientNetwork.store.getChannelHeader(channel.nid)) === null || _c === void 0 ? void 0 : _c.label).toBe('renamed');
     });
     it('sends a newly subscribed headered channel alongside an existing world channel', () => {
-        var _a, _b, _c, _d;
+        var _a, _b;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -2441,16 +2458,13 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader((0, createSnapshotBuffer_1.default)(user, instance)));
         clientNetwork.processNextFrame();
         expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.channelOpens.map(open => open.channelId)).toEqual([inventory.nid]);
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.channelEntityCreates).toEqual([
-            { nid: item.nid, channelId: inventory.nid }
-        ]);
-        expect((_d = clientNetwork.latestFrame) === null || _d === void 0 ? void 0 : _d.createEntities).toEqual([
+        expect(clientNetwork.latestFrame.requireChannel(inventory.nid).createEntities).toEqual([
             { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
         ]);
         expect(clientNetwork.store.getChannelHeader(item.nid)).toEqual(inventory.header);
     });
     it('closes a known headered channel without sending each contained entity delete', () => {
-        var _a, _b, _c;
+        var _a, _b;
         const context = createContext();
         const instance = new Instance_1.Instance(context);
         const user = createUser(instance);
@@ -2487,8 +2501,7 @@ describe('server snapshot pipeline', () => {
                 channelId: channel.nid
             }
         ]);
-        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.deleteEntities).toEqual([]);
-        expect((_c = clientNetwork.latestFrame) === null || _c === void 0 ? void 0 : _c.closedChannels).toEqual([
+        expect((_b = clientNetwork.latestFrame) === null || _b === void 0 ? void 0 : _b.closedChannels).toEqual([
             {
                 channelId: channel.nid,
                 header: channel.header,
@@ -2522,8 +2535,8 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(BufferBinary_1.testBinaryAdapter.createReader((0, createSnapshotBuffer_1.default)(user, instance)));
         const frames = clientNetwork.drainFrames();
         expect(frames).toHaveLength(2);
-        expect(frames[0].createEntities).toHaveLength(1);
-        expect(frames[1].updateEntities).toEqual([
+        expect(frames[0].requireChannel(channel.nid).createEntities).toHaveLength(1);
+        expect(frames[1].requireChannel(channel.nid).updateEntities).toEqual([
             { nid: entity.nid, prop: 'x', previous: 1, value: 3 }
         ]);
         expect(clientNetwork.drainFrames()).toEqual([]);

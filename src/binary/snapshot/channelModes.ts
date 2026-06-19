@@ -153,16 +153,6 @@ export function getSingleEcsSpatialSnapshotChannel(user: User): EcsSpatialSnapsh
     return isEcsSpatialSnapshotChannel(channel) ? channel : null
 }
 
-export function getEcsSnapshotChannels(user: User): EcsSnapshotChannel[] {
-    const channels: EcsSnapshotChannel[] = []
-    for (const channel of user.subscriptions.values()) {
-        if (isEcsSnapshotChannel(channel)) {
-            channels.push(channel)
-        }
-    }
-    return channels
-}
-
 export function isCellFragmentChannel(channel: any): channel is CellFragmentChannel {
     return channel?.cellFragmentMode === true &&
         typeof channel.membershipVersion === 'number' &&

@@ -5,6 +5,9 @@ import { Client } from './Client'
 import { FixedStepInterpolator, FixedStepInterpolatorOptions } from './FixedStepInterpolator'
 import { Snapshot } from './Snapshot'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
+import { ChannelType, createChannelHeader } from '../common/ChannelHeader'
+
+const TEST_CHANNEL_ID = 1
 
 class MockAdapter {
     binary = testBinaryAdapter
@@ -28,14 +31,35 @@ export function createInterpolationTestContext() {
 }
 
 export function createTestSnapshot(args: Partial<Snapshot>): Snapshot {
+    const createEntities = args.createEntities || []
+    const updateEntities = args.updateEntities || []
+    const deleteEntities = args.deleteEntities || []
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
+    const channels = args.channels || (hasEntityCrud ? [{
+        channelId: TEST_CHANNEL_ID,
+        messages: [],
+        interpolatedMessages: [],
+        ecsCreateEntities: [],
+        ecsCreateComponents: [],
+        ecsDeleteEntities: [],
+        createEntities,
+        updateEntities,
+        updateEntityGroups: [],
+        deleteEntities
+    }] : [])
+
     return {
         timestamp: -1,
         confirmedClientTick: -1,
         messages: [],
+        ...args,
+        channelOpens: args.channelOpens || (hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: createChannelHeader(TEST_CHANNEL_ID, ChannelType.Channel) }]
+            : []),
+        channels,
         createEntities: [],
         updateEntities: [],
-        deleteEntities: [],
-        ...args
+        deleteEntities: []
     }
 }
 

@@ -53,7 +53,7 @@ describe('LocalAdapter', () => {
         const frame = client.network.processNextFrame()
 
         expect(frame).not.toBeNull()
-        expect(frame!.createEntities.map(created => created.nid)).toEqual([entity.nid])
+        expect(frame!.requireChannel(channel.nid).createEntities.map(created => created.nid)).toEqual([entity.nid])
         expect(client.network.store.entities.get(entity.nid)).toMatchObject({
             nid: entity.nid,
             ntype: 1,

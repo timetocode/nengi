@@ -97,31 +97,41 @@ Default header names are creation-time metadata. If the client needs mutable
 channel context, pass a schema-backed header object, mutate that object on the
 server, and call `channel.markHeaderDirty()`.
 
-On the client, bind item lifecycle by the schema-backed header:
+On the client, process the inventory channel's frame bucket:
 
 ```ts
-const replica = new ClientReplica(client)
-
-replica.bindChannel<InventoryHeader>(NType.InventoryHeader, {
-    open: channel => openInventory(channel.header),
-    close: channel => closeInventory(channel.header)
-})
-
-replica.bindChannelEntity<InventoryHeader, InventoryItem>(NType.InventoryHeader, NType.InventoryItem, {
-    mode: ClientEntityMode.Raw,
-    create(item, ctx) {
-        addInventoryItem(ctx.channel.header, item)
-    },
-    update(item, _local, ctx) {
-        updateInventoryItem(ctx.channel.header, item)
-    },
-    destroy(_local, ctx) {
-        removeInventoryItem(ctx.nid)
+for (const frame of client.network.drainFrames()) {
+    const inventory = frame.getChannel(inventoryChannelId)
+    if (!inventory) {
+        continue
     }
-})
+
+    const header = client.network.store.getChannelHeaderById(inventoryChannelId) as InventoryHeader
+    openInventory(header)
+
+    inventory.createEntities.forEach(item => addInventoryItem(header, item as InventoryItem))
+    inventory.updateEntities.forEach(update => {
+        const item = client.network.store.get(update.nid)
+        if (item) {
+            updateInventoryItem(header, item as InventoryItem)
+        }
+    })
+    inventory.deletedEntities.forEach(deleted => removeInventoryItem(deleted.nid))
+
+    frame.closedChannels.forEach(closed => {
+        if (closed.channelId === inventoryChannelId) {
+            closeInventory(header)
+            closed.entityNids.forEach(removeInventoryItem)
+        }
+    })
+}
 ```
 
-This lets the client know the created item arrived through inventory context instead of the main world. A scoped binding auto-tracks the item and receives create/update/destroy with the channel header available in the binding context. When the inventory channel closes, nengi purges the contained item entities on the client and calls `onClose`; do not write inventory UI cleanup that requires one delete callback per item. If the UI or renderer keeps side tables keyed by nid, use `ctx.closed.entityNids` inside `onClose`.
+This lets the client know the created item arrived through inventory context
+instead of the main world. When the inventory channel closes, nengi purges the
+contained item entities on the client and reports the purged ids in
+`frame.closedChannels`; do not write inventory UI cleanup that requires one
+delete callback per item.
 
 If an item moves between two inventory channels, model that as a delete from the source channel and a create in the target channel. Do not keep the same entity id across channels unless nengi grows an explicit transfer primitive.
 

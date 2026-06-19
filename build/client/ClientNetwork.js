@@ -266,8 +266,9 @@ class ClientNetwork {
             return null;
         }
         const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAt);
-        frame.deleteEntities.forEach(nid => {
-            this.entityNTypes.delete(nid);
+        frame.channels.forEach(channel => {
+            channel.deleteEntities.forEach(nid => this.entityNTypes.delete(nid));
+            channel.ecsDeleteEntities.forEach(pid => this.entityNTypes.delete(pid));
         });
         frame.closedChannels.forEach(closed => {
             this.entityNTypes.delete(closed.channelId);
@@ -282,7 +283,7 @@ class ClientNetwork {
             this.store.history.pruneBefore(this.frames[0].tick);
         }
         this.latestFrame = frame;
-        pending.snapshot.messages.forEach(message => this.messages.push(message));
+        frame.messages.forEach(message => this.messages.push(message));
         const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities);
         if (predictionErrorFrame.entities.size > 0) {
             this.client.network.predictionErrorFrames.push(predictionErrorFrame);
@@ -545,7 +546,6 @@ class ClientNetwork {
             interpolatedMessages: [],
             channels: [],
             channelOpens: [],
-            channelEntityCreates: [],
             channelHeaderUpdates: [],
             channelCloses: [],
             skipInterpolationNids: [],
@@ -690,16 +690,6 @@ class ClientNetwork {
                         snapshot.channelOpens.push({
                             channelId,
                             header
-                        });
-                    }
-                    break;
-                }
-                case BinarySection_1.BinarySection.ChannelEntityCreates: {
-                    const count = dr.readUInt32();
-                    for (let i = 0; i < count; i++) {
-                        snapshot.channelEntityCreates.push({
-                            nid: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr),
-                            channelId: (0, Protocol_1.readNetworkId)(this.protocol.nidType, dr)
                         });
                     }
                     break;

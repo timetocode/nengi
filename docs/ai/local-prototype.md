@@ -203,8 +203,6 @@ export {
     Binary,
     Channel,
     Client,
-    ClientEntityMode,
-    ClientReplica,
     CommandRouter,
     Context,
     Instance,
@@ -336,26 +334,26 @@ For a minimal browser game, use:
 
 - `Client`
 - `WebSocketClientAdapter`
-- `ClientReplica`
 - `AdaptiveInterpolator` or `StaticInterpolator`
+- `client.network.drainFrames()`
+- `client.network.store`
 - canvas, Pixi, or another renderer
 
 Client startup imports normally look like this:
 
 ```ts
-import { AdaptiveInterpolator, Client, ClientEntityMode, ClientReplica } from '#nengi'
+import { AdaptiveInterpolator, Client } from '#nengi'
 import { WebSocketClientAdapter } from 'nengi-websocket-client-adapter'
 import { createGameContext } from '../shared/context'
 ```
 
-Create the client and replica:
+Create the client and interpolator:
 
 ```ts
 const SERVER_TICK_RATE = 20
 const context = createGameContext()
 const client = new Client(context, WebSocketClientAdapter, SERVER_TICK_RATE)
 const interpolator = new AdaptiveInterpolator(client)
-const replica = new ClientReplica(client, { interpolator })
 
 await client.connect('ws://localhost:8079', { name: 'player' })
 ```
@@ -363,11 +361,13 @@ await client.connect('ws://localhost:8079', { name: 'player' })
 Keep the first client simple:
 
 1. Connect to the server.
-2. Register CRUD handlers with `ClientReplica`.
-3. Track remote entities as interpolated.
-4. Mark the local player as predicted or raw if the server sends
+2. Drain server frames and use frame create/update/delete facts to maintain
+   local presentation objects.
+3. Read raw authoritative state from `client.network.store`.
+4. Render remote moving entities from interpolated samples.
+5. Keep local prediction state for the controlled player if the server sends
    `YouArePlayer`.
-5. Each animation frame, process server frames, sample interpolation, draw, send
+6. Each animation frame, process server frames, sample interpolation, draw, send
    movement commands, and flush.
 
 ## Install And Run

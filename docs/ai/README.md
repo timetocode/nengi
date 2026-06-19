@@ -109,22 +109,22 @@ For any requested feature, answer these questions:
 
 ## Current recommended client shape
 
-Use `ClientReplica` as the normal client-side bridge from snapshots to game
-state.
+Use the raw client state surface as the normal bridge from snapshots to game
+client code.
 
-- Use `bindEntity` for ordinary replicated entities.
-- Use `bindEcsComponent` for nengi ECS channels, where roots are `pid`s and
-  replicated component state has its own `nid`.
-- Use `bindChannel` and `bindChannelEntity` when channel header context matters,
-  such as inventory items, team-private state, remote maps, terminals, or other
-  scoped UI.
-- Every channel has a header with id/type metadata. Use `name` for a simple
-  named channel, and use a schema-backed header object when the client needs
-  structured channel context.
-- Use ordinary messages for control/UI context and one-shot events that should
-  run after a snapshot's authoritative state is applied.
-- Use interpolated messages for effects whose delivery should line up with
-  interpolated entity motion. The message payload is not itself interpolated.
+- `ClientNetwork` decodes snapshots and applies them to `EntityStore`.
+- `EntityStore` is the latest raw authoritative state.
+- `Frame` is the per-snapshot change report: creates, updates, deletes,
+  messages, channel opens/closes, and channel-scoped CRUD.
+- Interpolators sample retained history for smooth rendering.
+- Prediction helpers reconcile local predicted state against raw store state.
+
+Do not build a second store or binding layer by default. Userland should create
+sprites, UI records, sounds, and local prediction state directly from frame
+facts and raw store lookups.
+
+For nengi ECS channels, apply the frame's ECS CRUD to an `EcsWorld`. Keep that
+sync layer tiny: CRUD in, ECS mutation plus facts out.
 
 ## Common mistakes to avoid
 
@@ -167,7 +167,9 @@ Use this map instead of reading every file every time.
 - Request/response: client-to-server interaction that expects a result.
 - Channel: server-side visibility/subscription container.
 - Channel header: schema-backed client context for a channel.
-- ClientReplica: client-side bridge for replicated state, channel-scoped CRUD, ECS components, messages, and interpolation-aware handling.
+- EntityStore: client-side authoritative raw state, indexed by nid and channel.
+- Frame: per-snapshot change report returned after nengi applies a snapshot.
+- Interpolator: samples retained entity history for smooth rendering.
 - Schema: binary definition of properties nengi can write over the network.
 
 ## Default recommendation

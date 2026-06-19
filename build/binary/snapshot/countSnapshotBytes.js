@@ -18,13 +18,6 @@ const UINT8_COUNT_BYTES = 1;
 const UINT32_COUNT_BYTES = 4;
 const UINT32_BYTES = 4;
 const RESPONSE_STATUS_BYTES = 1;
-function countChannelEntityCreates(plan, protocol) {
-    if (plan.channelEntityCreates.length === 0) {
-        return 0;
-    }
-    return SECTION_BYTES + UINT32_COUNT_BYTES +
-        (plan.channelEntityCreates.length * (0, Protocol_1.byteSizeOfNetworkType)(protocol.nidType) * 2);
-}
 function countChannelOpens(plan, context, protocol) {
     if (plan.channelOpens.length === 0) {
         return 0;
@@ -196,7 +189,6 @@ function countSnapshotBytes(plan, context, protocol = Protocol_1.DEFAULT_PROTOCO
         countInterpolatedMessages(plan, context, protocol) +
         countResponses(plan) +
         countChannelOpens(plan, context, protocol) +
-        countChannelEntityCreates(plan, protocol) +
         countChannelHeaderUpdates(plan, protocol) +
         countChannelCloses(plan, protocol) +
         countSkipInterpolation(plan, protocol) +

@@ -68,17 +68,6 @@ function writeResponses(plan, writer) {
         (0, EndpointPayload_1.writeEndpointPayload)(plan.responses[i].payload, writer);
     }
 }
-function writeChannelEntityCreates(plan, writer, protocol) {
-    if (plan.channelEntityCreates.length === 0) {
-        return;
-    }
-    writer.writeUInt8(BinarySection_1.BinarySection.ChannelEntityCreates);
-    writer.writeUInt32(plan.channelEntityCreates.length);
-    for (let i = 0; i < plan.channelEntityCreates.length; i++) {
-        (0, Protocol_1.writeNetworkId)(plan.channelEntityCreates[i].nid, protocol.nidType, writer);
-        (0, Protocol_1.writeNetworkId)(plan.channelEntityCreates[i].channelId, protocol.nidType, writer);
-    }
-}
 function writeChannelOpens(plan, context, writer, protocol) {
     if (plan.channelOpens.length === 0) {
         return;
@@ -224,7 +213,6 @@ function writeSnapshot(plan, context, writer, protocol = Protocol_1.DEFAULT_PROT
     writeChannelHeaderUpdates(plan, writer, protocol);
     writeChannelCloses(plan, writer, protocol);
     writeSkipInterpolation(plan, writer, protocol);
-    writeChannelEntityCreates(plan, writer, protocol);
     writeEcsCreateEntities(plan, writer, protocol);
     writeEcsCreateComponents(plan, context, writer, protocol);
     writeCreateEntities(plan, context, writer, protocol);
@@ -242,7 +230,6 @@ function writeSnapshotDebug(plan, context, writer, protocol = Protocol_1.DEFAULT
     writeChannelHeaderUpdates(plan, writer, protocol);
     writeChannelCloses(plan, writer, protocol);
     writeSkipInterpolation(plan, writer, protocol);
-    writeChannelEntityCreates(plan, writer, protocol);
     writeEcsCreateEntitiesDebug(plan, writer, protocol);
     writeEcsCreateComponentsDebug(plan, context, writer, protocol);
     writeCreateEntitiesDebug(plan, context, writer, protocol);

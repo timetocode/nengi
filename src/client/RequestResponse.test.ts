@@ -6,7 +6,7 @@ import { Context } from '../common/Context'
 import { MAX_UINT32, RequestPolicy, defineEndpoint } from '../common/Endpoint'
 import { Channel } from '../server/channel/Channel'
 import { Instance } from '../server/Instance'
-import { User } from '../server/User'
+import { User, UserConnectionState } from '../server/User'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 import { ClientNetwork } from './ClientNetwork'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
@@ -20,6 +20,7 @@ function createUser(instance: Instance) {
     } as any)
     user.id = 1
     user.instance = instance
+    user.connectionState = UserConnectionState.Open
     return user
 }
 
@@ -40,6 +41,7 @@ function createClientNetwork(context: Context) {
 function deliverRequestAndResponse(instance: Instance, user: User, clientNetwork: ClientNetwork) {
     const outbound = clientNetwork.createOutbound(testBinaryAdapter)
     instance.network.onMessage(user, outbound)
+    instance.processRequests()
 
     const responseBuffer = createSnapshotBuffer(user, instance) as Buffer
     clientNetwork.readSnapshot(testBinaryAdapter.createReader(responseBuffer))
@@ -176,6 +178,49 @@ describe('request/response', () => {
         await expect(response).resolves.toEqual({
             ok: true,
             echoed: 'cafe\u0301'
+        })
+    })
+
+    it('queues request handlers until the server explicitly processes requests', () => {
+        const context = new Context()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const received: any[] = []
+
+        instance.respond(1, ({ body }) => {
+            received.push(body)
+            return { ok: true }
+        })
+
+        clientNetwork.request(1, { text: 'queued' }, { timeoutMs: 0 }).catch(() => undefined)
+        instance.network.onMessage(user, clientNetwork.createOutbound(testBinaryAdapter))
+
+        expect(received).toEqual([])
+        expect(instance.network.requestQueue.length).toBe(1)
+
+        expect(instance.processRequests()).toBe(1)
+        expect(received).toEqual([{ text: 'queued' }])
+        expect(instance.network.requestQueue.length).toBe(0)
+    })
+
+    it('rejects requests received before the connection is open', async () => {
+        const context = new Context()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const handler = jest.fn(() => ({ ok: true }))
+        user.connectionState = UserConnectionState.OpenAwaitingHandshake
+
+        instance.respond(1, handler)
+
+        const response = clientNetwork.request(1, { text: 'early' })
+        deliverRequestAndResponse(instance, user, clientNetwork)
+
+        expect(handler).not.toHaveBeenCalled()
+        expect(instance.network.requestQueue.length).toBe(0)
+        await expect(response).rejects.toMatchObject({
+            code: 'NOT_OPEN'
         })
     })
 
@@ -397,7 +442,7 @@ describe('request/response', () => {
             chestNid: 123,
             inventoryNid: inventory.nid
         })
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([
+        expect(clientNetwork.latestFrame!.requireChannel(inventoryChannel.nid).createEntities).toEqual([
             item
         ])
         expect(clientNetwork.store.get(item.nid)?.inventoryNid).toBe(inventory.nid)
@@ -508,6 +553,7 @@ describe('request/response', () => {
             code: 'TIMEOUT'
         })
 
+        instance.processRequests()
         const responseBuffer = createSnapshotBuffer(user, instance) as Buffer
         expect(() => {
             clientNetwork.readSnapshot(testBinaryAdapter.createReader(responseBuffer))
@@ -630,10 +676,12 @@ describe('request/response', () => {
 
         instance.network.onMessage(user, clientNetwork.createOutbound(testBinaryAdapter))
 
+        expect(instance.network.requestQueue.length).toBe(255)
+        expect(clientNetwork.requestQueue.length).toBe(1)
+        instance.processRequests()
         expect(received).toHaveLength(255)
         expect(received[0]).toBe(0)
         expect(received[254]).toBe(254)
-        expect(clientNetwork.requestQueue.length).toBe(1)
         expect(onRequestBacklog).toHaveBeenCalledWith({
             queued: 256,
             sent: 255,
@@ -643,9 +691,11 @@ describe('request/response', () => {
 
         instance.network.onMessage(user, clientNetwork.createOutbound(testBinaryAdapter))
 
+        expect(instance.network.requestQueue.length).toBe(1)
+        expect(clientNetwork.requestQueue.length).toBe(0)
+        instance.processRequests()
         expect(received).toHaveLength(256)
         expect(received[255]).toBe(255)
-        expect(clientNetwork.requestQueue.length).toBe(0)
         expect(onRequestBacklog).toHaveBeenCalledTimes(1)
 
         clientNetwork.rejectPendingRequests(new Error('cleanup'))

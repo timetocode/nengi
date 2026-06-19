@@ -18,6 +18,27 @@ export * from './server/channel/EcsChannel'
 export * from './server/channel/EcsSpatialChannel2D'
 export * from './server/channel/EcsSpatialChannel3D'
 export * from './ecs/EcsWorld'
+export {
+    GameEcsWorld,
+    componentType as gameComponentType,
+    localComponentType as gameLocalComponentType,
+    resourceKey as gameResourceKey
+} from './ecs/GameEcsWorld'
+export type {
+    Pid as GameEcsPid,
+    Nid as GameEcsNid,
+    ComponentTypeId as GameEcsComponentTypeId,
+    Component as GameEcsComponent,
+    NetworkComponent as GameEcsNetworkComponent,
+    IdentifiedComponent as GameEcsIdentifiedComponent,
+    ComponentDef as GameEcsComponentDef,
+    ComponentOf as GameEcsComponentOf,
+    QueryComponents as GameEcsQueryComponents,
+    Query as GameEcsQuery,
+    ResourceCtor as GameEcsResourceCtor,
+    ResourceToken as GameEcsResourceToken,
+    ResourceKey as GameEcsResourceKey
+} from './ecs/GameEcsWorld'
 export * from './server/User'
 export * from './server/Historian'
 export * from './server/Historian2D'

@@ -1,8 +1,6 @@
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { IChannel } from '../../server/channel/IChannel'
-import { BinaryPayload } from '../../common/binary/BinaryAdapter'
-import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { collectSkipInterpolationNids, collectSnapshotPlan, MAX_RESPONSES_PER_FRAME } from './collectSnapshotPlan'
 import { commitSnapshotPlan } from './commitSnapshotPlan'
@@ -48,7 +46,7 @@ import {
     sumSharedMessageFragmentMessages,
     writeSharedMessageFragments
 } from './messageFragments'
-import { addEcsChannelEntityCreate, addEcsVisibilityCrud } from './ecsSnapshotCrud'
+import { addEcsVisibilityCrud } from './ecsSnapshotCrud'
 import {
     countPlanMessages,
     sumPlanCreates,
@@ -74,23 +72,31 @@ import {
     createSharedMessageFragmentChunk
 } from './snapshotChunkBuilders'
 import { addChannelMessages } from './channelMessages'
+import {
+    addRegularCreate,
+    addRegularUpdate,
+    collectCreateEntitiesForRoots
+} from './entitySnapshotPlans'
 import { writePayload } from './snapshotPayload'
 import { ProtocolConfig } from '../../common/binary/Protocol'
-
-type EntityDeltaFragments = {
-    creates: {
-        payload: BinaryPayload
-        bytes: number
-        creates: number
-        nids: Set<number>
-    } | null
-    deletes: {
-        payload: BinaryPayload
-        bytes: number
-        deletes: number
-        nids: Set<number>
-    } | null
-}
+import {
+    applyCellEntityFragmentsToUser,
+    cellMayHaveUpdates,
+    getCellCreateFragment,
+    getCellDeleteFragment,
+    getCellUpdateFragment,
+    getManualSpatialCellUpdateFragment
+} from './cellFragmentBuilders'
+import {
+    applySharedChannelDeltasToUser,
+    canUseSharedDeltaFragments,
+    countEntityDeltaFragmentBytes,
+    countEntityDeltaFragmentCreates,
+    countEntityDeltaFragmentDeletes,
+    getEntityDeltaFragments,
+    getSharedUpdateFragment,
+    writeEntityDeltaFragments
+} from './sharedEntityFragments'
 
 function collectEnvelopePlan(user: User) {
     const plan = createEmptySnapshotPlan()
@@ -148,10 +154,6 @@ function canUseCellFragments(channel: CellFragmentChannel, userId: number) {
     return channel.getVisibleCellKeys(userId).length <= channel.fragmentCellLimit
 }
 
-function canUseSharedDeltaFragments(user: User, channel: SharedUpdateChannel) {
-    return user.sharedChannelVersions.get(channel.nid) === channel.deltaBaseVersion
-}
-
 function hasChannelDeltas(channel: SharedUpdateChannel) {
     return channel.deltaBaseVersion !== channel.membershipVersion
 }
@@ -162,85 +164,6 @@ function rememberCellFragmentChannelVisibility(user: User) {
             channel.rememberVisibleCells(user.id)
         }
     }
-}
-
-function writeEntityDeltaFragments(writer: IBinaryWriter, instance: Instance, fragments: EntityDeltaFragments) {
-    if (fragments.creates) {
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0
-        writePayload(writer, fragments.creates.payload)
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, fragments.creates.bytes)
-        }
-    }
-
-    if (fragments.deletes) {
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0
-        writePayload(writer, fragments.deletes.payload)
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, fragments.deletes.bytes)
-        }
-    }
-}
-
-function countEntityDeltaFragmentBytes(fragments: EntityDeltaFragments) {
-    return (fragments.creates?.bytes || 0) + (fragments.deletes?.bytes || 0)
-}
-
-function countEntityDeltaFragmentCreates(fragments: EntityDeltaFragments) {
-    return fragments.creates?.creates || 0
-}
-
-function countEntityDeltaFragmentDeletes(fragments: EntityDeltaFragments) {
-    return fragments.deletes?.deletes || 0
-}
-
-function applySharedChannelDeltasToUser(user: User, channel: SharedUpdateChannel, tick: number, fragments: EntityDeltaFragments) {
-    const deletedNids = fragments.deletes?.nids
-    if (deletedNids) {
-        for (const nid of deletedNids) {
-            user.tickLastSeen.delete(nid)
-        }
-        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid))
-    }
-
-    for (let i = 0; i < user.currentlyVisible.length; i++) {
-        user.tickLastSeen.set(user.currentlyVisible[i], tick)
-    }
-
-    const createdNids = fragments.creates?.nids
-    if (createdNids) {
-        for (const nid of createdNids) {
-            user.markVisible(nid, tick, [], [], null, [])
-        }
-    }
-
-    user.lastVisibleCount = user.currentlyVisible.length
-    user.sharedChannelVersions.set(channel.nid, channel.membershipVersion)
-}
-
-function applyCellEntityFragmentsToUser(user: User, tick: number, createFragments: CellEntityFragment[], deleteFragments: CellEntityFragment[]) {
-    if (deleteFragments.length > 0) {
-        const deletedNids = new Set<number>()
-        for (let i = 0; i < deleteFragments.length; i++) {
-            for (const nid of deleteFragments[i].nids) {
-                deletedNids.add(nid)
-                user.tickLastSeen.delete(nid)
-            }
-        }
-        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid))
-    }
-
-    for (let i = 0; i < user.currentlyVisible.length; i++) {
-        user.tickLastSeen.set(user.currentlyVisible[i], tick)
-    }
-
-    for (let i = 0; i < createFragments.length; i++) {
-        for (const nid of createFragments[i].nids) {
-            user.markVisible(nid, tick, [], [], null, [])
-        }
-    }
-
-    user.lastVisibleCount = user.currentlyVisible.length
 }
 
 function rememberSharedChannelVersion(user: User) {
@@ -277,50 +200,8 @@ function countChannelVisibleEntities(instance: Instance, channel: SharedUpdateCh
     return count
 }
 
-function collectChannelUpdatePlan(instance: Instance, channel: SharedUpdateChannel, excludedNids?: Set<number>): SnapshotPlan {
-    const plan = createEmptySnapshotPlan()
-    const entities = channel.entities.array
-
-    for (let i = 0; i < entities.length; i++) {
-        instance.localState.forEachEntityTree(entities[i].nid, nid => {
-            if (excludedNids?.has(nid)) {
-                return
-            }
-            collectEntityUpdatePlan(instance, instance.localState.getByNid(nid), plan)
-        })
-    }
-
-    return plan
-}
-
-function collectSpatialCellUpdatePlan(instance: Instance, channel: CellFragmentChannel, cellKey: string): SnapshotPlan {
-    const plan = createEmptySnapshotPlan()
-    const entities = channel.getCellEntities(cellKey)
-
-    for (let i = 0; i < entities.length; i++) {
-        instance.localState.forEachEntityTree(entities[i].nid, nid => {
-            collectEntityUpdatePlan(instance, instance.localState.getByNid(nid), plan)
-        })
-    }
-
-    return plan
-}
-
-function collectEntityUpdatePlan(instance: Instance, entity: any, plan: SnapshotPlan) {
-    const nschema = instance.context.getSchema(entity.ntype)!
-    const diffs = instance.cache.getAndDiffGrouped(instance.tick, entity, nschema)
-    for (let j = 0; j < diffs.groups.length; j++) {
-        plan.updateEntityGroups.push(diffs.groups[j])
-    }
-    for (let j = 0; j < diffs.changes.length; j++) {
-        plan.updateEntities.push(diffs.changes[j])
-    }
-
-}
-
 function hasSnapshotPlanContent(plan: SnapshotPlan) {
     return plan.channelOpens.length > 0 ||
-        plan.channelEntityCreates.length > 0 ||
         plan.channelHeaderUpdates.length > 0 ||
         plan.channelCloses.length > 0 ||
         plan.ecsCreateEntities.length > 0 ||
@@ -334,436 +215,6 @@ function hasSnapshotPlanContent(plan: SnapshotPlan) {
         plan.messages.length > 0 ||
         plan.interpolatedMessages.length > 0 ||
         plan.responses.length > 0
-}
-
-function collectCreateEntitiesForRoots(instance: Instance, roots: any[]) {
-    const createEntities: any[] = []
-    const nids = new Set<number>()
-    for (let i = 0; i < roots.length; i++) {
-        instance.localState.forEachEntityTree(roots[i].nid, nid => {
-            const entity = instance.localState.getByNid(nid)
-            const nschema = instance.context.getSchema(entity.ntype)!
-            if (!nschema) {
-                throw new Error(`Entity [nid ${nid}] [ntype ${entity.ntype}] is missing a network schema.`)
-            }
-            if (!instance.cache.cacheContains(nid)) {
-                instance.cache.cacheify(instance.tick, entity, nschema)
-            }
-            createEntities.push(entity)
-            nids.add(nid)
-        })
-    }
-    return { createEntities, nids }
-}
-
-function collectNidsForRoots(instance: Instance, roots: any[]) {
-    const nids = new Set<number>()
-    for (let i = 0; i < roots.length; i++) {
-        instance.localState.forEachEntityTree(roots[i].nid, nid => {
-            nids.add(nid)
-        })
-    }
-    return nids
-}
-
-function getCellCreateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string): CellEntityFragment {
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:cell:create:${cellKey}:${channel.getCellVersion(cellKey)}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedCreateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached as CellEntityFragment
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let collectStart = 0
-    let collectMs = 0
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-    if (measure) {
-        collectStart = performance.now()
-    }
-    const collected = collectCreateEntitiesForRoots(instance, channel.getCellEntities(cellKey))
-    const plan = createEmptySnapshotPlan()
-    plan.createEntities = collected.createEntities
-    if (measure) {
-        collectMs = performance.now() - collectStart
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids: collected.nids,
-        creates: plan.createEntities.length,
-        deletes: 0,
-        updateProps: 0,
-        updateGroups: 0,
-        groupedUpdateProps: 0
-    }
-    instance.network.sharedCreateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })
-    return fragment
-}
-
-function getCellDeleteFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, nids: number[]): CellEntityFragment {
-    const protocol = instance.network.getProtocol()
-    const nidSignature = nids.join(',')
-    const key = `${instance.tick}:${channel.nid}:cell:delete:${cellKey}:${nidSignature}:${protocol.nidType}`
-    const cached = instance.network.sharedDeleteFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached as CellEntityFragment
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-    const plan = createEmptySnapshotPlan()
-    plan.deleteEntities = nids
-    if (measure) {
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids: new Set(nids),
-        creates: 0,
-        deletes: nids.length,
-        updateProps: 0,
-        updateGroups: 0,
-        groupedUpdateProps: 0
-    }
-    instance.network.sharedDeleteFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
-    return fragment
-}
-
-function getManualSpatialCellUpdateFragment(user: User, instance: Instance, channel: ManualSpatialCellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
-    const log = channel.getManualCellUpdateLog(cellKey)
-    if (!log) {
-        return {
-            payload: user.networkAdapter.binary.createWriter(0).payload,
-            bytes: 0,
-            nids: new Set<number>(),
-            creates: 0,
-            deletes: 0,
-            updateProps: 0,
-            updateGroups: 0,
-            groupedUpdateProps: 0
-        }
-    }
-
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:manual-cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedUpdateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached as CellEntityFragment
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-
-    if (measure) {
-        countStart = performance.now()
-    }
-    const bytes = countManualUpdateBytes(log, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeManualUpdates(log, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids: includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set<number>(),
-        creates: 0,
-        deletes: 0,
-        updateProps: log.manualPropNids.length,
-        updateGroups: log.manualGroupNids.length,
-        groupedUpdateProps: countManualGroupedProps(log)
-    }
-    instance.network.sharedUpdateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
-    return fragment
-}
-
-function getCellUpdateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
-    if (isManualSpatialCellFragmentChannel(channel)) {
-        return getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids)
-    }
-
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedUpdateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached as CellEntityFragment
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let collectStart = 0
-    let collectMs = 0
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-
-    if (measure) {
-        collectStart = performance.now()
-    }
-    const plan = collectSpatialCellUpdatePlan(instance, channel, cellKey)
-    const nids = includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set<number>()
-    if (measure) {
-        collectMs = performance.now() - collectStart
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids,
-        creates: 0,
-        deletes: 0,
-        updateProps: plan.updateEntities.length,
-        updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
-    }
-    instance.network.sharedUpdateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })
-    return fragment
-}
-
-function cellMayHaveUpdates(channel: CellFragmentChannel, cellKey: string) {
-    if (isManualSpatialCellFragmentChannel(channel)) {
-        return channel.cellHasManualUpdates(cellKey)
-    }
-    return true
-}
-
-function getSharedCreateFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
-    if (channel.createdRoots.length === 0) {
-        return null
-    }
-
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:create:${channel.deltaBaseVersion}:${channel.membershipVersion}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedCreateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let collectStart = 0
-    let collectMs = 0
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-    if (measure) {
-        collectStart = performance.now()
-    }
-    const collected = collectCreateEntitiesForRoots(instance, channel.createdRoots)
-    const plan = createEmptySnapshotPlan()
-    plan.createEntities = collected.createEntities
-    if (measure) {
-        collectMs = performance.now() - collectStart
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        creates: plan.createEntities.length,
-        nids: collected.nids
-    }
-    instance.network.sharedCreateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })
-    return fragment
-}
-
-function getSharedDeleteFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
-    if (channel.deletedNids.length === 0) {
-        return null
-    }
-
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:delete:${channel.deltaBaseVersion}:${channel.membershipVersion}:${protocol.nidType}`
-    const cached = instance.network.sharedDeleteFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-    const plan = createEmptySnapshotPlan()
-    plan.deleteEntities = channel.deletedNids
-    if (measure) {
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        deletes: plan.deleteEntities.length,
-        nids: new Set(plan.deleteEntities)
-    }
-    instance.network.sharedDeleteFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
-    return fragment
-}
-
-function getEntityDeltaFragments(user: User, instance: Instance, channel: SharedUpdateChannel): EntityDeltaFragments {
-    if (!instance.network.sharedUpdateFragmentsEnabled ||
-        instance.network.debugBinaryWrites ||
-        !canUseSharedDeltaFragments(user, channel)) {
-        return { creates: null, deletes: null }
-    }
-
-    return {
-        creates: getSharedCreateFragment(user, instance, channel),
-        deletes: getSharedDeleteFragment(user, instance, channel)
-    }
-}
-
-function getSharedUpdateFragment(user: User, instance: Instance, channel: SharedUpdateChannel, excludedNids?: Set<number>) {
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:${protocol.nidType}:${protocol.ntypeType}:${excludedNids ? 'delta' : 'steady'}`
-    const cached = instance.network.sharedUpdateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached
-    }
-
-    const measure = instance.network.snapshotPerformanceEnabled
-    let collectStart = 0
-    let collectMs = 0
-    let countStart = 0
-    let countMs = 0
-    let writeStart = 0
-    let writeMs = 0
-
-    if (measure) {
-        collectStart = performance.now()
-    }
-    const plan = collectChannelUpdatePlan(instance, channel, excludedNids)
-    if (measure) {
-        collectMs = performance.now() - collectStart
-        countStart = performance.now()
-    }
-    const bytes = countSnapshotBytes(plan, instance.context, protocol)
-    if (measure) {
-        countMs = performance.now() - countStart
-        writeStart = performance.now()
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeSnapshot(plan, instance.context, writer, protocol)
-    if (measure) {
-        writeMs = performance.now() - writeStart
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        updateProps: plan.updateEntities.length,
-        updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
-    }
-    instance.network.sharedUpdateFragments.set(key, fragment)
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })
-    return fragment
-}
-
-function addRegularCreate(plan: SnapshotPlan, instance: Instance, nid: number) {
-    const entity = instance.localState.getByNid(nid)
-    const nschema = instance.context.getSchema(entity.ntype)!
-    if (!nschema) {
-        throw new Error(`Entity [nid ${nid}] [ntype ${entity.ntype}] is missing a network schema.`)
-    }
-    if (!instance.cache.cacheContains(nid)) {
-        instance.cache.cacheify(instance.tick, entity, nschema)
-    }
-    plan.createEntities.push(entity)
-}
-
-function addRegularUpdate(plan: SnapshotPlan, instance: Instance, nid: number) {
-    const entity = instance.localState.getByNid(nid)
-    const nschema = instance.context.getSchema(entity.ntype)!
-    const diffs = instance.cache.getAndDiffGrouped(instance.tick, entity, nschema)
-    for (let i = 0; i < diffs.groups.length; i++) {
-        plan.updateEntityGroups.push(diffs.groups[i])
-    }
-    for (let i = 0; i < diffs.changes.length; i++) {
-        plan.updateEntities.push(diffs.changes[i])
-    }
 }
 
 function addChannelHeader(plan: SnapshotPlan, user: User, instance: Instance, channel: IChannel) {
@@ -932,10 +383,9 @@ function ecsHasManualUpdates(channel: EcsSnapshotChannel) {
 }
 
 function collectSubscribedChannelSnapshotPlan(user: User, instance: Instance, channel: IChannel) {
-    const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
+    const { toCreate, toUpdate, toDelete } = user.checkChannelVisibility(channel, instance.tick)
     const plan = createEmptySnapshotPlan()
     addChannelHeader(plan, user, instance, channel)
-    plan.channelEntityCreates = channelEntityCreates
 
     if (isEcsSnapshotChannel(channel)) {
         addEcsVisibilityCrud(plan, channel, toCreate, toDelete)
@@ -976,9 +426,8 @@ function collectPendingVisibilityDeletePlan(user: User) {
 }
 
 function collectManualSpatialVisibilityPlan(user: User, instance: Instance, channel: ManualSpatialCellFragmentChannel) {
-    const { toCreate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
+    const { toCreate, toDelete } = user.checkChannelVisibility(channel, instance.tick)
     const plan = createEmptySnapshotPlan()
-    plan.channelEntityCreates = channelEntityCreates
     for (let i = 0; i < toCreate.length; i++) {
         addRegularCreate(plan, instance, toCreate[i])
     }
@@ -1019,13 +468,11 @@ function collectStableEcsStructuralSnapshotBase(user: User, channel: EcsSnapshot
 
     for (let i = 0; i < channel.createdRoots.length; i++) {
         const nid = channel.createdRoots[i]
-        addEcsChannelEntityCreate(plan, channel, nid)
         user.currentlyVisible.push(nid)
         user.tickLastSeen.set(nid, user.instance!.tick)
     }
     for (let i = 0; i < channel.createdComponents.length; i++) {
         const nid = channel.createdComponents[i].nid
-        addEcsChannelEntityCreate(plan, channel, nid)
         user.currentlyVisible.push(nid)
         user.tickLastSeen.set(nid, user.instance!.tick)
     }
@@ -1061,8 +508,7 @@ function collectEcsSnapshotBase(user: User, instance: Instance, channel: EcsSnap
         return collectStableEcsStructuralSnapshotBase(user, channel)
     }
 
-    const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
-    plan.channelEntityCreates = channelEntityCreates
+    const { toCreate, toUpdate, toDelete } = user.checkChannelVisibility(channel, instance.tick)
     addEcsVisibilityCrud(plan, channel, toCreate, toDelete)
 
     addEnvelopeQueues(plan, user)
@@ -1189,8 +635,7 @@ function createEcsSnapshotBuffer(user: User, instance: Instance, channel: EcsSna
 
 function collectEcsSpatialSnapshotBase(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel) {
     const plan = createEmptySnapshotPlan()
-    const { toCreate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick)
-    plan.channelEntityCreates = channelEntityCreates
+    const { toCreate, toDelete } = user.checkChannelVisibility(channel, instance.tick)
     addEcsVisibilityCrud(plan, channel, toCreate, toDelete)
 
     addEnvelopeQueues(plan, user)
@@ -1543,11 +988,6 @@ function createSharedDeltaSnapshotBuffer(user: User, instance: Instance, channel
     const scopedMessagePlan = createEmptySnapshotPlan()
     addChannelMessages(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites)
     const updateFragment = getSharedUpdateFragment(user, instance, channel, entityDeltaFragments.creates?.nids)
-    if (entityDeltaFragments.creates) {
-        for (const nid of entityDeltaFragments.creates.nids) {
-            envelope.channelEntityCreates.push({ nid, channelId: channel.nid })
-        }
-    }
 
     if (measure) {
         collectMs = performance.now() - collectStart
@@ -1783,14 +1223,6 @@ function createManualStableSpatialCellSnapshotBuffer(user: User, instance: Insta
             addManualSpatialCreates(instance, plan, [move.entity], createNids)
         } else if (fromVisible && !toVisible) {
             addManualSpatialDeletes(instance, plan, move.entity.nid, deleteNids)
-        }
-    }
-    if (plan.createEntities.length > 0) {
-        for (let i = 0; i < plan.createEntities.length; i++) {
-            envelope.channelEntityCreates.push({
-                nid: plan.createEntities[i].nid,
-                channelId: channel.nid
-            })
         }
     }
     addChannelMessages(plan, user, channel, instance.network.debugBinaryWrites)

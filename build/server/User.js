@@ -302,16 +302,13 @@ class User {
             }
         }
     }
-    markVisible(nid, tick, toCreate, toUpdate, channel, channelEntityCreates) {
+    markVisible(nid, tick, toCreate, toUpdate) {
         const lastSeenTick = this.tickLastSeen.get(nid);
         if (lastSeenTick === tick) {
             return;
         }
         if (lastSeenTick === undefined) {
             toCreate.push(nid);
-            if (channel) {
-                channelEntityCreates.push({ nid, channelId: channel.nid });
-            }
             this.currentlyVisible.push(nid);
         }
         else {
@@ -323,9 +320,8 @@ class User {
         const toCreate = [];
         const toUpdate = [];
         const toDelete = [];
-        const channelEntityCreates = [];
         toDelete.push(...this.consumePendingVisibilityDeletes());
-        for (const [channelId, channel] of this.subscriptions.entries()) {
+        for (const channel of this.subscriptions.values()) {
             const visible = this.checkChannelVisibility(channel, tick);
             for (let i = 0; i < visible.toCreate.length; i++) {
                 toCreate.push(visible.toCreate[i]);
@@ -336,11 +332,8 @@ class User {
             for (let i = 0; i < visible.toDelete.length; i++) {
                 toDelete.push(visible.toDelete[i]);
             }
-            for (let i = 0; i < visible.channelEntityCreates.length; i++) {
-                channelEntityCreates.push(visible.channelEntityCreates[i]);
-            }
         }
-        return { toDelete, toUpdate, toCreate, channelEntityCreates };
+        return { toDelete, toUpdate, toCreate };
     }
     checkChannelVisibility(channel, tick) {
         return this.withChannelVisibilityState(channel.nid, () => {
@@ -348,7 +341,6 @@ class User {
             const toCreate = [];
             const toUpdate = [];
             const toDelete = [];
-            const channelEntityCreates = [];
             const visibleNids = (_a = channel.getVisibleNetworkedNids) === null || _a === void 0 ? void 0 : _a.call(channel, this.id);
             if (visibleNids) {
                 if (this.stableVisibleRefs.get(channel.nid) === visibleNids &&
@@ -357,25 +349,25 @@ class User {
                         toUpdate.push(visibleNids[i]);
                     }
                     this.lastVisibleCount = this.currentlyVisible.length;
-                    return { toDelete, toUpdate, toCreate, channelEntityCreates };
+                    return { toDelete, toUpdate, toCreate };
                 }
                 this.stableVisibleRefs.set(channel.nid, visibleNids);
                 for (let i = 0; i < visibleNids.length; i++) {
-                    this.markVisible(visibleNids[i], tick, toCreate, toUpdate, channel, channelEntityCreates);
+                    this.markVisible(visibleNids[i], tick, toCreate, toUpdate);
                 }
                 this.populateDeletions(tick, toDelete);
                 this.lastVisibleCount = this.currentlyVisible.length;
-                return { toDelete, toUpdate, toCreate, channelEntityCreates };
+                return { toDelete, toUpdate, toCreate };
             }
             const visibleRoots = ((_b = channel.getVisibleEntities) === null || _b === void 0 ? void 0 : _b.call(channel, this.id)) || [];
             for (let i = 0; i < visibleRoots.length; i++) {
                 this.instance.localState.forEachEntityTree(visibleRoots[i], nid => {
-                    this.markVisible(nid, tick, toCreate, toUpdate, channel, channelEntityCreates);
+                    this.markVisible(nid, tick, toCreate, toUpdate);
                 });
             }
             this.populateDeletions(tick, toDelete);
             this.lastVisibleCount = this.currentlyVisible.length;
-            return { toDelete, toUpdate, toCreate, channelEntityCreates };
+            return { toDelete, toUpdate, toCreate };
         });
     }
 }

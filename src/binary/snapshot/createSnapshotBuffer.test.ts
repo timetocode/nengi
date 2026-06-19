@@ -6,6 +6,7 @@ import createSnapshotBuffer, {
     writeSnapshot
 } from './createSnapshotBuffer'
 import { Binary } from '../../common/binary/Binary'
+import { DEFAULT_PROTOCOL, byteSizeOfNetworkType } from '../../common/binary/Protocol'
 import { defineEntitySchema, defineMessageSchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
 import { ResponseStatus } from '../../common/Endpoint'
@@ -27,12 +28,15 @@ import { TestBufferWriter, testBinaryAdapter } from '../../testSupport/BufferBin
 import { createEndpointPayload } from '../endpoint/EndpointPayload'
 import { BinaryDebugError } from '../BinaryDebugError'
 import { createEmptySnapshotPlan } from './SnapshotPlan'
+import { writeChannelScope } from './writeSnapshot'
 
 enum NType {
     Entity = 1,
     Message = 2,
     Transform = 3
 }
+
+const CHANNEL_SCOPE_BYTES = 1 + byteSizeOfNetworkType(DEFAULT_PROTOCOL.nidType)
 
 function createContext() {
     const context = new Context()
@@ -273,8 +277,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([firstNid])
-        expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([replacement.nid])
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.deleteEntities).toEqual([firstNid])
+        expect(frameChannel.createEntities.map(entity => entity.nid)).toEqual([replacement.nid])
         expect(clientNetwork.store.entities.has(firstNid)).toBe(false)
         expect(clientNetwork.store.get(replacement.nid)?.label).toBe('replacement')
     })
@@ -422,13 +427,14 @@ describe('server snapshot pipeline', () => {
         expect(plan.updateEntityGroups[0].group.name).toBe('position')
         expect(plan.updateEntityGroups[0].values).toEqual([11, 6])
 
-        const byteLength = countSnapshotBytes(plan, context)
+        const byteLength = CHANNEL_SCOPE_BYTES + countSnapshotBytes(plan, context)
         const writer = TestBufferWriter.create(byteLength)
+        writeChannelScope(channel.nid, writer)
         writeSnapshot(plan, context, writer)
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(writer.buffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.updateEntities).toEqual([
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).updateEntities).toEqual([
             { nid, prop: 'x', previous: 5, value: 11 }
         ])
         expect(clientNetwork.store.get(nid)).toEqual({
@@ -478,9 +484,14 @@ describe('server snapshot pipeline', () => {
         firstPlan.updateEntityGroups = [collected.updateEntityGroups[0]]
         secondPlan.updateEntityGroups = [collected.updateEntityGroups[1]]
 
-        const byteLength = countSnapshotBytes(firstPlan, context) + countSnapshotBytes(secondPlan, context)
+        const byteLength = CHANNEL_SCOPE_BYTES +
+            countSnapshotBytes(firstPlan, context) +
+            CHANNEL_SCOPE_BYTES +
+            countSnapshotBytes(secondPlan, context)
         const writer = TestBufferWriter.create(byteLength)
+        writeChannelScope(channel.nid, writer)
         writeSnapshot(firstPlan, context, writer)
+        writeChannelScope(channel.nid, writer)
         writeSnapshot(secondPlan, context, writer)
 
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(writer.buffer))
@@ -576,7 +587,7 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
         expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
-        expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.prop)).toEqual(['x', 'y'])
     })
 
     it('writes manual prop mutations directly', () => {
@@ -610,7 +621,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.store.get(entity.nid)?.label).toBe('gate')
-        expect(clientNetwork.latestFrame?.updateEntities.map(update => update.prop)).toEqual(['label'])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.prop)).toEqual(['label'])
     })
 
     it('does not scan ManualChannel entities in the mixed-channel fallback', () => {
@@ -849,8 +860,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        const createFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(createFrameChannel.ecsCreateEntities).toEqual([pid])
+        expect(createFrameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
         expect(clientNetwork.store.get(transform.nid)).toEqual({
             nid: transform.nid,
             ntype: NType.Transform,
@@ -876,8 +888,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
-        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([componentNid])
+        const deleteFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid])
+        expect(deleteFrameChannel.deleteEntities).toEqual([componentNid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(componentNid)).toBe(false)
     })
@@ -956,9 +969,12 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
-        expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([transform.nid, regular.nid])
+        const ecsCreateFrame = clientNetwork.latestFrame!.requireChannel(ecsChannel.nid)
+        const regularCreateFrame = clientNetwork.latestFrame!.requireChannel(regularChannel.nid)
+        expect(ecsCreateFrame.ecsCreateEntities).toEqual([pid])
+        expect(ecsCreateFrame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        expect(ecsCreateFrame.createEntities.map(entity => entity.nid)).toEqual([transform.nid])
+        expect(regularCreateFrame.createEntities.map(entity => entity.nid)).toEqual([regular.nid])
         expect(clientNetwork.latestFrame?.channels.map(channel => channel.channelId)).toEqual([ecsChannel.nid, regularChannel.nid])
         expect(clientNetwork.latestFrame?.channels[0].ecsCreateEntities).toEqual([pid])
         expect(clientNetwork.latestFrame?.channels[0].ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
@@ -991,12 +1007,12 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([regularNid])
-        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.deleteEntities).toHaveLength(2)
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual(expect.arrayContaining([transformNid, regularNid]))
-        expect(clientNetwork.latestFrame?.channels[0].ecsDeleteEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.channels[1].deleteEntities).toEqual([regularNid])
+        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
+        const ecsDeleteFrame = clientNetwork.latestFrame!.requireChannel(ecsChannel.nid)
+        const regularDeleteFrame = clientNetwork.latestFrame!.requireChannel(regularChannel.nid)
+        expect(ecsDeleteFrame.ecsDeleteEntities).toEqual([pid])
+        expect(ecsDeleteFrame.deleteEntities).toEqual([transformNid])
+        expect(regularDeleteFrame.deleteEntities).toEqual([regularNid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transformNid)).toBe(false)
         expect(clientNetwork.store.entities.has(regularNid)).toBe(false)
@@ -1041,7 +1057,6 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
         expect(clientNetwork.latestFrame?.closedChannels).toEqual([
             {
                 channelId: inventoryChannel.nid,
@@ -1076,8 +1091,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        const createFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(createFrameChannel.ecsCreateEntities).toEqual([pid])
+        expect(createFrameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
 
@@ -1099,8 +1115,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
-        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
+        const deleteFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid])
+        expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
@@ -1132,8 +1149,9 @@ describe('server snapshot pipeline', () => {
         }).not.toThrow()
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.ecsCreateEntities).toEqual([pid])
+        expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(6)
         expect(clientNetwork.store.get(transform.nid)?.y).toBe(7)
     })
@@ -1150,8 +1168,9 @@ describe('server snapshot pipeline', () => {
             game.channel.updateView(game.user, game.view)
             const frame = stepClient(game.instance, game.user, game.clientNetwork)
 
-            expect(frame.ecsCreateEntities).toEqual([pid])
-            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+            const frameChannel = frame.requireChannel(game.channel.nid)
+            expect(frameChannel.ecsCreateEntities).toEqual([pid])
+            expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true)
             expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(5)
         })
@@ -1167,8 +1186,9 @@ describe('server snapshot pipeline', () => {
             game.Transform.position(transform, 5, 5)
             const frame = stepClient(game.instance, game.user, game.clientNetwork)
 
-            expect(frame.ecsCreateEntities).toEqual([pid])
-            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+            const frameChannel = frame.requireChannel(game.channel.nid)
+            expect(frameChannel.ecsCreateEntities).toEqual([pid])
+            expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true)
             expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(5)
         })
@@ -1180,8 +1200,9 @@ describe('server snapshot pipeline', () => {
             const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
             const frame = stepClient(game.instance, game.user, game.clientNetwork)
 
-            expect(frame.ecsCreateEntities).toEqual([pid])
-            expect(frame.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+            const frameChannel = frame.requireChannel(game.channel.nid)
+            expect(frameChannel.ecsCreateEntities).toEqual([pid])
+            expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(true)
             expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(5)
         })
@@ -1197,8 +1218,9 @@ describe('server snapshot pipeline', () => {
             game.channel.updateView(game.user, game.view)
             const frame = stepClient(game.instance, game.user, game.clientNetwork)
 
-            expect(frame.ecsDeleteEntities).toEqual([pid])
-            expect(frame.deleteEntities).toEqual([transform.nid])
+            const frameChannel = frame.requireChannel(game.channel.nid)
+            expect(frameChannel.ecsDeleteEntities).toEqual([pid])
+            expect(frameChannel.deleteEntities).toEqual([transform.nid])
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false)
             expect(game.clientNetwork.store.entities.has(transform.nid)).toBe(false)
         })
@@ -1214,8 +1236,9 @@ describe('server snapshot pipeline', () => {
             game.Transform.position(transform, 500, 500)
             const frame = stepClient(game.instance, game.user, game.clientNetwork)
 
-            expect(frame.ecsDeleteEntities).toEqual([pid])
-            expect(frame.deleteEntities).toEqual([transform.nid])
+            const frameChannel = frame.requireChannel(game.channel.nid)
+            expect(frameChannel.ecsDeleteEntities).toEqual([pid])
+            expect(frameChannel.deleteEntities).toEqual([transform.nid])
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false)
             expect(game.clientNetwork.store.entities.has(transform.nid)).toBe(false)
         })
@@ -1230,8 +1253,9 @@ describe('server snapshot pipeline', () => {
             game.channel.removeEntity(pid)
             const frame = stepClient(game.instance, game.user, game.clientNetwork)
 
-            expect(frame.ecsDeleteEntities).toEqual([pid])
-            expect(frame.deleteEntities).toEqual([transformNid])
+            const frameChannel = frame.requireChannel(game.channel.nid)
+            expect(frameChannel.ecsDeleteEntities).toEqual([pid])
+            expect(frameChannel.deleteEntities).toEqual([transformNid])
             expect(game.clientNetwork.store.ecsEntities.has(pid)).toBe(false)
             expect(game.clientNetwork.store.entities.has(transformNid)).toBe(false)
         })
@@ -1303,7 +1327,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).ecsCreateEntities).toEqual([pid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
         expect(clientNetwork.store.get(transform.nid)?.z).toBe(5)
 
@@ -1325,8 +1349,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
+        const deleteFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid])
+        expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
@@ -1353,8 +1378,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.ecsCreateEntities).toEqual([pid])
+        expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
     })
@@ -1391,8 +1417,9 @@ describe('server snapshot pipeline', () => {
         }).not.toThrow()
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid, body.nid])
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.ecsCreateEntities).toEqual([pid])
+        expect(frameChannel.ecsCreateComponents.map(component => component.nid)).toEqual([transform.nid, body.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(5)
         expect(clientNetwork.store.get(body.nid)?.label).toBe('npc')
@@ -1433,8 +1460,9 @@ describe('server snapshot pipeline', () => {
         }).not.toThrow()
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toHaveLength(130)
-        expect(clientNetwork.latestFrame?.ecsCreateComponents).toHaveLength(260)
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.ecsCreateEntities).toHaveLength(130)
+        expect(frameChannel.ecsCreateComponents).toHaveLength(260)
         expect(clientNetwork.store.get(createdBodies[129].nid)?.label).toBe('npc-129')
     })
 
@@ -1462,7 +1490,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsCreateEntities).toEqual([pid])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).ecsCreateEntities).toEqual([pid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(true)
         expect(clientNetwork.store.get(transform.nid)?.y).toBe(500)
 
@@ -1474,8 +1502,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.ecsDeleteEntities).toEqual([pid])
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([transform.nid])
+        const deleteFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid])
+        expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
     })
@@ -1601,9 +1630,9 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.latestFrame?.deleteEntities).toEqual([moverNid])
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([moverNid])
         expect(firstClient.store.entities.has(moverNid)).toBe(false)
-        expect(secondClient.latestFrame?.createEntities.map(entity => entity.nid)).toContain(moverNid)
+        expect(secondClient.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toContain(moverNid)
         expect(secondClient.store.get(moverNid)?.x).toBe(150)
     })
 
@@ -1661,8 +1690,8 @@ describe('server snapshot pipeline', () => {
         secondClient.processNextFrame()
 
         expect(instance.network.sharedCreateFragments.size).toBe(1)
-        expect(firstClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid])
-        expect(secondClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid])
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid])
+        expect(secondClient.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([crateNid, itemNid])
         expect(firstClient.store.get(itemNid)?.label).toBe('item')
         expect(secondClient.store.get(itemNid)?.label).toBe('item')
 
@@ -1674,8 +1703,8 @@ describe('server snapshot pipeline', () => {
         secondClient.processNextFrame()
 
         expect(instance.network.sharedDeleteFragments.size).toBe(1)
-        expect(firstClient.latestFrame?.deleteEntities).toEqual([itemNid, crateNid])
-        expect(secondClient.latestFrame?.deleteEntities).toEqual([itemNid, crateNid])
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([itemNid, crateNid])
+        expect(secondClient.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([itemNid, crateNid])
         expect(firstClient.store.entities.has(crateNid)).toBe(false)
         expect(secondClient.store.entities.has(itemNid)).toBe(false)
         expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(4)
@@ -1724,8 +1753,8 @@ describe('server snapshot pipeline', () => {
         newClient.processNextFrame()
 
         expect(instance.network.sharedCreateFragments.size).toBe(1)
-        expect(existingClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([added.nid])
-        expect(newClient.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([initial.nid, added.nid])
+        expect(existingClient.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([added.nid])
+        expect(newClient.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([initial.nid, added.nid])
     })
 
     it('does not emit shared create or delete fragments for same-tick transient roots', () => {
@@ -1765,8 +1794,7 @@ describe('server snapshot pipeline', () => {
 
         expect(instance.network.sharedCreateFragments.size).toBe(0)
         expect(instance.network.sharedDeleteFragments.size).toBe(0)
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([])
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
+        expect(clientNetwork.latestFrame!.hasChannel(channel.nid)).toBe(false)
     })
 
     it('can use shared message fragments for channel broadcasts', () => {
@@ -1802,18 +1830,11 @@ describe('server snapshot pipeline', () => {
         secondClient.processNextFrame()
 
         expect(firstClient.messages).toEqual([
-            { ntype: NType.Message, text: 'private' },
-            { ntype: NType.Message, text: 'broadcast' }
+            { ntype: NType.Message, text: 'private' }
         ])
-        expect(secondClient.messages).toEqual([
-            { ntype: NType.Message, text: 'broadcast' }
-        ])
-        expect(firstClient.latestFrame?.interpolatedMessages).toEqual([
-            { ntype: NType.Message, text: 'broadcast-fx' }
-        ])
-        expect(secondClient.latestFrame?.interpolatedMessages).toEqual([
-            { ntype: NType.Message, text: 'broadcast-fx' }
-        ])
+        expect(secondClient.messages).toEqual([])
+        expect(firstClient.latestFrame?.interpolatedMessages).toEqual([])
+        expect(secondClient.latestFrame?.interpolatedMessages).toEqual([])
         expect(firstClient.latestFrame?.channels).toEqual([
             expect.objectContaining({
                 channelId: channel.nid,
@@ -2064,7 +2085,8 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.messages).toEqual([{ ntype: NType.Message, text: 'near-3d' }])
+        expect(firstClient.messages).toEqual([])
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).messages).toEqual([{ ntype: NType.Message, text: 'near-3d' }])
         expect(secondClient.messages).toEqual([])
     })
 
@@ -2239,7 +2261,8 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.messages).toEqual([{ ntype: NType.Message, text: 'near' }])
+        expect(firstClient.messages).toEqual([])
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).messages).toEqual([{ ntype: NType.Message, text: 'near' }])
         expect(secondClient.messages).toEqual([])
     })
 
@@ -2276,7 +2299,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.createEntities.map(entity => entity.nid)).toEqual([second.nid])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toEqual([second.nid])
         expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
     })
 
@@ -2315,7 +2338,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([firstNid])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([firstNid])
         expect(clientNetwork.store.entities.has(firstNid)).toBe(false)
         expect(clientNetwork.store.get(second.nid)?.label).toBe('second')
     })
@@ -2358,9 +2381,9 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.latestFrame?.deleteEntities).toEqual([nid])
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([nid])
         expect(firstClient.store.entities.has(nid)).toBe(false)
-        expect(secondClient.latestFrame?.createEntities.map(created => created.nid)).toEqual([nid])
+        expect(secondClient.latestFrame!.requireChannel(channel.nid).createEntities.map(created => created.nid)).toEqual([nid])
         expect(secondClient.store.get(nid)?.x).toBe(60)
     })
 
@@ -2400,7 +2423,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([childNid, parentNid])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([childNid, parentNid])
         expect(clientNetwork.store.entities.has(parentNid)).toBe(false)
         expect(clientNetwork.store.entities.has(childNid)).toBe(false)
     })
@@ -2563,7 +2586,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.protocol.nidType).toBe(Binary.UInt16)
-        expect(clientNetwork.latestFrame?.createEntities).toHaveLength(256)
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).createEntities).toHaveLength(256)
         expect(clientNetwork.store.get(257)).toEqual({
             nid: 257,
             ntype: NType.Entity,
@@ -2604,7 +2627,7 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame?.interpolatedMessages).toEqual([
             { ntype: NType.Message, text: 'shot' }
         ])
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).createEntities).toEqual([
             { nid, ntype: NType.Entity, x: 5, y: 6, label: 'door' }
         ])
         expect(clientNetwork.store.get(nid)).toEqual({
@@ -2622,8 +2645,9 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(updateBuffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([])
-        expect(clientNetwork.latestFrame?.updateEntities).toEqual([
+        const updateFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(updateFrameChannel.createEntities).toEqual([])
+        expect(updateFrameChannel.updateEntities).toEqual([
             { nid, prop: 'x', previous: 5, value: 11 }
         ])
         expect(clientNetwork.store.get(nid)?.x).toBe(11)
@@ -2635,7 +2659,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(deleteBuffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([nid])
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).deleteEntities).toEqual([nid])
         expect(clientNetwork.store.entities.has(nid)).toBe(false)
         expect(clientNetwork.entityNTypes.has(nid)).toBe(false)
     })
@@ -2675,7 +2699,7 @@ describe('server snapshot pipeline', () => {
                 header: channel.header
             }
         ])
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([
+        expect(clientNetwork.latestFrame!.requireChannel(channel.nid).createEntities).toEqual([
             { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
         ])
         expect(clientNetwork.store.getChannelHeader(channel.nid)).toEqual(channel.header)
@@ -2690,7 +2714,6 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.latestFrame?.channelHeaderUpdates).toHaveLength(1)
         expect(clientNetwork.store.getChannelHeader(channel.nid)?.label).toBe('renamed')
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([])
     })
 
     it('sends a newly subscribed headered channel alongside an existing world channel', () => {
@@ -2740,10 +2763,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.latestFrame?.channelOpens.map(open => open.channelId)).toEqual([inventory.nid])
-        expect(clientNetwork.latestFrame?.channelEntityCreates).toEqual([
-            { nid: item.nid, channelId: inventory.nid }
-        ])
-        expect(clientNetwork.latestFrame?.createEntities).toEqual([
+        expect(clientNetwork.latestFrame!.requireChannel(inventory.nid).createEntities).toEqual([
             { nid: item.nid, ntype: NType.Entity, x: 5, y: 6, label: 'item' }
         ])
         expect(clientNetwork.store.getChannelHeader(item.nid)).toEqual(inventory.header)
@@ -2790,7 +2810,6 @@ describe('server snapshot pipeline', () => {
                 channelId: channel.nid
             }
         ])
-        expect(clientNetwork.latestFrame?.deleteEntities).toEqual([])
         expect(clientNetwork.latestFrame?.closedChannels).toEqual([
             {
                 channelId: channel.nid,
@@ -2830,8 +2849,8 @@ describe('server snapshot pipeline', () => {
         const frames = clientNetwork.drainFrames()
 
         expect(frames).toHaveLength(2)
-        expect(frames[0].createEntities).toHaveLength(1)
-        expect(frames[1].updateEntities).toEqual([
+        expect(frames[0].requireChannel(channel.nid).createEntities).toHaveLength(1)
+        expect(frames[1].requireChannel(channel.nid).updateEntities).toEqual([
             { nid: entity.nid, prop: 'x', previous: 1, value: 3 }
         ])
         expect(clientNetwork.drainFrames()).toEqual([])

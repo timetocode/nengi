@@ -21,7 +21,10 @@ const snapshotPlanStats_1 = require("./snapshotPlanStats");
 const cellEntityFragments_1 = require("./cellEntityFragments");
 const snapshotChunkBuilders_1 = require("./snapshotChunkBuilders");
 const channelMessages_1 = require("./channelMessages");
+const entitySnapshotPlans_1 = require("./entitySnapshotPlans");
 const snapshotPayload_1 = require("./snapshotPayload");
+const cellFragmentBuilders_1 = require("./cellFragmentBuilders");
+const sharedEntityFragments_1 = require("./sharedEntityFragments");
 function collectEnvelopePlan(user) {
     const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
     const queuedResponses = user.responseQueue.length;
@@ -72,9 +75,6 @@ function canUseCellFragments(channel, userId) {
     }
     return channel.getVisibleCellKeys(userId).length <= channel.fragmentCellLimit;
 }
-function canUseSharedDeltaFragments(user, channel) {
-    return user.sharedChannelVersions.get(channel.nid) === channel.deltaBaseVersion;
-}
 function hasChannelDeltas(channel) {
     return channel.deltaBaseVersion !== channel.membershipVersion;
 }
@@ -84,76 +84,6 @@ function rememberCellFragmentChannelVisibility(user) {
             channel.rememberVisibleCells(user.id);
         }
     }
-}
-function writeEntityDeltaFragments(writer, instance, fragments) {
-    if (fragments.creates) {
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0;
-        (0, snapshotPayload_1.writePayload)(writer, fragments.creates.payload);
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, fragments.creates.bytes);
-        }
-    }
-    if (fragments.deletes) {
-        const copyStart = instance.network.snapshotPerformanceEnabled ? performance.now() : 0;
-        (0, snapshotPayload_1.writePayload)(writer, fragments.deletes.payload);
-        if (instance.network.snapshotPerformanceEnabled) {
-            instance.network.recordSharedFragmentCopy(performance.now() - copyStart, fragments.deletes.bytes);
-        }
-    }
-}
-function countEntityDeltaFragmentBytes(fragments) {
-    var _a, _b;
-    return (((_a = fragments.creates) === null || _a === void 0 ? void 0 : _a.bytes) || 0) + (((_b = fragments.deletes) === null || _b === void 0 ? void 0 : _b.bytes) || 0);
-}
-function countEntityDeltaFragmentCreates(fragments) {
-    var _a;
-    return ((_a = fragments.creates) === null || _a === void 0 ? void 0 : _a.creates) || 0;
-}
-function countEntityDeltaFragmentDeletes(fragments) {
-    var _a;
-    return ((_a = fragments.deletes) === null || _a === void 0 ? void 0 : _a.deletes) || 0;
-}
-function applySharedChannelDeltasToUser(user, channel, tick, fragments) {
-    var _a, _b;
-    const deletedNids = (_a = fragments.deletes) === null || _a === void 0 ? void 0 : _a.nids;
-    if (deletedNids) {
-        for (const nid of deletedNids) {
-            user.tickLastSeen.delete(nid);
-        }
-        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid));
-    }
-    for (let i = 0; i < user.currentlyVisible.length; i++) {
-        user.tickLastSeen.set(user.currentlyVisible[i], tick);
-    }
-    const createdNids = (_b = fragments.creates) === null || _b === void 0 ? void 0 : _b.nids;
-    if (createdNids) {
-        for (const nid of createdNids) {
-            user.markVisible(nid, tick, [], [], null, []);
-        }
-    }
-    user.lastVisibleCount = user.currentlyVisible.length;
-    user.sharedChannelVersions.set(channel.nid, channel.membershipVersion);
-}
-function applyCellEntityFragmentsToUser(user, tick, createFragments, deleteFragments) {
-    if (deleteFragments.length > 0) {
-        const deletedNids = new Set();
-        for (let i = 0; i < deleteFragments.length; i++) {
-            for (const nid of deleteFragments[i].nids) {
-                deletedNids.add(nid);
-                user.tickLastSeen.delete(nid);
-            }
-        }
-        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid));
-    }
-    for (let i = 0; i < user.currentlyVisible.length; i++) {
-        user.tickLastSeen.set(user.currentlyVisible[i], tick);
-    }
-    for (let i = 0; i < createFragments.length; i++) {
-        for (const nid of createFragments[i].nids) {
-            user.markVisible(nid, tick, [], [], null, []);
-        }
-    }
-    user.lastVisibleCount = user.currentlyVisible.length;
 }
 function rememberSharedChannelVersion(user) {
     const channel = (0, channelModes_1.getSingleSharedChannel)(user);
@@ -185,42 +115,8 @@ function countChannelVisibleEntities(instance, channel) {
     }
     return count;
 }
-function collectChannelUpdatePlan(instance, channel, excludedNids) {
-    const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    const entities = channel.entities.array;
-    for (let i = 0; i < entities.length; i++) {
-        instance.localState.forEachEntityTree(entities[i].nid, nid => {
-            if (excludedNids === null || excludedNids === void 0 ? void 0 : excludedNids.has(nid)) {
-                return;
-            }
-            collectEntityUpdatePlan(instance, instance.localState.getByNid(nid), plan);
-        });
-    }
-    return plan;
-}
-function collectSpatialCellUpdatePlan(instance, channel, cellKey) {
-    const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    const entities = channel.getCellEntities(cellKey);
-    for (let i = 0; i < entities.length; i++) {
-        instance.localState.forEachEntityTree(entities[i].nid, nid => {
-            collectEntityUpdatePlan(instance, instance.localState.getByNid(nid), plan);
-        });
-    }
-    return plan;
-}
-function collectEntityUpdatePlan(instance, entity, plan) {
-    const nschema = instance.context.getSchema(entity.ntype);
-    const diffs = instance.cache.getAndDiffGrouped(instance.tick, entity, nschema);
-    for (let j = 0; j < diffs.groups.length; j++) {
-        plan.updateEntityGroups.push(diffs.groups[j]);
-    }
-    for (let j = 0; j < diffs.changes.length; j++) {
-        plan.updateEntities.push(diffs.changes[j]);
-    }
-}
 function hasSnapshotPlanContent(plan) {
     return plan.channelOpens.length > 0 ||
-        plan.channelEntityCreates.length > 0 ||
         plan.channelHeaderUpdates.length > 0 ||
         plan.channelCloses.length > 0 ||
         plan.ecsCreateEntities.length > 0 ||
@@ -234,402 +130,6 @@ function hasSnapshotPlanContent(plan) {
         plan.messages.length > 0 ||
         plan.interpolatedMessages.length > 0 ||
         plan.responses.length > 0;
-}
-function collectCreateEntitiesForRoots(instance, roots) {
-    const createEntities = [];
-    const nids = new Set();
-    for (let i = 0; i < roots.length; i++) {
-        instance.localState.forEachEntityTree(roots[i].nid, nid => {
-            const entity = instance.localState.getByNid(nid);
-            const nschema = instance.context.getSchema(entity.ntype);
-            if (!nschema) {
-                throw new Error(`Entity [nid ${nid}] [ntype ${entity.ntype}] is missing a network schema.`);
-            }
-            if (!instance.cache.cacheContains(nid)) {
-                instance.cache.cacheify(instance.tick, entity, nschema);
-            }
-            createEntities.push(entity);
-            nids.add(nid);
-        });
-    }
-    return { createEntities, nids };
-}
-function collectNidsForRoots(instance, roots) {
-    const nids = new Set();
-    for (let i = 0; i < roots.length; i++) {
-        instance.localState.forEachEntityTree(roots[i].nid, nid => {
-            nids.add(nid);
-        });
-    }
-    return nids;
-}
-function getCellCreateFragment(user, instance, channel, cellKey) {
-    const protocol = instance.network.getProtocol();
-    const key = `${instance.tick}:${channel.nid}:cell:create:${cellKey}:${channel.getCellVersion(cellKey)}:${protocol.nidType}:${protocol.ntypeType}`;
-    const cached = instance.network.sharedCreateFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let collectStart = 0;
-    let collectMs = 0;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    if (measure) {
-        collectStart = performance.now();
-    }
-    const collected = collectCreateEntitiesForRoots(instance, channel.getCellEntities(cellKey));
-    const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    plan.createEntities = collected.createEntities;
-    if (measure) {
-        collectMs = performance.now() - collectStart;
-        countStart = performance.now();
-    }
-    const bytes = (0, countSnapshotBytes_1.countSnapshotBytes)(plan, instance.context, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, writeSnapshot_1.writeSnapshot)(plan, instance.context, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids: collected.nids,
-        creates: plan.createEntities.length,
-        deletes: 0,
-        updateProps: 0,
-        updateGroups: 0,
-        groupedUpdateProps: 0
-    };
-    instance.network.sharedCreateFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes });
-    return fragment;
-}
-function getCellDeleteFragment(user, instance, channel, cellKey, nids) {
-    const protocol = instance.network.getProtocol();
-    const nidSignature = nids.join(',');
-    const key = `${instance.tick}:${channel.nid}:cell:delete:${cellKey}:${nidSignature}:${protocol.nidType}`;
-    const cached = instance.network.sharedDeleteFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    plan.deleteEntities = nids;
-    if (measure) {
-        countStart = performance.now();
-    }
-    const bytes = (0, countSnapshotBytes_1.countSnapshotBytes)(plan, instance.context, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, writeSnapshot_1.writeSnapshot)(plan, instance.context, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids: new Set(nids),
-        creates: 0,
-        deletes: nids.length,
-        updateProps: 0,
-        updateGroups: 0,
-        groupedUpdateProps: 0
-    };
-    instance.network.sharedDeleteFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes });
-    return fragment;
-}
-function getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids = true) {
-    const log = channel.getManualCellUpdateLog(cellKey);
-    if (!log) {
-        return {
-            payload: user.networkAdapter.binary.createWriter(0).payload,
-            bytes: 0,
-            nids: new Set(),
-            creates: 0,
-            deletes: 0,
-            updateProps: 0,
-            updateGroups: 0,
-            groupedUpdateProps: 0
-        };
-    }
-    const protocol = instance.network.getProtocol();
-    const key = `${instance.tick}:${channel.nid}:manual-cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`;
-    const cached = instance.network.sharedUpdateFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    if (measure) {
-        countStart = performance.now();
-    }
-    const bytes = (0, manualUpdates_1.countManualUpdateBytes)(log, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, manualUpdates_1.writeManualUpdates)(log, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids: includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set(),
-        creates: 0,
-        deletes: 0,
-        updateProps: log.manualPropNids.length,
-        updateGroups: log.manualGroupNids.length,
-        groupedUpdateProps: (0, manualUpdates_1.countManualGroupedProps)(log)
-    };
-    instance.network.sharedUpdateFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes });
-    return fragment;
-}
-function getCellUpdateFragment(user, instance, channel, cellKey, includeNids = true) {
-    if ((0, channelModes_1.isManualSpatialCellFragmentChannel)(channel)) {
-        return getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids);
-    }
-    const protocol = instance.network.getProtocol();
-    const key = `${instance.tick}:${channel.nid}:cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`;
-    const cached = instance.network.sharedUpdateFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let collectStart = 0;
-    let collectMs = 0;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    if (measure) {
-        collectStart = performance.now();
-    }
-    const plan = collectSpatialCellUpdatePlan(instance, channel, cellKey);
-    const nids = includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set();
-    if (measure) {
-        collectMs = performance.now() - collectStart;
-        countStart = performance.now();
-    }
-    const bytes = (0, countSnapshotBytes_1.countSnapshotBytes)(plan, instance.context, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, writeSnapshot_1.writeSnapshot)(plan, instance.context, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        nids,
-        creates: 0,
-        deletes: 0,
-        updateProps: plan.updateEntities.length,
-        updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
-    };
-    instance.network.sharedUpdateFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes });
-    return fragment;
-}
-function cellMayHaveUpdates(channel, cellKey) {
-    if ((0, channelModes_1.isManualSpatialCellFragmentChannel)(channel)) {
-        return channel.cellHasManualUpdates(cellKey);
-    }
-    return true;
-}
-function getSharedCreateFragment(user, instance, channel) {
-    if (channel.createdRoots.length === 0) {
-        return null;
-    }
-    const protocol = instance.network.getProtocol();
-    const key = `${instance.tick}:${channel.nid}:create:${channel.deltaBaseVersion}:${channel.membershipVersion}:${protocol.nidType}:${protocol.ntypeType}`;
-    const cached = instance.network.sharedCreateFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let collectStart = 0;
-    let collectMs = 0;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    if (measure) {
-        collectStart = performance.now();
-    }
-    const collected = collectCreateEntitiesForRoots(instance, channel.createdRoots);
-    const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    plan.createEntities = collected.createEntities;
-    if (measure) {
-        collectMs = performance.now() - collectStart;
-        countStart = performance.now();
-    }
-    const bytes = (0, countSnapshotBytes_1.countSnapshotBytes)(plan, instance.context, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, writeSnapshot_1.writeSnapshot)(plan, instance.context, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        creates: plan.createEntities.length,
-        nids: collected.nids
-    };
-    instance.network.sharedCreateFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes });
-    return fragment;
-}
-function getSharedDeleteFragment(user, instance, channel) {
-    if (channel.deletedNids.length === 0) {
-        return null;
-    }
-    const protocol = instance.network.getProtocol();
-    const key = `${instance.tick}:${channel.nid}:delete:${channel.deltaBaseVersion}:${channel.membershipVersion}:${protocol.nidType}`;
-    const cached = instance.network.sharedDeleteFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    plan.deleteEntities = channel.deletedNids;
-    if (measure) {
-        countStart = performance.now();
-    }
-    const bytes = (0, countSnapshotBytes_1.countSnapshotBytes)(plan, instance.context, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, writeSnapshot_1.writeSnapshot)(plan, instance.context, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        deletes: plan.deleteEntities.length,
-        nids: new Set(plan.deleteEntities)
-    };
-    instance.network.sharedDeleteFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes });
-    return fragment;
-}
-function getEntityDeltaFragments(user, instance, channel) {
-    if (!instance.network.sharedUpdateFragmentsEnabled ||
-        instance.network.debugBinaryWrites ||
-        !canUseSharedDeltaFragments(user, channel)) {
-        return { creates: null, deletes: null };
-    }
-    return {
-        creates: getSharedCreateFragment(user, instance, channel),
-        deletes: getSharedDeleteFragment(user, instance, channel)
-    };
-}
-function getSharedUpdateFragment(user, instance, channel, excludedNids) {
-    const protocol = instance.network.getProtocol();
-    const key = `${instance.tick}:${channel.nid}:${protocol.nidType}:${protocol.ntypeType}:${excludedNids ? 'delta' : 'steady'}`;
-    const cached = instance.network.sharedUpdateFragments.get(key);
-    if (cached) {
-        instance.network.recordSharedFragmentHit();
-        return cached;
-    }
-    const measure = instance.network.snapshotPerformanceEnabled;
-    let collectStart = 0;
-    let collectMs = 0;
-    let countStart = 0;
-    let countMs = 0;
-    let writeStart = 0;
-    let writeMs = 0;
-    if (measure) {
-        collectStart = performance.now();
-    }
-    const plan = collectChannelUpdatePlan(instance, channel, excludedNids);
-    if (measure) {
-        collectMs = performance.now() - collectStart;
-        countStart = performance.now();
-    }
-    const bytes = (0, countSnapshotBytes_1.countSnapshotBytes)(plan, instance.context, protocol);
-    if (measure) {
-        countMs = performance.now() - countStart;
-        writeStart = performance.now();
-    }
-    const writer = user.networkAdapter.binary.createWriter(bytes);
-    (0, writeSnapshot_1.writeSnapshot)(plan, instance.context, writer, protocol);
-    if (measure) {
-        writeMs = performance.now() - writeStart;
-    }
-    const fragment = {
-        payload: writer.payload,
-        bytes,
-        updateProps: plan.updateEntities.length,
-        updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
-    };
-    instance.network.sharedUpdateFragments.set(key, fragment);
-    instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes });
-    return fragment;
-}
-function addRegularCreate(plan, instance, nid) {
-    const entity = instance.localState.getByNid(nid);
-    const nschema = instance.context.getSchema(entity.ntype);
-    if (!nschema) {
-        throw new Error(`Entity [nid ${nid}] [ntype ${entity.ntype}] is missing a network schema.`);
-    }
-    if (!instance.cache.cacheContains(nid)) {
-        instance.cache.cacheify(instance.tick, entity, nschema);
-    }
-    plan.createEntities.push(entity);
-}
-function addRegularUpdate(plan, instance, nid) {
-    const entity = instance.localState.getByNid(nid);
-    const nschema = instance.context.getSchema(entity.ntype);
-    const diffs = instance.cache.getAndDiffGrouped(instance.tick, entity, nschema);
-    for (let i = 0; i < diffs.groups.length; i++) {
-        plan.updateEntityGroups.push(diffs.groups[i]);
-    }
-    for (let i = 0; i < diffs.changes.length; i++) {
-        plan.updateEntities.push(diffs.changes[i]);
-    }
 }
 function addChannelHeader(plan, user, instance, channel) {
     const header = channel.header;
@@ -766,10 +266,9 @@ function ecsHasManualUpdates(channel) {
     return channel.manualPropNids.length > 0 || channel.manualGroupNids.length > 0;
 }
 function collectSubscribedChannelSnapshotPlan(user, instance, channel) {
-    const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick);
+    const { toCreate, toUpdate, toDelete } = user.checkChannelVisibility(channel, instance.tick);
     const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
     addChannelHeader(plan, user, instance, channel);
-    plan.channelEntityCreates = channelEntityCreates;
     if ((0, channelModes_1.isEcsSnapshotChannel)(channel)) {
         (0, ecsSnapshotCrud_1.addEcsVisibilityCrud)(plan, channel, toCreate, toDelete);
         addEcsManualUpdates(plan, instance, channel, new Set(toUpdate));
@@ -780,11 +279,11 @@ function collectSubscribedChannelSnapshotPlan(user, instance, channel) {
     const manualChannel = (0, channelModes_1.isManualUpdateChannel)(channel);
     const manualSpatialChannel = (0, channelModes_1.isManualSpatialCellFragmentChannel)(channel);
     for (let i = 0; i < toCreate.length; i++) {
-        addRegularCreate(plan, instance, toCreate[i]);
+        (0, entitySnapshotPlans_1.addRegularCreate)(plan, instance, toCreate[i]);
     }
     if (!manualChannel && !manualSpatialChannel) {
         for (let i = 0; i < toUpdate.length; i++) {
-            addRegularUpdate(plan, instance, toUpdate[i]);
+            (0, entitySnapshotPlans_1.addRegularUpdate)(plan, instance, toUpdate[i]);
         }
     }
     plan.deleteEntities = toDelete;
@@ -807,11 +306,10 @@ function collectPendingVisibilityDeletePlan(user) {
     return plan;
 }
 function collectManualSpatialVisibilityPlan(user, instance, channel) {
-    const { toCreate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick);
+    const { toCreate, toDelete } = user.checkChannelVisibility(channel, instance.tick);
     const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    plan.channelEntityCreates = channelEntityCreates;
     for (let i = 0; i < toCreate.length; i++) {
-        addRegularCreate(plan, instance, toCreate[i]);
+        (0, entitySnapshotPlans_1.addRegularCreate)(plan, instance, toCreate[i]);
     }
     plan.deleteEntities = toDelete;
     (0, channelMessages_1.addChannelMessages)(plan, user, channel, instance.network.debugBinaryWrites);
@@ -847,13 +345,11 @@ function collectStableEcsStructuralSnapshotBase(user, channel) {
     }
     for (let i = 0; i < channel.createdRoots.length; i++) {
         const nid = channel.createdRoots[i];
-        (0, ecsSnapshotCrud_1.addEcsChannelEntityCreate)(plan, channel, nid);
         user.currentlyVisible.push(nid);
         user.tickLastSeen.set(nid, user.instance.tick);
     }
     for (let i = 0; i < channel.createdComponents.length; i++) {
         const nid = channel.createdComponents[i].nid;
-        (0, ecsSnapshotCrud_1.addEcsChannelEntityCreate)(plan, channel, nid);
         user.currentlyVisible.push(nid);
         user.tickLastSeen.set(nid, user.instance.tick);
     }
@@ -881,8 +377,7 @@ function collectEcsSnapshotBase(user, instance, channel) {
         user.stableVisibleRefs.has(channel.nid)) {
         return collectStableEcsStructuralSnapshotBase(user, channel);
     }
-    const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick);
-    plan.channelEntityCreates = channelEntityCreates;
+    const { toCreate, toUpdate, toDelete } = user.checkChannelVisibility(channel, instance.tick);
     (0, ecsSnapshotCrud_1.addEcsVisibilityCrud)(plan, channel, toCreate, toDelete);
     addEnvelopeQueues(plan, user);
     (0, channelMessages_1.addChannelMessages)(plan, user, channel, true);
@@ -992,8 +487,7 @@ function createEcsSnapshotBuffer(user, instance, channel) {
 }
 function collectEcsSpatialSnapshotBase(user, instance, channel) {
     const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
-    const { toCreate, toDelete, channelEntityCreates } = user.checkChannelVisibility(channel, instance.tick);
-    plan.channelEntityCreates = channelEntityCreates;
+    const { toCreate, toDelete } = user.checkChannelVisibility(channel, instance.tick);
     (0, ecsSnapshotCrud_1.addEcsVisibilityCrud)(plan, channel, toCreate, toDelete);
     addEnvelopeQueues(plan, user);
     (0, channelMessages_1.addChannelMessages)(plan, user, channel, true);
@@ -1148,7 +642,7 @@ function createSharedUpdateSnapshotBuffer(user, instance, channel) {
     const messageFragments = (0, messageFragments_1.getSharedMessageFragments)(user, instance);
     const scopedMessagePlan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
     (0, channelMessages_1.addChannelMessages)(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites);
-    const fragment = getSharedUpdateFragment(user, instance, channel);
+    const fragment = (0, sharedEntityFragments_1.getSharedUpdateFragment)(user, instance, channel);
     if (measure) {
         countStart = performance.now();
     }
@@ -1292,16 +786,11 @@ function createSharedDeltaSnapshotBuffer(user, instance, channel) {
     instance.network.queueProtocolIfChanged(user);
     const protocol = instance.network.getProtocol();
     const { plan: envelope, queuedResponses } = collectEnvelopePlan(user);
-    const entityDeltaFragments = getEntityDeltaFragments(user, instance, channel);
+    const entityDeltaFragments = (0, sharedEntityFragments_1.getEntityDeltaFragments)(user, instance, channel);
     const messageFragments = (0, messageFragments_1.getSharedMessageFragments)(user, instance);
     const scopedMessagePlan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
     (0, channelMessages_1.addChannelMessages)(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites);
-    const updateFragment = getSharedUpdateFragment(user, instance, channel, (_a = entityDeltaFragments.creates) === null || _a === void 0 ? void 0 : _a.nids);
-    if (entityDeltaFragments.creates) {
-        for (const nid of entityDeltaFragments.creates.nids) {
-            envelope.channelEntityCreates.push({ nid, channelId: channel.nid });
-        }
-    }
+    const updateFragment = (0, sharedEntityFragments_1.getSharedUpdateFragment)(user, instance, channel, (_a = entityDeltaFragments.creates) === null || _a === void 0 ? void 0 : _a.nids);
     if (measure) {
         collectMs = performance.now() - collectStart;
         countStart = performance.now();
@@ -1309,11 +798,11 @@ function createSharedDeltaSnapshotBuffer(user, instance, channel) {
     const chunks = [
         (0, SnapshotChunk_1.createSnapshotPlanChunk)('Envelope', envelope, instance.context, protocol)
     ];
-    const entityDeltaFragmentBytes = countEntityDeltaFragmentBytes(entityDeltaFragments);
+    const entityDeltaFragmentBytes = (0, sharedEntityFragments_1.countEntityDeltaFragmentBytes)(entityDeltaFragments);
     if (entityDeltaFragmentBytes > 0) {
         chunks.push((0, snapshotChunkBuilders_1.createChannelScopeChunk)(channel.nid, protocol));
         chunks.push((0, SnapshotChunk_1.createSnapshotChunk)('EntityDeltaFragments', entityDeltaFragmentBytes, writer => {
-            writeEntityDeltaFragments(writer, instance, entityDeltaFragments);
+            (0, sharedEntityFragments_1.writeEntityDeltaFragments)(writer, instance, entityDeltaFragments);
         }));
     }
     const messageChunk = (0, snapshotChunkBuilders_1.createSharedMessageFragmentChunk)(instance, messageFragments);
@@ -1337,7 +826,7 @@ function createSharedDeltaSnapshotBuffer(user, instance, channel) {
         writeMs = performance.now() - writeStart;
         commitStart = performance.now();
     }
-    applySharedChannelDeltasToUser(user, channel, instance.tick, entityDeltaFragments);
+    (0, sharedEntityFragments_1.applySharedChannelDeltasToUser)(user, channel, instance.tick, entityDeltaFragments);
     (0, commitSnapshotPlan_1.commitSnapshotPlan)(user, envelope);
     instance.network.reportResponseBacklog(user, queuedResponses, envelope.responses.length);
     if (measure) {
@@ -1349,11 +838,11 @@ function createSharedDeltaSnapshotBuffer(user, instance, channel) {
             commitMs,
             sendMs: 0,
             bytes,
-            creates: countEntityDeltaFragmentCreates(entityDeltaFragments),
+            creates: (0, sharedEntityFragments_1.countEntityDeltaFragmentCreates)(entityDeltaFragments),
             updateProps: updateFragment.updateProps,
             updateGroups: updateFragment.updateGroups,
             groupedUpdateProps: updateFragment.groupedUpdateProps,
-            deletes: countEntityDeltaFragmentDeletes(entityDeltaFragments),
+            deletes: (0, sharedEntityFragments_1.countEntityDeltaFragmentDeletes)(entityDeltaFragments),
             messages: (0, snapshotPlanStats_1.countPlanMessages)(envelope) + (0, snapshotPlanStats_1.countPlanMessages)(scopedMessagePlan) + (0, messageFragments_1.sumSharedMessageFragmentMessages)(messageFragments),
             engineMessages: envelope.engineMessages.length,
             responses: envelope.responses.length
@@ -1439,7 +928,7 @@ function getMovementStableVisibleCellKeys(channel, userId) {
     return currentKeys;
 }
 function addManualSpatialCreates(instance, plan, roots, seen) {
-    const collected = collectCreateEntitiesForRoots(instance, roots);
+    const collected = (0, entitySnapshotPlans_1.collectCreateEntitiesForRoots)(instance, roots);
     for (let i = 0; i < collected.createEntities.length; i++) {
         const entity = collected.createEntities[i];
         if (seen.has(entity.nid)) {
@@ -1510,14 +999,6 @@ function createManualStableSpatialCellSnapshotBuffer(user, instance, channel, cu
             addManualSpatialDeletes(instance, plan, move.entity.nid, deleteNids);
         }
     }
-    if (plan.createEntities.length > 0) {
-        for (let i = 0; i < plan.createEntities.length; i++) {
-            envelope.channelEntityCreates.push({
-                nid: plan.createEntities[i].nid,
-                channelId: channel.nid
-            });
-        }
-    }
     (0, channelMessages_1.addChannelMessages)(plan, user, channel, instance.network.debugBinaryWrites);
     const updateFragments = [];
     for (let i = 0; i < currentCellKeys.length; i++) {
@@ -1525,7 +1006,7 @@ function createManualStableSpatialCellSnapshotBuffer(user, instance, channel, cu
         if (!channel.cellHasManualUpdates(cellKey)) {
             continue;
         }
-        const fragment = getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, false);
+        const fragment = (0, cellFragmentBuilders_1.getManualSpatialCellUpdateFragment)(user, instance, channel, cellKey, false);
         if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
             updateFragments.push(fragment);
         }
@@ -1605,10 +1086,10 @@ function createStableCellFragmentSnapshotBuffer(user, instance, channel, current
     (0, channelMessages_1.addChannelMessages)(scopedMessagePlan, user, channel, instance.network.debugBinaryWrites);
     const updateFragments = [];
     for (let i = 0; i < currentCellKeys.length; i++) {
-        if (!cellMayHaveUpdates(channel, currentCellKeys[i])) {
+        if (!(0, cellFragmentBuilders_1.cellMayHaveUpdates)(channel, currentCellKeys[i])) {
             continue;
         }
-        const fragment = getCellUpdateFragment(user, instance, channel, currentCellKeys[i], false);
+        const fragment = (0, cellFragmentBuilders_1.getCellUpdateFragment)(user, instance, channel, currentCellKeys[i], false);
         if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
             updateFragments.push(fragment);
         }
@@ -1718,10 +1199,10 @@ function createCellFragmentSnapshotBuffer(user, instance, channel) {
     for (let i = 0; i < currentCellKeys.length; i++) {
         const cellKey = currentCellKeys[i];
         if (previousCellKeySet.has(cellKey)) {
-            if (!cellMayHaveUpdates(channel, cellKey)) {
+            if (!(0, cellFragmentBuilders_1.cellMayHaveUpdates)(channel, cellKey)) {
                 continue;
             }
-            const fragment = getCellUpdateFragment(user, instance, channel, cellKey);
+            const fragment = (0, cellFragmentBuilders_1.getCellUpdateFragment)(user, instance, channel, cellKey);
             if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
                 updateFragments.push(fragment);
                 removeUpdateNidsFromPlan(plan, fragment.nids);
@@ -1729,14 +1210,14 @@ function createCellFragmentSnapshotBuffer(user, instance, channel) {
             continue;
         }
         if (allRootsWerePreviouslyHidden(channel, cellKey, beforeVisible)) {
-            const fragment = getCellCreateFragment(user, instance, channel, cellKey);
+            const fragment = (0, cellFragmentBuilders_1.getCellCreateFragment)(user, instance, channel, cellKey);
             if (fragment.creates > 0) {
                 createFragments.push(fragment);
                 removeCreateNidsFromPlan(plan, fragment.nids);
             }
         }
         else if ((0, channelModes_1.isManualSpatialCellFragmentChannel)(channel) && channel.cellHasManualUpdates(cellKey)) {
-            const fragment = getManualSpatialCellUpdateFragment(user, instance, channel, cellKey);
+            const fragment = (0, cellFragmentBuilders_1.getManualSpatialCellUpdateFragment)(user, instance, channel, cellKey);
             if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
                 updateFragments.push(fragment);
             }
@@ -1749,7 +1230,7 @@ function createCellFragmentSnapshotBuffer(user, instance, channel) {
         }
         const nids = channel.getRememberedCellNids(user.id, cellKey);
         if (allNidsArePlannedDeletes(nids, plannedDeletes)) {
-            const fragment = getCellDeleteFragment(user, instance, channel, cellKey, nids);
+            const fragment = (0, cellFragmentBuilders_1.getCellDeleteFragment)(user, instance, channel, cellKey, nids);
             if (fragment.deletes > 0) {
                 deleteFragments.push(fragment);
                 removeDeleteNidsFromPlan(plan, fragment.nids);
@@ -1797,7 +1278,7 @@ function createCellFragmentSnapshotBuffer(user, instance, channel) {
         commitStart = performance.now();
     }
     (0, commitSnapshotPlan_1.commitSnapshotPlan)(user, plan);
-    applyCellEntityFragmentsToUser(user, instance.tick, createFragments, deleteFragments);
+    (0, cellFragmentBuilders_1.applyCellEntityFragmentsToUser)(user, instance.tick, createFragments, deleteFragments);
     instance.network.reportResponseBacklog(user, queuedResponses, plan.responses.length);
     channel.rememberVisibleCells(user.id);
     if (measure) {
@@ -1844,7 +1325,7 @@ const createSnapshotBuffer = (user, instance) => {
         sharedChannel &&
         !channelHasHeaderPending(user, sharedChannel) &&
         hasChannelDeltas(sharedChannel) &&
-        user.withChannelVisibilityState(sharedChannel.nid, () => canUseSharedDeltaFragments(user, sharedChannel))) {
+        user.withChannelVisibilityState(sharedChannel.nid, () => (0, sharedEntityFragments_1.canUseSharedDeltaFragments)(user, sharedChannel))) {
         return user.withChannelVisibilityState(sharedChannel.nid, () => createSharedDeltaSnapshotBuffer(user, instance, sharedChannel));
     }
     if (instance.network.sharedUpdateFragmentsEnabled &&

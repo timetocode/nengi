@@ -8,10 +8,6 @@ export type SnapshotResponse = {
     status: ResponseStatus;
     payload: EndpointPayload;
 };
-export type ChannelEntityCreate = {
-    nid: number;
-    channelId: number;
-};
 export type ChannelOpen = {
     channelId: number;
     header: ChannelHeader;
@@ -48,7 +44,6 @@ export type SnapshotPlan = {
     channels: SnapshotChannel[];
     responses: SnapshotResponse[];
     channelOpens: ChannelOpen[];
-    channelEntityCreates: ChannelEntityCreate[];
     channelHeaderUpdates: ChannelHeaderUpdate[];
     channelCloses: ChannelClose[];
     channelHeaderVersions: ChannelHeaderVersion[];

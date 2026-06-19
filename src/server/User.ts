@@ -391,9 +391,7 @@ export class User {
         nid: number,
         tick: number,
         toCreate: number[],
-        toUpdate: number[],
-        channel: UserVisibilityChannel | null,
-        channelEntityCreates: { nid: number, channelId: number }[]
+        toUpdate: number[]
     ) {
         const lastSeenTick = this.tickLastSeen.get(nid)
         if (lastSeenTick === tick) {
@@ -402,9 +400,6 @@ export class User {
 
         if (lastSeenTick === undefined) {
             toCreate.push(nid)
-            if (channel) {
-                channelEntityCreates.push({ nid, channelId: channel.nid })
-            }
             this.currentlyVisible.push(nid)
         } else {
             toUpdate.push(nid)
@@ -416,10 +411,9 @@ export class User {
         const toCreate: number[] = []
         const toUpdate: number[] = []
         const toDelete: number[] = []
-        const channelEntityCreates: { nid: number, channelId: number }[] = []
         toDelete.push(...this.consumePendingVisibilityDeletes())
 
-        for (const [channelId, channel] of this.subscriptions.entries()) {
+        for (const channel of this.subscriptions.values()) {
             const visible = this.checkChannelVisibility(channel, tick)
             for (let i = 0; i < visible.toCreate.length; i++) {
                 toCreate.push(visible.toCreate[i])
@@ -430,12 +424,9 @@ export class User {
             for (let i = 0; i < visible.toDelete.length; i++) {
                 toDelete.push(visible.toDelete[i])
             }
-            for (let i = 0; i < visible.channelEntityCreates.length; i++) {
-                channelEntityCreates.push(visible.channelEntityCreates[i])
-            }
         }
 
-        return { toDelete, toUpdate, toCreate, channelEntityCreates }
+        return { toDelete, toUpdate, toCreate }
     }
 
     checkChannelVisibility(channel: UserVisibilityChannel, tick: number) {
@@ -443,7 +434,6 @@ export class User {
             const toCreate: number[] = []
             const toUpdate: number[] = []
             const toDelete: number[] = []
-            const channelEntityCreates: { nid: number, channelId: number }[] = []
 
             const visibleNids = channel.getVisibleNetworkedNids?.(this.id)
             if (visibleNids) {
@@ -455,28 +445,28 @@ export class User {
                         toUpdate.push(visibleNids[i])
                     }
                     this.lastVisibleCount = this.currentlyVisible.length
-                    return { toDelete, toUpdate, toCreate, channelEntityCreates }
+                    return { toDelete, toUpdate, toCreate }
                 }
                 this.stableVisibleRefs.set(channel.nid, visibleNids)
                 for (let i = 0; i < visibleNids.length; i++) {
-                    this.markVisible(visibleNids[i], tick, toCreate, toUpdate, channel, channelEntityCreates)
+                    this.markVisible(visibleNids[i], tick, toCreate, toUpdate)
                 }
                 this.populateDeletions(tick, toDelete)
                 this.lastVisibleCount = this.currentlyVisible.length
-                return { toDelete, toUpdate, toCreate, channelEntityCreates }
+                return { toDelete, toUpdate, toCreate }
             }
 
             const visibleRoots = channel.getVisibleEntities?.(this.id) || []
             for (let i = 0; i < visibleRoots.length; i++) {
                 this.instance!.localState.forEachEntityTree(visibleRoots[i], nid => {
-                    this.markVisible(nid, tick, toCreate, toUpdate, channel, channelEntityCreates)
+                    this.markVisible(nid, tick, toCreate, toUpdate)
                 })
             }
 
             this.populateDeletions(tick, toDelete)
             this.lastVisibleCount = this.currentlyVisible.length
 
-            return { toDelete, toUpdate, toCreate, channelEntityCreates }
+            return { toDelete, toUpdate, toCreate }
         })
     }
 

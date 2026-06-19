@@ -1,9 +1,13 @@
 import { Binary } from '../../common/binary/Binary'
 import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
+import { ChannelType, createChannelHeader } from '../../common/ChannelHeader'
 import { Client } from '../Client'
 import { CommandReplayPrediction } from './CommandReplayPrediction'
 import { testBinaryAdapter } from '../../testSupport/BufferBinary'
+import type { Snapshot } from '../Snapshot'
+
+const TEST_CHANNEL_ID = 1
 
 class MockAdapter {
     binary = testBinaryAdapter
@@ -23,6 +27,37 @@ function createClient() {
         y: Binary.Float64
     }))
     return new Client(context, MockAdapter, 20)
+}
+
+function snapshot(args: Partial<Snapshot>): Snapshot {
+    const createEntities = args.createEntities || []
+    const updateEntities = args.updateEntities || []
+    const deleteEntities = args.deleteEntities || []
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
+    return {
+        timestamp: -1,
+        confirmedClientTick: -1,
+        messages: [],
+        ...args,
+        channelOpens: hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: createChannelHeader(TEST_CHANNEL_ID, ChannelType.Channel) }]
+            : [],
+        channels: hasEntityCrud ? [{
+            channelId: TEST_CHANNEL_ID,
+            messages: [],
+            interpolatedMessages: [],
+            ecsCreateEntities: [],
+            ecsCreateComponents: [],
+            ecsDeleteEntities: [],
+            createEntities,
+            updateEntities,
+            updateEntityGroups: [],
+            deleteEntities
+        }] : [],
+        createEntities: [],
+        updateEntities: [],
+        deleteEntities: []
+    }
 }
 
 type MoveCommand = {
@@ -59,14 +94,14 @@ describe('CommandReplayPrediction', () => {
         client.network.incrementClientTick()
         movement.predict({ ntype: 2, dx: 1, dy: 0 })
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, y: 0 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000)
+        }), 1000)
         client.network.processNextFrame()
 
         const correction = movement.reconcile()
@@ -87,14 +122,14 @@ describe('CommandReplayPrediction', () => {
 
         movement.predict({ ntype: 2, dx: 1, dy: 0 })
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000)
+        }), 1000)
         client.network.processNextFrame()
 
         const correction = movement.reconcile()

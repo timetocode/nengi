@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Binary_1 = require("../../common/binary/Binary");
 const defineSchema_1 = require("../../common/binary/schema/defineSchema");
 const Context_1 = require("../../common/Context");
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const Client_1 = require("../Client");
 const CommandReplayPrediction_1 = require("./CommandReplayPrediction");
 const BufferBinary_1 = require("../../testSupport/BufferBinary");
+const TEST_CHANNEL_ID = 1;
 class MockAdapter {
     constructor() {
         this.binary = BufferBinary_1.testBinaryAdapter;
@@ -23,6 +25,26 @@ function createClient() {
         y: Binary_1.Binary.Float64
     }));
     return new Client_1.Client(context, MockAdapter, 20);
+}
+function snapshot(args) {
+    const createEntities = args.createEntities || [];
+    const updateEntities = args.updateEntities || [];
+    const deleteEntities = args.deleteEntities || [];
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0;
+    return Object.assign(Object.assign({ timestamp: -1, confirmedClientTick: -1, messages: [] }, args), { channelOpens: hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: (0, ChannelHeader_1.createChannelHeader)(TEST_CHANNEL_ID, ChannelHeader_1.ChannelType.Channel) }]
+            : [], channels: hasEntityCrud ? [{
+                channelId: TEST_CHANNEL_ID,
+                messages: [],
+                interpolatedMessages: [],
+                ecsCreateEntities: [],
+                ecsCreateComponents: [],
+                ecsDeleteEntities: [],
+                createEntities,
+                updateEntities,
+                updateEntityGroups: [],
+                deleteEntities
+            }] : [], createEntities: [], updateEntities: [], deleteEntities: [] });
 }
 function createMovement(client, local) {
     return new CommandReplayPrediction_1.CommandReplayPrediction({
@@ -49,14 +71,14 @@ describe('CommandReplayPrediction', () => {
         movement.predict({ ntype: 2, dx: 1, dy: 0 });
         client.network.incrementClientTick();
         movement.predict({ ntype: 2, dx: 1, dy: 0 });
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, y: 0 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000);
+        }), 1000);
         client.network.processNextFrame();
         const correction = movement.reconcile();
         expect(correction).toEqual({
@@ -72,14 +94,14 @@ describe('CommandReplayPrediction', () => {
         const local = { x: 0, y: 0 };
         const movement = createMovement(client, local);
         movement.predict({ ntype: 2, dx: 1, dy: 0 });
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000);
+        }), 1000);
         client.network.processNextFrame();
         const correction = movement.reconcile();
         expect(correction === null || correction === void 0 ? void 0 : correction.corrected).toBe(true);

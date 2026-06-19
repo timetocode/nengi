@@ -14,6 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.gameResourceKey = exports.gameLocalComponentType = exports.gameComponentType = exports.GameEcsWorld = void 0;
 // server
 __exportStar(require("./server/Instance"), exports);
 __exportStar(require("./server/InstanceNetwork"), exports);
@@ -33,6 +34,11 @@ __exportStar(require("./server/channel/EcsChannel"), exports);
 __exportStar(require("./server/channel/EcsSpatialChannel2D"), exports);
 __exportStar(require("./server/channel/EcsSpatialChannel3D"), exports);
 __exportStar(require("./ecs/EcsWorld"), exports);
+var GameEcsWorld_1 = require("./ecs/GameEcsWorld");
+Object.defineProperty(exports, "GameEcsWorld", { enumerable: true, get: function () { return GameEcsWorld_1.GameEcsWorld; } });
+Object.defineProperty(exports, "gameComponentType", { enumerable: true, get: function () { return GameEcsWorld_1.componentType; } });
+Object.defineProperty(exports, "gameLocalComponentType", { enumerable: true, get: function () { return GameEcsWorld_1.localComponentType; } });
+Object.defineProperty(exports, "gameResourceKey", { enumerable: true, get: function () { return GameEcsWorld_1.resourceKey; } });
 __exportStar(require("./server/User"), exports);
 __exportStar(require("./server/Historian"), exports);
 __exportStar(require("./server/Historian2D"), exports);

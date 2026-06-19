@@ -1,8 +1,12 @@
 import { Binary } from '../../common/binary/Binary'
 import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
+import { ChannelType, createChannelHeader } from '../../common/ChannelHeader'
 import { EntityStore } from '../EntityStore'
+import type { Snapshot } from '../Snapshot'
 import { PredictionLog, PredictionOperationStatus } from './PredictionLog'
+
+const TEST_CHANNEL_ID = 1
 
 function createStore() {
     const context = new Context()
@@ -11,6 +15,37 @@ function createStore() {
         open: Binary.Boolean
     }))
     return new EntityStore(context)
+}
+
+function snapshot(args: Partial<Snapshot>): Snapshot {
+    const createEntities = args.createEntities || []
+    const updateEntities = args.updateEntities || []
+    const deleteEntities = args.deleteEntities || []
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
+    return {
+        timestamp: -1,
+        confirmedClientTick: -1,
+        messages: [],
+        ...args,
+        channelOpens: hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: createChannelHeader(TEST_CHANNEL_ID, ChannelType.Channel) }]
+            : [],
+        channels: hasEntityCrud ? [{
+            channelId: TEST_CHANNEL_ID,
+            messages: [],
+            interpolatedMessages: [],
+            ecsCreateEntities: [],
+            ecsCreateComponents: [],
+            ecsDeleteEntities: [],
+            createEntities,
+            updateEntities,
+            updateEntityGroups: [],
+            deleteEntities
+        }] : [],
+        createEntities: [],
+        updateEntities: [],
+        deleteEntities: []
+    }
 }
 
 describe('PredictionLog', () => {
@@ -35,14 +70,14 @@ describe('PredictionLog', () => {
         expect(log.confirmTick(6)).toEqual([])
         expect(log.getPendingCommands().map(op => op.id)).toEqual([operation.id])
 
-        const frame = store.applySnapshot({
+        const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 7,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
             updateEntities: [],
             deleteEntities: []
-        }, 1)
+        }), 1)
         const resolutions = log.confirmTick(7, frame, store)
 
         expect(resolutions).toHaveLength(1)
@@ -70,14 +105,14 @@ describe('PredictionLog', () => {
             }
         })
 
-        const frame = store.applySnapshot({
+        const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 10,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
             updateEntities: [],
             deleteEntities: []
-        }, 1)
+        }), 1)
         const resolutions = log.confirmTick(10, frame, store)
 
         expect(resolutions[0].accepted).toBe(false)
@@ -102,14 +137,14 @@ describe('PredictionLog', () => {
             }
         })
 
-        const frame = store.applySnapshot({
+        const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 99,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, open: false }],
             updateEntities: [],
             deleteEntities: []
-        }, 1)
+        }), 1)
 
         expect(localSwitch.open).toBe(true)
         const commandResolutions = log.confirmTick(99, frame, store)

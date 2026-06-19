@@ -9,7 +9,6 @@ function createEmptySnapshotPlan() {
         channels: [],
         responses: [],
         channelOpens: [],
-        channelEntityCreates: [],
         channelHeaderUpdates: [],
         channelCloses: [],
         channelHeaderVersions: [],

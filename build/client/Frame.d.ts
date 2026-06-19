@@ -1,6 +1,6 @@
 import { IEntity } from '../common/IEntity';
 import { ChannelHeader } from '../common/ChannelHeader';
-import type { ChannelEntityCreate, ChannelClose, ChannelHeaderUpdate, ChannelOpen } from '../binary/snapshot/SnapshotPlan';
+import type { ChannelClose, ChannelHeaderUpdate, ChannelOpen } from '../binary/snapshot/SnapshotPlan';
 export type AppliedEntityChange = {
     nid: number;
     prop: string;
@@ -9,8 +9,8 @@ export type AppliedEntityChange = {
 };
 export type DeletedEntity = {
     nid: number;
-    entity?: IEntity;
-    channelId?: number;
+    entity: IEntity;
+    channelId: number;
 };
 export type ClosedChannel = {
     channelId: number;
@@ -37,20 +37,12 @@ export interface IEntityFrame {
     tick: number;
     timestamp: number;
     receivedAt: number;
-    ecsCreateEntities?: number[];
-    ecsCreateComponents?: IEntity[];
-    ecsDeleteEntities?: number[];
     channelOpens?: ChannelOpen[];
-    channelEntityCreates?: ChannelEntityCreate[];
     channelHeaderUpdates?: ChannelHeaderUpdate[];
     channelCloses?: ChannelClose[];
     skipInterpolationNids?: number[] | Set<number>;
     openedChannels?: OpenedChannel[];
     closedChannels?: ClosedChannel[];
-    createEntities: IEntity[];
-    updateEntities: AppliedEntityChange[];
-    deleteEntities: number[];
-    deletedEntities: DeletedEntity[];
     messages: any[];
     interpolatedMessages?: any[];
     channels?: ChannelFrame[];
@@ -61,23 +53,18 @@ export declare class Frame implements IEntityFrame {
     confirmedClientTick: number;
     timestamp: number;
     receivedAt: number;
-    ecsCreateEntities: number[];
-    ecsCreateComponents: IEntity[];
-    ecsDeleteEntities: number[];
     channelOpens: ChannelOpen[];
-    channelEntityCreates: ChannelEntityCreate[];
     channelHeaderUpdates: ChannelHeaderUpdate[];
     channelCloses: ChannelClose[];
     skipInterpolationNids: Set<number>;
     openedChannels: OpenedChannel[];
     closedChannels: ClosedChannel[];
-    createEntities: IEntity[];
-    updateEntities: AppliedEntityChange[];
-    deleteEntities: number[];
-    deletedEntities: DeletedEntity[];
     messages: any[];
     interpolatedMessages: any[];
     channels: ChannelFrame[];
     constructor(args: IEntityFrame);
+    getChannel(channelId: number): ChannelFrame | undefined;
+    requireChannel(channelId: number): ChannelFrame;
+    hasChannel(channelId: number): boolean;
 }
 //# sourceMappingURL=Frame.d.ts.map

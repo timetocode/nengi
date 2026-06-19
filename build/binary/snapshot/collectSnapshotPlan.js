@@ -64,7 +64,7 @@ function collectUpdateEntities(instance, toUpdate) {
     return { updates: updateEntities, groups: updateEntityGroups };
 }
 function collectSnapshotPlan(user, instance) {
-    const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkVisibility(instance.tick);
+    const { toCreate, toUpdate, toDelete } = user.checkVisibility(instance.tick);
     const plan = (0, SnapshotPlan_1.createEmptySnapshotPlan)();
     const channelOpens = user.consumePendingChannelOpens();
     for (let i = 0; i < channelOpens.length; i++) {
@@ -77,7 +77,6 @@ function collectSnapshotPlan(user, instance) {
     for (let i = 0; i < channelCloses.length; i++) {
         plan.channelCloses.push({ channelId: channelCloses[i] });
     }
-    plan.channelEntityCreates = channelEntityCreates;
     plan.skipInterpolationNids = collectSkipInterpolationNids(user);
     for (const channel of user.subscriptions.values()) {
         const header = channel.header;

@@ -30,6 +30,17 @@ export declare class EntityStore {
     getByChannel(channelId: number): IEntity[];
     getWhere(prop: string, value: any): IEntity[];
     applySnapshot(snapshot: Snapshot, tick: number, receivedAt?: number): Frame;
+    private applyChannelSnapshot;
+    private createEcsEntity;
+    private createEcsComponent;
+    private createEntity;
+    private updateEntity;
+    private deleteEntity;
+    private deleteEcsEntity;
+    private assertNoTopLevelEntityCrud;
+    private requireChannelHeader;
+    private assertNidAvailable;
+    private assertOwnedByChannel;
     private purgeChannel;
 }
 //# sourceMappingURL=EntityStore.d.ts.map

@@ -7,23 +7,33 @@ class Frame {
         this.confirmedClientTick = args.confirmedClientTick;
         this.timestamp = args.timestamp;
         this.receivedAt = args.receivedAt;
-        this.ecsCreateEntities = args.ecsCreateEntities || [];
-        this.ecsCreateComponents = args.ecsCreateComponents || [];
-        this.ecsDeleteEntities = args.ecsDeleteEntities || [];
         this.channelOpens = args.channelOpens || [];
-        this.channelEntityCreates = args.channelEntityCreates || [];
         this.channelHeaderUpdates = args.channelHeaderUpdates || [];
         this.channelCloses = args.channelCloses || [];
         this.skipInterpolationNids = new Set(args.skipInterpolationNids || []);
         this.openedChannels = args.openedChannels || [];
         this.closedChannels = args.closedChannels || [];
-        this.createEntities = args.createEntities;
-        this.updateEntities = args.updateEntities;
-        this.deleteEntities = args.deleteEntities;
-        this.deletedEntities = args.deletedEntities;
         this.messages = args.messages;
         this.interpolatedMessages = args.interpolatedMessages || [];
         this.channels = args.channels || [];
+    }
+    getChannel(channelId) {
+        for (let i = 0; i < this.channels.length; i++) {
+            if (this.channels[i].channelId === channelId) {
+                return this.channels[i];
+            }
+        }
+        return undefined;
+    }
+    requireChannel(channelId) {
+        const channel = this.getChannel(channelId);
+        if (!channel) {
+            throw new Error(`Frame does not contain channel ${channelId}.`);
+        }
+        return channel;
+    }
+    hasChannel(channelId) {
+        return this.getChannel(channelId) !== undefined;
     }
 }
 exports.Frame = Frame;

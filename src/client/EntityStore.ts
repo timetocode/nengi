@@ -3,11 +3,16 @@ import { Context } from '../common/Context'
 import { ChannelHeader, cloneChannelHeader } from '../common/ChannelHeader'
 import { AppliedEntityChange, ChannelFrame, ClosedChannel, DeletedEntity, Frame, OpenedChannel } from './Frame'
 import { Snapshot } from './Snapshot'
+import type { SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 import { getLocalTime } from './time'
 import { EntityHistory } from './EntityHistory'
 
 function cloneEntity(entity: IEntity): IEntity {
     return Object.assign({}, entity)
+}
+
+type ApplyState = {
+    changedNids: Set<number>
 }
 
 export class EntityStore {
@@ -73,25 +78,18 @@ export class EntityStore {
     }
 
     applySnapshot(snapshot: Snapshot, tick: number, receivedAt = getLocalTime()) {
-        const createEntities: IEntity[] = []
-        const updateEntities: AppliedEntityChange[] = []
-        const deleteEntities: number[] = []
-        const deletedEntities: DeletedEntity[] = []
+        this.assertNoTopLevelEntityCrud(snapshot)
         const openedChannels: OpenedChannel[] = []
         const closedChannels: ClosedChannel[] = []
-        const ecsCreateEntities: number[] = []
-        const ecsCreateComponents: IEntity[] = []
-        const ecsDeleteEntities: number[] = []
         const channelOpens = snapshot.channelOpens || []
-        const channelEntityCreates = snapshot.channelEntityCreates || []
         const channelHeaderUpdates = snapshot.channelHeaderUpdates || []
         const channelCloses = snapshot.channelCloses || []
         const scopedChannels = snapshot.channels || []
         const frameChannels: ChannelFrame[] = scopedChannels.map(channel => ({
             channelId: channel.channelId,
-            ecsCreateEntities: channel.ecsCreateEntities.slice(),
+            ecsCreateEntities: [],
             ecsCreateComponents: [],
-            ecsDeleteEntities: channel.ecsDeleteEntities.slice(),
+            ecsDeleteEntities: [],
             createEntities: [],
             updateEntities: [],
             deleteEntities: [],
@@ -101,35 +99,7 @@ export class EntityStore {
         }))
         const channelFramesById = new Map<number, ChannelFrame>()
         frameChannels.forEach(channel => channelFramesById.set(channel.channelId, channel))
-        scopedChannels.forEach(channel => {
-            snapshot.messages.push(...channel.messages)
-            snapshot.interpolatedMessages?.push(...channel.interpolatedMessages)
-            snapshot.ecsCreateEntities?.push(...channel.ecsCreateEntities)
-            snapshot.ecsCreateComponents?.push(...channel.ecsCreateComponents)
-            snapshot.ecsDeleteEntities?.push(...channel.ecsDeleteEntities)
-            snapshot.createEntities.push(...channel.createEntities)
-            snapshot.updateEntities.push(...channel.updateEntities)
-            snapshot.deleteEntities.push(...channel.deleteEntities)
-            channel.ecsCreateEntities.forEach(nid => channelEntityCreates.push({ nid, channelId: channel.channelId }))
-            channel.ecsCreateComponents.forEach(component => channelEntityCreates.push({ nid: component.nid, channelId: channel.channelId }))
-            channel.createEntities.forEach(entity => channelEntityCreates.push({ nid: entity.nid, channelId: channel.channelId }))
-        })
         const changedNids = new Set<number>()
-        const snapshotDeleteNids = new Set(snapshot.deleteEntities)
-        const scopedCreateNidsByChannel = new Map<number, Set<number>>()
-        const scopedUpdateNidsByChannel = new Map<number, Set<number>>()
-        const scopedDeleteNidsByChannel = new Map<number, Set<number>>()
-        scopedChannels.forEach(channel => {
-            scopedCreateNidsByChannel.set(channel.channelId, new Set([
-                ...channel.createEntities.map(entity => entity.nid),
-                ...channel.ecsCreateComponents.map(component => component.nid)
-            ]))
-            scopedUpdateNidsByChannel.set(channel.channelId, new Set(channel.updateEntities.map(update => update.nid)))
-            scopedDeleteNidsByChannel.set(channel.channelId, new Set([
-                ...channel.deleteEntities,
-                ...channel.ecsDeleteEntities
-            ]))
-        })
 
         channelOpens.forEach(open => {
             this.channels.add(open.channelId)
@@ -138,23 +108,8 @@ export class EntityStore {
             openedChannels.push({ channelId: open.channelId, header: cloneChannelHeader(header) })
         })
 
-        channelCloses.forEach(close => {
-            const previous = this.channelHeaders.get(close.channelId)
-            // Channel close sends only the channel id. The client already knows
-            // which local nids arrived through that channel, so it derives the
-            // purged list without paying for per-entity deletes on the wire.
-            const entityNids = this.purgeChannel(close.channelId, tick)
-            closedChannels.push({
-                channelId: close.channelId,
-                header: cloneChannelHeader(previous!),
-                entityNids
-            })
-            this.channelHeaders.delete(close.channelId)
-            this.channels.delete(close.channelId)
-        })
-
         channelHeaderUpdates.forEach(headerUpdate => {
-            const header = this.channelHeaders.get(headerUpdate.channelId)!
+            const header = this.requireChannelHeader(headerUpdate.channelId)
             headerUpdate.changes.forEach(update => {
                 const nschema = this.context.getSchema(header.ntype)
                 const propData = nschema.props[update.prop]
@@ -162,144 +117,11 @@ export class EntityStore {
             })
         })
 
-        channelEntityCreates.forEach(create => {
-            this.channels.add(create.channelId)
-            this.entityChannels.set(create.nid, create.channelId)
-        })
-
-        ;(snapshot.ecsDeleteEntities || []).forEach(pid => {
-            const components = this.ecsComponentsByParent.get(pid)
-            if (components) {
-                components.forEach(nid => {
-                    if (snapshotDeleteNids.has(nid)) {
-                        return
-                    }
-                    const previous = this.entities.get(nid)
-                    const channelId = this.entityChannels.get(nid)
-                    this.entities.delete(nid)
-                    this.ntypes.delete(nid)
-                    this.entityChannels.delete(nid)
-                    this.ecsComponentParent.delete(nid)
-                    deleteEntities.push(nid)
-                    deletedEntities.push({
-                        nid,
-                        entity: previous ? cloneEntity(previous) : undefined,
-                        channelId
-                    })
-                    this.history.recordDelete(tick, nid)
-                })
-            }
-            this.ecsComponentsByParent.delete(pid)
-            this.ecsEntities.delete(pid)
-            this.entityChannels.delete(pid)
-            ecsDeleteEntities.push(pid)
-        })
-
-        snapshot.deleteEntities.forEach(nid => {
-            const previous = this.entities.get(nid)
-            const channelId = this.entityChannels.get(nid)
-            this.entities.delete(nid)
-            this.ntypes.delete(nid)
-            this.entityChannels.delete(nid)
-            const pid = this.ecsComponentParent.get(nid)
-            if (pid !== undefined) {
-                this.ecsComponentParent.delete(nid)
-                this.ecsComponentsByParent.get(pid)?.delete(nid)
-            }
-            deleteEntities.push(nid)
-            deletedEntities.push({
-                nid,
-                entity: previous ? cloneEntity(previous) : undefined,
-                channelId
+        scopedChannels.forEach(channel => {
+            const frameChannel = channelFramesById.get(channel.channelId)!
+            this.applyChannelSnapshot(channel, frameChannel, tick, {
+                changedNids
             })
-            this.history.recordDelete(tick, nid)
-        })
-
-        ;(snapshot.ecsCreateEntities || []).forEach(pid => {
-            this.ecsEntities.add(pid)
-            if (!this.ecsComponentsByParent.has(pid)) {
-                this.ecsComponentsByParent.set(pid, new Set())
-            }
-            ecsCreateEntities.push(pid)
-        })
-
-        ;(snapshot.ecsCreateComponents || []).forEach(component => {
-            const stored = cloneEntity(component)
-            const pid = (stored as any).pid
-            this.entities.set(stored.nid, stored)
-            this.ntypes.set(stored.nid, stored.ntype)
-            this.ecsComponentParent.set(stored.nid, pid)
-            if (!this.ecsComponentsByParent.has(pid)) {
-                this.ecsComponentsByParent.set(pid, new Set())
-            }
-            this.ecsComponentsByParent.get(pid)!.add(stored.nid)
-            createEntities.push(cloneEntity(stored))
-            ecsCreateComponents.push(cloneEntity(stored))
-            const channelId = this.entityChannels.get(stored.nid)
-            if (channelId !== undefined && scopedCreateNidsByChannel.get(channelId)?.has(stored.nid)) {
-                channelFramesById.get(channelId)?.ecsCreateComponents.push(cloneEntity(stored))
-                channelFramesById.get(channelId)?.createEntities.push(cloneEntity(stored))
-            }
-            changedNids.add(stored.nid)
-        })
-
-        snapshot.createEntities.forEach(entity => {
-            const stored = cloneEntity(entity)
-            this.entities.set(stored.nid, stored)
-            this.ntypes.set(stored.nid, stored.ntype)
-            createEntities.push(cloneEntity(stored))
-            const channelId = this.entityChannels.get(stored.nid)
-            if (channelId !== undefined && scopedCreateNidsByChannel.get(channelId)?.has(stored.nid)) {
-                channelFramesById.get(channelId)?.createEntities.push(cloneEntity(stored))
-            }
-            changedNids.add(stored.nid)
-        })
-
-        channelEntityCreates.forEach(create => {
-            this.channels.add(create.channelId)
-            this.entityChannels.set(create.nid, create.channelId)
-        })
-
-        snapshot.updateEntities.forEach(update => {
-            const entity = this.entities.get(update.nid)
-            if (!entity) {
-                return
-            }
-            const nschema = this.context.getSchema(entity.ntype)
-            const propData = nschema.props[update.prop]
-            const previous = propData.binary.clone(entity[update.prop])
-            const value = propData.binary.clone(update.value)
-            if (propData.binary.compare(previous, value)) {
-                return
-            }
-            entity[update.prop] = propData.binary.clone(update.value)
-            updateEntities.push({
-                nid: update.nid,
-                prop: update.prop,
-                previous,
-                value
-            })
-            const channelId = this.entityChannels.get(update.nid)
-            if (channelId !== undefined && scopedUpdateNidsByChannel.get(channelId)?.has(update.nid)) {
-                channelFramesById.get(channelId)?.updateEntities.push({
-                    nid: update.nid,
-                    prop: update.prop,
-                    previous,
-                    value
-                })
-            }
-            changedNids.add(update.nid)
-        })
-
-        deletedEntities.forEach(deleted => {
-            const channelId = deleted.channelId
-            if (channelId !== undefined && scopedDeleteNidsByChannel.get(channelId)?.has(deleted.nid)) {
-                const channelFrame = channelFramesById.get(channelId)
-                if (channelFrame) {
-                    channelFrame.deleteEntities.push(deleted.nid)
-                    channelFrame.deletedEntities.push(deleted)
-                }
-            }
         })
 
         changedNids.forEach(nid => {
@@ -309,15 +131,16 @@ export class EntityStore {
             }
         })
 
-        const dedupedChannelEntityCreates: typeof channelEntityCreates = []
-        const seenChannelEntityCreates = new Set<string>()
-        channelEntityCreates.forEach(create => {
-            const key = `${create.channelId}:${create.nid}`
-            if (seenChannelEntityCreates.has(key)) {
-                return
-            }
-            seenChannelEntityCreates.add(key)
-            dedupedChannelEntityCreates.push(create)
+        channelCloses.forEach(close => {
+            const previous = this.requireChannelHeader(close.channelId)
+            const entityNids = this.purgeChannel(close.channelId, tick)
+            closedChannels.push({
+                channelId: close.channelId,
+                header: cloneChannelHeader(previous),
+                entityNids
+            })
+            this.channelHeaders.delete(close.channelId)
+            this.channels.delete(close.channelId)
         })
 
         return new Frame({
@@ -325,24 +148,183 @@ export class EntityStore {
             timestamp: snapshot.timestamp,
             receivedAt,
             confirmedClientTick: snapshot.confirmedClientTick,
-            ecsCreateEntities,
-            ecsCreateComponents,
-            ecsDeleteEntities,
             channelOpens,
-            channelEntityCreates: dedupedChannelEntityCreates,
             channelHeaderUpdates,
             channelCloses,
             skipInterpolationNids: (snapshot.skipInterpolationNids || []).slice(),
             openedChannels,
             closedChannels,
-            createEntities,
-            updateEntities,
-            deleteEntities,
-            deletedEntities,
             messages: snapshot.messages.slice(),
             interpolatedMessages: (snapshot.interpolatedMessages || []).slice(),
             channels: frameChannels
         })
+    }
+
+    private applyChannelSnapshot(channel: SnapshotChannel, frame: ChannelFrame, tick: number, state: ApplyState) {
+        this.requireChannelHeader(channel.channelId)
+
+        channel.ecsCreateEntities.forEach(pid => {
+            this.createEcsEntity(channel.channelId, pid, frame, state)
+        })
+
+        channel.ecsCreateComponents.forEach(component => {
+            this.createEcsComponent(channel.channelId, component, frame, state)
+        })
+
+        channel.createEntities.forEach(entity => {
+            this.createEntity(channel.channelId, entity, frame, state)
+        })
+
+        channel.updateEntities.forEach(update => {
+            this.updateEntity(channel.channelId, update, frame, state)
+        })
+
+        channel.deleteEntities.forEach(nid => {
+            this.deleteEntity(channel.channelId, nid, frame, state, tick)
+        })
+
+        channel.ecsDeleteEntities.forEach(pid => {
+            this.deleteEcsEntity(channel.channelId, pid, frame, state, tick)
+        })
+    }
+
+    private createEcsEntity(channelId: number, pid: number, frame: ChannelFrame, state: ApplyState) {
+        this.assertNidAvailable(pid, channelId)
+        this.ecsEntities.add(pid)
+        this.entityChannels.set(pid, channelId)
+        if (!this.ecsComponentsByParent.has(pid)) {
+            this.ecsComponentsByParent.set(pid, new Set())
+        }
+        frame.ecsCreateEntities.push(pid)
+    }
+
+    private createEcsComponent(channelId: number, component: IEntity, frame: ChannelFrame, state: ApplyState) {
+        const pid = (component as any).pid
+        if (typeof pid !== 'number') {
+            throw new Error(`ECS component ${component.nid} is missing pid.`)
+        }
+        this.assertOwnedByChannel(pid, channelId)
+        this.assertNidAvailable(component.nid, channelId)
+        const stored = cloneEntity(component)
+        this.entities.set(stored.nid, stored)
+        this.ntypes.set(stored.nid, stored.ntype)
+        this.entityChannels.set(stored.nid, channelId)
+        this.ecsComponentParent.set(stored.nid, pid)
+        this.ecsComponentsByParent.get(pid)!.add(stored.nid)
+        const clone = cloneEntity(stored)
+        frame.createEntities.push(clone)
+        frame.ecsCreateComponents.push(cloneEntity(stored))
+        state.changedNids.add(stored.nid)
+    }
+
+    private createEntity(channelId: number, entity: IEntity, frame: ChannelFrame, state: ApplyState) {
+        this.assertNidAvailable(entity.nid, channelId)
+        const stored = cloneEntity(entity)
+        this.entities.set(stored.nid, stored)
+        this.ntypes.set(stored.nid, stored.ntype)
+        this.entityChannels.set(stored.nid, channelId)
+        frame.createEntities.push(cloneEntity(stored))
+        state.changedNids.add(stored.nid)
+    }
+
+    private updateEntity(channelId: number, update: any, frame: ChannelFrame, state: ApplyState) {
+        this.assertOwnedByChannel(update.nid, channelId)
+        const entity = this.entities.get(update.nid)
+        if (!entity) {
+            throw new Error(`Cannot update missing entity nid ${update.nid} in channel ${channelId}.`)
+        }
+        const nschema = this.context.getSchema(entity.ntype)
+        const propData = nschema.props[update.prop]
+        const previous = propData.binary.clone(entity[update.prop])
+        const value = propData.binary.clone(update.value)
+        if (propData.binary.compare(previous, value)) {
+            return
+        }
+        entity[update.prop] = propData.binary.clone(update.value)
+        const applied = {
+            nid: update.nid,
+            prop: update.prop,
+            previous,
+            value
+        }
+        frame.updateEntities.push(applied)
+        state.changedNids.add(update.nid)
+    }
+
+    private deleteEntity(channelId: number, nid: number, frame: ChannelFrame, state: ApplyState, tick: number) {
+        this.assertOwnedByChannel(nid, channelId)
+        const previous = this.entities.get(nid)
+        if (!previous) {
+            throw new Error(`Cannot delete missing entity nid ${nid} in channel ${channelId}.`)
+        }
+        this.entities.delete(nid)
+        this.ntypes.delete(nid)
+        this.entityChannels.delete(nid)
+        const pid = this.ecsComponentParent.get(nid)
+        if (pid !== undefined) {
+            this.ecsComponentParent.delete(nid)
+            this.ecsComponentsByParent.get(pid)?.delete(nid)
+        }
+        const deleted = {
+            nid,
+            entity: cloneEntity(previous),
+            channelId
+        }
+        frame.deleteEntities.push(nid)
+        frame.deletedEntities.push(deleted)
+        this.history.recordDelete(tick, nid)
+    }
+
+    private deleteEcsEntity(channelId: number, pid: number, frame: ChannelFrame, state: ApplyState, tick: number) {
+        this.assertOwnedByChannel(pid, channelId)
+        const components = Array.from(this.ecsComponentsByParent.get(pid) || [])
+        for (let i = 0; i < components.length; i++) {
+            const componentNid = components[i]
+            if (this.entities.has(componentNid)) {
+                this.deleteEntity(channelId, componentNid, frame, state, tick)
+            }
+        }
+        this.ecsComponentsByParent.delete(pid)
+        this.ecsEntities.delete(pid)
+        this.entityChannels.delete(pid)
+        frame.ecsDeleteEntities.push(pid)
+        this.history.recordDelete(tick, pid)
+    }
+
+    private assertNoTopLevelEntityCrud(snapshot: Snapshot) {
+        const hasTopLevelCrud =
+            snapshot.createEntities.length > 0 ||
+            snapshot.updateEntities.length > 0 ||
+            snapshot.deleteEntities.length > 0 ||
+            (snapshot.ecsCreateEntities?.length || 0) > 0 ||
+            (snapshot.ecsCreateComponents?.length || 0) > 0 ||
+            (snapshot.ecsDeleteEntities?.length || 0) > 0
+
+        if (hasTopLevelCrud) {
+            throw new Error('EntityStore requires channel-scoped entity CRUD.')
+        }
+    }
+
+    private requireChannelHeader(channelId: number) {
+        const header = this.channelHeaders.get(channelId)
+        if (!header) {
+            throw new Error(`Missing channel ${channelId}.`)
+        }
+        return header
+    }
+
+    private assertNidAvailable(nid: number, channelId: number) {
+        const existingChannelId = this.entityChannels.get(nid)
+        if (existingChannelId !== undefined) {
+            throw new Error(`Nid ${nid} already belongs to channel ${existingChannelId}, cannot create in channel ${channelId}.`)
+        }
+    }
+
+    private assertOwnedByChannel(nid: number, channelId: number) {
+        const existingChannelId = this.entityChannels.get(nid)
+        if (existingChannelId !== channelId) {
+            throw new Error(`Nid ${nid} belongs to channel ${existingChannelId ?? 'none'}, not channel ${channelId}.`)
+        }
     }
 
     private purgeChannel(channelId: number, tick: number) {

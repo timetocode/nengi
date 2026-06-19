@@ -133,27 +133,16 @@ export declare class User {
     send(buffer: BinaryPayload): void;
     disconnect(reason: StringOrJSONStringifiable): void;
     populateDeletions(tick: number, toDelete: number[]): void;
-    markVisible(nid: number, tick: number, toCreate: number[], toUpdate: number[], channel: UserVisibilityChannel | null, channelEntityCreates: {
-        nid: number;
-        channelId: number;
-    }[]): void;
+    markVisible(nid: number, tick: number, toCreate: number[], toUpdate: number[]): void;
     checkVisibility(tick: number): {
         toDelete: number[];
         toUpdate: number[];
         toCreate: number[];
-        channelEntityCreates: {
-            nid: number;
-            channelId: number;
-        }[];
     };
     checkChannelVisibility(channel: UserVisibilityChannel, tick: number): {
         toDelete: number[];
         toUpdate: number[];
         toCreate: number[];
-        channelEntityCreates: {
-            nid: number;
-            channelId: number;
-        }[];
     };
 }
 export {};

@@ -1,139 +1,209 @@
-# ClientReplica
+# Raw Client State
 
-`ClientReplica` is the normal client-side bridge from nengi snapshots to game
-client state. It processes pending server frames, calls entity/component/channel
-bindings, handles messages, and applies interpolation samples.
+The recommended client-side surface is the raw nengi client state path:
+
+```ts
+binary snapshot -> ClientNetwork -> EntityStore -> Frame
+```
+
+`EntityStore` owns the latest authoritative state. `Frame` tells userland what
+changed while applying one server snapshot. Userland owns rendering, local UI
+state, prediction presentation, inventory widgets, sounds, and other game
+objects.
+
+Do not build a second entity store over nengi's store. Do not add a binding
+layer unless the game has a real local architecture reason for one.
 
 ## Basic Loop
 
 ```ts
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
-const replica = new ClientReplica(client, { interpolator })
 await client.connect('ws://localhost:8079', handshake)
 
 function frame() {
-    const batch = replica.process({ maxFrames: 20 })
-    const sample = replica.sampleInterpolated(100)
-    replica.applyInterpolatedSample(sample)
+    for (const frame of client.network.drainFrames()) {
+        applyCreates(frame)
+        applyUpdates(frame)
+        applyDeletes(frame)
+        applyMessages(frame)
+    }
+
+    syncInterpolatedSprites()
+    runPrediction()
     client.flush()
     requestAnimationFrame(frame)
 }
 ```
 
-`maxFrames` chunks catch-up work but never skips delta snapshots. If a client is
-too far behind to process the backlog, reconnect rather than skipping frames.
+Always process queued frames in order. If the browser tab was hidden and several
+snapshots are queued, drain and apply them sequentially. Do not skip later
+snapshots to "catch up"; nengi snapshots contain deltas and skipping a snapshot
+can desync the local store.
 
-## Flat Entities
+## Raw Authoritative State
 
-Use `bindEntity` for ordinary replicated objects where the network entity is the
-thing userland wants to track.
+Use `client.network.store` for latest raw server state:
 
 ```ts
-replica.bindEntity<PlayerEntity, PlayerView>(NType.Player, {
-    mode: ClientEntityMode.Interpolated,
-    create: entity => createPlayerView(entity),
-    update(entity, view) {
-        view.hp = entity.hp
-    },
-    sample(entity, view) {
-        view.sprite.position.set(entity.x, entity.y)
-    },
-    destroy(view) {
-        view.sprite.destroy()
+const entity = client.network.store.get(nid)
+const players = client.network.store.getByNType(NType.Player)
+const inventoryItems = client.network.store.getByChannel(inventoryChannelId)
+```
+
+The store also tracks channel metadata:
+
+```ts
+const channelId = client.network.store.getEntityChannelId(nid)
+const header = client.network.store.getChannelHeaderById(channelId)
+```
+
+Raw state is the authority that prediction reconciles against. Interpolated
+state is a render sample, not the canonical game state.
+
+## Frame Facts
+
+Each processed snapshot returns a `Frame`:
+
+```ts
+for (const frame of client.network.drainFrames()) {
+    for (const entity of frame.createEntities) {
+        createSprite(entity)
     }
-})
-```
 
-Raw and predicted bindings destroy immediately when the authoritative entity is
-deleted or its channel closes. Interpolated bindings can remain alive until the
-interpolation sample exits the entity, then `destroy` runs.
-
-## ECS Components
-
-Use `bindEcsComponent` for nengi ECS channels. The ECS root is a `pid`;
-replicated state lives in component records with their own `nid`.
-
-```ts
-replica.bindEcsComponent<TransformComponent, TransformView>(NType.Transform, {
-    mode: ClientEntityMode.Interpolated,
-    create(component, ctx) {
-        return createTransformView(ctx.pid, component)
-    },
-    sample(component, view, ctx) {
-        view.pid = ctx.pid
-        view.sprite.position.set(component.x, component.y)
-    },
-    destroy(view) {
-        view.sprite.destroy()
+    for (const update of frame.updateEntities) {
+        const entity = client.network.store.get(update.nid)
+        markDirty(entity, update.prop)
     }
-})
-```
 
-Use `ctx.pid` for the local ECS/root identity. Use `ctx.nid` or
-`component.nid` only when code specifically needs the replicated component id,
-such as prediction reconciliation or raw authoritative lookup.
-
-Root lifecycle hooks are available when userland needs them:
-
-```ts
-replica.onEcsCreateEntity(pid => createLocalRootState(pid))
-replica.onEcsDeleteEntity(pid => destroyLocalRootState(pid))
-```
-
-Visibility loss from a channel close destroys component bindings, but it is not
-the same event as authoritative root deletion.
-
-## Channel Context
-
-Every channel has a default header. `channel.header.nid` is the channel id,
-`channel.header.channelType` is a `ChannelType` enum value, and default header
-`ntype` is `0`. A channel created with `name` also has `channel.header.name`.
-Use schema-backed header objects when ordinary entities need richer channel
-context, such as inventory items.
-
-```ts
-replica.bindChannel<InventoryHeader>(NType.InventoryHeader, {
-    open: channel => openInventory(channel.header),
-    update: channel => refreshInventoryHeader(channel.header),
-    close: channel => closeInventory(channel.header.inventoryId)
-})
-
-replica.bindChannelEntity<InventoryHeader, InventoryItem>(NType.InventoryHeader, NType.InventoryItem, {
-    mode: ClientEntityMode.Raw,
-    create(item, ctx) {
-        upsertInventoryItem(ctx.channel.header.inventoryId, item)
-    },
-    update(item, _local, ctx) {
-        upsertInventoryItem(ctx.channel.header.inventoryId, item)
-    },
-    destroy(_local, ctx) {
-        removeInventoryItem(ctx.nid)
+    for (const deleted of frame.deletedEntities) {
+        destroySprite(deleted.nid)
     }
+}
+```
+
+`frame.updateEntities` contains applied changes with `previous` and `value`.
+`frame.deletedEntities` includes the last known entity when available.
+
+## Channel Scope
+
+Channel-scoped data is available through `frame.channels`:
+
+```ts
+const inventory = frame.getChannel(inventoryChannelId)
+if (inventory) {
+    inventory.createEntities.forEach(createInventoryItem)
+    inventory.updateEntities.forEach(updateInventoryItem)
+    inventory.deletedEntities.forEach(removeInventoryItem)
+}
+```
+
+Use channel headers for game meaning:
+
+```ts
+const header = client.network.store.getChannelHeaderById(inventoryChannelId)
+```
+
+Default headers carry channel id/type metadata and optional creation-time
+`name`. Schema-backed headers carry structured context such as inventory id,
+owner id, slot count, team id, or terminal mode.
+
+## Interpolation
+
+Use an interpolator for presentation, not for raw authority:
+
+```ts
+const sample = interpolator.sampleEntities(visibleMovingNids, interpDelay)
+sample.entities.forEach(entity => {
+    moveSprite(entity.nid, entity.x, entity.y)
 })
 ```
 
-Use channel headers for game meaning. Treat raw channel ids as internal
-bookkeeping.
+Common choices:
+
+```ts
+interpolator.getEntity(nid, delay)
+interpolator.getEntities(nids, delay)
+interpolator.sampleEntities(nids, delay)
+interpolator.sample(delay)
+```
+
+Render remote moving entities from interpolated samples. Render predicted local
+entities from local predicted state and reconcile them against raw authority.
+
+## Prediction
+
+Prediction should read raw authority from `client.network.store` and keep local
+predicted state in userland:
+
+```ts
+const movement = new CommandReplayPrediction({
+    client,
+    nid: () => controlledPlayerNid,
+    getLocal: () => predictedTransform,
+    applyCommand(state, command) {
+        state.x += command.dx
+        state.y += command.dy
+    },
+    affectedProps: ['x', 'y']
+})
+```
+
+The helper sends commands, applies local prediction, and rebuilds local state
+from latest authority plus pending commands during reconciliation. The store
+remains the raw server truth.
 
 ## Messages
 
-Immediate messages run after the frame's authoritative state is applied:
+Immediate messages are available on the frame after authoritative state has
+been applied:
 
 ```ts
-replica.onMessage(NType.YouArePlayer, message => {
-    setControlledPlayer(message.pid, message.componentNid)
+frame.messages.forEach(message => {
+    if (message.ntype === NType.YouArePlayer) {
+        controlledPlayerNid = message.nid
+    }
 })
 ```
 
-Interpolated messages are released on the interpolation timeline:
+Interpolated messages use the interpolation timeline:
 
 ```ts
-replica.onInterpolatedMessage(NType.ShotFired, message => {
-    drawShot(message)
-})
+frame.interpolatedMessages.forEach(queueEffectMessage)
 ```
 
-Use immediate messages for control/UI context and notifications. Use
+Use ordinary messages for UI/control context and notifications. Use
 interpolated messages for transient effects that should line up with
 interpolated entity motion.
+
+## ECS Channels
+
+For nengi ECS channels, use the same frame/store principle but apply channel
+ECS CRUD to an `EcsWorld`:
+
+```ts
+const channel = frame.getChannel(arenaChannelId)
+if (channel) {
+    channel.ecsCreateEntities.forEach(pid => ecs.createEntity(pid))
+    channel.ecsCreateComponents.forEach(component => ecs.add(component))
+    channel.updateEntities.forEach(update => setComponentProp(update))
+    channel.ecsDeleteEntities.forEach(pid => ecs.removeEntity(pid))
+}
+```
+
+This can be wrapped as a tiny `ClientEcsSync`, but it should only apply CRUD and
+record facts. It should not create sprites, bind roles, or decide prediction.
+
+## What Not To Add
+
+Avoid recreating `ClientReplica`-style layers:
+
+- no type-to-callback binding DSL as the default path
+- no second entity store
+- no generic replica refs
+- no renderer ownership
+- no inventory-specific client framework
+- no automatic prediction policy
+
+The clean surface is small: raw store, frame facts, interpolation samples, and
+prediction helpers.

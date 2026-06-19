@@ -16,6 +16,7 @@ import { createEndpointPayload, readSizedEndpointPayload, skipEndpointPayload } 
 import { ResponseStatus } from '../common/Endpoint'
 import type { ResponseEndpoint } from './Instance'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
+import { NQueue } from '../NQueue'
 
 export interface INetworkEvent {
     type: NetworkEvent
@@ -25,6 +26,14 @@ export interface INetworkEvent {
     commandTimings?: Array<CommandTimingEstimate | undefined>
     serverReceivedTimeMs?: number
     payload?: any
+}
+
+export interface INetworkRequest {
+    user: User
+    requestId: number
+    endpointId: number
+    endpoint?: ResponseEndpoint
+    body?: any
 }
 
 export type ResponseBacklogInfo = {
@@ -209,6 +218,7 @@ function serializeConnectionError(err: any) {
 export class InstanceNetwork {
     instance: Instance
     responseBacklogUsers = new Set<User>()
+    requestQueue = new NQueue<INetworkRequest>()
     requireSchemaFingerprint = false
     debugBinaryWrites = false
     sharedUpdateFragmentsEnabled = false
@@ -470,6 +480,20 @@ export class InstanceNetwork {
         }
     }
 
+    processRequests(max = Number.POSITIVE_INFINITY) {
+        let processed = 0
+        while (processed < max && !this.requestQueue.isEmpty()) {
+            const request = this.requestQueue.next()
+            processed++
+            if (!request.endpoint) {
+                this.queueErrorResponse(request.user, request.requestId, 'NO_ENDPOINT', 'No response handler is registered for this endpoint.')
+                continue
+            }
+            this.runRequestHandler(request.user, request.requestId, request.endpoint, request.body)
+        }
+        return processed
+    }
+
     onOpen(user: User) {
         user.connectionState = UserConnectionState.OpenPreHandshake
         user.network = this
@@ -629,13 +653,24 @@ export class InstanceNetwork {
                         const requestId = binaryReader.readUInt32()
                         const endpoint = binaryReader.readUInt32()
                         const payloadByteLength = binaryReader.readUInt32()
+                        if (user.connectionState !== UserConnectionState.Open) {
+                            skipEndpointPayload(binaryReader, payloadByteLength)
+                            this.queueErrorResponse(user, requestId, 'NOT_OPEN', 'Request received before the connection was open.')
+                            continue
+                        }
                         const responseEndpoint = this.instance.responseEndPoints.get(endpoint)
                         if (!responseEndpoint) {
                             skipEndpointPayload(binaryReader, payloadByteLength)
-                            this.queueErrorResponse(user, requestId, 'NO_ENDPOINT', 'No response handler is registered for this endpoint.')
+                            this.requestQueue.enqueue({ user, requestId, endpointId: endpoint })
                         } else {
                             const body = readSizedEndpointPayload(binaryReader, payloadByteLength, responseEndpoint.endpoint?.requestSchema)
-                            this.runRequestHandler(user, requestId, responseEndpoint, body)
+                            this.requestQueue.enqueue({
+                                user,
+                                requestId,
+                                endpointId: endpoint,
+                                endpoint: responseEndpoint,
+                                body
+                            })
                         }
                     }
                     break

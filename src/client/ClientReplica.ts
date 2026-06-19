@@ -165,6 +165,11 @@ function addHandler<T>(handlers: Map<number, T[]>, ntype: number, handler: T) {
     handlers.set(ntype, arr)
 }
 
+/**
+ * @deprecated ClientReplica is a legacy convenience layer. New code should
+ * consume ClientNetwork frames directly and read entity CRUD from
+ * `frame.channels`.
+ */
 export class ClientReplica {
     client: Client
     interpolator: FixedStepInterpolator
@@ -441,75 +446,92 @@ export class ClientReplica {
     }
 
     private processCreates(frame: Frame, batch: ClientReplicaBatch) {
-        for (let i = 0; i < frame.createEntities.length; i++) {
-            const entity = frame.createEntities[i]
-            batch.createEntities.push(entity)
-            batch.createdNids.add(entity.nid)
-            batch.changedNids.add(entity.nid)
-            this.applyCreate(frame, entity)
-        }
+        frame.channels.forEach(channel => {
+            for (let i = 0; i < channel.createEntities.length; i++) {
+                const entity = channel.createEntities[i]
+                batch.createEntities.push(entity)
+                batch.createdNids.add(entity.nid)
+                batch.changedNids.add(entity.nid)
+                this.applyCreate(frame, entity)
+            }
+        })
     }
 
     private processEcsCreateEntities(frame: Frame, batch: ClientReplicaBatch) {
-        frame.ecsCreateEntities.forEach(pid => {
-            batch.ecsCreateEntities.push(pid)
-            this.ecsCreateEntityHandlers.forEach(handler => handler(pid, frame))
+        frame.channels.forEach(channel => {
+            channel.ecsCreateEntities.forEach(pid => {
+                batch.ecsCreateEntities.push(pid)
+                this.ecsCreateEntityHandlers.forEach(handler => handler(pid, frame))
+            })
         })
     }
 
     private processEcsCreateComponents(frame: Frame, batch: ClientReplicaBatch) {
-        frame.ecsCreateComponents.forEach(component => {
-            batch.ecsCreateComponents.push(component)
+        frame.channels.forEach(channel => {
+            channel.ecsCreateComponents.forEach(component => {
+                batch.ecsCreateComponents.push(component)
+            })
         })
     }
 
     private processEcsDeleteEntities(frame: Frame, batch: ClientReplicaBatch) {
-        frame.ecsDeleteEntities.forEach(pid => {
-            batch.ecsDeleteEntities.push(pid)
-            this.ecsDeleteEntityHandlers.forEach(handler => handler(pid, frame))
+        frame.channels.forEach(channel => {
+            channel.ecsDeleteEntities.forEach(pid => {
+                batch.ecsDeleteEntities.push(pid)
+                this.ecsDeleteEntityHandlers.forEach(handler => handler(pid, frame))
+            })
         })
     }
 
     private processUpdates(frame: Frame, batch: ClientReplicaBatch) {
-        frame.updateEntities.forEach(update => {
-            const entity = this.client.network.store.get(update.nid)
-            const ref = this.entities.get(update.nid)
-            batch.updateEntities.push(update)
-            batch.updatedNids.add(update.nid)
-            batch.changedNids.add(update.nid)
-            if (!entity || !ref) {
-                return
-            }
-            const binding = this.entityBindingsByNid.get(update.nid)
-            binding?.update?.(entity, ref.local, this.createContext(ref, {
-                frame,
-                update
-            }))
+        frame.channels.forEach(channel => {
+            channel.updateEntities.forEach(update => {
+                const entity = this.client.network.store.get(update.nid)
+                const ref = this.entities.get(update.nid)
+                batch.updateEntities.push(update)
+                batch.updatedNids.add(update.nid)
+                batch.changedNids.add(update.nid)
+                if (!entity || !ref) {
+                    return
+                }
+                const binding = this.entityBindingsByNid.get(update.nid)
+                binding?.update?.(entity, ref.local, this.createContext(ref, {
+                    frame,
+                    update
+                }))
+            })
         })
     }
 
     private processDeletes(frame: Frame, batch: ClientReplicaBatch) {
-        frame.deletedEntities.forEach(deleted => {
-            const ref = this.entities.get(deleted.nid)
-            if (ref) {
-                ref.deleted = true
-                this.destroyBinding(ref, {
-                    frame,
-                    deleted
-                })
-                if (ref.mode !== ClientEntityMode.Interpolated) {
-                    this.untrack(deleted.nid)
+        frame.channels.forEach(channel => {
+            channel.deletedEntities.forEach(deleted => {
+                const ref = this.entities.get(deleted.nid)
+                if (ref) {
+                    ref.deleted = true
+                    this.destroyBinding(ref, {
+                        frame,
+                        deleted
+                    })
+                    if (ref.mode !== ClientEntityMode.Interpolated) {
+                        this.untrack(deleted.nid)
+                    }
                 }
-            }
-            batch.deleteEntities.push(deleted.nid)
-            batch.deletedEntities.push(deleted)
-            batch.deletedNids.add(deleted.nid)
-            batch.changedNids.add(deleted.nid)
+                batch.deleteEntities.push(deleted.nid)
+                batch.deletedEntities.push(deleted)
+                batch.deletedNids.add(deleted.nid)
+                batch.changedNids.add(deleted.nid)
+            })
         })
     }
 
     private processMessages(frame: Frame, batch: ClientReplicaBatch) {
-        frame.messages.forEach(message => {
+        const messages = frame.messages.slice()
+        frame.channels.forEach(channel => {
+            messages.push(...channel.messages)
+            messages.push(...channel.interpolatedMessages)
+        })
+        messages.forEach(message => {
             batch.messages.push(message)
             this.anyMessageHandlers.forEach(handler => handler(message, frame))
             const handlers = this.messageHandlers.get(message.ntype) || []

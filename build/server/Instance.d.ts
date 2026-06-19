@@ -42,6 +42,12 @@ export declare class Instance {
     detachChild(parent: IEntity, child: IEntity): void;
     markDirty(entity: IEntity): boolean;
     respond<Request = any, Response = any>(endpoint: Endpoint<Request, Response>, callback: ResponseHandler<Request, Response>): void;
+    /**
+     * Runs queued request handlers. Network reads enqueue requests instead of
+     * invoking handlers immediately, allowing games to place request processing
+     * at a deliberate point in the server tick.
+     */
+    processRequests(max?: number): number;
     step(): void;
 }
 export {};

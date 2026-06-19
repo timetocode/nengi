@@ -84,6 +84,15 @@ export class Instance {
         })
     }
 
+    /**
+     * Runs queued request handlers. Network reads enqueue requests instead of
+     * invoking handlers immediately, allowing games to place request processing
+     * at a deliberate point in the server tick.
+     */
+    processRequests(max?: number) {
+        return this.network.processRequests(max)
+    }
+
     step() {
         const timestamp = Date.now()
         const timeSyncEngineMessage = {

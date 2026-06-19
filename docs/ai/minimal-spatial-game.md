@@ -77,36 +77,37 @@ entity moves. Call `updateView(user, view)` when the user's interest area moves.
 
 ## Client
 
-Create a client and replica:
+Create a client, interpolator, and local presentation records:
 
 ```ts
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
-const replica = new ClientReplica(client, { interpolator })
+const sprites = new Map<number, Sprite>()
 await client.connect('ws://localhost:8079', handshake)
 ```
 
-Bind remote entities as interpolated:
+Create and destroy local presentation from frame facts:
 
 ```ts
-replica.bindEntity<PlayerEntity, Sprite>(NType.Player, {
-    mode: ClientEntityMode.Interpolated,
-    create: entity => createPlayerSprite(entity),
-    sample: (entity, sprite) => {
-        sprite.x = entity.x
-        sprite.y = entity.y
-    },
-    destroy: sprite => sprite.destroy()
-})
+function applyFrame(frame: Frame) {
+    frame.createEntities.forEach(entity => {
+        if (entity.ntype === NType.Player) {
+            sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))
+        }
+    })
+
+    frame.deletedEntities.forEach(deleted => {
+        sprites.get(deleted.nid)?.destroy()
+        sprites.delete(deleted.nid)
+    })
+}
 ```
 
-If the server tells the client which player it controls, switch that entity to
-predicted/raw local handling:
+If the server tells the client which player it controls, keep that nid out of
+interpolated rendering and drive it with local prediction:
 
 ```ts
-replica.onMessage(NType.YouArePlayer, message => {
-    replica.setMode(message.nid, ClientEntityMode.Predicted)
-})
+let controlledNid: number | null = null
 ```
 
 Each render frame. This example sends commands at a fixed 30 Hz command rate
@@ -117,9 +118,24 @@ const COMMAND_INTERVAL_MS = 1000 / 30
 let commandAccumulatorMs = 0
 
 function frame(dtMs: number) {
-    replica.process({ maxFrames: 20 })
-    const sample = replica.sampleInterpolated(100)
-    replica.applyInterpolatedSample(sample)
+    for (const frame of client.network.drainFrames()) {
+        applyFrame(frame)
+        frame.messages.forEach(message => {
+            if (message.ntype === NType.YouArePlayer) {
+                controlledNid = message.nid
+            }
+        })
+    }
+
+    const interpolatedNids = Array.from(sprites.keys()).filter(nid => nid !== controlledNid)
+    const sample = interpolator.sampleEntities(interpolatedNids, 100)
+    sample.entities.forEach(entity => {
+        const sprite = sprites.get(entity.nid)
+        if (sprite) {
+            sprite.x = entity.x
+            sprite.y = entity.y
+        }
+    })
 
     commandAccumulatorMs += dtMs
     while (commandAccumulatorMs >= COMMAND_INTERVAL_MS) {

@@ -11,13 +11,6 @@ export function addEcsVisibilityCrud(
     addEcsDeletes(plan, channel, toDelete)
 }
 
-export function addEcsChannelEntityCreate(plan: SnapshotPlan, channel: { nid: number }, nid: number) {
-    plan.channelEntityCreates.push({
-        nid,
-        channelId: channel.nid
-    })
-}
-
 function addEcsCreates(plan: SnapshotPlan, channel: EcsSnapshotChannel, toCreate: number[]) {
     for (let i = 0; i < toCreate.length; i++) {
         const nid = toCreate[i]

@@ -41,11 +41,17 @@ Good fits:
 
 Messages are not persistent. A user who was not subscribed or connected when the message was sent does not reconstruct that message later from state.
 
-On the client, messages may be handled immediately or on the interpolation timeline:
+On the client, messages may be handled immediately from processed frames or on
+the interpolation timeline:
 
 ```ts
-router.onMessage(NType.YouArePlayer, message => setControlledPlayer(message.nid))
-router.onInterpolatedMessage(NType.ShotFired, message => drawShot(message))
+for (const frame of client.network.drainFrames()) {
+    frame.messages.forEach(message => {
+        if (message.ntype === NType.YouArePlayer) {
+            setControlledPlayer(message.nid)
+        }
+    })
+}
 ```
 
 Use ordinary messages for UI/control context, chat, notifications, and other
@@ -162,15 +168,19 @@ entities for binary encoding. Every channel also has a replicated header
 descriptor. The descriptor's `nid` is the channel id, and `channelType` is one
 of nengi's `ChannelType` enum values.
 
-On the client, use `ctx.channel.header` inside `ClientReplica` channel bindings.
+On the client, use `Frame` channel buckets and `EntityStore` channel headers.
 Default headers carry channel id/type metadata, and include `name` when the
 server creates the channel with `name`. Use a schema-backed header object when
 the client needs structured channel context, such as inventory id, owner id,
 slot count, team id, or terminal mode. Schema-backed header data is sent with
-channel open before normal channel entities and can be used with
-`bindChannel(...)` and `bindChannelEntity(...)` for scoped CRUD. Choose the
-header when creating the channel; mutate schema-backed header fields later and
-call `markHeaderDirty()` when those fields should replicate.
+channel open before normal channel entities. Choose the header when creating the
+channel; mutate schema-backed header fields later and call `markHeaderDirty()`
+when those fields should replicate.
+
+```ts
+const inventory = frame.getChannel(inventoryChannelId)
+const header = client.network.store.getChannelHeaderById(inventoryChannelId)
+```
 
 Treat `name` as simple creation-time metadata, not mutable game state. The
 server mutates the schema-backed header object you pass in; it is not cloned on
@@ -179,25 +189,8 @@ channel creation.
 When a channel closes, the client receives a channel close and purges entities
 that came through that channel. The server does not send a full per-entity
 delete list for the close; the client derives the purged ids from local channel
-membership. Userland should usually handle this with `bindChannel(...).close`
-instead of expecting individual delete handlers for every contained entity.
-Entity destroy callbacks also receive close context when local cleanup is keyed
-by entity nid.
-
-`ClientReplica` supports flat entity bindings:
-
-```ts
-replica.bindEntity(NType.Player, playerBinding)
-```
-
-It also supports channel-scoped entity bindings:
-
-```ts
-replica.bindChannelEntity(NType.InventoryView, NType.InventoryItem, inventoryItemBinding)
-```
-
-Use flat bindings when type alone is enough and channel bindings when channel
-context matters.
+membership. `frame.closedChannels` includes the purged `entityNids` so userland
+can destroy local presentation state keyed by nid.
 
 ## Schema
 

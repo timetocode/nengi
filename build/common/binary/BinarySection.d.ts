@@ -14,13 +14,12 @@ declare enum BinarySection {
     EcsCreateComponents = 12,
     EcsDeleteEntities = 13,
     EcsUpdateComponentGroups = 14,
-    ChannelEntityCreates = 15,
-    ChannelHeaderUpdates = 16,
-    ChannelCloses = 17,
-    SkipInterpolation = 18,
-    InterpolatedMessages = 19,
-    ChannelOpens = 20,
-    ChannelScope = 21
+    ChannelHeaderUpdates = 15,
+    ChannelCloses = 16,
+    SkipInterpolation = 17,
+    InterpolatedMessages = 18,
+    ChannelOpens = 19,
+    ChannelScope = 20
 }
 export { BinarySection };
 //# sourceMappingURL=BinarySection.d.ts.map

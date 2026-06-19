@@ -389,8 +389,9 @@ export class ClientNetwork {
         }
 
         const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAt)
-        frame.deleteEntities.forEach(nid => {
-            this.entityNTypes.delete(nid)
+        frame.channels.forEach(channel => {
+            channel.deleteEntities.forEach(nid => this.entityNTypes.delete(nid))
+            channel.ecsDeleteEntities.forEach(pid => this.entityNTypes.delete(pid))
         })
         frame.closedChannels.forEach(closed => {
             this.entityNTypes.delete(closed.channelId)
@@ -405,7 +406,7 @@ export class ClientNetwork {
             this.store.history.pruneBefore(this.frames[0].tick)
         }
         this.latestFrame = frame
-        pending.snapshot.messages.forEach(message => this.messages.push(message))
+        frame.messages.forEach(message => this.messages.push(message))
 
         const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities)
         if (predictionErrorFrame.entities.size > 0) {
@@ -710,7 +711,6 @@ export class ClientNetwork {
             interpolatedMessages: [],
             channels: [],
             channelOpens: [],
-            channelEntityCreates: [],
             channelHeaderUpdates: [],
             channelCloses: [],
             skipInterpolationNids: [],
@@ -855,16 +855,6 @@ export class ClientNetwork {
                     snapshot.channelOpens!.push({
                         channelId,
                         header
-                    })
-                }
-                break
-            }
-            case BinarySection.ChannelEntityCreates: {
-                const count = dr.readUInt32()
-                for (let i = 0; i < count; i++) {
-                    snapshot.channelEntityCreates!.push({
-                        nid: readNetworkId(this.protocol.nidType, dr),
-                        channelId: readNetworkId(this.protocol.nidType, dr)
                     })
                 }
                 break

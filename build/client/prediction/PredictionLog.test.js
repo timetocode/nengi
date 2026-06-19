@@ -3,8 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Binary_1 = require("../../common/binary/Binary");
 const defineSchema_1 = require("../../common/binary/schema/defineSchema");
 const Context_1 = require("../../common/Context");
+const ChannelHeader_1 = require("../../common/ChannelHeader");
 const EntityStore_1 = require("../EntityStore");
 const PredictionLog_1 = require("./PredictionLog");
+const TEST_CHANNEL_ID = 1;
 function createStore() {
     const context = new Context_1.Context();
     context.register(1, (0, defineSchema_1.defineEntitySchema)({
@@ -12,6 +14,26 @@ function createStore() {
         open: Binary_1.Binary.Boolean
     }));
     return new EntityStore_1.EntityStore(context);
+}
+function snapshot(args) {
+    const createEntities = args.createEntities || [];
+    const updateEntities = args.updateEntities || [];
+    const deleteEntities = args.deleteEntities || [];
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0;
+    return Object.assign(Object.assign({ timestamp: -1, confirmedClientTick: -1, messages: [] }, args), { channelOpens: hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: (0, ChannelHeader_1.createChannelHeader)(TEST_CHANNEL_ID, ChannelHeader_1.ChannelType.Channel) }]
+            : [], channels: hasEntityCrud ? [{
+                channelId: TEST_CHANNEL_ID,
+                messages: [],
+                interpolatedMessages: [],
+                ecsCreateEntities: [],
+                ecsCreateComponents: [],
+                ecsDeleteEntities: [],
+                createEntities,
+                updateEntities,
+                updateEntityGroups: [],
+                deleteEntities
+            }] : [], createEntities: [], updateEntities: [], deleteEntities: [] });
 }
 describe('PredictionLog', () => {
     it('keeps command predictions pending until their client tick is confirmed', () => {
@@ -32,14 +54,14 @@ describe('PredictionLog', () => {
         expect(local.x).toBe(1);
         expect(log.confirmTick(6)).toEqual([]);
         expect(log.getPendingCommands().map(op => op.id)).toEqual([operation.id]);
-        const frame = store.applySnapshot({
+        const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 7,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
             updateEntities: [],
             deleteEntities: []
-        }, 1);
+        }), 1);
         const resolutions = log.confirmTick(7, frame, store);
         expect(resolutions).toHaveLength(1);
         expect(resolutions[0].accepted).toBe(true);
@@ -63,14 +85,14 @@ describe('PredictionLog', () => {
                 }
             }
         });
-        const frame = store.applySnapshot({
+        const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 10,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
             updateEntities: [],
             deleteEntities: []
-        }, 1);
+        }), 1);
         const resolutions = log.confirmTick(10, frame, store);
         expect(resolutions[0].accepted).toBe(false);
         expect(local.x).toBe(1);
@@ -91,14 +113,14 @@ describe('PredictionLog', () => {
                 }
             }
         });
-        const frame = store.applySnapshot({
+        const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 99,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, open: false }],
             updateEntities: [],
             deleteEntities: []
-        }, 1);
+        }), 1);
         expect(localSwitch.open).toBe(true);
         const commandResolutions = log.confirmTick(99, frame, store);
         expect(commandResolutions).toEqual([]);

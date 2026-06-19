@@ -1,6 +1,6 @@
 import { IEntity } from '../common/IEntity'
 import { ChannelHeader } from '../common/ChannelHeader'
-import type { ChannelEntityCreate, ChannelClose, ChannelHeaderUpdate, ChannelOpen } from '../binary/snapshot/SnapshotPlan'
+import type { ChannelClose, ChannelHeaderUpdate, ChannelOpen } from '../binary/snapshot/SnapshotPlan'
 
 export type AppliedEntityChange = {
     nid: number
@@ -11,8 +11,8 @@ export type AppliedEntityChange = {
 
 export type DeletedEntity = {
     nid: number
-    entity?: IEntity
-    channelId?: number
+    entity: IEntity
+    channelId: number
 }
 
 export type ClosedChannel = {
@@ -43,20 +43,12 @@ export interface IEntityFrame {
     tick: number
     timestamp: number
     receivedAt: number
-    ecsCreateEntities?: number[]
-    ecsCreateComponents?: IEntity[]
-    ecsDeleteEntities?: number[]
     channelOpens?: ChannelOpen[]
-    channelEntityCreates?: ChannelEntityCreate[]
     channelHeaderUpdates?: ChannelHeaderUpdate[]
     channelCloses?: ChannelClose[]
     skipInterpolationNids?: number[] | Set<number>
     openedChannels?: OpenedChannel[]
     closedChannels?: ClosedChannel[]
-    createEntities: IEntity[]
-    updateEntities: AppliedEntityChange[]
-    deleteEntities: number[]
-    deletedEntities: DeletedEntity[]
     messages: any[]
     interpolatedMessages?: any[]
     channels?: ChannelFrame[]
@@ -68,20 +60,12 @@ export class Frame implements IEntityFrame {
     confirmedClientTick: number
     timestamp: number
     receivedAt: number
-    ecsCreateEntities: number[]
-    ecsCreateComponents: IEntity[]
-    ecsDeleteEntities: number[]
     channelOpens: ChannelOpen[]
-    channelEntityCreates: ChannelEntityCreate[]
     channelHeaderUpdates: ChannelHeaderUpdate[]
     channelCloses: ChannelClose[]
     skipInterpolationNids: Set<number>
     openedChannels: OpenedChannel[]
     closedChannels: ClosedChannel[]
-    createEntities: IEntity[]
-    updateEntities: AppliedEntityChange[]
-    deleteEntities: number[]
-    deletedEntities: DeletedEntity[]
     messages: any[]
     interpolatedMessages: any[]
     channels: ChannelFrame[]
@@ -91,22 +75,35 @@ export class Frame implements IEntityFrame {
         this.confirmedClientTick = args.confirmedClientTick
         this.timestamp = args.timestamp
         this.receivedAt = args.receivedAt
-        this.ecsCreateEntities = args.ecsCreateEntities || []
-        this.ecsCreateComponents = args.ecsCreateComponents || []
-        this.ecsDeleteEntities = args.ecsDeleteEntities || []
         this.channelOpens = args.channelOpens || []
-        this.channelEntityCreates = args.channelEntityCreates || []
         this.channelHeaderUpdates = args.channelHeaderUpdates || []
         this.channelCloses = args.channelCloses || []
         this.skipInterpolationNids = new Set(args.skipInterpolationNids || [])
         this.openedChannels = args.openedChannels || []
         this.closedChannels = args.closedChannels || []
-        this.createEntities = args.createEntities
-        this.updateEntities = args.updateEntities
-        this.deleteEntities = args.deleteEntities
-        this.deletedEntities = args.deletedEntities
         this.messages = args.messages
         this.interpolatedMessages = args.interpolatedMessages || []
         this.channels = args.channels || []
+    }
+
+    getChannel(channelId: number) {
+        for (let i = 0; i < this.channels.length; i++) {
+            if (this.channels[i].channelId === channelId) {
+                return this.channels[i]
+            }
+        }
+        return undefined
+    }
+
+    requireChannel(channelId: number) {
+        const channel = this.getChannel(channelId)
+        if (!channel) {
+            throw new Error(`Frame does not contain channel ${channelId}.`)
+        }
+        return channel
+    }
+
+    hasChannel(channelId: number) {
+        return this.getChannel(channelId) !== undefined
     }
 }

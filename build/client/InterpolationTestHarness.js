@@ -11,6 +11,8 @@ const Context_1 = require("../common/Context");
 const Client_1 = require("./Client");
 const FixedStepInterpolator_1 = require("./FixedStepInterpolator");
 const BufferBinary_1 = require("../testSupport/BufferBinary");
+const ChannelHeader_1 = require("../common/ChannelHeader");
+const TEST_CHANNEL_ID = 1;
 class MockAdapter {
     constructor() {
         this.binary = BufferBinary_1.testBinaryAdapter;
@@ -31,7 +33,25 @@ function createInterpolationTestContext() {
     return context;
 }
 function createTestSnapshot(args) {
-    return Object.assign({ timestamp: -1, confirmedClientTick: -1, messages: [], createEntities: [], updateEntities: [], deleteEntities: [] }, args);
+    const createEntities = args.createEntities || [];
+    const updateEntities = args.updateEntities || [];
+    const deleteEntities = args.deleteEntities || [];
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0;
+    const channels = args.channels || (hasEntityCrud ? [{
+            channelId: TEST_CHANNEL_ID,
+            messages: [],
+            interpolatedMessages: [],
+            ecsCreateEntities: [],
+            ecsCreateComponents: [],
+            ecsDeleteEntities: [],
+            createEntities,
+            updateEntities,
+            updateEntityGroups: [],
+            deleteEntities
+        }] : []);
+    return Object.assign(Object.assign({ timestamp: -1, confirmedClientTick: -1, messages: [] }, args), { channelOpens: args.channelOpens || (hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: (0, ChannelHeader_1.createChannelHeader)(TEST_CHANNEL_ID, ChannelHeader_1.ChannelType.Channel) }]
+            : []), channels, createEntities: [], updateEntities: [], deleteEntities: [] });
 }
 function createInterpolationTestClient(tickRate = 20) {
     return new Client_1.Client(createInterpolationTestContext(), MockAdapter, tickRate);

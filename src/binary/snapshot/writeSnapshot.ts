@@ -75,19 +75,6 @@ function writeResponses(plan: SnapshotPlan, writer: IBinaryWriter) {
     }
 }
 
-function writeChannelEntityCreates(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.channelEntityCreates.length === 0) {
-        return
-    }
-
-    writer.writeUInt8(BinarySection.ChannelEntityCreates)
-    writer.writeUInt32(plan.channelEntityCreates.length)
-    for (let i = 0; i < plan.channelEntityCreates.length; i++) {
-        writeNetworkId(plan.channelEntityCreates[i].nid, protocol.nidType, writer)
-        writeNetworkId(plan.channelEntityCreates[i].channelId, protocol.nidType, writer)
-    }
-}
-
 function writeChannelOpens(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.channelOpens.length === 0) {
         return
@@ -254,7 +241,6 @@ export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBin
     writeChannelHeaderUpdates(plan, writer, protocol)
     writeChannelCloses(plan, writer, protocol)
     writeSkipInterpolation(plan, writer, protocol)
-    writeChannelEntityCreates(plan, writer, protocol)
     writeEcsCreateEntities(plan, writer, protocol)
     writeEcsCreateComponents(plan, context, writer, protocol)
     writeCreateEntities(plan, context, writer, protocol)
@@ -273,7 +259,6 @@ export function writeSnapshotDebug(plan: SnapshotPlan, context: Context, writer:
     writeChannelHeaderUpdates(plan, writer, protocol)
     writeChannelCloses(plan, writer, protocol)
     writeSkipInterpolation(plan, writer, protocol)
-    writeChannelEntityCreates(plan, writer, protocol)
     writeEcsCreateEntitiesDebug(plan, writer, protocol)
     writeEcsCreateComponentsDebug(plan, context, writer, protocol)
     writeCreateEntitiesDebug(plan, context, writer, protocol)

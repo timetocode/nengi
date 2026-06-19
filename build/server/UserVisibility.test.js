@@ -24,10 +24,6 @@ describe('User channel visibility', () => {
         visibleA = [];
         const third = user.checkVisibility(3);
         expect(first.toCreate).toEqual([7, 7]);
-        expect(first.channelEntityCreates).toEqual([
-            { nid: 7, channelId: 1 },
-            { nid: 7, channelId: 2 }
-        ]);
         expect(second.toUpdate).toEqual([7, 7]);
         expect(third.toDelete).toEqual([7]);
         expect(third.toUpdate).toEqual([7]);

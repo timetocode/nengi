@@ -73,7 +73,7 @@ function collectUpdateEntities(instance: Instance, toUpdate: number[]): { update
 }
 
 export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPlan {
-    const { toCreate, toUpdate, toDelete, channelEntityCreates } = user.checkVisibility(instance.tick)
+    const { toCreate, toUpdate, toDelete } = user.checkVisibility(instance.tick)
     const plan = createEmptySnapshotPlan()
 
     const channelOpens = user.consumePendingChannelOpens()
@@ -89,7 +89,6 @@ export function collectSnapshotPlan(user: User, instance: Instance): SnapshotPla
         plan.channelCloses.push({ channelId: channelCloses[i] })
     }
 
-    plan.channelEntityCreates = channelEntityCreates
     plan.skipInterpolationNids = collectSkipInterpolationNids(user)
 
     for (const channel of user.subscriptions.values()) {

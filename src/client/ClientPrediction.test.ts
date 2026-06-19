@@ -4,6 +4,10 @@ import { Context } from '../common/Context'
 import { Client } from './Client'
 import { StateReplayPrediction } from './prediction/StateReplayPrediction'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
+import { ChannelType, createChannelHeader } from '../common/ChannelHeader'
+import type { Snapshot } from './Snapshot'
+
+const TEST_CHANNEL_ID = 1
 
 class MockAdapter {
     binary = testBinaryAdapter
@@ -24,6 +28,37 @@ function createClient() {
         autoAmmo: Binary.UInt16
     }))
     return new Client(context, MockAdapter, 20)
+}
+
+function snapshot(args: Partial<Snapshot>): Snapshot {
+    const createEntities = args.createEntities || []
+    const updateEntities = args.updateEntities || []
+    const deleteEntities = args.deleteEntities || []
+    const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
+    return {
+        timestamp: -1,
+        confirmedClientTick: -1,
+        messages: [],
+        ...args,
+        channelOpens: hasEntityCrud
+            ? [{ channelId: TEST_CHANNEL_ID, header: createChannelHeader(TEST_CHANNEL_ID, ChannelType.Channel) }]
+            : [],
+        channels: hasEntityCrud ? [{
+            channelId: TEST_CHANNEL_ID,
+            messages: [],
+            interpolatedMessages: [],
+            ecsCreateEntities: [],
+            ecsCreateComponents: [],
+            ecsDeleteEntities: [],
+            createEntities,
+            updateEntities,
+            updateEntityGroups: [],
+            deleteEntities
+        }] : [],
+        createEntities: [],
+        updateEntities: [],
+        deleteEntities: []
+    }
 }
 
 describe('client prediction', () => {
@@ -48,14 +83,14 @@ describe('client prediction', () => {
         expect(client.predictor.log.getPendingCommands().map(op => op.id)).toEqual([operation!.id])
         expect(operation!.clientTick).toBe(1)
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000)
+        }), 1000)
         client.network.processNextFrame()
 
         expect(client.predictor.log.getPendingCommands()).toEqual([])
@@ -67,14 +102,14 @@ describe('client prediction', () => {
         const localDoor = { open: false }
         const events: string[] = []
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000)
+        }), 1000)
         client.network.processNextFrame()
 
         client.predictor.onReconcile(event => {
@@ -100,14 +135,14 @@ describe('client prediction', () => {
 
         expect(localDoor.open).toBe(true)
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1050,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [],
             updateEntities: [],
             deleteEntities: []
-        }, 1050)
+        }), 1050)
         client.network.processNextFrame()
 
         expect(localDoor.open).toBe(false)
@@ -119,14 +154,14 @@ describe('client prediction', () => {
         const client = createClient()
         const mismatchCounts: number[] = []
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000)
+        }), 1000)
         client.network.processNextFrame()
 
         client.predictor.onReconcile(event => {
@@ -143,14 +178,14 @@ describe('client prediction', () => {
             expected: [{ nid: 1, values: { x: 2 } }]
         })
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1050,
             confirmedClientTick: 1,
             messages: [],
             createEntities: [],
             updateEntities: [{ nid: 1, prop: 'x', value: 2 }],
             deleteEntities: []
-        }, 1050)
+        }), 1050)
         client.network.processNextFrame()
 
         expect(mismatchCounts).toEqual([0])
@@ -180,14 +215,14 @@ describe('client prediction', () => {
             affectedProps: ['semiAmmo']
         })
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1000,
             confirmedClientTick: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, semiAmmo: 6, autoAmmo: 22 }],
             updateEntities: [],
             deleteEntities: []
-        }, 1000)
+        }), 1000)
         client.network.processNextFrame()
 
         client.predictor.onReconcile(event => {
@@ -201,14 +236,14 @@ describe('client prediction', () => {
         client.network.incrementClientTick()
         ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 3 }, { semiAmmo: 3 })
 
-        client.network.queueSnapshot({
+        client.network.queueSnapshot(snapshot({
             timestamp: 1050,
             confirmedClientTick: 2,
             messages: [],
             createEntities: [],
             updateEntities: [],
             deleteEntities: []
-        }, 1050)
+        }), 1050)
         client.network.processNextFrame()
 
         expect(localPlayer.semiAmmo).toBe(5)

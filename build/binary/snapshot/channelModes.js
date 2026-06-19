@@ -7,7 +7,6 @@ exports.isEcsSnapshotChannel = isEcsSnapshotChannel;
 exports.getSingleEcsSnapshotChannel = getSingleEcsSnapshotChannel;
 exports.isEcsSpatialSnapshotChannel = isEcsSpatialSnapshotChannel;
 exports.getSingleEcsSpatialSnapshotChannel = getSingleEcsSpatialSnapshotChannel;
-exports.getEcsSnapshotChannels = getEcsSnapshotChannels;
 exports.isCellFragmentChannel = isCellFragmentChannel;
 exports.isManualSpatialCellFragmentChannel = isManualSpatialCellFragmentChannel;
 exports.getSingleSharedChannel = getSingleSharedChannel;
@@ -77,15 +76,6 @@ function getSingleEcsSpatialSnapshotChannel(user) {
     }
     const channel = user.subscriptions.values().next().value;
     return isEcsSpatialSnapshotChannel(channel) ? channel : null;
-}
-function getEcsSnapshotChannels(user) {
-    const channels = [];
-    for (const channel of user.subscriptions.values()) {
-        if (isEcsSnapshotChannel(channel)) {
-            channels.push(channel);
-        }
-    }
-    return channels;
 }
 function isCellFragmentChannel(channel) {
     return (channel === null || channel === void 0 ? void 0 : channel.cellFragmentMode) === true &&

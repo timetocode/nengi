@@ -6,6 +6,7 @@ import { EngineMessage } from '../common/EngineMessage';
 import { BinaryPayload } from '../common/binary/BinaryAdapter';
 import { ProtocolConfig } from '../common/binary/Protocol';
 import type { ResponseEndpoint } from './Instance';
+import { NQueue } from '../NQueue';
 export interface INetworkEvent {
     type: NetworkEvent;
     user: User;
@@ -14,6 +15,13 @@ export interface INetworkEvent {
     commandTimings?: Array<CommandTimingEstimate | undefined>;
     serverReceivedTimeMs?: number;
     payload?: any;
+}
+export interface INetworkRequest {
+    user: User;
+    requestId: number;
+    endpointId: number;
+    endpoint?: ResponseEndpoint;
+    body?: any;
 }
 export type ResponseBacklogInfo = {
     user: User;
@@ -117,6 +125,7 @@ export type SharedDeleteFragment = {
 export declare class InstanceNetwork {
     instance: Instance;
     responseBacklogUsers: Set<User>;
+    requestQueue: NQueue<INetworkRequest>;
     requireSchemaFingerprint: boolean;
     debugBinaryWrites: boolean;
     sharedUpdateFragmentsEnabled: boolean;
@@ -168,6 +177,7 @@ export declare class InstanceNetwork {
     queueErrorResponse(user: User, requestId: number, code: string, message: string): void;
     reportResponseBacklog(user: User, queued: number, sent: number): void;
     runRequestHandler(user: User, requestId: number, endpoint: ResponseEndpoint, body: any): void;
+    processRequests(max?: number): number;
     onOpen(user: User): void;
     onHandshake(user: User, handshake: any, clientSchemaFingerprint?: string): Promise<void>;
     onMessage(user: User, buffer: BinaryPayload): void;

@@ -105,6 +105,11 @@ export type ClientReplicaOptions = {
 export type ProcessClientReplicaOptions = {
     maxFrames?: number;
 };
+/**
+ * @deprecated ClientReplica is a legacy convenience layer. New code should
+ * consume ClientNetwork frames directly and read entity CRUD from
+ * `frame.channels`.
+ */
 export declare class ClientReplica {
     client: Client;
     interpolator: FixedStepInterpolator;

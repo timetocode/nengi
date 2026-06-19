@@ -85,7 +85,6 @@ export declare function isEcsSnapshotChannel(channel: any): channel is EcsSnapsh
 export declare function getSingleEcsSnapshotChannel(user: User): EcsSnapshotChannel | null;
 export declare function isEcsSpatialSnapshotChannel(channel: any): channel is EcsSpatialSnapshotChannel;
 export declare function getSingleEcsSpatialSnapshotChannel(user: User): EcsSpatialSnapshotChannel | null;
-export declare function getEcsSnapshotChannels(user: User): EcsSnapshotChannel[];
 export declare function isCellFragmentChannel(channel: any): channel is CellFragmentChannel;
 export declare function isManualSpatialCellFragmentChannel(channel: any): channel is ManualSpatialCellFragmentChannel;
 export declare function getSingleSharedChannel(user: User): SharedUpdateChannel | null;
