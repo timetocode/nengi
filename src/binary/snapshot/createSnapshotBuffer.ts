@@ -18,6 +18,7 @@ import {
     countEcsManualUpdateBytes,
     countManualGroupedProps,
     countManualUpdateBytes,
+    EcsManualUpdateLog,
     getManualUpdateFragment,
     ManualUpdateFragment,
     writeEcsManualUpdates,
@@ -643,12 +644,73 @@ function collectEcsSpatialSnapshotBase(user: User, instance: Instance, channel: 
     return plan
 }
 
+function filterEcsSpatialManualLog(channel: EcsSpatialSnapshotChannel, log: EcsManualUpdateLog) {
+    for (let i = 0; i < log.manualPropNids.length; i++) {
+        if (!channel.getComponent(log.manualPropNids[i])) {
+            return copyLiveEcsSpatialManualLog(channel, log)
+        }
+    }
+
+    for (let i = 0; i < log.manualGroupNids.length; i++) {
+        if (!channel.getComponent(log.manualGroupNids[i])) {
+            return copyLiveEcsSpatialManualLog(channel, log)
+        }
+    }
+
+    return log
+}
+
+function copyLiveEcsSpatialManualLog(channel: EcsSpatialSnapshotChannel, log: EcsManualUpdateLog) {
+    const filtered: EcsManualUpdateLog = {
+        manualPropNids: [],
+        manualPropSchemas: [],
+        manualPropValues: [],
+        manualGroupNids: [],
+        manualGroupNTypes: [],
+        manualGroupSchemas: [],
+        manualGroupValueOffsets: [],
+        manualGroupValues: []
+    }
+
+    for (let i = 0; i < log.manualPropNids.length; i++) {
+        const nid = log.manualPropNids[i]
+        if (!channel.getComponent(nid)) {
+            continue
+        }
+        filtered.manualPropNids.push(nid)
+        filtered.manualPropSchemas.push(log.manualPropSchemas[i])
+        filtered.manualPropValues.push(log.manualPropValues[i])
+    }
+
+    for (let i = 0; i < log.manualGroupNids.length; i++) {
+        const nid = log.manualGroupNids[i]
+        const group = log.manualGroupSchemas[i]
+        let offset = log.manualGroupValueOffsets[i]
+        if (!channel.getComponent(nid)) {
+            continue
+        }
+        filtered.manualGroupNids.push(nid)
+        filtered.manualGroupNTypes.push(log.manualGroupNTypes[i])
+        filtered.manualGroupSchemas.push(group)
+        filtered.manualGroupValueOffsets.push(filtered.manualGroupValues.length)
+        for (let j = 0; j < group.props.length; j++) {
+            filtered.manualGroupValues.push(log.manualGroupValues[offset++])
+        }
+    }
+
+    return filtered
+}
+
 function getEcsSpatialCellUpdateFragment(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel, cellKey: string) {
     const log = channel.getManualCellUpdateLog(cellKey)
     if (!log) {
         return null
     }
-    return getManualUpdateFragment(user, instance, { nid: channel.nid, ...log }, `ecs-spatial:${cellKey}`)
+    const filtered = filterEcsSpatialManualLog(channel, log)
+    if (filtered.manualPropNids.length === 0 && filtered.manualGroupNids.length === 0) {
+        return null
+    }
+    return getManualUpdateFragment(user, instance, { nid: channel.nid, ...filtered }, `ecs-spatial:${cellKey}`)
 }
 
 function createEcsSpatialSnapshotBuffer(user: User, instance: Instance, channel: EcsSpatialSnapshotChannel) {

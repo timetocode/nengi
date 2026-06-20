@@ -1157,6 +1157,258 @@ describe('server snapshot pipeline', () => {
     })
 
     describe('ECS spatial visibility transitions', () => {
+        it('applies queued ECS spatial movement snapshots after the subscriber view crosses cells', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const { transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            const send = game.user.networkAdapter.send as jest.Mock
+            send.mockClear()
+
+            const positions = [20, 35, 50, 65, 80]
+            positions.forEach(x => {
+                transform.x = x
+                game.Transform.groups.position(transform, transform.x, transform.y)
+                game.channel.updateSpatialComponent(transform)
+                game.channel.updateView(game.user, new AABB2D(x, 5, 4, 4))
+                game.instance.step()
+            })
+
+            const buffers = send.mock.calls.map(call => call[1] as Buffer)
+            expect(buffers).toHaveLength(positions.length)
+            expect(() => {
+                buffers.forEach(buffer => {
+                    game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(buffer))
+                })
+                game.clientNetwork.drainFrames()
+            }).not.toThrow()
+            expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(positions[positions.length - 1])
+            expect(game.clientNetwork.store.getEntityChannelId(transform.nid)).toBe(game.channel.nid)
+        })
+
+        it('applies queued ECS spatial snapshots while a followed view passes world entities', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 8, 8))
+            const { transform: playerTransform } = addEcsSpatialRoot(game.channel, 5, 5)
+            const worldTransforms = [
+                addEcsSpatialRoot(game.channel, 25, 5).transform,
+                addEcsSpatialRoot(game.channel, 45, 5).transform,
+                addEcsSpatialRoot(game.channel, 65, 5).transform,
+                addEcsSpatialRoot(game.channel, 85, 5).transform,
+                addEcsSpatialRoot(game.channel, 105, 5).transform
+            ]
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            const send = game.user.networkAdapter.send as jest.Mock
+            send.mockClear()
+
+            for (let tick = 1; tick <= 40; tick++) {
+                const x = 5 + tick * 3
+                playerTransform.x = x
+                game.Transform.groups.position(playerTransform, playerTransform.x, playerTransform.y)
+                game.channel.updateSpatialComponent(playerTransform)
+                game.channel.updateView(game.user, new AABB2D(x, 5, 8, 8))
+
+                worldTransforms.forEach((transform, index) => {
+                    transform.y = 5 + ((tick + index) % 3)
+                    game.Transform.groups.position(transform, transform.x, transform.y)
+                    game.channel.updateSpatialComponent(transform)
+                })
+
+                game.instance.step()
+            }
+
+            const buffers = send.mock.calls.map(call => call[1] as Buffer)
+            expect(buffers).toHaveLength(40)
+            expect(() => {
+                buffers.forEach(buffer => {
+                    game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(buffer))
+                })
+                game.clientNetwork.drainFrames()
+            }).not.toThrow()
+            expect(game.clientNetwork.store.get(playerTransform.nid)?.x).toBe(125)
+            expect(game.clientNetwork.store.getEntityChannelId(playerTransform.nid)).toBe(game.channel.nid)
+        })
+
+        it('applies one ECS spatial snapshot after many followed-view moves in one server frame', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 8, 8))
+            const { transform: playerTransform } = addEcsSpatialRoot(game.channel, 5, 5)
+            const worldTransforms = [
+                addEcsSpatialRoot(game.channel, 25, 5).transform,
+                addEcsSpatialRoot(game.channel, 45, 5).transform,
+                addEcsSpatialRoot(game.channel, 65, 5).transform,
+                addEcsSpatialRoot(game.channel, 85, 5).transform,
+                addEcsSpatialRoot(game.channel, 105, 5).transform,
+                addEcsSpatialRoot(game.channel, 125, 5).transform,
+                addEcsSpatialRoot(game.channel, 145, 5).transform,
+                addEcsSpatialRoot(game.channel, 165, 5).transform
+            ]
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            for (let move = 1; move <= 200; move++) {
+                const x = 5 + move
+                playerTransform.x = x
+                game.Transform.groups.position(playerTransform, playerTransform.x, playerTransform.y)
+                game.channel.updateSpatialComponent(playerTransform)
+                game.channel.updateView(game.user, new AABB2D(x, 5, 8, 8))
+
+                worldTransforms.forEach((transform, index) => {
+                    transform.y = 5 + ((move + index) % 3)
+                    game.Transform.groups.position(transform, transform.x, transform.y)
+                    game.channel.updateSpatialComponent(transform)
+                })
+            }
+
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(playerTransform.nid)?.x).toBe(205)
+            expect(game.clientNetwork.store.getEntityChannelId(playerTransform.nid)).toBe(game.channel.nid)
+        })
+
+        it('uses final ECS spatial view after many server-side view updates in one frame', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const worldTransforms = [
+                addEcsSpatialRoot(game.channel, 5, 5).transform,
+                addEcsSpatialRoot(game.channel, 25, 5).transform,
+                addEcsSpatialRoot(game.channel, 45, 5).transform,
+                addEcsSpatialRoot(game.channel, 65, 5).transform,
+                addEcsSpatialRoot(game.channel, 85, 5).transform
+            ]
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            for (let i = 0; i < 200; i++) {
+                const x = 5 + i * 0.4
+                const nearby = worldTransforms[Math.min(worldTransforms.length - 1, Math.floor(x / 20))]
+                nearby.y = 5 + (i % 4)
+                game.Transform.props.y(nearby, nearby.y)
+                game.channel.updateSpatialComponent(nearby)
+                game.channel.updateView(game.user, new AABB2D(x, 5, 4, 4))
+            }
+
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+
+            const frameChannel = game.clientNetwork.latestFrame!.requireChannel(game.channel.nid)
+            expect(frameChannel.deleteEntities).toContain(worldTransforms[0].nid)
+            expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(worldTransforms[0].nid)
+            expect(game.clientNetwork.store.get(worldTransforms[0].nid)).toBeUndefined()
+            expect(game.clientNetwork.store.get(worldTransforms[4].nid)?.x).toBe(85)
+        })
+
+        it('does not send stale ECS spatial updates for components deleted in the same snapshot', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            transform.x = 6
+            game.Transform.groups.position(transform, transform.x, transform.y)
+            game.channel.removeEntity(pid)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.getEntityChannelId(transform.nid)).toBeUndefined()
+        })
+
+        it('does not send stale ECS spatial updates when another entity keeps the dirty cell visible', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const removed = addEcsSpatialRoot(game.channel, 5, 5)
+            const survivor = addEcsSpatialRoot(game.channel, 6, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            removed.transform.x = 7
+            game.Transform.groups.position(removed.transform, removed.transform.x, removed.transform.y)
+            game.channel.removeEntity(removed.pid)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(removed.transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.get(survivor.transform.nid)?.x).toBe(6)
+        })
+
+        it('does not send stale ECS spatial updates for components deleted from a dirty visible cell', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const removed = addEcsSpatialRoot(game.channel, 5, 5)
+            const survivor = addEcsSpatialRoot(game.channel, 6, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            removed.transform.x = 7
+            game.Transform.props.x(removed.transform, removed.transform.x)
+            game.channel.removeComponent(removed.transform.nid)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(removed.transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.get(survivor.transform.nid)?.x).toBe(6)
+        })
+
+        it('does not send stale ECS spatial prop updates after a visibility-only delete', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const leaving = addEcsSpatialRoot(game.channel, 5, 5)
+            const entering = addEcsSpatialRoot(game.channel, 50, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            leaving.transform.x = 6
+            game.Transform.props.x(leaving.transform, leaving.transform.x)
+            game.channel.updateSpatialComponent(leaving.transform)
+            game.channel.updateView(game.user, new AABB2D(50, 5, 4, 4))
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            const frameChannel = game.clientNetwork.latestFrame!.requireChannel(game.channel.nid)
+            expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(leaving.transform.nid)
+            expect(game.clientNetwork.store.get(leaving.transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.get(entering.transform.nid)?.x).toBe(50)
+        })
+
+        it('does not send stale ECS spatial prop updates when a persistent entity teleports out of view', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const hazard = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            hazard.transform.y = 500
+            game.Transform.props.y(hazard.transform, hazard.transform.y)
+            game.channel.skipInterpolation(hazard.transform)
+            game.channel.updateSpatialComponent(hazard.transform)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            const frameChannel = game.clientNetwork.latestFrame!.requireChannel(game.channel.nid)
+            expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(hazard.transform.nid)
+            expect(game.clientNetwork.store.get(hazard.transform.nid)).toBeUndefined()
+        })
+
         it('creates roots when the subscriber view moves into them', () => {
             const game = createEcsSpatial2DTest(new AABB2D(500, 500, 10, 10))
             const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
@@ -2385,6 +2637,87 @@ describe('server snapshot pipeline', () => {
         expect(firstClient.store.entities.has(nid)).toBe(false)
         expect(secondClient.latestFrame!.requireChannel(channel.nid).createEntities.map(created => created.nid)).toEqual([nid])
         expect(secondClient.store.get(nid)?.x).toBe(60)
+    })
+
+    it('keeps ownership when a visible entity and subscriber view move to the same new cell', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel2D(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'moving-with-view'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const nid = entity.nid
+        entity.x = 60
+        channel.updateEntity(entity)
+        channel.updateView(user, new AABB2D(60, 10, 5, 5))
+        instance.step()
+
+        expect(() => clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))).not.toThrow()
+        expect(() => clientNetwork.processNextFrame()).not.toThrow()
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.deleteEntities).not.toContain(nid)
+        expect(clientNetwork.store.get(nid)?.x).toBe(60)
+        expect(clientNetwork.store.getEntityChannelId(nid)).toBe(channel.nid)
+    })
+
+    it('applies queued spatial movement snapshots after the subscriber view crosses cells', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new SpatialChannel2D(instance.localState, 50)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(10, 10, 5, 5))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'queued-mover'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const send = user.networkAdapter.send as jest.Mock
+        send.mockClear()
+
+        const positions = [60, 110, 160, 210, 260]
+        positions.forEach(x => {
+            entity.x = x
+            channel.updateEntity(entity)
+            channel.updateView(user, new AABB2D(x, 10, 5, 5))
+            instance.step()
+        })
+
+        const buffers = send.mock.calls.map(call => call[1] as Buffer)
+        expect(buffers).toHaveLength(positions.length)
+        expect(() => {
+            buffers.forEach(buffer => {
+                clientNetwork.readSnapshot(testBinaryAdapter.createReader(buffer))
+            })
+            clientNetwork.drainFrames()
+        }).not.toThrow()
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(positions[positions.length - 1])
+        expect(clientNetwork.store.getEntityChannelId(entity.nid)).toBe(channel.nid)
     })
 
     it('orders SpatialChannel2D leave-cell tree deletes from child to parent', () => {
