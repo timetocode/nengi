@@ -98,6 +98,14 @@ import {
     getSharedUpdateFragment,
     writeEntityDeltaFragments
 } from './sharedEntityFragments'
+import {
+    createFinalStateSpatialChannel2DSnapshotBuffer,
+    getSingleFinalStateSpatialChannel2D
+} from '../../server/channel/FinalStateSpatialChannel2DSnapshot'
+import {
+    createPlannedSpatialChannel2DSnapshotBuffer,
+    getSinglePlannedSpatialChannel2D
+} from '../../server/channel/PlannedSpatialChannel2DSnapshot'
 
 function collectEnvelopePlan(user: User) {
     const plan = createEmptySnapshotPlan()
@@ -1641,6 +1649,16 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
     const manualUpdateChannel = getSingleManualUpdateChannel(user)
     const sharedChannel = getSingleSharedChannel(user)
     const cellFragmentChannel = getSingleCellFragmentChannel(user)
+    const plannedSpatialChannel = getSinglePlannedSpatialChannel2D(user)
+    if (plannedSpatialChannel && !user.hasPendingVisibilityDeletes()) {
+        return createPlannedSpatialChannel2DSnapshotBuffer(user, instance, plannedSpatialChannel)
+    }
+
+    const finalStateSpatialChannel = getSingleFinalStateSpatialChannel2D(user)
+    if (finalStateSpatialChannel && !user.hasPendingVisibilityDeletes()) {
+        return createFinalStateSpatialChannel2DSnapshotBuffer(user, instance, finalStateSpatialChannel)
+    }
+
     if (!hasPendingLifecycleWork && ecsSpatialChannel && !channelHasHeaderPending(user, ecsSpatialChannel)) {
         return user.withChannelVisibilityState(ecsSpatialChannel.nid, () =>
             createEcsSpatialSnapshotBuffer(user, instance, ecsSpatialChannel)

@@ -8,6 +8,8 @@ import { AABB2D } from '../server/channel/AABB2D'
 import { AABB3D } from '../server/channel/AABB3D'
 import { SpatialChannel2D } from '../server/channel/SpatialChannel2D'
 import { SpatialChannel3D } from '../server/channel/SpatialChannel3D'
+import { FinalStateSpatialChannel2D } from '../server/channel/FinalStateSpatialChannel2D'
+import { PlannedSpatialChannel2D } from '../server/channel/PlannedSpatialChannel2D'
 import { SpatialPlane } from '../server/channel/SpatialView'
 import { Channel } from '../server/channel/Channel'
 import { ManualChannel } from '../server/channel/ManualChannel'
@@ -37,6 +39,8 @@ type ScenarioName =
     | 'sparse-visible'
     | 'non-overlap'
     | 'spatial-channel-2d'
+    | 'final-state-spatial-channel-2d'
+    | 'planned-spatial-channel-2d'
     | 'spatial-channel-3d'
     | 'manual-channel'
     | 'manual-spatial-channel-2d'
@@ -63,6 +67,8 @@ const SCENARIOS = new Set<ScenarioName>([
     'sparse-visible',
     'non-overlap',
     'spatial-channel-2d',
+    'final-state-spatial-channel-2d',
+    'planned-spatial-channel-2d',
     'spatial-channel-3d',
     'manual-channel',
     'manual-spatial-channel-2d',
@@ -83,6 +89,17 @@ const SCENARIOS = new Set<ScenarioName>([
     'parent-child-manual-spatial-channel',
     'channel-churn'
 ])
+
+type SuiteName = 'spatial-fanout'
+
+const SUITES: Record<SuiteName, ScenarioName[]> = {
+    'spatial-fanout': [
+        'spatial-channel-2d',
+        'manual-spatial-channel-2d',
+        'final-state-spatial-channel-2d',
+        'planned-spatial-channel-2d'
+    ]
+}
 
 type ManualEmitMode = 'group4' | 'props'
 type EntityShape = 'standard' | 'monolith' | 'ecs'
@@ -278,8 +295,8 @@ function envBool(name: string, fallback: boolean) {
     return value === '1' || value === 'true'
 }
 
-function readConfig(): ScenarioConfig {
-    const scenarioValue = process.env.PROFILE_SCENARIO || 'shared-npcs'
+function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
+    const scenarioValue = scenarioOverride || process.env.PROFILE_SCENARIO || 'shared-npcs'
     if (!SCENARIOS.has(scenarioValue as ScenarioName)) {
         throw new Error(`Unknown PROFILE_SCENARIO "${scenarioValue}". Use one of: ${Array.from(SCENARIOS).join(', ')}`)
     }
@@ -1404,6 +1421,46 @@ function setupSpatialChannel(instance: Instance, users: User[], entities: TestEn
     }
 }
 
+function setupFinalStateSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new FinalStateSpatialChannel2D(instance.localState, config.cellSize, {
+        queryPadding: config.queryPadding,
+        plane: config.spatialPlane,
+        name: 'final-state-spatial-channel-2d'
+    })
+    for (let i = 0; i < entities.length; i++) {
+        channel.addEntity(entities[i])
+    }
+    for (let i = 0; i < users.length; i++) {
+        channel.subscribe(users[i], createSpatialView(i, entities, config))
+    }
+    return () => {
+        const moving = Math.floor(entities.length * config.moveFraction)
+        for (let i = 0; i < moving; i++) {
+            channel.updateEntity(entities[i])
+        }
+    }
+}
+
+function setupPlannedSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new PlannedSpatialChannel2D(instance.localState, config.cellSize, {
+        queryPadding: config.queryPadding,
+        plane: config.spatialPlane,
+        name: 'planned-spatial-channel-2d'
+    })
+    for (let i = 0; i < entities.length; i++) {
+        channel.addEntity(entities[i])
+    }
+    for (let i = 0; i < users.length; i++) {
+        channel.subscribe(users[i], createSpatialView(i, entities, config))
+    }
+    return () => {
+        const moving = Math.floor(entities.length * config.moveFraction)
+        for (let i = 0; i < moving; i++) {
+            channel.updateEntity(entities[i])
+        }
+    }
+}
+
 function setupSpatialChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new SpatialChannel3D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
@@ -1485,6 +1542,8 @@ function buildScenario(config: ScenarioConfig) {
         }
     }
     if (config.scenario === 'spatial-channel-2d' ||
+        config.scenario === 'final-state-spatial-channel-2d' ||
+        config.scenario === 'planned-spatial-channel-2d' ||
         config.scenario === 'spatial-channel-3d' ||
         config.scenario === 'manual-spatial-channel-2d' ||
         config.scenario === 'manual-spatial-channel-3d' ||
@@ -1512,6 +1571,10 @@ function buildScenario(config: ScenarioConfig) {
         setupFixedVisible(instance, users, entities, config)
     } else if (config.scenario === 'spatial-channel-2d') {
         updateSpatialIndex = setupSpatialChannel(instance, users, entities, config)
+    } else if (config.scenario === 'final-state-spatial-channel-2d') {
+        updateSpatialIndex = setupFinalStateSpatialChannel(instance, users, entities, config)
+    } else if (config.scenario === 'planned-spatial-channel-2d') {
+        updateSpatialIndex = setupPlannedSpatialChannel(instance, users, entities, config)
     } else if (config.scenario === 'spatial-channel-3d') {
         updateSpatialIndex = setupSpatialChannel3D(instance, users, entities, config)
     } else if (config.scenario === 'channel-churn') {
@@ -1582,8 +1645,7 @@ function fmt(value: number) {
     return Number(value.toFixed(3))
 }
 
-function run() {
-    const config = readConfig()
+function runScenario(config: ScenarioConfig) {
     const { instance, adapter, entities, updateSpatialIndex, beforeStep } = buildScenario(config)
     const stepTimes: number[] = []
     const preStepTimes: number[] = []
@@ -1734,7 +1796,25 @@ function run() {
         deletesPerSnapshot: Math.round(perf.deletesTotal / snapshots)
     }
 
-    console.log(JSON.stringify(result, null, 2))
+    return result
+}
+
+function run() {
+    const suiteName = process.env.PROFILE_SUITE as SuiteName | undefined
+    if (suiteName) {
+        const scenarios = SUITES[suiteName]
+        if (!scenarios) {
+            throw new Error(`Unknown PROFILE_SUITE "${suiteName}". Use one of: ${Object.keys(SUITES).join(', ')}`)
+        }
+        const results = scenarios.map(scenario => runScenario(readConfig(scenario)))
+        console.log(JSON.stringify({
+            suite: suiteName,
+            results
+        }, null, 2))
+        return
+    }
+
+    console.log(JSON.stringify(runScenario(readConfig()), null, 2))
 }
 
 run()

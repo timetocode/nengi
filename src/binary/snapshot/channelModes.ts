@@ -84,6 +84,7 @@ export type CellFragmentChannel = {
 
 export function isSharedUpdateChannel(channel: any): channel is SharedUpdateChannel {
     return channel?.cellFragmentMode !== true &&
+        channel?.finalStateSpatialChannelMode !== true &&
         Array.isArray(channel.entityNids) &&
         typeof channel.membershipVersion === 'number' &&
         typeof channel.deltaBaseVersion === 'number' &&

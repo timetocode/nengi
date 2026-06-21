@@ -21,7 +21,8 @@ npm run profile:snapshot
 Useful knobs:
 
 ```bash
-PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel-2d | spatial-channel-3d | manual-channel | manual-spatial-channel-2d | manual-spatial-channel-3d | ecs-channel | ecs-spatial-channel-2d | ecs-spatial-clump | ecs-spatial-channel-3d
+PROFILE_SCENARIO=shared-npcs     # shared-npcs | players-300 | sparse-visible | non-overlap | spatial-channel-2d | final-state-spatial-channel-2d | planned-spatial-channel-2d | spatial-channel-3d | manual-channel | manual-spatial-channel-2d | manual-spatial-channel-3d | ecs-channel | ecs-spatial-channel-2d | ecs-spatial-clump | ecs-spatial-channel-3d
+PROFILE_SUITE=spatial-fanout     # optional: run spatial-channel-2d, manual-spatial-channel-2d, final-state-spatial-channel-2d, and planned-spatial-channel-2d back-to-back
 PROFILE_USERS=20
 PROFILE_ENTITIES=1000
 PROFILE_VISIBLE=1000
@@ -64,6 +65,16 @@ Scenarios:
   the normal reconciliation path.
   `PROFILE_VIEW_SHAPE=circle` uses coarse circular cell selection for 2D or
   projected views.
+- `final-state-spatial-channel-2d`: correctness-baseline 2D/projected spatial
+  channel. It derives create/update/delete from final per-user visibility at
+  snapshot time and does not use cell-fragment update sharing. Compare it
+  directly against `spatial-channel-2d` and `manual-spatial-channel-2d` when
+  evaluating the cost of final-state semantics.
+- `planned-spatial-channel-2d`: prototype 2D/projected spatial channel that
+  builds a channel-wide final visibility plan before writing the first user's
+  channel body. It groups users by final visible cell set, derives per-user
+  final CRUD from that plan, and shares steady update fragments at the group
+  level.
 - `spatial-channel-3d`: true volumetric `SpatialChannel3D` workload using
   `AABB3D` views and `x:y:z` cell keys. This is the control for games that
   need vertical culling rather than horizontal projection. `PROFILE_VIEW_SHAPE=sphere`
@@ -129,6 +140,14 @@ Scenarios:
 - `ecs-spatial-channel-3d`: true 3D spatial ECS channel. Root visibility comes
   from the spatial component using AABB or sphere views and `x:y:z` cell keys.
 
+Suites:
+
+- `spatial-fanout`: runs `spatial-channel-2d`,
+  `manual-spatial-channel-2d`, `final-state-spatial-channel-2d`, and
+  `planned-spatial-channel-2d` with the same profile knobs, then prints one
+  JSON result bundle. Use this for direct clumped fanout and distributed
+  spatial comparisons.
+
 Output is JSON and includes:
 
 - `stepMs`: avg/p50/p95/max for `instance.step()`
@@ -163,7 +182,10 @@ PROFILE_SCENARIO=ecs-channel-churn PROFILE_USERS=20 PROFILE_ENTITIES=10000 PROFI
 PROFILE_SCENARIO=ecs-spatial-clump npm run profile:snapshot
 PROFILE_SCENARIO=ecs-spatial-clump PROFILE_USERS=450 PROFILE_ENTITIES=450 PROFILE_VISIBLE=450 npm run profile:snapshot
 PROFILE_SCENARIO=ecs-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SCENARIO=final-state-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 npm run profile:snapshot
+PROFILE_SCENARIO=planned-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 PROFILE_SCENARIO=manual-spatial-channel-2d PROFILE_SPATIAL_DISTRIBUTION=homogeneous PROFILE_USERS=100 PROFILE_ENTITIES=500000 PROFILE_VIEW_HALF=640 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=8192 PROFILE_MOVE_FRACTION=0.01 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
+PROFILE_SUITE=spatial-fanout PROFILE_SPATIAL_DISTRIBUTION=single-cell PROFILE_USERS=200 PROFILE_ENTITIES=200 PROFILE_VISIBLE=200 PROFILE_VIEW_HALF=512 PROFILE_CELL_SIZE=512 PROFILE_WORLD_SIZE=512 PROFILE_MOVE_FRACTION=1 PROFILE_TICKS=500 PROFILE_WARMUP=100 PROFILE_SHARED_UPDATES=1 npm run profile:snapshot
 ```
 
 Interpretation notes:

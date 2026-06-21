@@ -15,6 +15,8 @@ import { AABB2D } from '../../server/channel/AABB2D'
 import { AABB3D } from '../../server/channel/AABB3D'
 import { SpatialChannel2D } from '../../server/channel/SpatialChannel2D'
 import { SpatialChannel3D } from '../../server/channel/SpatialChannel3D'
+import { FinalStateSpatialChannel2D } from '../../server/channel/FinalStateSpatialChannel2D'
+import { PlannedSpatialChannel2D } from '../../server/channel/PlannedSpatialChannel2D'
 import { Channel } from '../../server/channel/Channel'
 import { ManualChannel } from '../../server/channel/ManualChannel'
 import { ManualSpatialChannel2D } from '../../server/channel/ManualSpatialChannel2D'
@@ -1886,6 +1888,375 @@ describe('server snapshot pipeline', () => {
         expect(firstClient.store.entities.has(moverNid)).toBe(false)
         expect(secondClient.latestFrame!.requireChannel(channel.nid).createEntities.map(entity => entity.nid)).toContain(moverNid)
         expect(secondClient.store.get(moverNid)?.x).toBe(150)
+    })
+
+    it('sends delete-only when a final-state spatial entity mutates then moves out of view', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new FinalStateSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'visible'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const nid = entity.nid
+        entity.label = 'changed-before-leaving'
+        entity.x = 250
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.deleteEntities).toEqual([nid])
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(nid)
+        expect(clientNetwork.store.entities.has(nid)).toBe(false)
+    })
+
+    it('sends create-only when a final-state spatial entity mutates then moves into view', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new FinalStateSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 250,
+            y: 6,
+            label: 'hidden'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const nid = entity.nid
+        entity.label = 'entered'
+        entity.x = 5
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.createEntities.map(created => created.nid)).toEqual([nid])
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(nid)
+        expect(frameChannel.deleteEntities).not.toContain(nid)
+        expect(clientNetwork.store.get(nid)?.label).toBe('entered')
+    })
+
+    it('sends update when a final-state spatial entity changes cells but remains visible', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new FinalStateSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(75, 50, 100, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'mover'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const nid = entity.nid
+        entity.x = 150
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.createEntities.map(created => created.nid)).not.toContain(nid)
+        expect(frameChannel.deleteEntities).not.toContain(nid)
+        expect(frameChannel.updateEntities.map(update => update.nid)).toContain(nid)
+        expect(clientNetwork.store.get(nid)?.x).toBe(150)
+    })
+
+    it('shares final-state spatial update fragments for identical steady visible sets', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        instance.network.snapshotPerformanceEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new FinalStateSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(50, 50, 60, 60))
+        channel.subscribe(secondUser, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'shared'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+        instance.network.resetSnapshotPerformance()
+
+        const nid = entity.nid
+        entity.x = 6
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedFragmentHits).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedSnapshots).toBe(2)
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.nid)).toContain(nid)
+        expect(secondClient.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.nid)).toContain(nid)
+        expect(firstClient.store.get(nid)?.x).toBe(6)
+        expect(secondClient.store.get(nid)?.x).toBe(6)
+    })
+
+    it('sends delete-only when a planned spatial entity mutates then moves out of view', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new PlannedSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'visible'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const nid = entity.nid
+        entity.label = 'changed-before-leaving'
+        entity.x = 250
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.deleteEntities).toEqual([nid])
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(nid)
+        expect(clientNetwork.store.entities.has(nid)).toBe(false)
+    })
+
+    it('shares planned spatial update fragments for identical multi-cell visible sets', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        instance.network.snapshotPerformanceEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new PlannedSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(75, 50, 100, 60))
+        channel.subscribe(secondUser, new AABB2D(75, 50, 100, 60))
+        const firstEntity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'left-cell'
+        })
+        const secondEntity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 150,
+            y: 6,
+            label: 'right-cell'
+        })
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+        instance.network.resetSnapshotPerformance()
+
+        firstEntity.x = 6
+        secondEntity.x = 151
+        channel.updateEntity(firstEntity)
+        channel.updateEntity(secondEntity)
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedFragmentHits).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedSnapshots).toBe(2)
+        expect(firstClient.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.nid)).toEqual([
+            firstEntity.nid,
+            secondEntity.nid
+        ])
+        expect(secondClient.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.nid)).toEqual([
+            firstEntity.nid,
+            secondEntity.nid
+        ])
+        expect(firstClient.store.get(firstEntity.nid)?.x).toBe(6)
+        expect(secondClient.store.get(secondEntity.nid)?.x).toBe(151)
+    })
+
+    it('sends create-only when a planned spatial entity mutates then moves into view', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new PlannedSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 250,
+            y: 6,
+            label: 'hidden'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const nid = entity.nid
+        entity.label = 'entered'
+        entity.x = 5
+        channel.updateEntity(entity)
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.createEntities.map(created => created.nid)).toEqual([nid])
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(nid)
+        expect(frameChannel.deleteEntities).not.toContain(nid)
+        expect(clientNetwork.store.get(nid)?.label).toBe('entered')
+    })
+
+    it('creates and deletes planned spatial entities when the subscriber view moves', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new PlannedSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const firstEntity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'first'
+        })
+        const secondEntity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 250,
+            y: 6,
+            label: 'second'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        channel.updateView(user, new AABB2D(250, 50, 60, 60))
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
+        expect(frameChannel.deleteEntities).toEqual([firstEntity.nid])
+        expect(frameChannel.createEntities.map(created => created.nid)).toEqual([secondEntity.nid])
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(firstEntity.nid)
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(secondEntity.nid)
+        expect(clientNetwork.store.entities.has(firstEntity.nid)).toBe(false)
+        expect(clientNetwork.store.get(secondEntity.nid)?.label).toBe('second')
+    })
+
+    it('does not emit planned spatial updates for clean steady visible entities', () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new PlannedSpatialChannel2D(instance.localState, 100)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'clean'
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frameChannel = clientNetwork.latestFrame!.getChannel(channel.nid)
+        expect(frameChannel?.createEntities.map(created => created.nid) || []).not.toContain(entity.nid)
+        expect(frameChannel?.updateEntities.map(update => update.nid) || []).not.toContain(entity.nid)
+        expect(frameChannel?.deleteEntities || []).not.toContain(entity.nid)
+        expect(clientNetwork.store.get(entity.nid)?.label).toBe('clean')
     })
 
     it('can use shared create and delete fragments for synchronized all-visible channel deltas', () => {
