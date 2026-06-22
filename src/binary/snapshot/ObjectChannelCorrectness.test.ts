@@ -390,6 +390,15 @@ function createScenario(
     return { context, instance, channel, writer, users, clients, views, records: [], visible, move, damage }
 }
 
+function createManualSpatial2DScenario() {
+    return createScenario(
+        instance => new ManualSpatialChannel2D(instance.localState, 10, { name: 'manual-spatial-2d-stale-check' }),
+        [new AABB2D(5, 5, 4, 4), new AABB2D(500, 500, 4, 4)],
+        visible2D,
+        true
+    )
+}
+
 function allVisible(entity: TestEntity, view: any) {
     return true
 }
@@ -537,6 +546,66 @@ describe('object channel snapshot correctness', () => {
             visible2D,
             true
         ), { spatial: true, is3D: false })
+    })
+
+    it('does not send stale ManualSpatialChannel2D updates for an entity removed in the same snapshot', () => {
+        const scenario = createManualSpatial2DScenario()
+        const removed = addEntity(scenario, 5, 5, 0, 100)
+        const survivor = addEntity(scenario, 6, 5, 0, 200)
+        stepAndAssert(scenario)
+
+        scenario.damage(removed.entity, 90)
+        removeEntity(scenario, removed)
+        scenario.instance.step()
+
+        expect(() => {
+            scenario.clients[0].readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(scenario.users[0])))
+        }).not.toThrow()
+        scenario.clients[0].processNextFrame()
+        const frameChannel = scenario.clients[0].latestFrame!.requireChannel(scenario.channel.nid)
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(removed.entity.nid)
+        expect(scenario.clients[0].store.get(removed.entity.nid)).toBeUndefined()
+        expect(scenario.clients[0].store.get(survivor.entity.nid)?.hp).toBe(200)
+    })
+
+    it('does not send stale ManualSpatialChannel2D updates after a visibility-only delete', () => {
+        const scenario = createManualSpatial2DScenario()
+        const leaving = addEntity(scenario, 5, 5, 0, 100)
+        const entering = addEntity(scenario, 50, 5, 0, 200)
+        stepAndAssert(scenario)
+
+        scenario.damage(leaving.entity, 90)
+        scenario.views[0].x = 50
+        scenario.channel.updateView?.(scenario.users[0], scenario.views[0])
+        scenario.instance.step()
+
+        expect(() => {
+            scenario.clients[0].readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(scenario.users[0])))
+        }).not.toThrow()
+        scenario.clients[0].processNextFrame()
+        const frameChannel = scenario.clients[0].latestFrame!.requireChannel(scenario.channel.nid)
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(leaving.entity.nid)
+        expect(scenario.clients[0].store.get(leaving.entity.nid)).toBeUndefined()
+        expect(scenario.clients[0].store.get(entering.entity.nid)?.hp).toBe(200)
+    })
+
+    it('does not send stale ManualSpatialChannel2D updates when a dirty entity moves out of view', () => {
+        const scenario = createManualSpatial2DScenario()
+        const leaving = addEntity(scenario, 5, 5, 0, 100)
+        const survivor = addEntity(scenario, 6, 5, 0, 200)
+        stepAndAssert(scenario)
+
+        scenario.move(leaving.entity, 50, 5, 0)
+        scenario.instance.step()
+
+        expect(() => {
+            scenario.clients[0].readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(scenario.users[0])))
+        }).not.toThrow()
+        scenario.clients[0].processNextFrame()
+        const frameChannel = scenario.clients[0].latestFrame!.requireChannel(scenario.channel.nid)
+        expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(leaving.entity.nid)
+        expect(scenario.clients[0].store.get(leaving.entity.nid)).toBeUndefined()
+        expect(scenario.clients[0].store.get(survivor.entity.nid)?.hp).toBe(200)
     })
 
     it('keeps SpatialChannel3D synchronized when queued snapshots are drained later', () => {

@@ -106,6 +106,10 @@ import {
     createPlannedSpatialChannel2DSnapshotBuffer,
     getSinglePlannedSpatialChannel2D
 } from '../../server/channel/PlannedSpatialChannel2DSnapshot'
+import {
+    createPlannedEcsSpatialChannel2DSnapshotBuffer,
+    getSinglePlannedEcsSpatialChannel2D
+} from '../../server/channel/PlannedEcsSpatialChannel2DSnapshot'
 
 function collectEnvelopePlan(user: User) {
     const plan = createEmptySnapshotPlan()
@@ -1645,6 +1649,7 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
         user.hasPendingChannelOpens() ||
         user.hasPendingChannelCloses()
     const ecsSpatialChannel = getSingleEcsSpatialSnapshotChannel(user)
+    const plannedEcsSpatialChannel = getSinglePlannedEcsSpatialChannel2D(user)
     const ecsChannel = getSingleEcsSnapshotChannel(user)
     const manualUpdateChannel = getSingleManualUpdateChannel(user)
     const sharedChannel = getSingleSharedChannel(user)
@@ -1652,6 +1657,10 @@ const createSnapshotBuffer = (user: User, instance: Instance) => {
     const plannedSpatialChannel = getSinglePlannedSpatialChannel2D(user)
     if (plannedSpatialChannel && !user.hasPendingVisibilityDeletes()) {
         return createPlannedSpatialChannel2DSnapshotBuffer(user, instance, plannedSpatialChannel)
+    }
+
+    if (plannedEcsSpatialChannel) {
+        return createPlannedEcsSpatialChannel2DSnapshotBuffer(user, instance, plannedEcsSpatialChannel)
     }
 
     const finalStateSpatialChannel = getSingleFinalStateSpatialChannel2D(user)

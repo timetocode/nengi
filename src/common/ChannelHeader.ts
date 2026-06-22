@@ -11,7 +11,8 @@ export enum ChannelType {
     EcsSpatialChannel2D = 8,
     EcsSpatialChannel3D = 9,
     FinalStateSpatialChannel2D = 10,
-    PlannedSpatialChannel2D = 11
+    PlannedSpatialChannel2D = 11,
+    PlannedEcsSpatialChannel2D = 12
 }
 
 export const DefaultChannelHeaderNType = 0

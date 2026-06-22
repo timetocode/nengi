@@ -19,6 +19,7 @@ export * from './server/channel/ManualSpatialChannel3D'
 export * from './server/channel/EcsChannel'
 export * from './server/channel/EcsSpatialChannel2D'
 export * from './server/channel/EcsSpatialChannel3D'
+export * from './server/channel/PlannedEcsSpatialChannel2D'
 export * from './ecs/EcsWorld'
 export {
     GameEcsWorld,

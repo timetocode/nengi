@@ -7,6 +7,7 @@ import { AABB2D } from '../../server/channel/AABB2D'
 import { AABB3D } from '../../server/channel/AABB3D'
 import { EcsSpatialChannel2D } from '../../server/channel/EcsSpatialChannel2D'
 import { EcsSpatialChannel3D } from '../../server/channel/EcsSpatialChannel3D'
+import { PlannedEcsSpatialChannel2D } from '../../server/channel/PlannedEcsSpatialChannel2D'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { testBinaryAdapter } from '../../testSupport/BufferBinary'
@@ -559,6 +560,18 @@ describe('ECS spatial snapshot correctness', () => {
 
     it('keeps EcsSpatialChannel2D synchronized when queued snapshots are drained later', () => {
         runQueuedSnapshotScenario(instance => new EcsSpatialChannel2D(instance.localState, 10, { name: 'optimized-queued' }))
+    })
+
+    it('keeps PlannedEcsSpatialChannel2D clients synchronized with the cell-coarse oracle', () => {
+        runScriptedCorrectnessScenario(instance => new PlannedEcsSpatialChannel2D(instance.localState, 10, { name: 'planned-ecs-spatial-correctness' }))
+    })
+
+    it('keeps PlannedEcsSpatialChannel2D synchronized during deterministic spatial churn', () => {
+        runDeterministicFuzzScenario(instance => new PlannedEcsSpatialChannel2D(instance.localState, 10, { name: 'planned-ecs-spatial-fuzz' }))
+    })
+
+    it('keeps PlannedEcsSpatialChannel2D synchronized when queued snapshots are drained later', () => {
+        runQueuedSnapshotScenario(instance => new PlannedEcsSpatialChannel2D(instance.localState, 10, { name: 'planned-ecs-spatial-queued' }))
     })
 
     it('keeps EcsSpatialChannel3D clients synchronized with the cell-coarse oracle', () => {

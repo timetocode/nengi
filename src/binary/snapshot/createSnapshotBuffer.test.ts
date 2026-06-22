@@ -24,6 +24,7 @@ import { ManualSpatialChannel3D } from '../../server/channel/ManualSpatialChanne
 import { EcsChannel } from '../../server/channel/EcsChannel'
 import { EcsSpatialChannel2D } from '../../server/channel/EcsSpatialChannel2D'
 import { EcsSpatialChannel3D } from '../../server/channel/EcsSpatialChannel3D'
+import { PlannedEcsSpatialChannel2D } from '../../server/channel/PlannedEcsSpatialChannel2D'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { TestBufferWriter, testBinaryAdapter } from '../../testSupport/BufferBinary'
@@ -159,12 +160,36 @@ function stepClient(instance: Instance, user: User, clientNetwork: ClientNetwork
     return clientNetwork.latestFrame!
 }
 
-function createEcsSpatial2DTest(view: AABB2D) {
+function expectNoDeletedNidUpdates(frameChannel: { deleteEntities: number[], updateEntities: Array<{ nid: number }> }) {
+    const deleted = new Set(frameChannel.deleteEntities)
+    const updatedDeletedNids = frameChannel.updateEntities
+        .map(update => update.nid)
+        .filter(nid => deleted.has(nid))
+    expect(updatedDeletedNids).toEqual([])
+}
+
+type EcsSpatial2DTestChannel = {
+    nid: number
+    createEntity(): number
+    addSpatialComponent<T extends { nid: number, ntype: number }>(pid: number, component: T): T & { pid: number }
+    createComponentWriter(ntype: number, schema: any): any
+    subscribe(user: User, view: AABB2D): void
+    removeEntity(pidOrEntity: number | any): number
+    removeComponent(componentOrNid: number | any): void
+    updateSpatialComponent(componentOrNid: number | any): void
+    updateView(user: User, view: AABB2D): void
+    skipInterpolation(pidOrComponent: number | any): boolean
+}
+
+function createEcsSpatial2DTest(
+    view: AABB2D,
+    createChannel: (instance: Instance) => EcsSpatial2DTestChannel = instance => new EcsSpatialChannel2D(instance.localState, 10)
+) {
     const context = createEcsContext()
     const instance = new Instance(context)
     const user = createUser(instance)
     const clientNetwork = createClientNetwork(context)
-    const channel = new EcsSpatialChannel2D(instance.localState, 10)
+    const channel = createChannel(instance)
     const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
     instance.users.set(user.id, user)
@@ -173,7 +198,7 @@ function createEcsSpatial2DTest(view: AABB2D) {
     return { context, instance, user, clientNetwork, channel, Transform, view }
 }
 
-function addEcsSpatialRoot(channel: EcsSpatialChannel2D, x: number, y: number) {
+function addEcsSpatialRoot(channel: EcsSpatial2DTestChannel, x: number, y: number) {
     const pid = channel.createEntity()
     const transform = channel.addSpatialComponent(pid, {
         nid: 0,
@@ -1343,8 +1368,69 @@ describe('server snapshot pipeline', () => {
                 game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
             }).not.toThrow()
             expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expectNoDeletedNidUpdates(game.clientNetwork.latestFrame!.requireChannel(game.channel.nid))
             expect(game.clientNetwork.store.get(removed.transform.nid)).toBeUndefined()
             expect(game.clientNetwork.store.get(survivor.transform.nid)?.x).toBe(6)
+        })
+
+        it('does not reuse dirty ECS spatial cell fragments across users after a same-tick delete', () => {
+            const context = createEcsContext()
+            const instance = new Instance(context)
+            const firstUser = createUser(instance)
+            const secondUser = createUser(instance)
+            secondUser.id = 2
+            const firstClient = createClientNetwork(context)
+            const secondClient = createClientNetwork(context)
+            const channel = new EcsSpatialChannel2D(instance.localState, 10)
+            const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+            instance.users.set(firstUser.id, firstUser)
+            instance.users.set(secondUser.id, secondUser)
+            channel.subscribe(firstUser, new AABB2D(5, 5, 4, 4))
+            channel.subscribe(secondUser, new AABB2D(5, 5, 4, 4))
+
+            const removedPid = channel.createEntity()
+            const removed = channel.addSpatialComponent(removedPid, {
+                nid: 0,
+                ntype: NType.Transform,
+                x: 5,
+                y: 5
+            })
+            const survivorPid = channel.createEntity()
+            const survivor = channel.addSpatialComponent(survivorPid, {
+                nid: 0,
+                ntype: NType.Transform,
+                x: 6,
+                y: 5
+            })
+
+            instance.step()
+            firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+            firstClient.processNextFrame()
+            secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+            secondClient.processNextFrame()
+
+            removed.x = 7
+            Transform.groups.position(removed, removed.x, removed.y)
+            const removedNid = removed.nid
+            channel.removeEntity(removedPid)
+            instance.step()
+
+            firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+            firstClient.processNextFrame()
+            secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+            secondClient.processNextFrame()
+
+            const firstFrameChannel = firstClient.latestFrame!.requireChannel(channel.nid)
+            const secondFrameChannel = secondClient.latestFrame!.requireChannel(channel.nid)
+            expect(firstFrameChannel.deleteEntities).toContain(removedNid)
+            expect(secondFrameChannel.deleteEntities).toContain(removedNid)
+            expectNoDeletedNidUpdates(firstFrameChannel)
+            expectNoDeletedNidUpdates(secondFrameChannel)
+            expect(firstClient.store.get(removedNid)).toBeUndefined()
+            expect(secondClient.store.get(removedNid)).toBeUndefined()
+            expect(firstClient.store.get(survivor.nid)?.x).toBe(6)
+            expect(secondClient.store.get(survivor.nid)?.x).toBe(6)
         })
 
         it('does not send stale ECS spatial updates for components deleted from a dirty visible cell', () => {
@@ -1363,6 +1449,7 @@ describe('server snapshot pipeline', () => {
                 game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
             }).not.toThrow()
             expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expectNoDeletedNidUpdates(game.clientNetwork.latestFrame!.requireChannel(game.channel.nid))
             expect(game.clientNetwork.store.get(removed.transform.nid)).toBeUndefined()
             expect(game.clientNetwork.store.get(survivor.transform.nid)?.x).toBe(6)
         })
@@ -1409,6 +1496,126 @@ describe('server snapshot pipeline', () => {
             const frameChannel = game.clientNetwork.latestFrame!.requireChannel(game.channel.nid)
             expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(hazard.transform.nid)
             expect(game.clientNetwork.store.get(hazard.transform.nid)).toBeUndefined()
+        })
+
+        it('coalesces repeated ECS spatial manual writes to final prop values', () => {
+            const game = createEcsSpatial2DTest(new AABB2D(5, 5, 4, 4))
+            const { transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            game.Transform.groups.position(transform, 10, 10)
+            game.Transform.props.x(transform, 20)
+            game.Transform.groups.position(transform, 30, 30)
+            game.Transform.props.y(transform, 40)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+
+            const frameUpdates = game.clientNetwork.latestFrame!.requireChannel(game.channel.nid).updateEntities
+                .filter(update => update.nid === transform.nid)
+            expect(frameUpdates).toEqual([
+                { nid: transform.nid, prop: 'x', previous: 5, value: 30 },
+                { nid: transform.nid, prop: 'y', previous: 5, value: 40 }
+            ])
+            expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(30)
+            expect(game.clientNetwork.store.get(transform.nid)?.y).toBe(40)
+        })
+
+        it('does not send stale planned ECS spatial updates for components deleted in the same snapshot', () => {
+            const game = createEcsSpatial2DTest(
+                new AABB2D(5, 5, 4, 4),
+                instance => new PlannedEcsSpatialChannel2D(instance.localState, 10)
+            )
+            const { pid, transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            transform.x = 6
+            game.Transform.groups.position(transform, transform.x, transform.y)
+            game.channel.removeEntity(pid)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.getEntityChannelId(transform.nid)).toBeUndefined()
+        })
+
+        it('does not send stale planned ECS spatial updates when another entity keeps the dirty cell visible', () => {
+            const game = createEcsSpatial2DTest(
+                new AABB2D(5, 5, 4, 4),
+                instance => new PlannedEcsSpatialChannel2D(instance.localState, 10)
+            )
+            const removed = addEcsSpatialRoot(game.channel, 5, 5)
+            const survivor = addEcsSpatialRoot(game.channel, 6, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            removed.transform.x = 7
+            game.Transform.groups.position(removed.transform, removed.transform.x, removed.transform.y)
+            game.channel.removeEntity(removed.pid)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(removed.transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.get(survivor.transform.nid)?.x).toBe(6)
+        })
+
+        it('does not send stale planned ECS spatial prop updates after a visibility-only delete', () => {
+            const game = createEcsSpatial2DTest(
+                new AABB2D(5, 5, 4, 4),
+                instance => new PlannedEcsSpatialChannel2D(instance.localState, 10)
+            )
+            const leaving = addEcsSpatialRoot(game.channel, 5, 5)
+            const entering = addEcsSpatialRoot(game.channel, 50, 5)
+
+            stepClient(game.instance, game.user, game.clientNetwork)
+
+            leaving.transform.x = 6
+            game.Transform.props.x(leaving.transform, leaving.transform.x)
+            game.channel.updateSpatialComponent(leaving.transform)
+            game.channel.updateView(game.user, new AABB2D(50, 5, 4, 4))
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            const frameChannel = game.clientNetwork.latestFrame!.requireChannel(game.channel.nid)
+            expect(frameChannel.updateEntities.map(update => update.nid)).not.toContain(leaving.transform.nid)
+            expect(game.clientNetwork.store.get(leaving.transform.nid)).toBeUndefined()
+            expect(game.clientNetwork.store.get(entering.transform.nid)?.x).toBe(50)
+        })
+
+        it('uses planned ECS spatial snapshots without legacy user visibility state', () => {
+            const game = createEcsSpatial2DTest(
+                new AABB2D(5, 5, 4, 4),
+                instance => new PlannedEcsSpatialChannel2D(instance.localState, 10)
+            )
+            const { transform } = addEcsSpatialRoot(game.channel, 5, 5)
+
+            ;(game.user as any).pendingVisibilityDeletes.set(999, [123])
+            transform.x = 6
+            transform.y = 6
+            game.Transform.groups.position(transform, 6, 6)
+            game.instance.step()
+
+            expect(() => {
+                game.clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(game.user)))
+            }).not.toThrow()
+            expect(() => game.clientNetwork.processNextFrame()).not.toThrow()
+            expect(game.clientNetwork.store.get(transform.nid)?.x).toBe(6)
+            expect(game.clientNetwork.store.get(transform.nid)?.y).toBe(6)
+            expect(game.user.hasPendingVisibilityDeletes()).toBe(true)
         })
 
         it('creates roots when the subscriber view moves into them', () => {
@@ -1608,6 +1815,53 @@ describe('server snapshot pipeline', () => {
         expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid])
         expect(clientNetwork.store.ecsEntities.has(pid)).toBe(false)
         expect(clientNetwork.store.entities.has(transform.nid)).toBe(false)
+    })
+
+    it('coalesces repeated ECS spatial 3D manual writes to final prop values', () => {
+        const context = createEcsContext3D()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsSpatialChannel3D(instance.localState, 10)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(5, 5, 5, 10, 10, 10))
+
+        const pid = channel.createEntity()
+        const transform = channel.addSpatialComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 5,
+            z: 5
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        Transform.groups.position(transform, 10, 10, 10)
+        Transform.props.x(transform, 20)
+        Transform.groups.position(transform, 30, 30, 30)
+        Transform.props.z(transform, 40)
+        instance.step()
+
+        expect(() => {
+            clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        }).not.toThrow()
+        expect(() => clientNetwork.processNextFrame()).not.toThrow()
+
+        const frameUpdates = clientNetwork.latestFrame!.requireChannel(channel.nid).updateEntities
+            .filter(update => update.nid === transform.nid)
+        expect(frameUpdates).toEqual([
+            { nid: transform.nid, prop: 'x', previous: 5, value: 30 },
+            { nid: transform.nid, prop: 'y', previous: 5, value: 30 },
+            { nid: transform.nid, prop: 'z', previous: 5, value: 40 }
+        ])
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(30)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(30)
+        expect(clientNetwork.store.get(transform.nid)?.z).toBe(40)
     })
 
     it('spatially replicates existing ECS roots when a user subscribes after creation', () => {
