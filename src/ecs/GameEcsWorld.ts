@@ -78,6 +78,9 @@ export class GameEcsWorld {
 
     add<T extends Component>(component: T): T {
         this.createEntity(component.pid)
+        if (this.byPid.get(component.pid)!.has(component.ntype)) {
+            throw new Error(`Entity ${component.pid} already has component ${component.ntype}`)
+        }
         if (component.nid === undefined) {
             component.nid = this.nextId()
         }

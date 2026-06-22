@@ -75,10 +75,10 @@ The current channel family is intentionally plural:
 
 - `Channel`: automatic all-visible entity channel; scans visible entities against schemas.
 - `ManualChannel`: all-visible entity channel where userland explicitly appends prop/group mutations.
-- `SpatialChannel2D` / `SpatialChannel3D`: automatic grid-culled entity channels.
-- `ManualSpatialChannel2D` / `ManualSpatialChannel3D`: grid-culled entity channels with explicit mutation logs per dirty cell.
+- `Channel2D` / `Channel3D`: automatic grid-culled entity channels.
+- `ManualChannel2D2D` / `ManualChannel2D3D`: grid-culled entity channels with explicit mutation logs per dirty cell.
 - `EcsChannel`: manual ECS channel where roots are nids and replicated state lives on component entities.
-- `EcsSpatialChannel2D` / `EcsSpatialChannel3D`: ECS channel where a selected spatial component places the root in the grid.
+- `EcsChannel2D` / `EcsChannel3D`: ECS channel where a selected spatial component places the root in the grid.
 
 Manual means "userland tells nengi what changed." It is the fast path and intentionally does less validation in production. Debug options may add checks, but the default writer path should remain close to direct array appends.
 

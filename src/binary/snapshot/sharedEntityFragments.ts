@@ -54,48 +54,7 @@ export function countEntityDeltaFragmentDeletes(fragments: EntityDeltaFragments)
     return fragments.deletes?.deletes || 0
 }
 
-export function applySharedChannelDeltasToUser(user: User, channel: SharedUpdateChannel, tick: number, fragments: EntityDeltaFragments) {
-    const deletedNids = fragments.deletes?.nids
-    if (deletedNids) {
-        for (const nid of deletedNids) {
-            user.tickLastSeen.delete(nid)
-        }
-        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid))
-    }
-
-    for (let i = 0; i < user.currentlyVisible.length; i++) {
-        user.tickLastSeen.set(user.currentlyVisible[i], tick)
-    }
-
-    const createdNids = fragments.creates?.nids
-    if (createdNids) {
-        for (const nid of createdNids) {
-            user.markVisible(nid, tick, [], [])
-        }
-    }
-
-    user.lastVisibleCount = user.currentlyVisible.length
-    user.sharedChannelVersions.set(channel.nid, channel.membershipVersion)
-}
-
-export function canUseSharedDeltaFragments(user: User, channel: SharedUpdateChannel) {
-    return user.sharedChannelVersions.get(channel.nid) === channel.deltaBaseVersion
-}
-
-export function getEntityDeltaFragments(user: User, instance: Instance, channel: SharedUpdateChannel): EntityDeltaFragments {
-    if (!instance.network.sharedUpdateFragmentsEnabled ||
-        instance.network.debugBinaryWrites ||
-        !canUseSharedDeltaFragments(user, channel)) {
-        return { creates: null, deletes: null }
-    }
-
-    return {
-        creates: getSharedCreateFragment(user, instance, channel),
-        deletes: getSharedDeleteFragment(user, instance, channel)
-    }
-}
-
-function getSharedCreateFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
+export function getSharedCreateFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
     if (channel.createdRoots.length === 0) {
         return null
     }
@@ -147,7 +106,7 @@ function getSharedCreateFragment(user: User, instance: Instance, channel: Shared
     return fragment
 }
 
-function getSharedDeleteFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
+export function getSharedDeleteFragment(user: User, instance: Instance, channel: SharedUpdateChannel) {
     if (channel.deletedNids.length === 0) {
         return null
     }

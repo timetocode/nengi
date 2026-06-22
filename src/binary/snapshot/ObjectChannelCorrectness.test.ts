@@ -7,10 +7,10 @@ import { AABB2D } from '../../server/channel/AABB2D'
 import { AABB3D } from '../../server/channel/AABB3D'
 import { Channel } from '../../server/channel/Channel'
 import { ManualChannel } from '../../server/channel/ManualChannel'
-import { ManualSpatialChannel2D } from '../../server/channel/ManualSpatialChannel2D'
-import { ManualSpatialChannel3D } from '../../server/channel/ManualSpatialChannel3D'
-import { SpatialChannel2D } from '../../server/channel/SpatialChannel2D'
-import { SpatialChannel3D } from '../../server/channel/SpatialChannel3D'
+import { ManualChannel2D } from '../../server/channel/ManualChannel2D'
+import { ManualChannel3D } from '../../server/channel/ManualChannel3D'
+import { Channel2D } from '../../server/channel/Channel2D'
+import { Channel3D } from '../../server/channel/Channel3D'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { testBinaryAdapter } from '../../testSupport/BufferBinary'
@@ -390,9 +390,9 @@ function createScenario(
     return { context, instance, channel, writer, users, clients, views, records: [], visible, move, damage }
 }
 
-function createManualSpatial2DScenario() {
+function createManual2DScenario() {
     return createScenario(
-        instance => new ManualSpatialChannel2D(instance.localState, 10, { name: 'manual-spatial-2d-stale-check' }),
+        instance => new ManualChannel2D(instance.localState, 10, { name: 'manual-channel-2d-stale-check' }),
         [new AABB2D(5, 5, 4, 4), new AABB2D(500, 500, 4, 4)],
         visible2D,
         true
@@ -422,36 +422,36 @@ describe('object channel snapshot correctness', () => {
         ))
     })
 
-    it('keeps SpatialChannel2D clients synchronized with the cell-coarse oracle', () => {
+    it('keeps Channel2D clients synchronized with the cell-coarse oracle', () => {
         runObjectScenario(createScenario(
-            instance => new SpatialChannel2D(instance.localState, 10, { name: 'spatial-2d-correctness' }),
+            instance => new Channel2D(instance.localState, 10, { name: 'spatial-2d-correctness' }),
             [new AABB2D(5, 5, 10, 10), new AABB2D(105, 5, 10, 10)],
             visible2D,
             false
         ))
     })
 
-    it('keeps ManualSpatialChannel2D clients synchronized with the cell-coarse oracle', () => {
+    it('keeps ManualChannel2D clients synchronized with the cell-coarse oracle', () => {
         runObjectScenario(createScenario(
-            instance => new ManualSpatialChannel2D(instance.localState, 10, { name: 'manual-spatial-2d-correctness' }),
+            instance => new ManualChannel2D(instance.localState, 10, { name: 'manual-channel-2d-correctness' }),
             [new AABB2D(5, 5, 10, 10), new AABB2D(105, 5, 10, 10)],
             visible2D,
             true
         ))
     })
 
-    it('keeps SpatialChannel3D clients synchronized with the cell-coarse oracle', () => {
+    it('keeps Channel3D clients synchronized with the cell-coarse oracle', () => {
         runObjectScenario(createScenario(
-            instance => new SpatialChannel3D(instance.localState, 10, { name: 'spatial-3d-correctness' }),
+            instance => new Channel3D(instance.localState, 10, { name: 'spatial-3d-correctness' }),
             [new AABB3D(5, 5, 5, 10, 10, 10), new AABB3D(105, 5, 5, 10, 10, 10)],
             visible3D,
             false
         ))
     })
 
-    it('keeps ManualSpatialChannel3D clients synchronized with the cell-coarse oracle', () => {
+    it('keeps ManualChannel3D clients synchronized with the cell-coarse oracle', () => {
         runObjectScenario(createScenario(
-            instance => new ManualSpatialChannel3D(instance.localState, 10, { name: 'manual-spatial-3d-correctness' }),
+            instance => new ManualChannel3D(instance.localState, 10, { name: 'manual-channel-3d-correctness' }),
             [new AABB3D(5, 5, 5, 10, 10, 10), new AABB3D(105, 5, 5, 10, 10, 10)],
             visible3D,
             true
@@ -476,36 +476,36 @@ describe('object channel snapshot correctness', () => {
         ), { spatial: false, is3D: false })
     })
 
-    it('keeps SpatialChannel2D synchronized during deterministic spatial churn', () => {
+    it('keeps Channel2D synchronized during deterministic spatial churn', () => {
         runDeterministicChurnScenario(createScenario(
-            instance => new SpatialChannel2D(instance.localState, 10, { name: 'spatial-2d-churn-correctness' }),
+            instance => new Channel2D(instance.localState, 10, { name: 'spatial-2d-churn-correctness' }),
             [new AABB2D(5, 5, 10, 10), new AABB2D(105, 5, 10, 10)],
             visible2D,
             false
         ), { spatial: true, is3D: false })
     })
 
-    it('keeps ManualSpatialChannel2D synchronized during deterministic spatial churn', () => {
+    it('keeps ManualChannel2D synchronized during deterministic spatial churn', () => {
         runDeterministicChurnScenario(createScenario(
-            instance => new ManualSpatialChannel2D(instance.localState, 10, { name: 'manual-spatial-2d-churn-correctness' }),
+            instance => new ManualChannel2D(instance.localState, 10, { name: 'manual-channel-2d-churn-correctness' }),
             [new AABB2D(5, 5, 10, 10), new AABB2D(105, 5, 10, 10)],
             visible2D,
             true
         ), { spatial: true, is3D: false })
     })
 
-    it('keeps SpatialChannel3D synchronized during deterministic spatial churn', () => {
+    it('keeps Channel3D synchronized during deterministic spatial churn', () => {
         runDeterministicChurnScenario(createScenario(
-            instance => new SpatialChannel3D(instance.localState, 10, { name: 'spatial-3d-churn-correctness' }),
+            instance => new Channel3D(instance.localState, 10, { name: 'spatial-3d-churn-correctness' }),
             [new AABB3D(5, 5, 5, 10, 10, 10), new AABB3D(105, 5, 5, 10, 10, 10)],
             visible3D,
             false
         ), { spatial: true, is3D: true })
     })
 
-    it('keeps ManualSpatialChannel3D synchronized during deterministic spatial churn', () => {
+    it('keeps ManualChannel3D synchronized during deterministic spatial churn', () => {
         runDeterministicChurnScenario(createScenario(
-            instance => new ManualSpatialChannel3D(instance.localState, 10, { name: 'manual-spatial-3d-churn-correctness' }),
+            instance => new ManualChannel3D(instance.localState, 10, { name: 'manual-channel-3d-churn-correctness' }),
             [new AABB3D(5, 5, 5, 10, 10, 10), new AABB3D(105, 5, 5, 10, 10, 10)],
             visible3D,
             true
@@ -530,26 +530,26 @@ describe('object channel snapshot correctness', () => {
         ), { spatial: false, is3D: false })
     })
 
-    it('keeps SpatialChannel2D synchronized when queued snapshots are drained later', () => {
+    it('keeps Channel2D synchronized when queued snapshots are drained later', () => {
         runQueuedSnapshotScenario(createScenario(
-            instance => new SpatialChannel2D(instance.localState, 10, { name: 'spatial-2d-queued-correctness' }),
+            instance => new Channel2D(instance.localState, 10, { name: 'spatial-2d-queued-correctness' }),
             [new AABB2D(5, 5, 10, 10), new AABB2D(105, 5, 10, 10)],
             visible2D,
             false
         ), { spatial: true, is3D: false })
     })
 
-    it('keeps ManualSpatialChannel2D synchronized when queued snapshots are drained later', () => {
+    it('keeps ManualChannel2D synchronized when queued snapshots are drained later', () => {
         runQueuedSnapshotScenario(createScenario(
-            instance => new ManualSpatialChannel2D(instance.localState, 10, { name: 'manual-spatial-2d-queued-correctness' }),
+            instance => new ManualChannel2D(instance.localState, 10, { name: 'manual-channel-2d-queued-correctness' }),
             [new AABB2D(5, 5, 10, 10), new AABB2D(105, 5, 10, 10)],
             visible2D,
             true
         ), { spatial: true, is3D: false })
     })
 
-    it('does not send stale ManualSpatialChannel2D updates for an entity removed in the same snapshot', () => {
-        const scenario = createManualSpatial2DScenario()
+    it('does not send stale ManualChannel2D updates for an entity removed in the same snapshot', () => {
+        const scenario = createManual2DScenario()
         const removed = addEntity(scenario, 5, 5, 0, 100)
         const survivor = addEntity(scenario, 6, 5, 0, 200)
         stepAndAssert(scenario)
@@ -568,8 +568,8 @@ describe('object channel snapshot correctness', () => {
         expect(scenario.clients[0].store.get(survivor.entity.nid)?.hp).toBe(200)
     })
 
-    it('does not send stale ManualSpatialChannel2D updates after a visibility-only delete', () => {
-        const scenario = createManualSpatial2DScenario()
+    it('does not send stale ManualChannel2D updates after a visibility-only delete', () => {
+        const scenario = createManual2DScenario()
         const leaving = addEntity(scenario, 5, 5, 0, 100)
         const entering = addEntity(scenario, 50, 5, 0, 200)
         stepAndAssert(scenario)
@@ -589,8 +589,8 @@ describe('object channel snapshot correctness', () => {
         expect(scenario.clients[0].store.get(entering.entity.nid)?.hp).toBe(200)
     })
 
-    it('does not send stale ManualSpatialChannel2D updates when a dirty entity moves out of view', () => {
-        const scenario = createManualSpatial2DScenario()
+    it('does not send stale ManualChannel2D updates when a dirty entity moves out of view', () => {
+        const scenario = createManual2DScenario()
         const leaving = addEntity(scenario, 5, 5, 0, 100)
         const survivor = addEntity(scenario, 6, 5, 0, 200)
         stepAndAssert(scenario)
@@ -608,18 +608,18 @@ describe('object channel snapshot correctness', () => {
         expect(scenario.clients[0].store.get(survivor.entity.nid)?.hp).toBe(200)
     })
 
-    it('keeps SpatialChannel3D synchronized when queued snapshots are drained later', () => {
+    it('keeps Channel3D synchronized when queued snapshots are drained later', () => {
         runQueuedSnapshotScenario(createScenario(
-            instance => new SpatialChannel3D(instance.localState, 10, { name: 'spatial-3d-queued-correctness' }),
+            instance => new Channel3D(instance.localState, 10, { name: 'spatial-3d-queued-correctness' }),
             [new AABB3D(5, 5, 5, 10, 10, 10), new AABB3D(105, 5, 5, 10, 10, 10)],
             visible3D,
             false
         ), { spatial: true, is3D: true })
     })
 
-    it('keeps ManualSpatialChannel3D synchronized when queued snapshots are drained later', () => {
+    it('keeps ManualChannel3D synchronized when queued snapshots are drained later', () => {
         runQueuedSnapshotScenario(createScenario(
-            instance => new ManualSpatialChannel3D(instance.localState, 10, { name: 'manual-spatial-3d-queued-correctness' }),
+            instance => new ManualChannel3D(instance.localState, 10, { name: 'manual-channel-3d-queued-correctness' }),
             [new AABB3D(5, 5, 5, 10, 10, 10), new AABB3D(105, 5, 5, 10, 10, 10)],
             visible3D,
             true

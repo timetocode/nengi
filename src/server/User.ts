@@ -5,7 +5,6 @@ import { IServerNetworkAdapter } from './adapter/IServerNetworkAdapter'
 import { BinaryPayload } from '../common/binary/BinaryAdapter'
 import type { SnapshotResponse } from '../binary/snapshot/SnapshotPlan'
 import { DEFAULT_PROTOCOL, ProtocolConfig } from '../common/binary/Protocol'
-import { ChannelHeader } from '../common/ChannelHeader'
 
 export enum UserConnectionState {
     NULL, // initial state
@@ -64,27 +63,6 @@ export function getCommandViewTimeMs(timing: CommandTimingEstimate | undefined, 
     return Math.min(nowMs, viewTimeMs)
 }
 
-export type UserVisibilityChannel = {
-    nid: number
-    header: ChannelHeader
-    getVisibleEntities?(userId: number): number[]
-    getVisibleNetworkedNids?(userId: number): number[]
-}
-
-export type UserChannelVisibilityState = {
-    tickLastSeen: Map<nid, tick>
-    currentlyVisible: nid[]
-    lastVisibleCount: number
-}
-
-function createChannelVisibilityState(): UserChannelVisibilityState {
-    return {
-        tickLastSeen: new Map(),
-        currentlyVisible: [],
-        lastVisibleCount: 0
-    }
-}
-
 export class User {
     id = 0
     socket: any
@@ -101,15 +79,6 @@ export class User {
     scopedInterpolatedMessageQueue: { channelId: number, message: any }[] = []
     responseQueue: SnapshotResponse[] = []
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
-    private channelVisibilityStates: Map<number, UserChannelVisibilityState> = new Map()
-    private legacyVisibilityState = createChannelVisibilityState()
-    private pendingVisibilityDeletes: Map<number, number[]> = new Map()
-    // Compatibility accessors for snapshot collectors that operate on one bound
-    // channel state at a time. New code should use getChannelVisibilityState().
-    tickLastSeen: Map<nid, tick> = new Map()
-    currentlyVisible: nid[] = []
-    sharedChannelVersions: Map<number, number> = new Map()
-    stableVisibleRefs: Map<number, number[]> = new Map()
     knownChannelIds: Set<number> = new Set()
     knownChannelHeaderVersions: Map<number, number> = new Map()
     private pendingChannelOpens: Set<number> = new Set()
@@ -130,77 +99,10 @@ export class User {
     clockSyncSamples = 0
     interpolationDelayMs = 0
     lastInterpolationDelayTimeMs = 0
-    lastVisibleCount = 0
 
     constructor(socket: any, networkAdapter: IServerNetworkAdapter<any, any, any>) {
         this.socket = socket
         this.networkAdapter = networkAdapter
-        this.bindVisibilityState(this.legacyVisibilityState)
-    }
-
-    private bindVisibilityState(state: UserChannelVisibilityState) {
-        this.tickLastSeen = state.tickLastSeen
-        this.currentlyVisible = state.currentlyVisible
-        this.lastVisibleCount = state.lastVisibleCount
-    }
-
-    private syncBoundVisibilityState(state: UserChannelVisibilityState) {
-        state.tickLastSeen = this.tickLastSeen
-        state.currentlyVisible = this.currentlyVisible
-        state.lastVisibleCount = this.lastVisibleCount
-    }
-
-    // Visibility is tracked per channel, even though older collector helpers
-    // still read this.currentlyVisible and this.tickLastSeen directly. Binding
-    // one channel's state preserves those helpers while avoiding cross-channel
-    // unioning or duplicate suppression in the production snapshot path.
-    getChannelVisibilityState(channelId: number) {
-        let state = this.channelVisibilityStates.get(channelId)
-        if (!state) {
-            state = createChannelVisibilityState()
-            this.channelVisibilityStates.set(channelId, state)
-        }
-        return state
-    }
-
-    deleteChannelVisibilityState(channelId: number) {
-        this.channelVisibilityStates.delete(channelId)
-        this.stableVisibleRefs.delete(channelId)
-        this.sharedChannelVersions.delete(channelId)
-    }
-
-    hasPendingVisibilityDeletes() {
-        return this.pendingVisibilityDeletes.size > 0
-    }
-
-    consumePendingVisibilityDeletes() {
-        const deletes: number[] = []
-        for (const nids of this.pendingVisibilityDeletes.values()) {
-            for (let i = 0; i < nids.length; i++) {
-                deletes.push(nids[i])
-            }
-        }
-        this.pendingVisibilityDeletes.clear()
-        return deletes
-    }
-
-    withChannelVisibilityState<T>(channelId: number, fn: (state: UserChannelVisibilityState) => T): T {
-        const previous = {
-            tickLastSeen: this.tickLastSeen,
-            currentlyVisible: this.currentlyVisible,
-            lastVisibleCount: this.lastVisibleCount
-        }
-        const state = this.getChannelVisibilityState(channelId)
-        this.bindVisibilityState(state)
-        try {
-            const result = fn(state)
-            this.syncBoundVisibilityState(state)
-            return result
-        } finally {
-            this.tickLastSeen = previous.tickLastSeen
-            this.currentlyVisible = previous.currentlyVisible
-            this.lastVisibleCount = previous.lastVisibleCount
-        }
     }
 
     calculateLatency() {
@@ -324,7 +226,6 @@ export class User {
             this.pendingChannelCloses.add(channel.nid)
         }
         this.knownChannelHeaderVersions.delete(channel.nid)
-        this.deleteChannelVisibilityState(channel.nid)
     }
 
     queueEngineMessage(engineMessage: any) {
@@ -373,101 +274,6 @@ export class User {
 
     disconnect(reason: StringOrJSONStringifiable) {
         this.networkAdapter.disconnect(this, reason)
-    }
-
-    populateDeletions(tick: number, toDelete: number[]) {
-        for (let i = this.currentlyVisible.length - 1; i >= 0; i--) {
-            const nid = this.currentlyVisible[i]
-            const lastSeenTick = this.tickLastSeen.get(nid)
-            if (lastSeenTick !== tick) {
-                toDelete.push(nid)
-                this.tickLastSeen.delete(nid)
-                this.currentlyVisible.splice(i, 1)
-            }
-        }
-    }
-
-    markVisible(
-        nid: number,
-        tick: number,
-        toCreate: number[],
-        toUpdate: number[]
-    ) {
-        const lastSeenTick = this.tickLastSeen.get(nid)
-        if (lastSeenTick === tick) {
-            return
-        }
-
-        if (lastSeenTick === undefined) {
-            toCreate.push(nid)
-            this.currentlyVisible.push(nid)
-        } else {
-            toUpdate.push(nid)
-        }
-        this.tickLastSeen.set(nid, tick)
-    }
-
-    checkVisibility(tick: number) {
-        const toCreate: number[] = []
-        const toUpdate: number[] = []
-        const toDelete: number[] = []
-        toDelete.push(...this.consumePendingVisibilityDeletes())
-
-        for (const channel of this.subscriptions.values()) {
-            const visible = this.checkChannelVisibility(channel, tick)
-            for (let i = 0; i < visible.toCreate.length; i++) {
-                toCreate.push(visible.toCreate[i])
-            }
-            for (let i = 0; i < visible.toUpdate.length; i++) {
-                toUpdate.push(visible.toUpdate[i])
-            }
-            for (let i = 0; i < visible.toDelete.length; i++) {
-                toDelete.push(visible.toDelete[i])
-            }
-        }
-
-        return { toDelete, toUpdate, toCreate }
-    }
-
-    checkChannelVisibility(channel: UserVisibilityChannel, tick: number) {
-        return this.withChannelVisibilityState(channel.nid, () => {
-            const toCreate: number[] = []
-            const toUpdate: number[] = []
-            const toDelete: number[] = []
-
-            const visibleNids = channel.getVisibleNetworkedNids?.(this.id)
-            if (visibleNids) {
-                if (
-                    this.stableVisibleRefs.get(channel.nid) === visibleNids &&
-                    this.currentlyVisible.length === visibleNids.length
-                ) {
-                    for (let i = 0; i < visibleNids.length; i++) {
-                        toUpdate.push(visibleNids[i])
-                    }
-                    this.lastVisibleCount = this.currentlyVisible.length
-                    return { toDelete, toUpdate, toCreate }
-                }
-                this.stableVisibleRefs.set(channel.nid, visibleNids)
-                for (let i = 0; i < visibleNids.length; i++) {
-                    this.markVisible(visibleNids[i], tick, toCreate, toUpdate)
-                }
-                this.populateDeletions(tick, toDelete)
-                this.lastVisibleCount = this.currentlyVisible.length
-                return { toDelete, toUpdate, toCreate }
-            }
-
-            const visibleRoots = channel.getVisibleEntities?.(this.id) || []
-            for (let i = 0; i < visibleRoots.length; i++) {
-                this.instance!.localState.forEachEntityTree(visibleRoots[i], nid => {
-                    this.markVisible(nid, tick, toCreate, toUpdate)
-                })
-            }
-
-            this.populateDeletions(tick, toDelete)
-            this.lastVisibleCount = this.currentlyVisible.length
-
-            return { toDelete, toUpdate, toCreate }
-        })
     }
 
 }

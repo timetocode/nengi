@@ -3,9 +3,9 @@ import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { EcsChannel } from './EcsChannel'
-import { EcsSpatialChannel2D } from './EcsSpatialChannel2D'
-import { EcsSpatialChannel3D } from './EcsSpatialChannel3D'
-import { ManualSpatialChannel2D } from './ManualSpatialChannel2D'
+import { ManualChannel2D } from './ManualChannel2D'
+import { EcsChannel2D } from './EcsChannel2D'
+import { EcsChannel3D } from './EcsChannel3D'
 
 enum NType {
     Component = 1
@@ -36,8 +36,8 @@ describe('ECS channels', () => {
         const schema = createCollidingSchema()
         const localState = new LocalState()
         const ecs = new EcsChannel(localState)
-        const ecsSpatial2D = new EcsSpatialChannel2D(localState, 100)
-        const ecsSpatial3D = new EcsSpatialChannel3D(localState, 100)
+        const ecsSpatial2D = new EcsChannel2D(localState, 100)
+        const ecsSpatial3D = new EcsChannel3D(localState, 100)
 
         for (const channel of [ecs, ecsSpatial2D, ecsSpatial3D]) {
             const writer = channel.createComponentWriter(NType.Component, schema)
@@ -76,9 +76,9 @@ describe('ECS channels', () => {
         expect(component.nid).toBe(0)
     })
 
-    it('destroys an EcsSpatialChannel2D subscription, roots, components, and local registration', () => {
+    it('destroys a EcsChannel2D subscription, roots, components, and local registration', () => {
         const localState = new LocalState()
-        const channel = new EcsSpatialChannel2D(localState, 100)
+        const channel = new EcsChannel2D(localState, 100)
         const user = createUser(localState)
 
         channel.subscribe(user, { x: 0, y: 0, halfWidth: 100, halfHeight: 100 })
@@ -105,9 +105,9 @@ describe('ECS channels', () => {
         expect(component.nid).toBe(0)
     })
 
-    it('destroys an EcsSpatialChannel3D subscription, roots, components, and local registration', () => {
+    it('destroys a EcsChannel3D subscription, roots, components, and local registration', () => {
         const localState = new LocalState()
-        const channel = new EcsSpatialChannel3D(localState, 100)
+        const channel = new EcsChannel3D(localState, 100)
         const user = createUser(localState)
 
         channel.subscribe(user, { x: 0, y: 0, z: 0, halfWidth: 100, halfHeight: 100, halfDepth: 100 })
@@ -138,17 +138,17 @@ describe('ECS channels', () => {
     it('can throw when a manual spatial write cannot be associated with a cell', () => {
         const schema = createCollidingSchema()
         const localState = new LocalState()
-        const channel = new ManualSpatialChannel2D(localState, 100, { strictManualWrites: true })
+        const channel = new ManualChannel2D(localState, 100, { strictManualWrites: true })
         const writer = channel.createEntityWriter(NType.Component, schema)
 
         expect(() => writer.props.x({ nid: 999, ntype: NType.Component, x: 1, y: 1 }, 2))
-            .toThrow('ManualSpatialChannel2D cannot write mutation')
+            .toThrow('ManualChannel2D cannot write mutation')
     })
 
     it('can throw when an ECS spatial write cannot be associated with a cell', () => {
         const schema = createCollidingSchema()
         const localState = new LocalState()
-        const channel = new EcsSpatialChannel2D(localState, 100, { strictManualWrites: true })
+        const channel = new EcsChannel2D(localState, 100, { strictManualWrites: true })
         const writer = channel.createComponentWriter(NType.Component, schema)
         const pid = channel.createEntity()
         const component = channel.addComponent(pid, {
@@ -159,13 +159,13 @@ describe('ECS channels', () => {
         })
 
         expect(() => writer.props.x(component, 2))
-            .toThrow('EcsSpatialChannel2D cannot write mutation')
+            .toThrow('EcsChannel2D cannot write mutation')
     })
 
     it('can throw when an ECS spatial 3D write cannot be associated with a cell', () => {
         const schema = createCollidingSchema()
         const localState = new LocalState()
-        const channel = new EcsSpatialChannel3D(localState, 100, { strictManualWrites: true })
+        const channel = new EcsChannel3D(localState, 100, { strictManualWrites: true })
         const writer = channel.createComponentWriter(NType.Component, schema)
         const pid = channel.createEntity()
         const component = channel.addComponent(pid, {
@@ -177,6 +177,6 @@ describe('ECS channels', () => {
         })
 
         expect(() => writer.props.x(component, 2))
-            .toThrow('EcsSpatialChannel3D cannot write mutation')
+            .toThrow('EcsChannel3D cannot write mutation')
     })
 })

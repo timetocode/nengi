@@ -47,10 +47,10 @@ they trade automatic scanning for userland responsibility.
 Pick the channel that matches visibility:
 
 - If everyone subscribed to a channel should see everything in it, use `Channel`.
-- If visibility depends on 2D position or a projected 3D plane, use `SpatialChannel2D`.
-- If visibility depends on true 3D position, use `SpatialChannel3D`.
+- If visibility depends on 2D position or a projected 3D plane, use `Channel2D`.
+- If visibility depends on true 3D position, use `Channel3D`.
 - If the game has explicit mutation points, consider the matching manual channel.
-- If the game uses nengi's ECS channel model, use `EcsChannel` or `EcsSpatialChannel2D/3D`.
+- If the game uses nengi's ECS channel model, use `EcsChannel` or `EcsChannel2D/3D`.
 
 Nengi is a networking framework. It does not own your game objects, game loop, physics, inventory system, ECS scheduler, or renderer.
 
@@ -80,7 +80,7 @@ coding:
 
 - A small arena or lobby-like game usually has one shared `Channel`.
 - A world where players spread out and have local vision usually has a
-  `SpatialChannel2D` or `SpatialChannel3D`.
+  `Channel2D` or `Channel3D`.
 - A container, inventory, terminal, party panel, or remote map is often a
   separate headered `Channel`.
 - Repeated player controls are commands.
@@ -123,7 +123,7 @@ Do not build a second store or binding layer by default. Userland should create
 sprites, UI records, sounds, and local prediction state directly from frame
 facts and raw store lookups.
 
-For nengi ECS channels, apply the frame's ECS CRUD to an `EcsWorld`. Keep that
+For nengi ECS channels, apply the frame's ECS CRUD to a `GameEcsWorld`. Keep that
 sync layer tiny: CRUD in, ECS mutation plus facts out.
 
 ## Common mistakes to avoid
@@ -176,6 +176,6 @@ Use this map instead of reading every file every time.
 
 Choose the channel from the game's visibility model. If all subscribed users see
 the same state, use `Channel`. If visibility is spatial, use
-`SpatialChannel2D` or `SpatialChannel3D`. If game code has reliable explicit
+`Channel2D` or `Channel3D`. If game code has reliable explicit
 mutation points, use the matching manual path where that responsibility is worth
 the control.

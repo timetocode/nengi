@@ -51,7 +51,7 @@ describe('Channel', () => {
             channelType: ChannelType.Channel
         })
         expect(channel.headerVersion).toBe(0)
-        expect(channel.markHeaderDirty()).toBe(false)
+        expect(channel.syncHeader()).toBe(false)
     })
 
     it('should add 10 entities', () => {
@@ -150,7 +150,7 @@ describe('Channel', () => {
         expect(localState.ownerByNid.has(header.nid)).toBe(false)
 
         header.x = 5
-        expect(headeredChannel.markHeaderDirty()).toBe(true)
+        expect(headeredChannel.syncHeader()).toBe(true)
         expect(headeredChannel.headerVersion).toBe(2)
     })
 
@@ -239,84 +239,6 @@ describe('Channel', () => {
 
         channel.destroy()
         expect(channel.entities.size).toBe(0)
-    })
-
-    it('cascades child visibility from a visible parent entity', () => {
-        const child = new ComponentTest()
-        channel.addEntity(entity)
-        localState.addChild(entity, child)
-        channel.subscribe(user)
-
-        const visible = user.checkVisibility(1)
-
-        expect(visible.toCreate).toEqual([entity.nid, child.nid])
-        expect(visible.toUpdate).toEqual([])
-        expect(visible.toDelete).toEqual([])
-    })
-
-    it('removes child visibility when the parent source is no longer visible', () => {
-        const child = new ComponentTest()
-        channel.addEntity(entity)
-        localState.addChild(entity, child)
-        channel.subscribe(user)
-
-        user.checkVisibility(1)
-        const parentNid = entity.nid
-        const childNid = child.nid
-
-        channel.removeEntity(entity)
-        const visible = user.checkVisibility(2)
-
-        expect(visible.toCreate).toEqual([])
-        expect(visible.toUpdate).toEqual([])
-        expect(visible.toDelete).toEqual([childNid, parentNid])
-        expect(child.nid).toBe(0)
-    })
-
-    it('keeps stable child visibility update and delete accounting correct', () => {
-        const child = new ComponentTest()
-        channel.addEntity(entity)
-        localState.addChild(entity, child)
-        channel.subscribe(user)
-
-        const first = user.checkVisibility(1)
-        const second = user.checkVisibility(2)
-        const parentNid = entity.nid
-        const childNid = child.nid
-
-        expect(first.toCreate).toEqual([parentNid, childNid])
-        expect(second.toCreate).toEqual([])
-        expect(second.toUpdate).toEqual([parentNid, childNid])
-        expect(second.toDelete).toEqual([])
-
-        channel.removeEntity(entity)
-        const third = user.checkVisibility(3)
-
-        expect(third.toCreate).toEqual([])
-        expect(third.toUpdate).toEqual([])
-        expect(third.toDelete).toEqual([childNid, parentNid])
-    })
-
-    it('orders nested hierarchy deletes from deepest child to root parent', () => {
-        const child = new ComponentTest()
-        const grandchild = new ComponentTest()
-
-        channel.addEntity(entity)
-        localState.addChild(entity, child)
-        localState.addChild(child, grandchild)
-        channel.subscribe(user)
-
-        user.checkVisibility(1)
-        const parentNid = entity.nid
-        const childNid = child.nid
-        const grandchildNid = grandchild.nid
-
-        channel.removeEntity(entity)
-        const visible = user.checkVisibility(2)
-
-        expect(visible.toCreate).toEqual([])
-        expect(visible.toUpdate).toEqual([])
-        expect(visible.toDelete).toEqual([grandchildNid, childNid, parentNid])
     })
 
     it('prevents a child entity from also being directly channel-owned', () => {

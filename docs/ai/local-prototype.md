@@ -207,7 +207,7 @@ export {
     Context,
     Instance,
     NetworkEvent,
-    SpatialChannel2D,
+    Channel2D,
     StaticInterpolator,
     User,
     defineEntitySchema,
@@ -280,17 +280,17 @@ For a minimal spatial game, use:
 
 - `Instance`
 - `WsInstanceAdapter`
-- `SpatialChannel2D`
+- `Channel2D`
 - `CommandRouter`
 - one `Player` entity per connected user
 
 For a tiny shared arena where every connected user should see every entity, use
-`Channel` instead of `SpatialChannel2D`.
+`Channel` instead of `Channel2D`.
 
 Server startup imports normally look like this:
 
 ```ts
-import { CommandRouter, Instance, NetworkEvent, SpatialChannel2D, User } from '#nengi'
+import { CommandRouter, Instance, NetworkEvent, Channel2D, User } from '#nengi'
 import { WsInstanceAdapter } from 'nengi-ws-instance-adapter'
 import { createGameContext } from '../shared/context'
 ```
@@ -315,11 +315,10 @@ Call `world.updateEntity(player)` after a spatial entity moves so the spatial
 grid can update its cell bookkeeping. Call `world.updateView(user, view)` when
 the user's interest area moves.
 
-For automatic `Channel` and `SpatialChannel2D`, ordinary replicated property
-changes are diffed during snapshot construction. `markDirty(entity)` is not
-required for correctness on the automatic path. Use explicit mutation APIs and
-manual channels only when the game is deliberately taking responsibility for
-reported mutations.
+For automatic `Channel` and `Channel2D`, ordinary replicated property
+changes are diffed during snapshot construction. Automatic channels do not need
+dirty markers. Use explicit mutation APIs and manual channels only when the game
+is deliberately taking responsibility for reported mutations.
 
 The server loop should:
 

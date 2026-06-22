@@ -26,8 +26,8 @@ own the relevant mutations.
 Use `createEntityWriter(ntype, schema)` with:
 
 - `ManualChannel`
-- `ManualSpatialChannel2D`
-- `ManualSpatialChannel3D`
+- `ManualChannel2D`
+- `ManualChannel3D`
 
 Example:
 
@@ -61,8 +61,8 @@ Prefer group writers for common hot bundles.
 Use `createComponentWriter(ntype, schema)` with:
 
 - `EcsChannel`
-- `EcsSpatialChannel2D`
-- `EcsSpatialChannel3D`
+- `EcsChannel2D`
+- `EcsChannel3D`
 
 Example:
 

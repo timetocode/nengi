@@ -26,24 +26,12 @@ function addEcsCreates(plan: SnapshotPlan, channel: EcsSnapshotChannel, toCreate
 }
 
 function addEcsDeletes(plan: SnapshotPlan, channel: EcsSnapshotChannel, toDelete: number[]) {
-    const deletingRoots = new Set<number>()
     for (let i = 0; i < toDelete.length; i++) {
         const nid = toDelete[i]
         if (channel.isRootNid(nid)) {
-            deletingRoots.add(nid)
             plan.ecsDeleteEntities.push(nid)
+        } else if (channel.isComponentNid(nid)) {
+            plan.deleteEntities.push(nid)
         }
-    }
-
-    for (let i = 0; i < toDelete.length; i++) {
-        const nid = toDelete[i]
-        if (channel.isRootNid(nid)) {
-            continue
-        }
-        const component = channel.getComponent(nid)
-        if (channel.isRootDeletedComponentNid(nid) || (component && deletingRoots.has(component.pid))) {
-            continue
-        }
-        plan.deleteEntities.push(nid)
     }
 }

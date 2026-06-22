@@ -50,4 +50,17 @@ describe('GameEcsWorld', () => {
 
         expect(seen).toEqual([[moving, 1, 3]])
     })
+
+    it('throws when adding the same component type to an entity twice', () => {
+        const ecs = new GameEcsWorld()
+        const pid = ecs.createEntity()
+        const original = ecs.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
+
+        expect(() => ecs.add(Position.create({ pid, nid: 11, x: 3, y: 4 }))).toThrow(
+            'Entity -1 already has component 1'
+        )
+        expect(ecs.get(pid, Position)).toBe(original)
+        expect(ecs.getByNid(10)).toBe(original)
+        expect(ecs.getByNid(11)).toBeUndefined()
+    })
 })

@@ -6,19 +6,15 @@ import { ChannelHeader, ChannelType, createChannelHeader } from '../common/Chann
 import { IEntity } from '../common/IEntity'
 import { AABB2D } from '../server/channel/AABB2D'
 import { AABB3D } from '../server/channel/AABB3D'
-import { SpatialChannel2D } from '../server/channel/SpatialChannel2D'
-import { SpatialChannel3D } from '../server/channel/SpatialChannel3D'
-import { FinalStateSpatialChannel2D } from '../server/channel/FinalStateSpatialChannel2D'
-import { PlannedSpatialChannel2D } from '../server/channel/PlannedSpatialChannel2D'
+import { Channel2D } from '../server/channel/Channel2D'
+import { Channel3D } from '../server/channel/Channel3D'
 import { SpatialPlane } from '../server/channel/SpatialView'
 import { Channel } from '../server/channel/Channel'
 import { ManualChannel } from '../server/channel/ManualChannel'
-import { ManualSpatialChannel2D } from '../server/channel/ManualSpatialChannel2D'
-import { ManualSpatialChannel3D } from '../server/channel/ManualSpatialChannel3D'
+import { ManualChannel2D } from '../server/channel/ManualChannel2D'
+import { ManualChannel3D } from '../server/channel/ManualChannel3D'
 import { EcsChannel } from '../server/channel/EcsChannel'
-import { EcsSpatialChannel2D } from '../server/channel/EcsSpatialChannel2D'
-import { EcsSpatialChannel3D } from '../server/channel/EcsSpatialChannel3D'
-import { PlannedEcsSpatialChannel2D } from '../server/channel/PlannedEcsSpatialChannel2D'
+import { EcsChannel2D } from '../server/channel/EcsChannel2D'
 import { IChannel } from '../server/channel/IChannel'
 import { Instance } from '../server/Instance'
 import { User } from '../server/User'
@@ -39,29 +35,24 @@ type ScenarioName =
     | 'players-300'
     | 'sparse-visible'
     | 'non-overlap'
-    | 'spatial-channel-2d'
-    | 'final-state-spatial-channel-2d'
-    | 'planned-spatial-channel-2d'
-    | 'spatial-channel-3d'
+    | 'channel-2d'
+    | 'channel-3d'
     | 'manual-channel'
-    | 'manual-spatial-channel-2d'
-    | 'manual-spatial-channel-3d'
+    | 'manual-channel-2d'
+    | 'manual-channel-3d'
     | 'wide-channel'
     | 'wide-manual-channel'
     | 'ecs-manual-channel'
     | 'ecs-channel'
     | 'ecs-channel-churn'
-    | 'ecs-spatial-channel-2d'
-    | 'planned-ecs-spatial-channel-2d'
-    | 'planned-ecs-spatial-clump'
-    | 'ecs-spatial-clump'
-    | 'ecs-spatial-channel-3d'
-    | 'wide-manual-spatial'
-    | 'ecs-manual-spatial'
+    | 'ecs-channel-2d'
+    | 'ecs-channel-clump'
+    | 'wide-manual-channel-2d'
+    | 'ecs-manual-channel-2d'
     | 'parent-child-channel'
     | 'parent-child-manual-channel'
-    | 'parent-child-spatial-channel'
-    | 'parent-child-manual-spatial-channel'
+    | 'parent-child-channel-2d'
+    | 'parent-child-manual-channel-2d'
     | 'channel-churn'
 
 const SCENARIOS = new Set<ScenarioName>([
@@ -69,29 +60,24 @@ const SCENARIOS = new Set<ScenarioName>([
     'players-300',
     'sparse-visible',
     'non-overlap',
-    'spatial-channel-2d',
-    'final-state-spatial-channel-2d',
-    'planned-spatial-channel-2d',
-    'spatial-channel-3d',
+    'channel-2d',
+    'channel-3d',
     'manual-channel',
-    'manual-spatial-channel-2d',
-    'manual-spatial-channel-3d',
+    'manual-channel-2d',
+    'manual-channel-3d',
     'wide-channel',
     'wide-manual-channel',
     'ecs-manual-channel',
     'ecs-channel',
     'ecs-channel-churn',
-    'ecs-spatial-channel-2d',
-    'planned-ecs-spatial-channel-2d',
-    'planned-ecs-spatial-clump',
-    'ecs-spatial-clump',
-    'ecs-spatial-channel-3d',
-    'wide-manual-spatial',
-    'ecs-manual-spatial',
+    'ecs-channel-2d',
+    'ecs-channel-clump',
+    'wide-manual-channel-2d',
+    'ecs-manual-channel-2d',
     'parent-child-channel',
     'parent-child-manual-channel',
-    'parent-child-spatial-channel',
-    'parent-child-manual-spatial-channel',
+    'parent-child-channel-2d',
+    'parent-child-manual-channel-2d',
     'channel-churn'
 ])
 
@@ -99,11 +85,9 @@ type SuiteName = 'spatial-fanout'
 
 const SUITES: Record<SuiteName, ScenarioName[]> = {
     'spatial-fanout': [
-        'spatial-channel-2d',
-        'manual-spatial-channel-2d',
-        'final-state-spatial-channel-2d',
-        'planned-spatial-channel-2d',
-        'planned-ecs-spatial-channel-2d'
+        'channel-2d',
+        'manual-channel-2d',
+        'ecs-channel-2d'
     ]
 }
 
@@ -114,22 +98,19 @@ type SpatialViewShape = 'aabb' | 'circle' | 'sphere'
 const CUSTOM_MUTATION_SCENARIOS = new Set<ScenarioName>([
     'channel-churn',
     'manual-channel',
-    'manual-spatial-channel-2d',
-    'manual-spatial-channel-3d',
+    'manual-channel-2d',
+    'manual-channel-3d',
     'wide-channel',
     'wide-manual-channel',
-    'wide-manual-spatial',
+    'wide-manual-channel-2d',
     'ecs-manual-channel',
     'ecs-channel',
     'ecs-channel-churn',
-    'ecs-manual-spatial',
-    'ecs-spatial-channel-2d',
-    'planned-ecs-spatial-channel-2d',
-    'planned-ecs-spatial-clump',
-    'ecs-spatial-clump',
-    'ecs-spatial-channel-3d',
+    'ecs-manual-channel-2d',
+    'ecs-channel-2d',
+    'ecs-channel-clump',
     'parent-child-manual-channel',
-    'parent-child-manual-spatial-channel'
+    'parent-child-manual-channel-2d'
 ])
 
 type TestEntity = IEntity & {
@@ -182,7 +163,7 @@ type EcsBundle = {
     loadout: LoadoutComponent
 }
 
-type EcsSpatial2DBenchmarkChannel = {
+type Ecs2DBenchmarkChannel = {
     createEntity(): number
     addSpatialComponent<T extends { nid: number, ntype: number }>(pid: number, component: T): T & { pid: number }
     addComponent<T extends { nid: number, ntype: number }>(pid: number, component: T): T & { pid: number }
@@ -322,7 +303,7 @@ function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
         throw new Error('PROFILE_MANUAL_EMIT must be "group4" or "props".')
     }
     const entityShape = process.env.PROFILE_ENTITY_SHAPE || (
-        scenario.startsWith('wide-') ? 'monolith' : scenario.startsWith('ecs-') || scenario.startsWith('planned-ecs-') ? 'ecs' : 'standard'
+        scenario.startsWith('wide-') ? 'monolith' : scenario.startsWith('ecs-') ? 'ecs' : 'standard'
     )
     if (entityShape !== 'standard' && entityShape !== 'monolith' && entityShape !== 'ecs') {
         throw new Error('PROFILE_ENTITY_SHAPE must be "standard", "monolith", or "ecs".')
@@ -331,25 +312,25 @@ function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
     if (spatialViewShape !== 'aabb' && spatialViewShape !== 'circle' && spatialViewShape !== 'sphere') {
         throw new Error('PROFILE_VIEW_SHAPE must be "aabb", "circle", or "sphere".')
     }
-    const ecsSpatialClump = scenario === 'ecs-spatial-clump' || scenario === 'planned-ecs-spatial-clump'
+    const ecsChannelClump = scenario === 'ecs-channel-clump'
 
     return {
         scenario,
-        users: Math.max(1, Math.floor(envNumber('PROFILE_USERS', ecsSpatialClump ? 350 : scenario === 'players-300' ? 300 : 20))),
-        entities: Math.max(1, Math.floor(envNumber('PROFILE_ENTITIES', scenario === 'sparse-visible' ? 50000 : ecsSpatialClump ? 350 : scenario === 'players-300' ? 302 : 1000))),
-        visible: Math.max(1, Math.floor(envNumber('PROFILE_VISIBLE', scenario === 'sparse-visible' ? 200 : ecsSpatialClump ? 350 : scenario === 'players-300' ? 302 : 1000))),
+        users: Math.max(1, Math.floor(envNumber('PROFILE_USERS', ecsChannelClump ? 350 : scenario === 'players-300' ? 300 : 20))),
+        entities: Math.max(1, Math.floor(envNumber('PROFILE_ENTITIES', scenario === 'sparse-visible' ? 50000 : ecsChannelClump ? 350 : scenario === 'players-300' ? 302 : 1000))),
+        visible: Math.max(1, Math.floor(envNumber('PROFILE_VISIBLE', scenario === 'sparse-visible' ? 200 : ecsChannelClump ? 350 : scenario === 'players-300' ? 302 : 1000))),
         ticks: Math.max(1, Math.floor(envNumber('PROFILE_TICKS', 300))),
         warmup: Math.max(0, Math.floor(envNumber('PROFILE_WARMUP', 60))),
-        sharedUpdates: envBool('PROFILE_SHARED_UPDATES', ecsSpatialClump),
+        sharedUpdates: envBool('PROFILE_SHARED_UPDATES', ecsChannelClump),
         groups: !envBool('PROFILE_GROUPS_OFF', false),
         nidStart: Math.max(1, Math.floor(envNumber('PROFILE_NID_START', 1))),
-        cellSize: Math.max(1, envNumber('PROFILE_CELL_SIZE', ecsSpatialClump ? 512 : 50)),
-        viewHalf: Math.max(1, envNumber('PROFILE_VIEW_HALF', ecsSpatialClump ? 512 : Math.sqrt(Math.max(1, envNumber('PROFILE_VISIBLE', scenario === 'sparse-visible' ? 200 : scenario === 'players-300' ? 302 : 1000))) * 1.5)),
+        cellSize: Math.max(1, envNumber('PROFILE_CELL_SIZE', ecsChannelClump ? 512 : 50)),
+        viewHalf: Math.max(1, envNumber('PROFILE_VIEW_HALF', ecsChannelClump ? 512 : Math.sqrt(Math.max(1, envNumber('PROFILE_VISIBLE', scenario === 'sparse-visible' ? 200 : scenario === 'players-300' ? 302 : 1000))) * 1.5)),
         churn: Math.max(0, Math.floor(envNumber('PROFILE_CHURN', scenario === 'channel-churn' || scenario === 'ecs-channel-churn' ? 100 : 0))),
         children: Math.max(0, Math.floor(envNumber('PROFILE_CHILDREN', scenario === 'channel-churn' ? 1 : 0))),
-        spatialDistribution: process.env.PROFILE_SPATIAL_DISTRIBUTION || (ecsSpatialClump ? 'single-cell' : 'default'),
+        spatialDistribution: process.env.PROFILE_SPATIAL_DISTRIBUTION || (ecsChannelClump ? 'single-cell' : 'default'),
         spatialPlane: process.env.PROFILE_SPATIAL_PLANE === 'xz' ? 'xz' : 'xy',
-        worldSize: Math.max(1, envNumber('PROFILE_WORLD_SIZE', ecsSpatialClump ? 512 : 5000)),
+        worldSize: Math.max(1, envNumber('PROFILE_WORLD_SIZE', ecsChannelClump ? 512 : 5000)),
         clusters: Math.max(1, Math.floor(envNumber('PROFILE_CLUSTERS', 8))),
         moveFraction: Math.min(1, Math.max(0, envNumber('PROFILE_MOVE_FRACTION', 1))),
         queryPadding: Math.max(0, envNumber('PROFILE_QUERY_PADDING', 0)),
@@ -575,9 +556,8 @@ function spreadEntitiesClustered(entities: TestEntity[], config: ScenarioConfig)
 
 function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig) {
     if (
-        config.scenario === 'spatial-channel-3d' ||
-        config.scenario === 'manual-spatial-channel-3d' ||
-        config.scenario === 'ecs-spatial-channel-3d'
+        config.scenario === 'channel-3d' ||
+        config.scenario === 'manual-channel-3d'
     ) {
         spreadEntitiesHomogeneous3D(entities, config)
         return
@@ -800,13 +780,13 @@ function setupManualChannel(instance: Instance, users: User[], entities: TestEnt
     }
 }
 
-function setupManualSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new ManualSpatialChannel2D(instance.localState, config.cellSize, {
+function setupManualChannel2D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         plane: config.spatialPlane,
-        name: 'manual-spatial'
+        name: 'manual-channel'
     })
     const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
@@ -845,12 +825,12 @@ function setupManualSpatialChannel(instance: Instance, users: User[], entities: 
     }
 }
 
-function setupManualSpatialChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new ManualSpatialChannel3D(instance.localState, config.cellSize, {
+function setupManualChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel3D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        name: 'manual-spatial-channel-3d'
+        name: 'manual-channel-3d'
     })
     const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const transform = Entity.transform
@@ -913,13 +893,13 @@ function setupWideManualChannel(instance: Instance, users: User[], entities: Wid
     }
 }
 
-function setupWideManualSpatial(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
-    const channel = new ManualSpatialChannel2D(instance.localState, config.cellSize, {
+function setupWideManualChannel2D(instance: Instance, users: User[], entities: WideEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         plane: config.spatialPlane,
-        name: 'wide-manual-spatial'
+        name: 'wide-manual-channel-2d'
     })
     const Wide = channel.createEntityWriter(NType.WideEntity, instance.context.getSchema(NType.WideEntity)!)
     for (let i = 0; i < entities.length; i++) {
@@ -1074,13 +1054,13 @@ function setupEcsChannelChurn(instance: Instance, users: User[], bundles: EcsBun
     }
 }
 
-function setupEcsManualSpatial(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
-    const channel = new ManualSpatialChannel2D(instance.localState, config.cellSize, {
+function setupEcsManualChannel2D(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
+    const channel = new ManualChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         plane: config.spatialPlane,
-        name: 'ecs-manual-spatial'
+        name: 'ecs-manual-channel-2d'
     })
     const Transform = channel.createEntityWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
     const Vitals = channel.createEntityWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
@@ -1135,12 +1115,12 @@ function setupEcsManualSpatial(instance: Instance, users: User[], bundles: EcsBu
     }
 }
 
-function setupEcsSpatialChannel(
+function setupEcsChannel2D(
     instance: Instance,
     users: User[],
     bundles: EcsBundle[],
     config: ScenarioConfig,
-    createChannel: (name: string) => EcsSpatial2DBenchmarkChannel = name => new EcsSpatialChannel2D(instance.localState, config.cellSize, {
+    createChannel: (name: string) => Ecs2DBenchmarkChannel = name => new EcsChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
@@ -1148,7 +1128,7 @@ function setupEcsSpatialChannel(
         name
     })
 ) {
-    const channel = createChannel('ecs-spatial')
+    const channel = createChannel('ecs-channel')
     const Transform = channel.createComponentWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
     const Vitals = channel.createComponentWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
     const Loadout = channel.createComponentWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
@@ -1202,68 +1182,6 @@ function setupEcsSpatialChannel(
     }
 }
 
-function setupEcsSpatialChannel3D(instance: Instance, users: User[], bundles: EcsBundle[], config: ScenarioConfig) {
-    const channel = new EcsSpatialChannel3D(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        fragmentCellLimit: config.fragmentCellLimit,
-        stableFragmentCellLimit: config.stableFragmentCellLimit,
-        name: 'ecs-spatial-channel-3d'
-    })
-    const Transform = channel.createComponentWriter(NType.TransformComponent, instance.context.getSchema(NType.TransformComponent)!)
-    const Vitals = channel.createComponentWriter(NType.VitalsComponent, instance.context.getSchema(NType.VitalsComponent)!)
-    const Loadout = channel.createComponentWriter(NType.LoadoutComponent, instance.context.getSchema(NType.LoadoutComponent)!)
-    const transforms: TransformComponent[] = []
-    for (let i = 0; i < bundles.length; i++) {
-        const bundle = bundles[i]
-        transforms.push(bundle.transform)
-        const pid = channel.createEntity()
-        bundle.root.nid = pid
-        channel.addSpatialComponent(pid, bundle.transform)
-        channel.addComponent(pid, bundle.vitals)
-        channel.addComponent(pid, bundle.loadout)
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView3D(i, transforms as any, config))
-    }
-    return () => {
-        const moving = Math.floor(bundles.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            const bundle = bundles[i]
-            const values = nextStateValues(
-                bundle.transform.x,
-                bundle.transform.y,
-                bundle.transform.z,
-                bundle.transform.rot,
-                bundle.vitals.hp,
-                bundle.vitals.maxHp,
-                bundle.vitals.shield,
-                bundle.loadout.weapon,
-                bundle.loadout.ammo,
-                bundle.loadout.reload,
-                instance.tick,
-                i
-            )
-            bundle.root.x = values.x
-            bundle.root.y = values.y
-            bundle.root.z = values.z
-            bundle.transform.x = values.x
-            bundle.transform.y = values.y
-            bundle.transform.z = values.z
-            bundle.transform.rot = values.rot
-            bundle.vitals.hp = values.hp
-            bundle.vitals.maxHp = values.maxHp
-            bundle.vitals.shield = values.shield
-            bundle.loadout.weapon = values.weapon
-            bundle.loadout.ammo = values.ammo
-            bundle.loadout.reload = values.reload
-            channel.updateSpatialComponent(bundle.transform as any)
-            Transform.transform(bundle.transform, values.x, values.y, values.z, values.rot)
-            Vitals.vitals(bundle.vitals, values.hp, values.maxHp, values.shield)
-            Loadout.loadout(bundle.loadout, values.weapon, values.ammo, values.reload)
-        }
-    }
-}
-
 function setupParentChildChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new Channel(instance.localState, { name: 'parent-child-channel' })
     for (let i = 0; i < entities.length; i++) {
@@ -1300,8 +1218,8 @@ function setupParentChildManualChannel(instance: Instance, users: User[], entiti
     }
 }
 
-function setupParentChildSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new SpatialChannel2D(instance.localState, config.cellSize, {
+function setupParentChildChannel2D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new Channel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
@@ -1318,7 +1236,7 @@ function setupParentChildSpatialChannel(instance: Instance, users: User[], entit
     const allEntities = entities.concat(children)
     return {
         allEntities,
-        updateSpatialIndex() {
+        updateChannel2DIndex() {
             const movingRoots = Math.floor(entities.length * config.moveFraction)
             for (let i = 0; i < movingRoots; i++) {
                 channel.updateEntity(entities[i])
@@ -1327,13 +1245,13 @@ function setupParentChildSpatialChannel(instance: Instance, users: User[], entit
     }
 }
 
-function setupParentChildManualSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new ManualSpatialChannel2D(instance.localState, config.cellSize, {
+function setupParentChildManualChannel2D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new ManualChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         plane: config.spatialPlane,
-        name: 'parent-child-manual-spatial'
+        name: 'parent-child-manual-channel'
     })
     const Entity = channel.createEntityWriter(NType.Entity, instance.context.getSchema(NType.Entity)!)
     const allEntities = entities.slice()
@@ -1434,13 +1352,13 @@ function createSpatialView3D(userIndex: number, entities: TestEntity[], config: 
     return new AABB3D(entity.x, entity.y, entity.z, config.viewHalf, config.viewHalf, config.viewHalf)
 }
 
-function setupSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new SpatialChannel2D(instance.localState, config.cellSize, {
+function setupChannel2D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new Channel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         plane: config.spatialPlane,
-        name: 'spatial-channel-2d'
+        name: 'channel-2d'
     })
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1456,52 +1374,12 @@ function setupSpatialChannel(instance: Instance, users: User[], entities: TestEn
     }
 }
 
-function setupFinalStateSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new FinalStateSpatialChannel2D(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        plane: config.spatialPlane,
-        name: 'final-state-spatial-channel-2d'
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
-        }
-    }
-}
-
-function setupPlannedSpatialChannel(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new PlannedSpatialChannel2D(instance.localState, config.cellSize, {
-        queryPadding: config.queryPadding,
-        plane: config.spatialPlane,
-        name: 'planned-spatial-channel-2d'
-    })
-    for (let i = 0; i < entities.length; i++) {
-        channel.addEntity(entities[i])
-    }
-    for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, entities, config))
-    }
-    return () => {
-        const moving = Math.floor(entities.length * config.moveFraction)
-        for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
-        }
-    }
-}
-
-function setupSpatialChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new SpatialChannel3D(instance.localState, config.cellSize, {
+function setupChannel3D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
+    const channel = new Channel3D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
-        name: 'spatial-channel-3d'
+        name: 'channel-3d'
     })
     for (let i = 0; i < entities.length; i++) {
         channel.addEntity(entities[i])
@@ -1576,21 +1454,16 @@ function buildScenario(config: ScenarioConfig) {
             entities.push(createEntity(i))
         }
     }
-    if (config.scenario === 'spatial-channel-2d' ||
-        config.scenario === 'final-state-spatial-channel-2d' ||
-        config.scenario === 'planned-spatial-channel-2d' ||
-        config.scenario === 'spatial-channel-3d' ||
-        config.scenario === 'manual-spatial-channel-2d' ||
-        config.scenario === 'manual-spatial-channel-3d' ||
-        config.scenario === 'wide-manual-spatial' ||
-        config.scenario === 'ecs-manual-spatial' ||
-        config.scenario === 'ecs-spatial-channel-2d' ||
-        config.scenario === 'planned-ecs-spatial-channel-2d' ||
-        config.scenario === 'planned-ecs-spatial-clump' ||
-        config.scenario === 'ecs-spatial-clump' ||
-        config.scenario === 'ecs-spatial-channel-3d' ||
-        config.scenario === 'parent-child-spatial-channel' ||
-        config.scenario === 'parent-child-manual-spatial-channel') {
+    if (config.scenario === 'channel-2d' ||
+        config.scenario === 'channel-3d' ||
+        config.scenario === 'manual-channel-2d' ||
+        config.scenario === 'manual-channel-3d' ||
+        config.scenario === 'wide-manual-channel-2d' ||
+        config.scenario === 'ecs-manual-channel-2d' ||
+        config.scenario === 'ecs-channel-2d' ||
+        config.scenario === 'ecs-channel-clump' ||
+        config.scenario === 'parent-child-channel-2d' ||
+        config.scenario === 'parent-child-manual-channel-2d') {
         applySpatialDistribution(entities as TestEntity[], config)
         if (config.entityShape === 'ecs') {
             for (let i = 0; i < ecsBundles.length; i++) {
@@ -1601,70 +1474,62 @@ function buildScenario(config: ScenarioConfig) {
         }
     }
 
-    let updateSpatialIndex: (() => void) | null = null
+    let updateChannel2DIndex: (() => void) | null = null
     let beforeStep: (() => void) | null = null
     let mutateSet = entities
     if (config.scenario === 'sparse-visible' || config.scenario === 'non-overlap') {
         setupFixedVisible(instance, users, entities, config)
-    } else if (config.scenario === 'spatial-channel-2d') {
-        updateSpatialIndex = setupSpatialChannel(instance, users, entities, config)
-    } else if (config.scenario === 'final-state-spatial-channel-2d') {
-        updateSpatialIndex = setupFinalStateSpatialChannel(instance, users, entities, config)
-    } else if (config.scenario === 'planned-spatial-channel-2d') {
-        updateSpatialIndex = setupPlannedSpatialChannel(instance, users, entities, config)
-    } else if (config.scenario === 'spatial-channel-3d') {
-        updateSpatialIndex = setupSpatialChannel3D(instance, users, entities, config)
+    } else if (config.scenario === 'channel-2d') {
+        updateChannel2DIndex = setupChannel2D(instance, users, entities, config)
+    } else if (config.scenario === 'channel-3d') {
+        updateChannel2DIndex = setupChannel3D(instance, users, entities, config)
     } else if (config.scenario === 'channel-churn') {
         const churn = setupChannelChurn(instance, users, entities, config)
         beforeStep = churn.churn
         mutateSet = churn.liveEntities
     } else if (config.scenario === 'manual-channel') {
         beforeStep = setupManualChannel(instance, users, entities, config)
-    } else if (config.scenario === 'manual-spatial-channel-2d') {
-        beforeStep = setupManualSpatialChannel(instance, users, entities as TestEntity[], config)
-    } else if (config.scenario === 'manual-spatial-channel-3d') {
-        beforeStep = setupManualSpatialChannel3D(instance, users, entities as TestEntity[], config)
+    } else if (config.scenario === 'manual-channel-2d') {
+        beforeStep = setupManualChannel2D(instance, users, entities as TestEntity[], config)
+    } else if (config.scenario === 'manual-channel-3d') {
+        beforeStep = setupManualChannel3D(instance, users, entities as TestEntity[], config)
     } else if (config.scenario === 'wide-channel') {
         beforeStep = setupWideChannel(instance, users, entities as WideEntity[], config)
     } else if (config.scenario === 'wide-manual-channel') {
         beforeStep = setupWideManualChannel(instance, users, entities as WideEntity[], config)
-    } else if (config.scenario === 'wide-manual-spatial') {
-        beforeStep = setupWideManualSpatial(instance, users, entities as WideEntity[], config)
+    } else if (config.scenario === 'wide-manual-channel-2d') {
+        beforeStep = setupWideManualChannel2D(instance, users, entities as WideEntity[], config)
     } else if (config.scenario === 'ecs-manual-channel') {
         beforeStep = setupEcsManualChannel(instance, users, ecsBundles, config)
     } else if (config.scenario === 'ecs-channel') {
         beforeStep = setupEcsChannel(instance, users, ecsBundles, config)
     } else if (config.scenario === 'ecs-channel-churn') {
         beforeStep = setupEcsChannelChurn(instance, users, ecsBundles, config)
-    } else if (config.scenario === 'ecs-manual-spatial') {
-        beforeStep = setupEcsManualSpatial(instance, users, ecsBundles, config)
-    } else if (config.scenario === 'ecs-spatial-channel-2d' || config.scenario === 'ecs-spatial-clump') {
-        beforeStep = setupEcsSpatialChannel(instance, users, ecsBundles, config)
-    } else if (config.scenario === 'planned-ecs-spatial-channel-2d' || config.scenario === 'planned-ecs-spatial-clump') {
-        beforeStep = setupEcsSpatialChannel(instance, users, ecsBundles, config, name => new PlannedEcsSpatialChannel2D(instance.localState, config.cellSize, {
+    } else if (config.scenario === 'ecs-manual-channel-2d') {
+        beforeStep = setupEcsManualChannel2D(instance, users, ecsBundles, config)
+    } else if (config.scenario === 'ecs-channel-2d' || config.scenario === 'ecs-channel-clump') {
+        beforeStep = setupEcsChannel2D(instance, users, ecsBundles, config, name => new EcsChannel2D(instance.localState, config.cellSize, {
             queryPadding: config.queryPadding,
             fragmentCellLimit: config.fragmentCellLimit,
             stableFragmentCellLimit: config.stableFragmentCellLimit,
             plane: config.spatialPlane,
-            name: `planned-${name}`
+            name: `ecs-${name}`
         }))
-    } else if (config.scenario === 'ecs-spatial-channel-3d') {
-        beforeStep = setupEcsSpatialChannel3D(instance, users, ecsBundles, config)
     } else if (config.scenario === 'parent-child-channel') {
         mutateSet = setupParentChildChannel(instance, users, entities as TestEntity[], config)
     } else if (config.scenario === 'parent-child-manual-channel') {
         beforeStep = setupParentChildManualChannel(instance, users, entities as TestEntity[], config)
-    } else if (config.scenario === 'parent-child-spatial-channel') {
-        const parentChildSpatial = setupParentChildSpatialChannel(instance, users, entities as TestEntity[], config)
-        mutateSet = parentChildSpatial.allEntities
-        updateSpatialIndex = parentChildSpatial.updateSpatialIndex
-    } else if (config.scenario === 'parent-child-manual-spatial-channel') {
-        beforeStep = setupParentChildManualSpatialChannel(instance, users, entities as TestEntity[], config)
+    } else if (config.scenario === 'parent-child-channel-2d') {
+        const parentChildChannel2D = setupParentChildChannel2D(instance, users, entities as TestEntity[], config)
+        mutateSet = parentChildChannel2D.allEntities
+        updateChannel2DIndex = parentChildChannel2D.updateChannel2DIndex
+    } else if (config.scenario === 'parent-child-manual-channel-2d') {
+        beforeStep = setupParentChildManualChannel2D(instance, users, entities as TestEntity[], config)
     } else {
         setupShared(instance, users as any, entities as TestEntity[])
     }
 
-    return { instance, adapter, users, entities: mutateSet, updateSpatialIndex, beforeStep }
+    return { instance, adapter, users, entities: mutateSet, updateChannel2DIndex, beforeStep }
 }
 
 function percentile(sorted: number[], p: number) {
@@ -1691,7 +1556,7 @@ function fmt(value: number) {
 }
 
 function runScenario(config: ScenarioConfig) {
-    const { instance, adapter, entities, updateSpatialIndex, beforeStep } = buildScenario(config)
+    const { instance, adapter, entities, updateChannel2DIndex, beforeStep } = buildScenario(config)
     const stepTimes: number[] = []
     const preStepTimes: number[] = []
     const indexTimes: number[] = []
@@ -1703,8 +1568,8 @@ function runScenario(config: ScenarioConfig) {
         if (beforeStep) {
             beforeStep()
         }
-        if (updateSpatialIndex) {
-            updateSpatialIndex()
+        if (updateChannel2DIndex) {
+            updateChannel2DIndex()
         }
         instance.step()
     }
@@ -1724,9 +1589,9 @@ function runScenario(config: ScenarioConfig) {
             beforeStep()
             preStepTimes.push(performance.now() - preStepStart)
         }
-        if (updateSpatialIndex) {
+        if (updateChannel2DIndex) {
             const indexStart = performance.now()
-            updateSpatialIndex()
+            updateChannel2DIndex()
             indexTimes.push(performance.now() - indexStart)
         }
         const start = performance.now()

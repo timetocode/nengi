@@ -18,10 +18,10 @@ is the smallest example.
 
 ## Large 2D world
 
-Use `SpatialChannel2D`.
+Use `Channel2D`.
 
 ```ts
-const world = new SpatialChannel2D(instance.localState, 100, { name: 'world' })
+const world = new Channel2D(instance.localState, 100, { name: 'world' })
 world.addEntity(monster)
 world.subscribe(user, { x: player.x, y: player.y, halfWidth: 800, halfHeight: 600 })
 ```
@@ -34,10 +34,10 @@ world.updateView(user, { x: player.x, y: player.y, halfWidth: 800, halfHeight: 6
 
 ## 3D game with horizontal culling
 
-Use `SpatialChannel2D` with `plane: 'xz'`.
+Use `Channel2D` with `plane: 'xz'`.
 
 ```ts
-const world = new SpatialChannel2D(instance.localState, 100, {
+const world = new Channel2D(instance.localState, 100, {
     plane: 'xz',
     name: 'world-xz'
 })
@@ -47,10 +47,10 @@ world.subscribe(user, { x: player.x, z: player.z, halfX: 800, halfZ: 800 })
 
 ## True 3D space game
 
-Use `SpatialChannel3D`.
+Use `Channel3D`.
 
 ```ts
-const space = new SpatialChannel3D(instance.localState, 500, { name: 'space' })
+const space = new Channel3D(instance.localState, 500, { name: 'space' })
 space.subscribe(user, { x: ship.x, y: ship.y, z: ship.z, radius: 5000 })
 ```
 
@@ -95,7 +95,7 @@ If a channel only needs a simple name, use `name`. Use a schema-backed header
 object when scoped entity handling needs client-visible structured fields.
 Default header names are creation-time metadata. If the client needs mutable
 channel context, pass a schema-backed header object, mutate that object on the
-server, and call `channel.markHeaderDirty()`.
+server, and call `channel.syncHeader()`.
 
 On the client, process the inventory channel's frame bucket:
 
@@ -154,7 +154,7 @@ central game function. The important requirement is not that the feature is
 "advanced"; it is that every networked mutation reliably calls the writer.
 
 ```ts
-const world = new ManualSpatialChannel2D(instance.localState, 100)
+const world = new ManualChannel2D(instance.localState, 100)
 const Player = world.createEntityWriter(NType.Player, context.getSchema(NType.Player)!)
 
 player.x = nextX
@@ -169,7 +169,7 @@ desync bugs, not harmless debug noise.
 
 ## ECS character
 
-Use `EcsChannel` if all subscribed users see all ECS roots. Use `EcsSpatialChannel2D/3D` if roots need culling.
+Use `EcsChannel` if all subscribed users see all ECS roots. Use `EcsChannel2D/3D` if roots need culling.
 
 ```ts
 const ecs = new EcsChannel(instance.localState)
@@ -189,9 +189,9 @@ Transform.position(transform, nextX, nextY)
 
 A game can use several channels for one player:
 
-- Main world: `SpatialChannel2D`.
+- Main world: `Channel2D`.
 - Inventory: `Channel`.
 - Party/team state: `Channel`.
-- Remote map UI: another `SpatialChannel2D` with a different view.
+- Remote map UI: another `Channel2D` with a different view.
 
 Keep each channel's purpose clear.

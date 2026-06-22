@@ -1,5 +1,7 @@
 import { IEntity } from '../../common/IEntity'
 import { ChannelType } from '../../common/ChannelHeader'
+import { ProtocolConfig } from '../../common/binary/Protocol'
+import { Instance } from '../Instance'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
@@ -7,20 +9,28 @@ import { ICulledChannel } from './IChannel'
 import { Point3D } from './Point3D'
 import { SpatialGrid3D } from './SpatialGrid'
 import { normalizeSpatialView3D, objectInSpatialView3D, SpatialView3D } from './SpatialView'
+import { ChannelSnapshotOutput } from './ChannelSnapshotOutput'
+import { createCellFragmentChannelOutput } from './CellFragmentChannelOutput'
 
 type SpatialEntity3D = IEntity & Point3D
 export type SpatialMove3D = { entity: SpatialEntity3D, fromCell: string, toCell: string }
+export type Channel3DSnapshotVisibility = {
+    toCreate: number[]
+    toUpdate: number[]
+    toDelete: number[]
+    previous: Set<number>
+}
 
-export type SpatialChannel3DOptions = ChannelOptions & {
+export type Channel3DOptions = ChannelOptions & {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
 }
 
-// SpatialChannel3D intentionally mirrors SpatialChannel2D instead of using a
+// Channel3D intentionally mirrors Channel2D instead of using a
 // dimension-generic wrapper; this is snapshot hot-path code, so benchmark
 // before collapsing the parallel implementations.
-export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialEntity3D, SpatialView3D> {
+export class Channel3D extends Channel implements ICulledChannel<SpatialEntity3D, SpatialView3D> {
     readonly cellFragmentMode = true
     private views: Map<number, SpatialView3D> = new Map()
     private viewVersions: Map<number, number> = new Map()
@@ -38,14 +48,14 @@ export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialE
     stableFragmentCellLimit: number
     visibilityResolver = objectInSpatialView3D
 
-    constructor(localState: LocalState, cellSize: number, options: SpatialChannel3DOptions = {}) {
+    constructor(localState: LocalState, cellSize: number, options: Channel3DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
-            throw new Error('SpatialChannel3D requires a positive finite cell size.')
+            throw new Error('Channel3D requires a positive finite cell size.')
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
-            throw new Error('SpatialChannel3D queryPadding must be a non-negative finite number.')
+            throw new Error('Channel3D queryPadding must be a non-negative finite number.')
         }
-        super(localState, { ...options, channelType: ChannelType.SpatialChannel3D })
+        super(localState, { ...options, channelType: ChannelType.Channel3D })
         this.cellSize = cellSize
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
@@ -166,23 +176,8 @@ export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialE
         Array.from(this.entities.array).forEach(entity => this.removeEntity(entity as SpatialEntity3D))
     }
 
-    markDirty(entity: SpatialEntity3D) {
-        return this.localState.markDirty(entity)
-    }
-
     skipInterpolation(entity: SpatialEntity3D) {
         return super.skipInterpolation(entity)
-    }
-
-    getDirtyCellKeys() {
-        const keys = new Set<string>()
-        for (const nid of this.localState.dirtyNids) {
-            const ref = this.grid.objectCells.get(nid)
-            if (ref) {
-                keys.add(ref.key)
-            }
-        }
-        return Array.from(keys)
     }
 
     addMessage(message: any) {
@@ -216,7 +211,7 @@ export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialE
 
     subscribe(user: User, view?: SpatialView3D) {
         if (!view) {
-            throw new Error('SpatialChannel3D requires a view when subscribing.')
+            throw new Error('Channel3D requires a view when subscribing.')
         }
         this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
@@ -351,6 +346,37 @@ export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialE
         return this.rememberedCells.get(userId)?.get(key) || []
     }
 
+    collectSnapshotVisibility(userId: number): Channel3DSnapshotVisibility {
+        const previous = new Set<number>()
+        const previousCellKeys = this.getRememberedCellKeys(userId)
+        for (let i = 0; i < previousCellKeys.length; i++) {
+            const nids = this.getRememberedCellNids(userId, previousCellKeys[i])
+            for (let j = 0; j < nids.length; j++) {
+                previous.add(nids[j])
+            }
+        }
+
+        const currentNids = this.getVisibleNetworkedNids(userId)
+        const current = new Set(currentNids)
+        const toCreate: number[] = []
+        const toUpdate: number[] = []
+        const toDelete: number[] = []
+        for (let i = 0; i < currentNids.length; i++) {
+            const nid = currentNids[i]
+            if (previous.has(nid)) {
+                toUpdate.push(nid)
+            } else {
+                toCreate.push(nid)
+            }
+        }
+        previous.forEach(nid => {
+            if (!current.has(nid)) {
+                toDelete.push(nid)
+            }
+        })
+        return { toCreate, toUpdate, toDelete, previous }
+    }
+
     getStableVisibleCellKeys(userId: number) {
         const remembered = this.rememberedCells.get(userId)
         if (!remembered) {
@@ -380,6 +406,14 @@ export class SpatialChannel3D extends Channel implements ICulledChannel<SpatialE
         }
         this.rememberedCells.set(userId, remembered)
         this.rememberedCellSignatures.set(userId, this.getVisibleCellVersionSignature(userId))
+    }
+
+    rememberSnapshotVisibility(userId: number) {
+        this.rememberVisibleCells(userId)
+    }
+
+    createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig): ChannelSnapshotOutput {
+        return createCellFragmentChannelOutput(user, instance, this, protocol)
     }
 
     destroy() {

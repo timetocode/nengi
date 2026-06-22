@@ -70,10 +70,6 @@ export class Instance {
         this.localState.removeChild(parent, child)
     }
 
-    markDirty(entity: IEntity) {
-        return this.localState.markDirty(entity)
-    }
-
     respond<Request = any, Response = any>(
         endpoint: Endpoint<Request, Response>,
         callback: ResponseHandler<Request, Response>
@@ -144,6 +140,5 @@ export class Instance {
             channel.clearSnapshotDeltas?.()
         })
         this.localState.releaseDeferredIds()
-        this.localState.clearDirty()
     }
 }

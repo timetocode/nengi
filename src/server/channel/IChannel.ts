@@ -32,7 +32,7 @@ export interface IChannel {
      */
     skipInterpolation?(entity: IEntity): boolean
     destroy?(): void
-    markHeaderDirty?(): boolean
+    syncHeader?(): boolean
 }
 
 export interface IObjectChannel extends IChannel {
@@ -44,7 +44,6 @@ export interface IObjectChannel extends IChannel {
      */
     removeEntity(entity: IEntity): number
     removeAllEntities(): void
-    markDirty?(entity: IEntity): boolean
     /**
      * Marks an entity for one-frame interpolation skipping in the next snapshot.
      * Use this for discontinuous moves such as teleports, blinks, respawns,
@@ -67,7 +66,6 @@ export interface ICulledChannel<VisibleObjectType extends IEntity, ViewType> {
      */
     removeEntity(entity: VisibleObjectType): number
     removeAllEntities(): void
-    markDirty?(entity: VisibleObjectType): boolean
     /**
      * Marks an entity for one-frame interpolation skipping in the next snapshot.
      * Use this for discontinuous moves such as teleports, blinks, respawns,
@@ -87,5 +85,5 @@ export interface ICulledChannel<VisibleObjectType extends IEntity, ViewType> {
     clearBroadcastMessages?(): void
     clearSnapshotDeltas?(): void
     destroy?(): void
-    markHeaderDirty?(): boolean
+    syncHeader?(): boolean
 }

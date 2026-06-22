@@ -174,7 +174,7 @@ server creates the channel with `name`. Use a schema-backed header object when
 the client needs structured channel context, such as inventory id, owner id,
 slot count, team id, or terminal mode. Schema-backed header data is sent with
 channel open before normal channel entities. Choose the header when creating the
-channel; mutate schema-backed header fields later and call `markHeaderDirty()`
+channel; mutate schema-backed header fields later and call `syncHeader()`
 when those fields should replicate.
 
 ```ts

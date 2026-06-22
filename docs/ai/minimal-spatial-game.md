@@ -1,7 +1,7 @@
 # Minimal Spatial Game
 
 This is the current shape for a small 2D browser game with a server-authoritative
-world, `SpatialChannel2D`, client commands, and interpolated remote entities.
+world, `Channel2D`, client commands, and interpolated remote entities.
 
 For package setup, TypeScript, Vite, and local workspace imports, use
 [local-prototype.md](./local-prototype.md). This file only describes the nengi
@@ -13,7 +13,7 @@ Create one spatial world channel:
 
 ```ts
 const instance = new Instance(context)
-const world = new SpatialChannel2D(instance.localState, 100, { name: 'world' })
+const world = new Channel2D(instance.localState, 100, { name: 'world' })
 ```
 
 On connect, create a player, add it to the world, and subscribe the user with a
@@ -160,6 +160,6 @@ client sends commands at a fixed command rate. If the client sends commands from
 
 ## Gameplay queries
 
-`SpatialChannel2D` is network visibility. It is not a gameplay query engine. The
+`Channel2D` is network visibility. It is not a gameplay query engine. The
 server still needs game-specific logic for gathering range, attack arcs, nearest
 campfire, placement collision, and similar simulation rules.

@@ -1,8 +1,11 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
+import { Instance } from '../Instance'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
+import { createEcsChannelOutput } from './EcsChannelOutput'
 import { IChannel } from './IChannel'
 
 export type EcsComponent = IEntity & { pid: number }
@@ -20,9 +23,24 @@ export type EcsChannelOptions = {
     header?: ChannelHeaderInput
 }
 
+export type EcsChannelSnapshotVisibility = {
+    toCreate: number[]
+    toUpdate: number[]
+    toDelete: number[]
+    visibleRef: number[]
+    visibleSet: Set<number>
+}
+
+type RememberedEcsChannelVisibility = {
+    visibleRef: number[]
+    visibleSet: Set<number>
+}
+
+/**
+ * Full-visibility ECS channel with manual mutation emission. Userland must call
+ * the component writers for networked updates; nengi does not autodiff component state.
+ */
 export class EcsChannel implements IChannel {
-    // ECS channels are manual by design: roots are nids, components carry the
-    // replicated state, and userland component writers append the mutation log.
     readonly ecsChannelMode = true
     nid: number
     localState: LocalState
@@ -37,7 +55,6 @@ export class EcsChannel implements IChannel {
     deletedRoots: number[] = []
     createdComponents: EcsComponent[] = []
     deletedComponents: number[] = []
-    rootDeletedComponents: number[] = []
     manualPropNids: number[] = []
     manualPropSchemas: SchemaProp[] = []
     manualPropValues: any[] = []
@@ -54,6 +71,7 @@ export class EcsChannel implements IChannel {
     private componentsByRoot: Map<number, EcsComponent[]> = new Map()
     private componentByNid: Map<number, EcsComponent> = new Map()
     private visibleNetworkedNidsCache: { membershipVersion: number, nids: number[] } | null = null
+    private snapshotVisibilityByUser: Map<number, RememberedEcsChannelVisibility> = new Map()
 
     constructor(localState: LocalState, options: EcsChannelOptions = {}) {
         this.localState = localState
@@ -81,7 +99,7 @@ export class EcsChannel implements IChannel {
         return this.createEntity()
     }
 
-    markHeaderDirty() {
+    syncHeader() {
         if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
@@ -97,7 +115,7 @@ export class EcsChannel implements IChannel {
 
         const components = this.componentsByRoot.get(pid) || []
         for (let i = components.length - 1; i >= 0; i--) {
-            this.removeComponentInternal(components[i], false)
+            this.removeComponentInternal(components[i])
         }
 
         const createdIndex = this.createdRoots.indexOf(pid)
@@ -142,7 +160,7 @@ export class EcsChannel implements IChannel {
         return ecsComponent
     }
 
-    private removeComponentInternal(componentOrNid: EcsComponent | number, queueDelete: boolean) {
+    private removeComponentInternal(componentOrNid: EcsComponent | number) {
         const nid = typeof componentOrNid === 'number' ? componentOrNid : componentOrNid.nid
         const component = this.componentByNid.get(nid)
         if (!component) {
@@ -152,10 +170,8 @@ export class EcsChannel implements IChannel {
         const createdIndex = this.createdComponents.findIndex(created => created.nid === nid)
         if (createdIndex > -1) {
             this.createdComponents.splice(createdIndex, 1)
-        } else if (queueDelete) {
-            this.deletedComponents.push(nid)
         } else {
-            this.rootDeletedComponents.push(nid)
+            this.deletedComponents.push(nid)
         }
         this.componentSet.delete(nid)
         this.componentByNid.delete(nid)
@@ -176,7 +192,7 @@ export class EcsChannel implements IChannel {
     }
 
     removeComponent(componentOrNid: EcsComponent | number) {
-        this.removeComponentInternal(componentOrNid, true)
+        this.removeComponentInternal(componentOrNid)
     }
 
     isRootNid(nid: number) {
@@ -185,10 +201,6 @@ export class EcsChannel implements IChannel {
 
     isComponentNid(nid: number) {
         return this.componentSet.has(nid) || this.deletedComponents.indexOf(nid) > -1
-    }
-
-    isRootDeletedComponentNid(nid: number) {
-        return this.rootDeletedComponents.indexOf(nid) > -1
     }
 
     getComponent(nid: number) {
@@ -221,6 +233,57 @@ export class EcsChannel implements IChannel {
         return nids
     }
 
+    collectSnapshotVisibility(userOrId: User | number): EcsChannelSnapshotVisibility {
+        const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
+        const visibleRef = this.getVisibleNetworkedNids(userId)
+        let previous = this.snapshotVisibilityByUser.get(userId)
+        if (previous && previous.visibleRef === visibleRef) {
+            return {
+                toCreate: [],
+                toUpdate: visibleRef.slice(),
+                toDelete: [],
+                visibleRef,
+                visibleSet: previous.visibleSet
+            }
+        }
+
+        const visibleSet = new Set(visibleRef)
+        const toCreate: number[] = []
+        const toUpdate: number[] = []
+        const toDelete: number[] = []
+
+        if (!previous) {
+            toCreate.push(...visibleRef)
+        } else {
+            for (let i = 0; i < visibleRef.length; i++) {
+                const nid = visibleRef[i]
+                if (previous.visibleSet.has(nid)) {
+                    toUpdate.push(nid)
+                } else {
+                    toCreate.push(nid)
+                }
+            }
+            previous.visibleSet.forEach(nid => {
+                if (!visibleSet.has(nid)) {
+                    toDelete.push(nid)
+                }
+            })
+        }
+
+        return { toCreate, toUpdate, toDelete, visibleRef, visibleSet }
+    }
+
+    rememberSnapshotVisibility(userId: number, visibility: EcsChannelSnapshotVisibility) {
+        this.snapshotVisibilityByUser.set(userId, {
+            visibleRef: visibility.visibleRef,
+            visibleSet: visibility.visibleSet
+        })
+    }
+
+    createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig) {
+        return createEcsChannelOutput(user, instance, this, protocol)
+    }
+
     subscribe(user: User) {
         this.users.set(user.id, user)
         user.subscribe(this)
@@ -228,6 +291,7 @@ export class EcsChannel implements IChannel {
 
     unsubscribe(user: User) {
         this.users.delete(user.id)
+        this.snapshotVisibilityByUser.delete(user.id)
         user.unsubscribe(this)
     }
 
@@ -246,7 +310,6 @@ export class EcsChannel implements IChannel {
         this.deletedRoots.length = 0
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
-        this.rootDeletedComponents.length = 0
         this.manualPropNids.length = 0
         this.manualPropSchemas.length = 0
         this.manualPropValues.length = 0
@@ -262,6 +325,7 @@ export class EcsChannel implements IChannel {
         this.componentSet.clear()
         this.componentsByRoot.clear()
         this.componentByNid.clear()
+        this.snapshotVisibilityByUser.clear()
         this.visibleNetworkedNidsCache = null
     }
 
@@ -301,7 +365,6 @@ export class EcsChannel implements IChannel {
         this.deletedRoots.length = 0
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
-        this.rootDeletedComponents.length = 0
         this.manualPropNids.length = 0
         this.manualPropSchemas.length = 0
         this.manualPropValues.length = 0

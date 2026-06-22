@@ -8,7 +8,6 @@ import { NetworkIdType, maxValueForNetworkType, nextNetworkType } from '../commo
 export class LocalState {
     nidType: NetworkIdType = Binary.UInt8
     nidPool: IdPool = new IdPool(maxValueForNetworkType(Binary.UInt8))
-    dirtyNids: Set<number> = new Set()
     entityTreeVersion = 0
     /**
      * Entity nid -> owner nid currently keeping that entity networked.
@@ -124,26 +123,6 @@ export class LocalState {
         return nid
     }
 
-    markDirty(entity: IEntity) {
-        if (entity.nid === 0 || !this.ownerByNid.has(entity.nid)) {
-            return false
-        }
-
-        if (!this.dirtyNids.has(entity.nid)) {
-            this.dirtyNids.add(entity.nid)
-        }
-
-        return true
-    }
-
-    isDirty(nid: number) {
-        return this.dirtyNids.has(nid)
-    }
-
-    clearDirty() {
-        this.dirtyNids.clear()
-    }
-
     unregisterEntity(entity: IEntity, ownerId: number) {
         const nid = entity.nid
         const ownerNid = this.ownerByNid.get(nid)
@@ -157,7 +136,6 @@ export class LocalState {
         this.invalidateEntityTreeCache(nid)
         this.unregisterChildren(nid)
         this.ownerByNid.delete(nid)
-        this.dirtyNids.delete(nid)
         this.parentByNid.delete(nid)
         this.rootByNid.delete(nid)
         this._entities.remove(entity)

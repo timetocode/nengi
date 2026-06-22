@@ -3,16 +3,13 @@ import { IEntity } from './IEntity'
 export enum ChannelType {
     Channel = 1,
     ManualChannel = 2,
-    SpatialChannel2D = 3,
-    SpatialChannel3D = 4,
-    ManualSpatialChannel2D = 5,
-    ManualSpatialChannel3D = 6,
+    Channel2D = 3,
+    Channel3D = 4,
+    ManualChannel2D = 5,
+    ManualChannel3D = 6,
     EcsChannel = 7,
-    EcsSpatialChannel2D = 8,
-    EcsSpatialChannel3D = 9,
-    FinalStateSpatialChannel2D = 10,
-    PlannedSpatialChannel2D = 11,
-    PlannedEcsSpatialChannel2D = 12
+    EcsChannel2D = 12,
+    EcsChannel3D = 13
 }
 
 export const DefaultChannelHeaderNType = 0

@@ -3,10 +3,10 @@ import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { ManualChannel } from './ManualChannel'
-import { ManualSpatialChannel2D } from './ManualSpatialChannel2D'
-import { ManualSpatialChannel3D } from './ManualSpatialChannel3D'
-import { SpatialChannel2D } from './SpatialChannel2D'
-import { SpatialChannel3D } from './SpatialChannel3D'
+import { ManualChannel2D } from './ManualChannel2D'
+import { ManualChannel3D } from './ManualChannel3D'
+import { Channel2D } from './Channel2D'
+import { Channel3D } from './Channel3D'
 
 enum NType {
     Entity = 1
@@ -94,7 +94,7 @@ describe('manual and spatial channels', () => {
 
     it('records manual spatial 2D updates by visible cell and clears them after the snapshot boundary', () => {
         const localState = new LocalState()
-        const channel = new ManualSpatialChannel2D(localState, 10)
+        const channel = new ManualChannel2D(localState, 10)
         const user = createUser(localState)
         const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
         const entity = channel.addEntity(createEntity(1, 2))
@@ -115,7 +115,7 @@ describe('manual and spatial channels', () => {
 
     it('records manual spatial 3D updates by visible cell', () => {
         const localState = new LocalState()
-        const channel = new ManualSpatialChannel3D(localState, 10)
+        const channel = new ManualChannel3D(localState, 10)
         const user = createUser(localState)
         const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
         const entity = channel.addEntity(createEntity(1, 2, 3))
@@ -130,9 +130,9 @@ describe('manual and spatial channels', () => {
         expect(log.manualPropValues).toEqual([5])
     })
 
-    it('uses SpatialChannel2D views and movement updates for direct visibility', () => {
+    it('uses Channel2D views and movement updates for direct visibility', () => {
         const localState = new LocalState()
-        const channel = new SpatialChannel2D(localState, 10)
+        const channel = new Channel2D(localState, 10)
         const user = createUser(localState)
         const inside = channel.addEntity(createEntity(1, 1))
         const outside = channel.addEntity(createEntity(50, 50))
@@ -148,9 +148,9 @@ describe('manual and spatial channels', () => {
         expect(channel.getVisibleEntities(user.id).sort((a, b) => a - b)).toEqual([inside.nid, outside.nid].sort((a, b) => a - b))
     })
 
-    it('ignores stale SpatialChannel2D remove objects without mutating grid membership', () => {
+    it('ignores stale Channel2D remove objects without mutating grid membership', () => {
         const localState = new LocalState()
-        const channel = new SpatialChannel2D(localState, 10)
+        const channel = new Channel2D(localState, 10)
         const user = createUser(localState)
         const entity = channel.addEntity(createEntity(1, 1))
         const nid = entity.nid
@@ -164,9 +164,9 @@ describe('manual and spatial channels', () => {
         expect(entity.nid).toBe(nid)
     })
 
-    it('ignores stale ManualSpatialChannel2D remove objects without mutating grid membership', () => {
+    it('ignores stale ManualChannel2D remove objects without mutating grid membership', () => {
         const localState = new LocalState()
-        const channel = new ManualSpatialChannel2D(localState, 10)
+        const channel = new ManualChannel2D(localState, 10)
         const user = createUser(localState)
         const entity = channel.addEntity(createEntity(1, 1))
         const nid = entity.nid
@@ -182,7 +182,7 @@ describe('manual and spatial channels', () => {
 
     it('clears automatic spatial channel deltas at the snapshot boundary', () => {
         const localState = new LocalState()
-        const channel = new SpatialChannel2D(localState, 10)
+        const channel = new Channel2D(localState, 10)
         const entity = channel.addEntity(createEntity(1, 1))
 
         expect(channel.createdRoots.length).toBe(1)
@@ -198,9 +198,9 @@ describe('manual and spatial channels', () => {
         expect(channel.deletedNids).toEqual([])
     })
 
-    it('uses SpatialChannel3D views and vertical culling for direct visibility', () => {
+    it('uses Channel3D views and vertical culling for direct visibility', () => {
         const localState = new LocalState()
-        const channel = new SpatialChannel3D(localState, 10)
+        const channel = new Channel3D(localState, 10)
         const user = createUser(localState)
         const inside = channel.addEntity(createEntity(1, 1, 1))
         const above = channel.addEntity(createEntity(1, 50, 1))
@@ -217,7 +217,7 @@ describe('manual and spatial channels', () => {
 
     it('destroys spatial subscriptions, entities, and local registration', () => {
         const localState = new LocalState()
-        const channel = new SpatialChannel2D(localState, 10)
+        const channel = new Channel2D(localState, 10)
         const user = createUser(localState)
         const entity = channel.addEntity(createEntity(1, 1))
         const nid = entity.nid
@@ -258,9 +258,9 @@ describe('manual and spatial channels', () => {
         expect(channel.manualGroupValues).toEqual([])
     })
 
-    it('destroys SpatialChannel3D subscriptions, entities, and local registration', () => {
+    it('destroys Channel3D subscriptions, entities, and local registration', () => {
         const localState = new LocalState()
-        const channel = new SpatialChannel3D(localState, 10)
+        const channel = new Channel3D(localState, 10)
         const user = createUser(localState)
         const entity = channel.addEntity(createEntity(1, 1, 1))
         const nid = entity.nid
@@ -277,9 +277,9 @@ describe('manual and spatial channels', () => {
         expect(entity.nid).toBe(0)
     })
 
-    it('destroys ManualSpatialChannel2D subscriptions, entities, local registration, and manual logs', () => {
+    it('destroys ManualChannel2D subscriptions, entities, local registration, and manual logs', () => {
         const localState = new LocalState()
-        const channel = new ManualSpatialChannel2D(localState, 10)
+        const channel = new ManualChannel2D(localState, 10)
         const user = createUser(localState)
         const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
         const entity = channel.addEntity(createEntity(1, 1))
@@ -299,9 +299,9 @@ describe('manual and spatial channels', () => {
         expect(channel.dirtyCells.size).toBe(0)
     })
 
-    it('destroys ManualSpatialChannel3D subscriptions, entities, local registration, and manual logs', () => {
+    it('destroys ManualChannel3D subscriptions, entities, local registration, and manual logs', () => {
         const localState = new LocalState()
-        const channel = new ManualSpatialChannel3D(localState, 10)
+        const channel = new ManualChannel3D(localState, 10)
         const user = createUser(localState)
         const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
         const entity = channel.addEntity(createEntity(1, 1, 1))

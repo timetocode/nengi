@@ -2,14 +2,14 @@ import { SnapshotPlan } from './SnapshotPlan'
 
 type PlannedSnapshot = SnapshotPlan | { plan: SnapshotPlan }
 
-function getPlannedSnapshot(plan: PlannedSnapshot) {
+function getChannelSnapshot(plan: PlannedSnapshot) {
     return 'plan' in plan ? plan.plan : plan
 }
 
 export function sumPlanCreates(plans: PlannedSnapshot[]) {
     let creates = 0
     for (let i = 0; i < plans.length; i++) {
-        const plan = getPlannedSnapshot(plans[i])
+        const plan = getChannelSnapshot(plans[i])
         creates += plan.createEntities.length + plan.ecsCreateEntities.length + plan.ecsCreateComponents.length
     }
     return creates
@@ -18,7 +18,7 @@ export function sumPlanCreates(plans: PlannedSnapshot[]) {
 export function sumPlanDeletes(plans: PlannedSnapshot[]) {
     let deletes = 0
     for (let i = 0; i < plans.length; i++) {
-        const plan = getPlannedSnapshot(plans[i])
+        const plan = getChannelSnapshot(plans[i])
         deletes += plan.deleteEntities.length + plan.ecsDeleteEntities.length
     }
     return deletes
@@ -27,7 +27,7 @@ export function sumPlanDeletes(plans: PlannedSnapshot[]) {
 export function sumPlanUpdateProps(plans: PlannedSnapshot[]) {
     let props = 0
     for (let i = 0; i < plans.length; i++) {
-        const plan = getPlannedSnapshot(plans[i])
+        const plan = getChannelSnapshot(plans[i])
         props += plan.updateEntities.length
     }
     return props
@@ -36,7 +36,7 @@ export function sumPlanUpdateProps(plans: PlannedSnapshot[]) {
 export function sumPlanUpdateGroups(plans: PlannedSnapshot[]) {
     let groups = 0
     for (let i = 0; i < plans.length; i++) {
-        const plan = getPlannedSnapshot(plans[i])
+        const plan = getChannelSnapshot(plans[i])
         groups += plan.updateEntityGroups.length
     }
     return groups
@@ -45,7 +45,7 @@ export function sumPlanUpdateGroups(plans: PlannedSnapshot[]) {
 export function sumPlanGroupedUpdateProps(plans: PlannedSnapshot[]) {
     let props = 0
     for (let i = 0; i < plans.length; i++) {
-        const plan = getPlannedSnapshot(plans[i])
+        const plan = getChannelSnapshot(plans[i])
         props += plan.updateEntityGroups.reduce((total: number, update: any) => total + update.group.props.length, 0)
     }
     return props
@@ -58,7 +58,7 @@ export function countPlanMessages(plan: SnapshotPlan) {
 export function sumPlanMessages(plans: PlannedSnapshot[]) {
     let messages = 0
     for (let i = 0; i < plans.length; i++) {
-        messages += countPlanMessages(getPlannedSnapshot(plans[i]))
+        messages += countPlanMessages(getChannelSnapshot(plans[i]))
     }
     return messages
 }

@@ -1,14 +1,33 @@
 import { IEntity } from '../../common/IEntity'
+import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
+import { Instance } from '../Instance'
 import { LocalState } from '../LocalState'
 import { NDictionary } from '../NDictionary'
 import { User } from '../User'
+import { createChannelOutput } from './ChannelOutput'
 import { IObjectChannel } from './IChannel'
 
 export type ChannelOptions = {
     header?: ChannelHeaderInput
     name?: string
     channelType?: ChannelType
+}
+
+export type ChannelSnapshotVisibility = {
+    toCreate: number[]
+    toUpdate: number[]
+    toDelete: number[]
+    visibleRef: number[]
+    visibleSet?: Set<number>
+    hasPrevious: boolean
+    previousMembershipVersion: number
+}
+
+type RememberedChannelVisibility = {
+    visibleRef: number[]
+    visibleSet?: Set<number>
+    membershipVersion: number
 }
 
 export class Channel implements IObjectChannel {
@@ -28,6 +47,7 @@ export class Channel implements IObjectChannel {
     headerVersion = 0
     channelType: ChannelType
     private visibleNetworkedNidsCache: { membershipVersion: number, entityTreeVersion: number, nids: number[] } | null = null
+    private channelSnapshotVisibilityByUser: Map<number, RememberedChannelVisibility> = new Map()
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
         this.localState = localState
@@ -54,7 +74,7 @@ export class Channel implements IObjectChannel {
         return entity
     }
 
-    markHeaderDirty() {
+    syncHeader() {
         if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
@@ -82,10 +102,6 @@ export class Channel implements IObjectChannel {
         }
         this.membershipVersion++
         return nid
-    }
-
-    markDirty(entity: IEntity) {
-        return this.localState.markDirty(entity)
     }
 
     // One-frame interpolation skip for teleports, respawns, wraparound, or
@@ -118,6 +134,88 @@ export class Channel implements IObjectChannel {
         this.deltaBaseVersion = this.membershipVersion
     }
 
+    createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig) {
+        return createChannelOutput(user, instance, this, protocol)
+    }
+
+    collectChannelSnapshotVisibility(userOrId: User | number): ChannelSnapshotVisibility {
+        const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
+        const visibleRef = this.getVisibleNetworkedNids(userId)
+        let previous = this.channelSnapshotVisibilityByUser.get(userId)
+        if (previous && previous.visibleRef === visibleRef) {
+            return {
+                toCreate: [],
+                toUpdate: visibleRef.slice(),
+                toDelete: [],
+                visibleRef,
+                visibleSet: previous.visibleSet,
+                hasPrevious: true,
+                previousMembershipVersion: previous.membershipVersion
+            }
+        }
+
+        const visibleSet = new Set(visibleRef)
+        const toCreate: number[] = []
+        const toUpdate: number[] = []
+        const toDelete: number[] = []
+        if (!previous) {
+            toCreate.push(...visibleRef)
+        } else {
+            const previousVisibleSet = previous.visibleSet ?? new Set(previous.visibleRef)
+            for (let i = 0; i < visibleRef.length; i++) {
+                const nid = visibleRef[i]
+                if (previousVisibleSet.has(nid)) {
+                    toUpdate.push(nid)
+                } else {
+                    toCreate.push(nid)
+                }
+            }
+            previousVisibleSet.forEach(nid => {
+                if (!visibleSet.has(nid)) {
+                    toDelete.push(nid)
+                }
+            })
+        }
+        return {
+            toCreate,
+            toUpdate,
+            toDelete,
+            visibleRef,
+            visibleSet,
+            hasPrevious: !!previous,
+            previousMembershipVersion: previous?.membershipVersion || 0
+        }
+    }
+
+    collectChannelSharedDeltaVisibility(userOrId: User | number): ChannelSnapshotVisibility | null {
+        if (this.createdRoots.length === 0 && this.deletedNids.length === 0) {
+            return null
+        }
+
+        const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
+        const previous = this.channelSnapshotVisibilityByUser.get(userId)
+        if (!previous || previous.membershipVersion !== this.deltaBaseVersion) {
+            return null
+        }
+
+        return {
+            toCreate: [],
+            toUpdate: [],
+            toDelete: [],
+            visibleRef: this.getVisibleNetworkedNids(userId),
+            hasPrevious: true,
+            previousMembershipVersion: previous.membershipVersion
+        }
+    }
+
+    rememberChannelSnapshotVisibility(userId: number, visibility: ChannelSnapshotVisibility) {
+        this.channelSnapshotVisibilityByUser.set(userId, {
+            visibleRef: visibility.visibleRef,
+            visibleSet: visibility.visibleSet,
+            membershipVersion: this.membershipVersion
+        })
+    }
+
     subscribe(user: User) {
         this.users.set(user.id, user)
         user.subscribe(this)
@@ -125,6 +223,7 @@ export class Channel implements IObjectChannel {
 
     unsubscribe(user: User) {
         this.users.delete(user.id)
+        this.channelSnapshotVisibilityByUser.delete(user.id)
         user.unsubscribe(this)
     }
 
@@ -180,5 +279,6 @@ export class Channel implements IObjectChannel {
         this.removeAllEntities()
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this)
+        this.channelSnapshotVisibilityByUser.clear()
     }
 }

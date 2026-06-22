@@ -47,7 +47,7 @@ Transform.position(transform, nextX, nextY)
 Spatial ECS channels place roots in the grid using a selected spatial component. The root itself does not have position.
 
 ```ts
-const channel = new EcsSpatialChannel2D(instance.localState, 100)
+const channel = new EcsChannel2D(instance.localState, 100)
 const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
 channel.subscribe(user, { x: 0, y: 0, halfWidth: 500, halfHeight: 500 })
@@ -66,7 +66,7 @@ Transform.position(transform, nextX, nextY)
 channel.updateSpatialComponent(transform)
 ```
 
-Use `EcsSpatialChannel3D` when vertical culling matters.
+Use `EcsChannel3D` when vertical culling matters.
 
 ## When to use ECS channels
 

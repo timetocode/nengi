@@ -46,10 +46,10 @@ with `docs/ai`.
 Common starting choices:
 
 - Small arena or shared match state: `Channel`
-- Large 2D world: `SpatialChannel2D`
-- True 3D world: `SpatialChannel3D`
-- Hot explicit updates: `ManualChannel` or `ManualSpatialChannel2D/3D`
-- Nengi ECS roots/components: `EcsChannel` or `EcsSpatialChannel2D/3D`
+- Large 2D world: `Channel2D`
+- True 3D world: `Channel3D`
+- Hot explicit updates: `ManualChannel` or `ManualChannel2D/3D`
+- Nengi ECS roots/components: `EcsChannel` or `EcsChannel2D/3D`
 
 ## Renderer and game engine
 
@@ -67,7 +67,7 @@ Useful current examples:
 
 - `examples/player-arena`: prediction, interpolation, channel headers,
   inventory channels, requests, world items, and experimental gameplay features.
-- `examples/survival-lol`: a larger 2D spatial-channel template using Pixi,
+- `examples/survival-lol`: a larger 2D channel-2d template using Pixi,
   server-authoritative survival mechanics, private inventory messages, commands,
   and gameplay spatial queries.
 

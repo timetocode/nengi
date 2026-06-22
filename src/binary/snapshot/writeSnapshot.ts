@@ -32,32 +32,32 @@ function writeEngineMessages(plan: SnapshotPlan, context: Context, writer: IBina
     }
 }
 
-function writeMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.messages.length === 0) {
+export function writeMessageSection(
+    section: BinarySection.Messages | BinarySection.InterpolatedMessages,
+    messages: any[],
+    context: Context,
+    writer: IBinaryWriter,
+    protocol: ProtocolConfig
+) {
+    if (messages.length === 0) {
         return
     }
 
-    writer.writeUInt8(BinarySection.Messages)
-    writer.writeUInt32(plan.messages.length)
-    for (let i = 0; i < plan.messages.length; i++) {
-        const message = plan.messages[i]
+    writer.writeUInt8(section)
+    writer.writeUInt32(messages.length)
+    for (let i = 0; i < messages.length; i++) {
+        const message = messages[i]
         const nschema = context.getSchema(message.ntype)!
         writeMessage(message, nschema, writer, protocol.ntypeType)
     }
 }
 
-function writeInterpolatedMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.interpolatedMessages.length === 0) {
-        return
-    }
+function writeMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeMessageSection(BinarySection.Messages, plan.messages, context, writer, protocol)
+}
 
-    writer.writeUInt8(BinarySection.InterpolatedMessages)
-    writer.writeUInt32(plan.interpolatedMessages.length)
-    for (let i = 0; i < plan.interpolatedMessages.length; i++) {
-        const message = plan.interpolatedMessages[i]
-        const nschema = context.getSchema(message.ntype)!
-        writeMessage(message, nschema, writer, protocol.ntypeType)
-    }
+function writeInterpolatedMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeMessageSection(BinarySection.InterpolatedMessages, plan.interpolatedMessages, context, writer, protocol)
 }
 
 function writeResponses(plan: SnapshotPlan, writer: IBinaryWriter) {
@@ -96,15 +96,19 @@ function writeChannelOpens(plan: SnapshotPlan, context: Context, writer: IBinary
     }
 }
 
-function writeChannelHeaderUpdates(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.channelHeaderUpdates.length === 0) {
+export function writeChannelHeaderUpdateSection(
+    updates: SnapshotPlan['channelHeaderUpdates'],
+    writer: IBinaryWriter,
+    protocol: ProtocolConfig
+) {
+    if (updates.length === 0) {
         return
     }
 
     writer.writeUInt8(BinarySection.ChannelHeaderUpdates)
-    writer.writeUInt32(plan.channelHeaderUpdates.length)
-    for (let i = 0; i < plan.channelHeaderUpdates.length; i++) {
-        const update = plan.channelHeaderUpdates[i]
+    writer.writeUInt32(updates.length)
+    for (let i = 0; i < updates.length; i++) {
+        const update = updates[i]
         writeNetworkId(update.channelId, protocol.nidType, writer)
         writer.writeUInt32(update.changes.length)
         for (let j = 0; j < update.changes.length; j++) {
@@ -116,6 +120,10 @@ function writeChannelHeaderUpdates(plan: SnapshotPlan, writer: IBinaryWriter, pr
             writeUpdateGroup(update.groups[j], writer, protocol.nidType)
         }
     }
+}
+
+function writeChannelHeaderUpdates(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeChannelHeaderUpdateSection(plan.channelHeaderUpdates, writer, protocol)
 }
 
 function writeChannelCloses(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
@@ -156,43 +164,53 @@ function writeCreateEntities(plan: SnapshotPlan, context: Context, writer: IBina
     }
 }
 
-function writeEcsCreateEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.ecsCreateEntities.length === 0) {
+export function writeNetworkIdSection(
+    section: BinarySection.EcsCreateEntities | BinarySection.EcsDeleteEntities | BinarySection.DeleteEntities,
+    ids: number[],
+    writer: IBinaryWriter,
+    protocol: ProtocolConfig
+) {
+    if (ids.length === 0) {
         return
     }
 
-    writer.writeUInt8(BinarySection.EcsCreateEntities)
-    writer.writeUInt32(plan.ecsCreateEntities.length)
-    for (let i = 0; i < plan.ecsCreateEntities.length; i++) {
-        writeNetworkId(plan.ecsCreateEntities[i], protocol.nidType, writer)
+    writer.writeUInt8(section)
+    writer.writeUInt32(ids.length)
+    for (let i = 0; i < ids.length; i++) {
+        writeNetworkId(ids[i], protocol.nidType, writer)
     }
 }
 
-function writeEcsCreateComponents(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.ecsCreateComponents.length === 0) {
+function writeEcsCreateEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeNetworkIdSection(BinarySection.EcsCreateEntities, plan.ecsCreateEntities, writer, protocol)
+}
+
+export function writeEcsCreateComponentSection(
+    components: IEntity[],
+    context: Context,
+    writer: IBinaryWriter,
+    protocol: ProtocolConfig
+) {
+    if (components.length === 0) {
         return
     }
 
     writer.writeUInt8(BinarySection.EcsCreateComponents)
-    writer.writeUInt32(plan.ecsCreateComponents.length)
-    for (let i = 0; i < plan.ecsCreateComponents.length; i++) {
-        const component = plan.ecsCreateComponents[i] as any
+    writer.writeUInt32(components.length)
+    for (let i = 0; i < components.length; i++) {
+        const component = components[i] as any
         writeNetworkId(component.pid, protocol.nidType, writer)
         const nschema = context.getSchema(component.ntype)!
         writeEntity(component, nschema, writer, protocol.ntypeType, protocol.nidType)
     }
 }
 
-function writeEcsDeleteEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.ecsDeleteEntities.length === 0) {
-        return
-    }
+function writeEcsCreateComponents(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeEcsCreateComponentSection(plan.ecsCreateComponents, context, writer, protocol)
+}
 
-    writer.writeUInt8(BinarySection.EcsDeleteEntities)
-    writer.writeUInt32(plan.ecsDeleteEntities.length)
-    for (let i = 0; i < plan.ecsDeleteEntities.length; i++) {
-        writeNetworkId(plan.ecsDeleteEntities[i], protocol.nidType, writer)
-    }
+function writeEcsDeleteEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+    writeNetworkIdSection(BinarySection.EcsDeleteEntities, plan.ecsDeleteEntities, writer, protocol)
 }
 
 function writeUpdateEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
@@ -221,15 +239,7 @@ function writeUpdateEntityGroups(plan: SnapshotPlan, writer: IBinaryWriter, prot
 }
 
 function writeDeleteEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    if (plan.deleteEntities.length === 0) {
-        return
-    }
-
-    writer.writeUInt8(BinarySection.DeleteEntities)
-    writer.writeUInt32(plan.deleteEntities.length)
-    for (let i = 0; i < plan.deleteEntities.length; i++) {
-        writeNetworkId(plan.deleteEntities[i], protocol.nidType, writer)
-    }
+    writeNetworkIdSection(BinarySection.DeleteEntities, plan.deleteEntities, writer, protocol)
 }
 
 export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {

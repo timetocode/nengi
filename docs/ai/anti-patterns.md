@@ -88,7 +88,7 @@ Good fit for messages:
 
 ## Using ECS channels for ordinary objects
 
-Use ECS channels when roots are ids and state is in components. If the game has ordinary objects with small schemas, `Channel` or `SpatialChannel2D/3D` is simpler.
+Use ECS channels when roots are ids and state is in components. If the game has ordinary objects with small schemas, `Channel` or `Channel2D/3D` is simpler.
 
 ## Huge flat entity by default
 

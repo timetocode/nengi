@@ -73,7 +73,7 @@ for (const frame of client.network.drainFrames()) {
 
     for (const update of frame.updateEntities) {
         const entity = client.network.store.get(update.nid)
-        markDirty(entity, update.prop)
+        markSpriteDirty(entity, update.prop)
     }
 
     for (const deleted of frame.deletedEntities) {
@@ -179,7 +179,7 @@ interpolated entity motion.
 ## ECS Channels
 
 For nengi ECS channels, use the same frame/store principle but apply channel
-ECS CRUD to an `EcsWorld`:
+ECS CRUD to a `GameEcsWorld`:
 
 ```ts
 const channel = frame.getChannel(arenaChannelId)

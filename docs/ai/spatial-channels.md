@@ -7,12 +7,12 @@ the game's visibility rule.
 
 ## 2D, 3D, and projected planes
 
-Use `SpatialChannel2D` for 2D worlds and for 3D games where culling is horizontal.
+Use `Channel2D` for 2D worlds and for 3D games where culling is horizontal.
 
 For 3D games that ignore vertical culling, use the `xz` plane:
 
 ```ts
-const channel = new SpatialChannel2D(instance.localState, 100, {
+const channel = new Channel2D(instance.localState, 100, {
     plane: 'xz'
 })
 
@@ -24,7 +24,7 @@ channel.subscribe(user, {
 })
 ```
 
-Use `SpatialChannel3D` when vertical visibility matters.
+Use `Channel3D` when vertical visibility matters.
 
 ## Views
 
@@ -101,6 +101,6 @@ Spatial channels are usually the wrong model when:
 
 ## Manual spatial
 
-Use `ManualSpatialChannel2D/3D` when spatial culling is the right visibility
+Use `ManualChannel2D/3D` when spatial culling is the right visibility
 model and hot mutations are explicit. This is often the highest-performance path
 for large worlds with low mutation fractions.

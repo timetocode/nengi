@@ -16,34 +16,6 @@ type MessageFragment = {
     messages: number
 }
 
-export function collectBroadcastMessages(user: User) {
-    const messages: any[] = []
-    user.subscriptions.forEach((channel: any) => {
-        if (isSharedMessageChannel(channel) && channel.broadcastMessages.length > 0) {
-            for (let i = 0; i < channel.broadcastMessages.length; i++) {
-                messages.push(channel.broadcastMessages[i])
-            }
-        }
-    })
-    return messages
-}
-
-export function collectInterpolatedBroadcastMessages(user: User) {
-    const messages: any[] = []
-    user.subscriptions.forEach((channel: any) => {
-        if (isSharedMessageChannel(channel)) {
-            const interpolated = channel.interpolatedBroadcastMessages
-            if (!interpolated || interpolated.length === 0) {
-                return
-            }
-            for (let i = 0; i < interpolated.length; i++) {
-                messages.push(interpolated[i])
-            }
-        }
-    })
-    return messages
-}
-
 function getSharedMessageFragment(user: User, instance: Instance, channel: SharedMessageChannel): MessageFragment {
     const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:${protocol.ntypeType}`

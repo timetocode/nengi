@@ -1,8 +1,12 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelType } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
+import { Instance } from '../Instance'
 import { LocalState } from '../LocalState'
+import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
+import { createManualChannelOutput } from './ManualChannelOutput'
 
 export type ManualPropWriter = (entity: IEntity, value: any) => void
 export type ManualGroupWriter = (entity: IEntity, ...values: any[]) => void
@@ -13,6 +17,19 @@ export type ManualTypeWriters = {
     readonly schema: Schema
     readonly props: { [name: string]: ManualPropWriter }
     readonly groups: { [name: string]: ManualGroupWriter }
+}
+
+export type ManualChannelSnapshotVisibility = {
+    toCreate: number[]
+    toUpdate: number[]
+    toDelete: number[]
+    visibleRef: number[]
+    visibleSet: Set<number>
+}
+
+type RememberedManualChannelVisibility = {
+    visibleRef: number[]
+    visibleSet: Set<number>
 }
 
 export class ManualChannel extends Channel {
@@ -26,9 +43,64 @@ export class ManualChannel extends Channel {
     manualGroupSchemas: SchemaUpdateGroup[] = []
     manualGroupValueOffsets: number[] = []
     manualGroupValues: any[] = []
+    private snapshotVisibilityByUser: Map<number, RememberedManualChannelVisibility> = new Map()
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
         super(localState, { ...options, channelType: ChannelType.ManualChannel })
+    }
+
+    createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig) {
+        return createManualChannelOutput(user, instance, this, protocol)
+    }
+
+    collectSnapshotVisibility(userOrId: User | number): ManualChannelSnapshotVisibility {
+        const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
+        const visibleRef = this.getVisibleNetworkedNids(userId)
+        let previous = this.snapshotVisibilityByUser.get(userId)
+        if (previous && previous.visibleRef === visibleRef) {
+            return {
+                toCreate: [],
+                toUpdate: visibleRef.slice(),
+                toDelete: [],
+                visibleRef,
+                visibleSet: previous.visibleSet
+            }
+        }
+
+        const visibleSet = new Set(visibleRef)
+        const toCreate: number[] = []
+        const toUpdate: number[] = []
+        const toDelete: number[] = []
+        if (!previous) {
+            toCreate.push(...visibleRef)
+        } else {
+            for (let i = 0; i < visibleRef.length; i++) {
+                const nid = visibleRef[i]
+                if (previous.visibleSet.has(nid)) {
+                    toUpdate.push(nid)
+                } else {
+                    toCreate.push(nid)
+                }
+            }
+            previous.visibleSet.forEach(nid => {
+                if (!visibleSet.has(nid)) {
+                    toDelete.push(nid)
+                }
+            })
+        }
+        return { toCreate, toUpdate, toDelete, visibleRef, visibleSet }
+    }
+
+    rememberSnapshotVisibility(userId: number, visibility: ManualChannelSnapshotVisibility) {
+        this.snapshotVisibilityByUser.set(userId, {
+            visibleRef: visibility.visibleRef,
+            visibleSet: visibility.visibleSet
+        })
+    }
+
+    unsubscribe(user: User) {
+        this.snapshotVisibilityByUser.delete(user.id)
+        super.unsubscribe(user)
     }
 
     createEntityWriter(ntype: number, schema: Schema): ManualTypeWriters {
@@ -143,5 +215,6 @@ export class ManualChannel extends Channel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.snapshotVisibilityByUser.clear()
     }
 }

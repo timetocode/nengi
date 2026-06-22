@@ -3,7 +3,7 @@ import { User } from '../../server/User'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { writeSnapshot } from './writeSnapshot'
 import { createEmptySnapshotPlan } from './SnapshotPlan'
-import { CellFragmentChannel, isManualSpatialCellFragmentChannel, ManualSpatialCellFragmentChannel } from './channelModes'
+import { CellFragmentChannel, isManualCellFragmentChannel, ManualCellFragmentChannel } from './channelModes'
 import { CellEntityFragment } from './cellEntityFragments'
 import {
     collectCreateEntitiesForRoots,
@@ -13,33 +13,9 @@ import {
 import {
     countManualGroupedProps,
     countManualUpdateBytes,
+    ManualUpdateLog,
     writeManualUpdates
 } from './manualUpdates'
-
-export function applyCellEntityFragmentsToUser(user: User, tick: number, createFragments: CellEntityFragment[], deleteFragments: CellEntityFragment[]) {
-    if (deleteFragments.length > 0) {
-        const deletedNids = new Set<number>()
-        for (let i = 0; i < deleteFragments.length; i++) {
-            for (const nid of deleteFragments[i].nids) {
-                deletedNids.add(nid)
-                user.tickLastSeen.delete(nid)
-            }
-        }
-        user.currentlyVisible = user.currentlyVisible.filter(nid => !deletedNids.has(nid))
-    }
-
-    for (let i = 0; i < user.currentlyVisible.length; i++) {
-        user.tickLastSeen.set(user.currentlyVisible[i], tick)
-    }
-
-    for (let i = 0; i < createFragments.length; i++) {
-        for (const nid of createFragments[i].nids) {
-            user.markVisible(nid, tick, [], [])
-        }
-    }
-
-    user.lastVisibleCount = user.currentlyVisible.length
-}
 
 export function getCellCreateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string): CellEntityFragment {
     const protocol = instance.network.getProtocol()
@@ -142,12 +118,14 @@ export function getCellDeleteFragment(user: User, instance: Instance, channel: C
 export function getManualSpatialCellUpdateFragment(
     user: User,
     instance: Instance,
-    channel: ManualSpatialCellFragmentChannel,
+    channel: ManualCellFragmentChannel,
     cellKey: string,
     includeNids = true
 ): CellEntityFragment {
-    const log = channel.getManualCellUpdateLog(cellKey)
-    if (!log) {
+    const cellNids = collectNidsForRoots(instance, channel.getCellEntities(cellKey))
+    const cellLog = channel.getManualCellUpdateLog(cellKey)
+    const log = cellLog ? filterManualCellUpdateLog(cellLog, cellNids) : null
+    if (!log || (log.manualPropNids.length === 0 && log.manualGroupNids.length === 0)) {
         return {
             payload: user.networkAdapter.binary.createWriter(0).payload,
             bytes: 0,
@@ -191,7 +169,7 @@ export function getManualSpatialCellUpdateFragment(
     const fragment = {
         payload: writer.payload,
         bytes,
-        nids: includeNids ? collectNidsForRoots(instance, channel.getCellEntities(cellKey)) : new Set<number>(),
+        nids: includeNids ? cellNids : new Set<number>(),
         creates: 0,
         deletes: 0,
         updateProps: log.manualPropNids.length,
@@ -203,8 +181,59 @@ export function getManualSpatialCellUpdateFragment(
     return fragment
 }
 
+function filterManualCellUpdateLog(log: ManualUpdateLog, liveNids: Set<number>): ManualUpdateLog {
+    let needsFilter = false
+    for (let i = 0; i < log.manualPropNids.length; i++) {
+        if (!liveNids.has(log.manualPropNids[i])) {
+            needsFilter = true
+            break
+        }
+    }
+    for (let i = 0; !needsFilter && i < log.manualGroupNids.length; i++) {
+        if (!liveNids.has(log.manualGroupNids[i])) {
+            needsFilter = true
+        }
+    }
+    if (!needsFilter) {
+        return log
+    }
+
+    const filtered: ManualUpdateLog = {
+        manualPropNids: [],
+        manualPropSchemas: [],
+        manualPropValues: [],
+        manualGroupNids: [],
+        manualGroupSchemas: [],
+        manualGroupValueOffsets: [],
+        manualGroupValues: []
+    }
+    for (let i = 0; i < log.manualPropNids.length; i++) {
+        if (!liveNids.has(log.manualPropNids[i])) {
+            continue
+        }
+        filtered.manualPropNids.push(log.manualPropNids[i])
+        filtered.manualPropSchemas.push(log.manualPropSchemas[i])
+        filtered.manualPropValues.push(log.manualPropValues[i])
+    }
+    for (let i = 0; i < log.manualGroupNids.length; i++) {
+        const nid = log.manualGroupNids[i]
+        const group = log.manualGroupSchemas[i]
+        let offset = log.manualGroupValueOffsets[i]
+        if (!liveNids.has(nid)) {
+            continue
+        }
+        filtered.manualGroupNids.push(nid)
+        filtered.manualGroupSchemas.push(group)
+        filtered.manualGroupValueOffsets.push(filtered.manualGroupValues.length)
+        for (let j = 0; j < group.props.length; j++) {
+            filtered.manualGroupValues.push(log.manualGroupValues[offset++])
+        }
+    }
+    return filtered
+}
+
 export function getCellUpdateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
-    if (isManualSpatialCellFragmentChannel(channel)) {
+    if (isManualCellFragmentChannel(channel)) {
         return getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids)
     }
 
@@ -260,7 +289,7 @@ export function getCellUpdateFragment(user: User, instance: Instance, channel: C
 }
 
 export function cellMayHaveUpdates(channel: CellFragmentChannel, cellKey: string) {
-    if (isManualSpatialCellFragmentChannel(channel)) {
+    if (isManualCellFragmentChannel(channel)) {
         return channel.cellHasManualUpdates(cellKey)
     }
     return true

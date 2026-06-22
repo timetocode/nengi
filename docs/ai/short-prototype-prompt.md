@@ -20,7 +20,7 @@ Before coding, read:
 2. `nengi/docs/ai/local-prototype.md`
 
 Then read only the topic docs you actually need. Let the game design determine
-whether the world should use `Channel` or `SpatialChannel2D`.
+whether the world should use `Channel` or `Channel2D`.
 
 Create `AI_NOTES.md` early and update it as you work. Record what docs you read,
 why you chose each nengi primitive, what was confusing, what worked well, and

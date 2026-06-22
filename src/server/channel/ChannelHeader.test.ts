@@ -8,13 +8,13 @@ import { User } from '../User'
 import { testBinaryAdapter } from '../../testSupport/BufferBinary'
 import { Channel } from './Channel'
 import { ManualChannel } from './ManualChannel'
-import { SpatialChannel2D } from './SpatialChannel2D'
-import { SpatialChannel3D } from './SpatialChannel3D'
-import { ManualSpatialChannel2D } from './ManualSpatialChannel2D'
-import { ManualSpatialChannel3D } from './ManualSpatialChannel3D'
+import { Channel2D } from './Channel2D'
+import { Channel3D } from './Channel3D'
+import { ManualChannel2D } from './ManualChannel2D'
+import { ManualChannel3D } from './ManualChannel3D'
 import { EcsChannel } from './EcsChannel'
-import { EcsSpatialChannel2D } from './EcsSpatialChannel2D'
-import { EcsSpatialChannel3D } from './EcsSpatialChannel3D'
+import { EcsChannel2D } from './EcsChannel2D'
+import { EcsChannel3D } from './EcsChannel3D'
 
 enum NType {
     Entity = 1,
@@ -102,36 +102,36 @@ describe('channel headers', () => {
             }
         },
         {
-            name: 'SpatialChannel2D',
+            name: 'Channel2D',
             setup(instance, user, header) {
-                const channel = new SpatialChannel2D(instance.localState, 10, { header })
+                const channel = new Channel2D(instance.localState, 10, { header })
                 channel.subscribe(user, { x: 0, y: 0, halfWidth: 10, halfHeight: 10 })
                 const entity = channel.addEntity(createEntity())
                 return [entity.nid]
             }
         },
         {
-            name: 'SpatialChannel3D',
+            name: 'Channel3D',
             setup(instance, user, header) {
-                const channel = new SpatialChannel3D(instance.localState, 10, { header })
+                const channel = new Channel3D(instance.localState, 10, { header })
                 channel.subscribe(user, { x: 0, y: 0, z: 0, halfWidth: 10, halfHeight: 10, halfDepth: 10 })
                 const entity = channel.addEntity(createEntity())
                 return [entity.nid]
             }
         },
         {
-            name: 'ManualSpatialChannel2D',
+            name: 'ManualChannel2D',
             setup(instance, user, header) {
-                const channel = new ManualSpatialChannel2D(instance.localState, 10, { header })
+                const channel = new ManualChannel2D(instance.localState, 10, { header })
                 channel.subscribe(user, { x: 0, y: 0, halfWidth: 10, halfHeight: 10 })
                 const entity = channel.addEntity(createEntity())
                 return [entity.nid]
             }
         },
         {
-            name: 'ManualSpatialChannel3D',
+            name: 'ManualChannel3D',
             setup(instance, user, header) {
-                const channel = new ManualSpatialChannel3D(instance.localState, 10, { header })
+                const channel = new ManualChannel3D(instance.localState, 10, { header })
                 channel.subscribe(user, { x: 0, y: 0, z: 0, halfWidth: 10, halfHeight: 10, halfDepth: 10 })
                 const entity = channel.addEntity(createEntity())
                 return [entity.nid]
@@ -148,9 +148,9 @@ describe('channel headers', () => {
             }
         },
         {
-            name: 'EcsSpatialChannel2D',
+            name: 'EcsChannel2D',
             setup(instance, user, header) {
-                const channel = new EcsSpatialChannel2D(instance.localState, 10, { header })
+                const channel = new EcsChannel2D(instance.localState, 10, { header })
                 channel.subscribe(user, { x: 0, y: 0, halfWidth: 10, halfHeight: 10 })
                 const pid = channel.createEntity()
                 const component = channel.addSpatialComponent(pid, createEntity(NType.Component))
@@ -158,9 +158,9 @@ describe('channel headers', () => {
             }
         },
         {
-            name: 'EcsSpatialChannel3D',
+            name: 'EcsChannel3D',
             setup(instance, user, header) {
-                const channel = new EcsSpatialChannel3D(instance.localState, 10, { header })
+                const channel = new EcsChannel3D(instance.localState, 10, { header })
                 channel.subscribe(user, { x: 0, y: 0, z: 0, halfWidth: 10, halfHeight: 10, halfDepth: 10 })
                 const pid = channel.createEntity()
                 const component = channel.addSpatialComponent(pid, createEntity(NType.Component))

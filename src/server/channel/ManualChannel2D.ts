@@ -1,18 +1,28 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
+import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
+import { Instance } from '../Instance'
 import { LocalState } from '../LocalState'
 import { NDictionary } from '../NDictionary'
 import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
-import { SpatialGrid3D, SpatialGridCell } from './SpatialGrid'
-import { normalizeSpatialView3D, objectInSpatialView3D, SpatialView3D } from './SpatialView'
+import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
+import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialView'
+import { ChannelSnapshotOutput } from './ChannelSnapshotOutput'
+import { createCellFragmentChannelOutput } from './CellFragmentChannelOutput'
 
 type SpatialEntity = IEntity & Record<string, any>
-export type ManualSpatial3DMove = { entity: SpatialEntity, fromCell: string, toCell: string }
+export type Manual2DMove = { entity: SpatialEntity, fromCell: string, toCell: string }
+export type Manual2DSnapshotVisibility = {
+    toCreate: number[]
+    toUpdate: number[]
+    toDelete: number[]
+    previous: Set<number>
+}
 
-export type ManualSpatial3DCellLog = {
+export type Manual2DCellLog = {
     manualPropNids: number[]
     manualPropSchemas: SchemaProp[]
     manualPropValues: any[]
@@ -22,9 +32,9 @@ export type ManualSpatial3DCellLog = {
     manualGroupValues: any[]
 }
 
-type Cell = SpatialGridCell<SpatialEntity> & ManualSpatial3DCellLog
+type Cell = SpatialGridCell<SpatialEntity> & Manual2DCellLog
 
-export type ManualSpatial3DTypeWriters = {
+export type Manual2DTypeWriters = {
     [name: string]: any
     readonly ntype: number
     readonly schema: Schema
@@ -32,15 +42,16 @@ export type ManualSpatial3DTypeWriters = {
     readonly groups: { [name: string]: (entity: SpatialEntity, ...values: any[]) => void }
 }
 
-export type ManualSpatialChannel3DOptions = ChannelOptions & {
+export type ManualChannel2DOptions = ChannelOptions & {
     queryPadding?: number
     fragmentCellLimit?: number
     stableFragmentCellLimit?: number
-    spatialProps?: { x?: string, y?: string, z?: string }
+    plane?: SpatialPlane
+    spatialProps?: { x?: string, y?: string }
     strictManualWrites?: boolean
 }
 
-function initializeManualSpatialCell(cell: SpatialGridCell<SpatialEntity>) {
+function initializeManualCell(cell: SpatialGridCell<SpatialEntity>) {
     const manualCell = cell as Cell
     manualCell.manualPropNids = []
     manualCell.manualPropSchemas = []
@@ -51,11 +62,11 @@ function initializeManualSpatialCell(cell: SpatialGridCell<SpatialEntity>) {
     manualCell.manualGroupValues = []
 }
 
-// ManualSpatialChannel3D intentionally mirrors ManualSpatialChannel2D instead
+// ManualChannel2D intentionally mirrors ManualChannel3D instead
 // of using a dimension-generic wrapper; this is snapshot hot-path code, so
 // benchmark before collapsing the parallel implementations.
-export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, SpatialView3D> {
-    readonly manualSpatialChannelMode = true
+export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialView> {
+    readonly manualCellFragmentChannelMode = true
     readonly cellFragmentMode = true
     nid: number
     localState: LocalState
@@ -63,17 +74,17 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
     users: Map<number, User> = new Map()
     header: ChannelHeader
     headerVersion = 0
-    channelType = ChannelType.ManualSpatialChannel3D
-    visibilityResolver = objectInSpatialView3D
+    channelType = ChannelType.ManualChannel2D
+    visibilityResolver = (obj: any, view: SpatialView) => objectInSpatialView(obj, view, this.plane)
     cellSize: number
     queryPadding: number
     membershipVersion = 0
     fragmentCellLimit: number
     stableFragmentCellLimit: number
     dirtyCells: Set<string> = new Set()
-    private views: Map<number, SpatialView3D> = new Map()
+    private views: Map<number, SpatialView> = new Map()
     private viewVersions: Map<number, number> = new Map()
-    private grid: SpatialGrid3D<SpatialEntity>
+    private grid: SpatialGrid2D<SpatialEntity>
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
@@ -81,18 +92,19 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
     private rememberedCellSignatures: Map<number, string> = new Map()
     private spatialXProp: string
     private spatialYProp: string
-    private spatialZProp: string
+    plane: SpatialPlane
+    private axes: SpatialPlaneAxes
     private strictManualWrites: boolean
-    private movedRoots: ManualSpatial3DMove[] = []
+    private movedRoots: Manual2DMove[] = []
     private structuralDeltas = false
     skipInterpolationNids: number[] = []
 
-    constructor(localState: LocalState, cellSize: number, options: ManualSpatialChannel3DOptions = {}) {
+    constructor(localState: LocalState, cellSize: number, options: ManualChannel2DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
-            throw new Error('ManualSpatialChannel3D requires a positive finite cell size.')
+            throw new Error('ManualChannel2D requires a positive finite cell size.')
         }
         if (options.queryPadding !== undefined && (!Number.isFinite(options.queryPadding) || options.queryPadding < 0)) {
-            throw new Error('ManualSpatialChannel3D queryPadding must be a non-negative finite number.')
+            throw new Error('ManualChannel2D queryPadding must be a non-negative finite number.')
         }
         this.localState = localState
         this.nid = localState.nextNetworkId()
@@ -102,16 +114,16 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         this.queryPadding = options.queryPadding || 0
         this.fragmentCellLimit = Math.max(1, Math.floor(options.fragmentCellLimit || 16))
         this.stableFragmentCellLimit = Math.max(this.fragmentCellLimit, Math.floor(options.stableFragmentCellLimit || 64))
-        this.spatialXProp = options.spatialProps?.x || 'x'
-        this.spatialYProp = options.spatialProps?.y || 'y'
-        this.spatialZProp = options.spatialProps?.z || 'z'
+        this.plane = options.plane || 'xy'
+        this.axes = getSpatialPlaneAxes(this.plane)
+        this.spatialXProp = options.spatialProps?.x || this.axes.a
+        this.spatialYProp = options.spatialProps?.y || this.axes.b
         this.strictManualWrites = options.strictManualWrites === true
-        this.grid = new SpatialGrid3D({
+        this.grid = new SpatialGrid2D({
             cellSize,
             getX: entity => entity[this.spatialXProp],
             getY: entity => entity[this.spatialYProp],
-            getZ: entity => entity[this.spatialZProp],
-            initializeCell: initializeManualSpatialCell
+            initializeCell: initializeManualCell
         })
         this.localState.channels.add(this as any)
     }
@@ -173,7 +185,7 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         }
 
         if (this.strictManualWrites) {
-            throw new Error(`ManualSpatialChannel3D cannot write mutation for nid ${entity.nid}; no spatial cell was found for the entity or its root.`)
+            throw new Error(`ManualChannel2D cannot write mutation for nid ${entity.nid}; no spatial cell was found for the entity or its root.`)
         }
         return null
     }
@@ -188,19 +200,20 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         this.invalidateVisibleEntityCache()
     }
 
-    private viewRange(view: SpatialView3D) {
-        const spatialView = normalizeSpatialView3D(view)
-        const halfWidth = spatialView.halfWidth + this.queryPadding
-        const halfHeight = spatialView.halfHeight + this.queryPadding
-        const halfDepth = spatialView.halfDepth + this.queryPadding
+    private viewRange(view: SpatialView) {
+        const spatialView = normalizeSpatialView(view, this.plane)
+        const halfWidth = spatialView.halfA + this.queryPadding
+        const halfHeight = spatialView.halfB + this.queryPadding
+        const startX = spatialView.a - halfWidth
+        const startY = spatialView.b - halfHeight
+        const endX = spatialView.a + halfWidth
+        const endY = spatialView.b + halfHeight
 
         return {
-            minX: this.grid.cellCoord(spatialView.x - halfWidth),
-            maxX: this.grid.cellCoordForEnd(spatialView.x + halfWidth),
-            minY: this.grid.cellCoord(spatialView.y - halfHeight),
-            maxY: this.grid.cellCoordForEnd(spatialView.y + halfHeight),
-            minZ: this.grid.cellCoord(spatialView.z - halfDepth),
-            maxZ: this.grid.cellCoordForEnd(spatialView.z + halfDepth)
+            minX: this.grid.cellCoord(startX),
+            maxX: this.grid.cellCoordForEnd(endX),
+            minY: this.grid.cellCoord(startY),
+            maxY: this.grid.cellCoordForEnd(endY)
         }
     }
 
@@ -212,9 +225,9 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
             return { keys, nids }
         }
 
-        const spatialView = normalizeSpatialView3D(view)
+        const spatialView = normalizeSpatialView(view, this.plane)
         const visibleKeys = spatialView.radius !== undefined ?
-            this.grid.getVisibleCellKeysInSphere(spatialView.x, spatialView.y, spatialView.z, spatialView.radius + this.queryPadding) :
+            this.grid.getVisibleCellKeysInCircle(spatialView.a, spatialView.b, spatialView.radius + this.queryPadding) :
             this.grid.getVisibleCellKeys(this.viewRange(view))
         for (let i = 0; i < visibleKeys.length; i++) {
             const key = visibleKeys[i]
@@ -244,10 +257,10 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         return nids
     }
 
-    createEntityWriter(ntype: number, schema: Schema): ManualSpatial3DTypeWriters {
-        const props: ManualSpatial3DTypeWriters['props'] = Object.create(null)
-        const groups: ManualSpatial3DTypeWriters['groups'] = Object.create(null)
-        const writers: ManualSpatial3DTypeWriters = {
+    createEntityWriter(ntype: number, schema: Schema): Manual2DTypeWriters {
+        const props: Manual2DTypeWriters['props'] = Object.create(null)
+        const groups: Manual2DTypeWriters['groups'] = Object.create(null)
+        const writers: Manual2DTypeWriters = {
             ntype,
             schema,
             props,
@@ -360,7 +373,7 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         return entity
     }
 
-    markHeaderDirty() {
+    syncHeader() {
         if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
         }
@@ -392,10 +405,6 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
 
     removeAllEntities() {
         Array.from(this.entities.array).forEach(entity => this.removeEntity(entity as SpatialEntity))
-    }
-
-    markDirty(entity: SpatialEntity) {
-        return this.localState.markDirty(entity)
     }
 
     // One-frame interpolation skip for teleports, respawns, wraparound, or
@@ -451,14 +460,14 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         this.structuralDeltas = false
     }
 
-    subscribe(user: User, view: SpatialView3D) {
+    subscribe(user: User, view: SpatialView) {
         this.views.set(user.id, view)
         this.viewVersions.set(user.id, 1)
         this.users.set(user.id, user)
         user.subscribe(this as any)
     }
 
-    updateView(user: User, view: SpatialView3D) {
+    updateView(user: User, view: SpatialView) {
         if (!this.users.has(user.id)) {
             return
         }
@@ -600,6 +609,37 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         return this.rememberedCells.get(userId)?.get(key) || []
     }
 
+    collectSnapshotVisibility(userId: number): Manual2DSnapshotVisibility {
+        const previous = new Set<number>()
+        const previousCellKeys = this.getRememberedCellKeys(userId)
+        for (let i = 0; i < previousCellKeys.length; i++) {
+            const nids = this.getRememberedCellNids(userId, previousCellKeys[i])
+            for (let j = 0; j < nids.length; j++) {
+                previous.add(nids[j])
+            }
+        }
+
+        const currentNids = this.getVisibleNetworkedNids(userId)
+        const current = new Set(currentNids)
+        const toCreate: number[] = []
+        const toUpdate: number[] = []
+        const toDelete: number[] = []
+        for (let i = 0; i < currentNids.length; i++) {
+            const nid = currentNids[i]
+            if (previous.has(nid)) {
+                toUpdate.push(nid)
+            } else {
+                toCreate.push(nid)
+            }
+        }
+        previous.forEach(nid => {
+            if (!current.has(nid)) {
+                toDelete.push(nid)
+            }
+        })
+        return { toCreate, toUpdate, toDelete, previous }
+    }
+
     getStableVisibleCellKeys(userId: number) {
         const remembered = this.rememberedCells.get(userId)
         if (!remembered) {
@@ -629,6 +669,14 @@ export class ManualSpatialChannel3D implements ICulledChannel<SpatialEntity, Spa
         }
         this.rememberedCells.set(userId, remembered)
         this.rememberedCellSignatures.set(userId, this.getVisibleCellVersionSignature(userId))
+    }
+
+    rememberSnapshotVisibility(userId: number) {
+        this.rememberVisibleCells(userId)
+    }
+
+    createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig): ChannelSnapshotOutput {
+        return createCellFragmentChannelOutput(user, instance, this, protocol)
     }
 
     destroy() {
