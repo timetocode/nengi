@@ -45,7 +45,7 @@ export type EcsChannelSnapshotChannel = {
     header: any
     headerVersion: number
     createdRoots: number[]
-    deletedRoots: number[]
+    deletedEntities: number[]
     createdComponents: any[]
     deletedComponents: number[]
     prepareVisibilityPlan(tick: number): any

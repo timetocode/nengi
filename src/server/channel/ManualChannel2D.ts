@@ -1,17 +1,26 @@
 import { Schema, SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
 import { ProtocolConfig } from '../../common/binary/Protocol'
-import { ChannelHeader, ChannelHeaderInput, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
+import { ChannelHeader, ChannelType, createChannelHeader, hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { IEntity } from '../../common/IEntity'
 import { Instance } from '../Instance'
 import { LocalState } from '../LocalState'
 import { NDictionary } from '../NDictionary'
 import { User } from '../User'
-import { Channel, ChannelOptions } from './Channel'
+import { ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialView'
 import { ChannelSnapshotOutput } from './ChannelSnapshotOutput'
 import { createCellFragmentChannelOutput } from './CellFragmentChannelOutput'
+import {
+    appendManualGroup,
+    appendManualGroup1,
+    appendManualGroup2,
+    appendManualGroup3,
+    appendManualGroup4,
+    appendManualProp,
+    coalesceManualUpdateLog
+} from './EcsSpatialManualLog'
 
 type SpatialEntity = IEntity & Record<string, any>
 export type Manual2DMove = { entity: SpatialEntity, fromCell: string, toCell: string }
@@ -20,6 +29,34 @@ export type Manual2DSnapshotVisibility = {
     toUpdate: number[]
     toDelete: number[]
     previous: Set<number>
+    visibleCellKeys?: string[]
+    nextCellSignature?: string
+    nextVisibleRef?: number[]
+    nextVisibleSet?: Set<number>
+}
+
+const EMPTY_NIDS: number[] = []
+
+type Manual2DVisibilityGroup = {
+    cellSignature: string
+    visibleCellKeys: string[]
+    visibleNids: number[]
+    visibleCellKeySet?: Set<string>
+    visibleNidSet?: Set<number>
+    users: User[]
+    stableSnapshot?: Manual2DSnapshotVisibility
+}
+
+type Manual2DVisibilityPlan = {
+    tick: number
+    groups: Manual2DVisibilityGroup[]
+    userSnapshots: Map<number, Manual2DSnapshotVisibility>
+}
+
+type Manual2DVisibilityState = {
+    cellSignature: string
+    visibleRef: number[]
+    visibleSet: Set<number>
 }
 
 export type Manual2DCellLog = {
@@ -30,6 +67,9 @@ export type Manual2DCellLog = {
     manualGroupSchemas: SchemaUpdateGroup[]
     manualGroupValueOffsets: number[]
     manualGroupValues: any[]
+    manualOpTypes: number[]
+    manualOpIndexes: number[]
+    manualNeedsCoalesce: boolean
 }
 
 type Cell = SpatialGridCell<SpatialEntity> & Manual2DCellLog
@@ -60,6 +100,9 @@ function initializeManualCell(cell: SpatialGridCell<SpatialEntity>) {
     manualCell.manualGroupSchemas = []
     manualCell.manualGroupValueOffsets = []
     manualCell.manualGroupValues = []
+    manualCell.manualOpTypes = []
+    manualCell.manualOpIndexes = []
+    manualCell.manualNeedsCoalesce = false
 }
 
 // ManualChannel2D intentionally mirrors ManualChannel3D instead
@@ -97,6 +140,8 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     private strictManualWrites: boolean
     private movedRoots: Manual2DMove[] = []
     private structuralDeltas = false
+    private visibilityPlan: Manual2DVisibilityPlan | null = null
+    private visibilityStateByUser: Map<number, Manual2DVisibilityState> = new Map()
     skipInterpolationNids: number[] = []
 
     constructor(localState: LocalState, cellSize: number, options: ManualChannel2DOptions = {}) {
@@ -193,11 +238,121 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     private invalidateVisibleEntityCache() {
         this.visibleEntityCache.clear()
         this.visibleNetworkedNidsCache.clear()
+        this.clearVisibilityPlan()
     }
 
     private invalidateVisibleCellKeyCache() {
         this.visibleCellKeyCache.clear()
         this.invalidateVisibleEntityCache()
+    }
+
+    private clearVisibilityPlan() {
+        this.visibilityPlan = null
+    }
+
+    private getGroupVisibleCellSet(group: Manual2DVisibilityGroup) {
+        if (!group.visibleCellKeySet) {
+            group.visibleCellKeySet = new Set(group.visibleCellKeys)
+        }
+        return group.visibleCellKeySet
+    }
+
+    private getGroupVisibleSet(group: Manual2DVisibilityGroup) {
+        if (!group.visibleNidSet) {
+            group.visibleNidSet = new Set(group.visibleNids)
+        }
+        return group.visibleNidSet
+    }
+
+    private hasVisibilityCellMove(group: Manual2DVisibilityGroup) {
+        if (this.movedRoots.length === 0) {
+            return false
+        }
+
+        const visibleCells = this.getGroupVisibleCellSet(group)
+        for (let i = 0; i < this.movedRoots.length; i++) {
+            const move = this.movedRoots[i]
+            if (visibleCells.has(move.fromCell) !== visibleCells.has(move.toCell)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private collectUserSnapshotFromGroup(user: User, group: Manual2DVisibilityGroup): Manual2DSnapshotVisibility {
+        const state = this.visibilityStateByUser.get(user.id)
+        if (state && state.visibleRef === group.visibleNids) {
+            if (!group.stableSnapshot) {
+                group.stableSnapshot = {
+                    toCreate: EMPTY_NIDS,
+                    toUpdate: EMPTY_NIDS,
+                    toDelete: EMPTY_NIDS,
+                    previous: state.visibleSet,
+                    visibleCellKeys: group.visibleCellKeys,
+                    nextCellSignature: group.cellSignature,
+                    nextVisibleRef: group.visibleNids,
+                    nextVisibleSet: state.visibleSet
+                }
+            }
+            return group.stableSnapshot
+        }
+
+        if (state && state.cellSignature === group.cellSignature && !this.hasVisibilityCellMove(group)) {
+            if (!group.stableSnapshot) {
+                group.stableSnapshot = {
+                    toCreate: EMPTY_NIDS,
+                    toUpdate: EMPTY_NIDS,
+                    toDelete: EMPTY_NIDS,
+                    previous: state.visibleSet,
+                    visibleCellKeys: group.visibleCellKeys,
+                    nextCellSignature: group.cellSignature,
+                    nextVisibleRef: group.visibleNids,
+                    nextVisibleSet: state.visibleSet
+                }
+            }
+            return group.stableSnapshot
+        }
+
+        const currentSet = this.getGroupVisibleSet(group)
+        if (!state) {
+            return {
+                toCreate: group.visibleNids.slice(),
+                toUpdate: EMPTY_NIDS,
+                toDelete: EMPTY_NIDS,
+                previous: new Set<number>(),
+                visibleCellKeys: group.visibleCellKeys,
+                nextCellSignature: group.cellSignature,
+                nextVisibleRef: group.visibleNids,
+                nextVisibleSet: currentSet
+            }
+        }
+
+        const toCreate: number[] = []
+        const toDelete: number[] = []
+        for (let i = 0; i < group.visibleNids.length; i++) {
+            const nid = group.visibleNids[i]
+            if (!state.visibleSet.has(nid)) {
+                toCreate.push(nid)
+            }
+        }
+        for (let i = 0; i < state.visibleRef.length; i++) {
+            const nid = state.visibleRef[i]
+            if (!currentSet.has(nid)) {
+                toDelete.push(nid)
+            }
+        }
+
+        const previous = state.visibleSet
+        return {
+            toCreate,
+            toUpdate: EMPTY_NIDS,
+            toDelete,
+            previous,
+            visibleCellKeys: group.visibleCellKeys,
+            nextCellSignature: group.cellSignature,
+            nextVisibleRef: group.visibleNids,
+            nextVisibleSet: currentSet
+        }
     }
 
     private viewRange(view: SpatialView) {
@@ -290,9 +445,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                 if (!cell) {
                     return
                 }
-                cell.manualPropNids.push(entity.nid)
-                cell.manualPropSchemas.push(prop)
-                cell.manualPropValues.push(value)
+                appendManualProp(cell, entity.nid, prop, value)
             }
             addAlias(name, props[name])
         }
@@ -305,10 +458,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     if (!cell) {
                         return
                     }
-                    cell.manualGroupNids.push(entity.nid)
-                    cell.manualGroupSchemas.push(group)
-                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
-                    cell.manualGroupValues.push(v0)
+                    appendManualGroup1(cell, entity.nid, group, v0)
                 }
             } else if (group.props.length === 2) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any) => {
@@ -316,10 +466,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     if (!cell) {
                         return
                     }
-                    cell.manualGroupNids.push(entity.nid)
-                    cell.manualGroupSchemas.push(group)
-                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
-                    cell.manualGroupValues.push(v0, v1)
+                    appendManualGroup2(cell, entity.nid, group, v0, v1)
                 }
             } else if (group.props.length === 3) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any, v2: any) => {
@@ -327,10 +474,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     if (!cell) {
                         return
                     }
-                    cell.manualGroupNids.push(entity.nid)
-                    cell.manualGroupSchemas.push(group)
-                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
-                    cell.manualGroupValues.push(v0, v1, v2)
+                    appendManualGroup3(cell, entity.nid, group, v0, v1, v2)
                 }
             } else if (group.props.length === 4) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any, v2: any, v3: any) => {
@@ -338,10 +482,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     if (!cell) {
                         return
                     }
-                    cell.manualGroupNids.push(entity.nid)
-                    cell.manualGroupSchemas.push(group)
-                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
-                    cell.manualGroupValues.push(v0, v1, v2, v3)
+                    appendManualGroup4(cell, entity.nid, group, v0, v1, v2, v3)
                 }
             } else {
                 groups[group.name] = (entity: SpatialEntity, ...values: any[]) => {
@@ -349,12 +490,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     if (!cell) {
                         return
                     }
-                    cell.manualGroupNids.push(entity.nid)
-                    cell.manualGroupSchemas.push(group)
-                    cell.manualGroupValueOffsets.push(cell.manualGroupValues.length)
-                    for (let j = 0; j < group.props.length; j++) {
-                        cell.manualGroupValues.push(values[j])
-                    }
+                    appendManualGroup(cell, entity.nid, group, values)
                 }
             }
             addAlias(group.name, groups[group.name])
@@ -453,6 +589,9 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             cell.manualGroupSchemas.length = 0
             cell.manualGroupValueOffsets.length = 0
             cell.manualGroupValues.length = 0
+            cell.manualOpTypes.length = 0
+            cell.manualOpIndexes.length = 0
+            cell.manualNeedsCoalesce = false
         }
         this.dirtyCells.clear()
         this.skipInterpolationNids.length = 0
@@ -486,8 +625,10 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         this.visibleNetworkedNidsCache.delete(user.id)
         this.rememberedCells.delete(user.id)
         this.rememberedCellSignatures.delete(user.id)
+        this.visibilityStateByUser.delete(user.id)
         this.users.delete(user.id)
         user.unsubscribe(this as any)
+        this.clearVisibilityPlan()
     }
 
     unsubscribeAll() {
@@ -507,6 +648,10 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             keys: visible.keys
         })
         return visible.keys
+    }
+
+    getVisibleCellKeySignature(userId: number) {
+        return this.getVisibleCellKeys(userId).join('|')
     }
 
     getVisibleEntities(userId: number) {
@@ -576,6 +721,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         if (cell.manualPropNids.length === 0 && cell.manualGroupNids.length === 0) {
             return null
         }
+        coalesceManualUpdateLog(cell)
         return cell
     }
 
@@ -640,6 +786,53 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         return { toCreate, toUpdate, toDelete, previous }
     }
 
+    prepareVisibilityPlan(tick: number) {
+        if (this.visibilityPlan && this.visibilityPlan.tick === tick) {
+            return this.visibilityPlan
+        }
+
+        const usersByCellSignature = new Map<string, User[]>()
+        for (const user of this.users.values()) {
+            const signature = this.getVisibleCellKeySignature(user.id)
+            let groupUsers = usersByCellSignature.get(signature)
+            if (!groupUsers) {
+                groupUsers = []
+                usersByCellSignature.set(signature, groupUsers)
+            }
+            groupUsers.push(user)
+        }
+
+        const groups: Manual2DVisibilityGroup[] = []
+        const userSnapshots = new Map<number, Manual2DSnapshotVisibility>()
+        for (const [cellSignature, groupUsers] of usersByCellSignature) {
+            const first = groupUsers[0]
+            const visibleCellKeys = first ? this.getVisibleCellKeys(first.id) : []
+            const visibleNids = first ? this.getVisibleNetworkedNids(first.id) : []
+            const group = {
+                cellSignature,
+                visibleCellKeys,
+                visibleNids,
+                users: groupUsers
+            }
+            groups.push(group)
+            for (let i = 0; i < groupUsers.length; i++) {
+                const user = groupUsers[i]
+                userSnapshots.set(user.id, this.collectUserSnapshotFromGroup(user, group))
+            }
+        }
+
+        this.visibilityPlan = { tick, groups, userSnapshots }
+        return this.visibilityPlan
+    }
+
+    getChannelSnapshot(user: User, tick: number) {
+        if (this.structuralDeltas) {
+            return null
+        }
+        const plan = this.prepareVisibilityPlan(tick)
+        return plan.userSnapshots.get(user.id) || null
+    }
+
     getStableVisibleCellKeys(userId: number) {
         const remembered = this.rememberedCells.get(userId)
         if (!remembered) {
@@ -671,8 +864,22 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         this.rememberedCellSignatures.set(userId, this.getVisibleCellVersionSignature(userId))
     }
 
-    rememberSnapshotVisibility(userId: number) {
+    rememberSnapshotVisibility(userId: number, visibility?: Manual2DSnapshotVisibility) {
         this.rememberVisibleCells(userId)
+        if (visibility?.nextCellSignature && visibility.nextVisibleRef && visibility.nextVisibleSet) {
+            this.visibilityStateByUser.set(userId, {
+                cellSignature: visibility.nextCellSignature,
+                visibleRef: visibility.nextVisibleRef,
+                visibleSet: visibility.nextVisibleSet
+            })
+            return
+        }
+        const visibleRef = this.getVisibleNetworkedNids(userId)
+        this.visibilityStateByUser.set(userId, {
+            cellSignature: this.getVisibleCellKeySignature(userId),
+            visibleRef,
+            visibleSet: new Set(visibleRef)
+        })
     }
 
     createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig): ChannelSnapshotOutput {
@@ -692,6 +899,8 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         this.dirtyCells.clear()
         this.rememberedCells.clear()
         this.rememberedCellSignatures.clear()
+        this.visibilityStateByUser.clear()
+        this.clearVisibilityPlan()
         this.grid.cells.clear()
         this.grid.objectCells.clear()
         this.visibilityResolver = () => true

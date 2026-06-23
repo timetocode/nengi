@@ -142,8 +142,8 @@ For expected game failures, prefer normal responses like `{ accepted: false, rea
 
 Requests do not have to own the resulting state. In many game features, a
 request is only the validated transaction boundary. The durable result then
-arrives through normal entities, messages, or channel subscription changes. For
-example, moving an inventory item is usually a request, while the item records
+arrives through normal entities, messages, or channel subscription changes.
+Moving an inventory item is usually a request, while the item records
 inside the open inventory channels are still entities. The client UI can also
 keep local-only state such as drag position, selected slot, pending/open/denied
 status, or optimistic visual feedback.
@@ -217,7 +217,7 @@ scenegraph-like objects or objects with replicated parts.
 Parent/child entities are not the ECS channel model. In nengi ECS channels, a
 root is only an id and replicated state lives on component entities with `pid`.
 
-## Feature decision examples
+## Feature decisions
 
 Simple private inventory counters:
 

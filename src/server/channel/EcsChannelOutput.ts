@@ -20,12 +20,12 @@ import {
 import { addChannelMessages } from '../../binary/snapshot/channelMessages'
 import { addEcsVisibilityCrud } from '../../binary/snapshot/ecsSnapshotCrud'
 import { countPlanMessages } from '../../binary/snapshot/snapshotPlanStats'
-import { addRegularUpdate } from '../../binary/snapshot/entitySnapshotPlans'
 import {
     ChannelSnapshotOutput,
     createChunkedChannelSnapshotOutput
 } from './ChannelSnapshotOutput'
 import { EcsChannel } from './EcsChannel'
+import { coalesceEcsSpatialManualUpdateLog } from './EcsSpatialManualLog'
 
 function hasSnapshotPlanContent(plan: SnapshotPlan) {
     return plan.ecsCreateEntities.length > 0 ||
@@ -97,6 +97,7 @@ export function createEcsChannelOutput(
     protocol: ProtocolConfig
 ): ChannelSnapshotOutput {
     const visibility = channel.collectSnapshotVisibility(user)
+    coalesceEcsSpatialManualUpdateLog(channel)
     const plan = createEmptySnapshotPlan()
     addEcsVisibilityCrud(plan, channel, visibility.toCreate, visibility.toDelete)
     addChannelMessages(plan, user, channel, true)
@@ -136,7 +137,7 @@ export function createEcsChannelOutput(
                 writeManualLogDirectly ? channel.manualGroupNids.length : plan.updateEntityGroups.length,
             groupedUpdateProps: manualFragment ? manualFragment.groupedUpdateProps :
                 writeManualLogDirectly ? countManualGroupedProps(channel) :
-                plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
+                    plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
             deletes: plan.ecsDeleteEntities.length + plan.deleteEntities.length,
             messages: countPlanMessages(plan),
             usedSharedFragments: !!manualFragment

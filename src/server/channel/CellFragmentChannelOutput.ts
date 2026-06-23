@@ -33,8 +33,23 @@ import {
     createChunkedChannelSnapshotOutput
 } from './ChannelSnapshotOutput'
 
+type CellFragmentVisibility = {
+    toCreate: number[]
+    toUpdate: number[]
+    toDelete: number[]
+    previous: Set<number>
+    visibleCellKeys?: string[]
+}
+
+type CellFirstManualChannel = CellFragmentChannel & {
+    getChannelSnapshot?(user: User, tick: number): CellFragmentVisibility | null
+}
+
 function collectVisibilityPlan(user: User, instance: Instance, channel: CellFragmentChannel) {
-    const visibility = channel.collectSnapshotVisibility(user.id)
+    const manualCellFirstSnapshot = isManualCellFragmentChannel(channel) ?
+        (channel as CellFirstManualChannel).getChannelSnapshot?.(user, instance.tick) :
+        null
+    const visibility: CellFragmentVisibility = manualCellFirstSnapshot || channel.collectSnapshotVisibility(user.id)
     const plan = createEmptySnapshotPlan()
     const isManual = isManualCellFragmentChannel(channel)
     for (let i = 0; i < visibility.toCreate.length; i++) {
@@ -95,7 +110,7 @@ export function createCellFragmentChannelOutput(
     const previousCellKeySet = new Set(previousCellKeys)
     const { plan, visibility } = collectVisibilityPlan(user, instance, channel)
     const previousVisible = visibility.previous
-    const currentCellKeys = channel.getVisibleCellKeys(user.id)
+    const currentCellKeys = visibility.visibleCellKeys || channel.getVisibleCellKeys(user.id)
     const currentCellKeySet = new Set(currentCellKeys)
     const createFragments: CellEntityFragment[] = []
     const deleteFragments: CellEntityFragment[] = []
@@ -177,7 +192,7 @@ export function createCellFragmentChannelOutput(
             usedSharedFragments: createFragments.length > 0 || deleteFragments.length > 0 || updateFragments.length > 0
         },
         commit() {
-            channel.rememberSnapshotVisibility(user.id)
+            channel.rememberSnapshotVisibility(user.id, visibility)
         }
     })
 }

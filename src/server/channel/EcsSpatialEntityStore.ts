@@ -13,7 +13,7 @@ export class EcsSpatialEntityStore<T extends EcsSpatialComponent> {
     rootNids: number[] = []
     componentNids: number[] = []
     createdRoots: number[] = []
-    deletedRoots: number[] = []
+    deletedEntities: number[] = []
     createdComponents: T[] = []
     deletedComponents: number[] = []
 
@@ -52,7 +52,7 @@ export class EcsSpatialEntityStore<T extends EcsSpatialComponent> {
         if (createdIndex > -1) {
             this.createdRoots.splice(createdIndex, 1)
         } else {
-            this.deletedRoots.push(pid)
+            this.deletedEntities.push(pid)
         }
         this.rootSet.delete(pid)
         this.componentsByRoot.delete(pid)
@@ -129,7 +129,7 @@ export class EcsSpatialEntityStore<T extends EcsSpatialComponent> {
     }
 
     isRootNid(nid: number) {
-        return this.rootSet.has(nid) || this.deletedRoots.indexOf(nid) > -1
+        return this.rootSet.has(nid) || this.deletedEntities.indexOf(nid) > -1
     }
 
     isComponentNid(nid: number) {
@@ -157,7 +157,7 @@ export class EcsSpatialEntityStore<T extends EcsSpatialComponent> {
 
     clearSnapshotDeltas() {
         this.createdRoots.length = 0
-        this.deletedRoots.length = 0
+        this.deletedEntities.length = 0
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
     }
@@ -166,7 +166,7 @@ export class EcsSpatialEntityStore<T extends EcsSpatialComponent> {
         this.rootNids.length = 0
         this.componentNids.length = 0
         this.createdRoots.length = 0
-        this.deletedRoots.length = 0
+        this.deletedEntities.length = 0
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
         this.rootSet.clear()

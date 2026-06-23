@@ -7,6 +7,14 @@ import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { createEcsChannelOutput } from './EcsChannelOutput'
 import { IChannel } from './IChannel'
+import {
+    appendEcsSpatialManualProp,
+    appendManualGroup,
+    appendManualGroup1,
+    appendManualGroup2,
+    appendManualGroup3,
+    appendManualGroup4
+} from './EcsSpatialManualLog'
 
 export type EcsComponent = IEntity & { pid: number }
 
@@ -52,7 +60,7 @@ export class EcsChannel implements IChannel {
     componentNids: number[] = []
     membershipVersion = 0
     createdRoots: number[] = []
-    deletedRoots: number[] = []
+    deletedEntities: number[] = []
     createdComponents: EcsComponent[] = []
     deletedComponents: number[] = []
     manualPropNids: number[] = []
@@ -63,6 +71,9 @@ export class EcsChannel implements IChannel {
     manualGroupSchemas: SchemaUpdateGroup[] = []
     manualGroupValueOffsets: number[] = []
     manualGroupValues: any[] = []
+    manualOpTypes: number[] = []
+    manualOpIndexes: number[] = []
+    manualNeedsCoalesce = false
     skipInterpolationNids: number[] = []
     broadcastMessages: any[] = []
     interpolatedBroadcastMessages: any[] = []
@@ -122,7 +133,7 @@ export class EcsChannel implements IChannel {
         if (createdIndex > -1) {
             this.createdRoots.splice(createdIndex, 1)
         } else {
-            this.deletedRoots.push(pid)
+            this.deletedEntities.push(pid)
         }
         this.rootSet.delete(pid)
         this.componentsByRoot.delete(pid)
@@ -196,7 +207,7 @@ export class EcsChannel implements IChannel {
     }
 
     isRootNid(nid: number) {
-        return this.rootSet.has(nid) || this.deletedRoots.indexOf(nid) > -1
+        return this.rootSet.has(nid) || this.deletedEntities.indexOf(nid) > -1
     }
 
     isComponentNid(nid: number) {
@@ -207,11 +218,11 @@ export class EcsChannel implements IChannel {
         return this.componentByNid.get(nid)
     }
 
-    getVisibleEntities(userId: number) {
+    getVisibleEntities() {
         return this.rootNids
     }
 
-    getVisibleNetworkedNids(userId: number) {
+    getVisibleNetworkedNids() {
         const cached = this.visibleNetworkedNidsCache
         if (cached && cached.membershipVersion === this.membershipVersion) {
             return cached.nids
@@ -235,8 +246,8 @@ export class EcsChannel implements IChannel {
 
     collectSnapshotVisibility(userOrId: User | number): EcsChannelSnapshotVisibility {
         const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
-        const visibleRef = this.getVisibleNetworkedNids(userId)
-        let previous = this.snapshotVisibilityByUser.get(userId)
+        const visibleRef = this.getVisibleNetworkedNids()
+        const previous = this.snapshotVisibilityByUser.get(userId)
         if (previous && previous.visibleRef === visibleRef) {
             return {
                 toCreate: [],
@@ -307,7 +318,7 @@ export class EcsChannel implements IChannel {
         this.rootNids.length = 0
         this.componentNids.length = 0
         this.createdRoots.length = 0
-        this.deletedRoots.length = 0
+        this.deletedEntities.length = 0
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
         this.manualPropNids.length = 0
@@ -318,6 +329,9 @@ export class EcsChannel implements IChannel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.manualOpTypes.length = 0
+        this.manualOpIndexes.length = 0
+        this.manualNeedsCoalesce = false
         this.skipInterpolationNids.length = 0
         this.broadcastMessages.length = 0
         this.interpolatedBroadcastMessages.length = 0
@@ -355,14 +369,14 @@ export class EcsChannel implements IChannel {
 
     hasStructuralDeltas() {
         return this.createdRoots.length > 0 ||
-            this.deletedRoots.length > 0 ||
+            this.deletedEntities.length > 0 ||
             this.createdComponents.length > 0 ||
             this.deletedComponents.length > 0
     }
 
     clearSnapshotDeltas() {
         this.createdRoots.length = 0
-        this.deletedRoots.length = 0
+        this.deletedEntities.length = 0
         this.createdComponents.length = 0
         this.deletedComponents.length = 0
         this.manualPropNids.length = 0
@@ -373,6 +387,9 @@ export class EcsChannel implements IChannel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.manualOpTypes.length = 0
+        this.manualOpIndexes.length = 0
+        this.manualNeedsCoalesce = false
         this.skipInterpolationNids.length = 0
     }
 
@@ -396,69 +413,37 @@ export class EcsChannel implements IChannel {
             writers[name] = writer
         }
 
-        const propNids = this.manualPropNids
-        const propSchemas = this.manualPropSchemas
-        const propValues = this.manualPropValues
         const propNames = Object.keys(schema.props)
         for (let i = 0; i < propNames.length; i++) {
             const name = propNames[i]
             const prop = schema.props[name]
-            props[name] = function writeEcsProp(component: EcsComponent, value: any) {
-                propNids.push(component.nid)
-                propSchemas.push(prop)
-                propValues.push(value)
+            props[name] = (component: EcsComponent, value: any) => {
+                appendEcsSpatialManualProp(this, component.nid, prop, value)
             }
             addAlias(name, props[name])
         }
 
-        const groupNids = this.manualGroupNids
-        const groupNTypes = this.manualGroupNTypes
-        const groupSchemas = this.manualGroupSchemas
-        const groupValueOffsets = this.manualGroupValueOffsets
-        const groupValues = this.manualGroupValues
         for (let i = 0; i < schema.updateGroups.length; i++) {
             const group = schema.updateGroups[i]
             if (group.props.length === 1) {
-                groups[group.name] = function writeEcsGroup1(component: EcsComponent, v0: any) {
-                    groupNids.push(component.nid)
-                    groupNTypes.push(ntype)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0)
+                groups[group.name] = (component: EcsComponent, v0: any) => {
+                    appendManualGroup1(this, component.nid, group, v0, ntype)
                 }
             } else if (group.props.length === 2) {
-                groups[group.name] = function writeEcsGroup2(component: EcsComponent, v0: any, v1: any) {
-                    groupNids.push(component.nid)
-                    groupNTypes.push(ntype)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0, v1)
+                groups[group.name] = (component: EcsComponent, v0: any, v1: any) => {
+                    appendManualGroup2(this, component.nid, group, v0, v1, ntype)
                 }
             } else if (group.props.length === 3) {
-                groups[group.name] = function writeEcsGroup3(component: EcsComponent, v0: any, v1: any, v2: any) {
-                    groupNids.push(component.nid)
-                    groupNTypes.push(ntype)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0, v1, v2)
+                groups[group.name] = (component: EcsComponent, v0: any, v1: any, v2: any) => {
+                    appendManualGroup3(this, component.nid, group, v0, v1, v2, ntype)
                 }
             } else if (group.props.length === 4) {
-                groups[group.name] = function writeEcsGroup4(component: EcsComponent, v0: any, v1: any, v2: any, v3: any) {
-                    groupNids.push(component.nid)
-                    groupNTypes.push(ntype)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0, v1, v2, v3)
+                groups[group.name] = (component: EcsComponent, v0: any, v1: any, v2: any, v3: any) => {
+                    appendManualGroup4(this, component.nid, group, v0, v1, v2, v3, ntype)
                 }
             } else {
-                groups[group.name] = function writeEcsGroup(component: EcsComponent) {
-                    groupNids.push(component.nid)
-                    groupNTypes.push(ntype)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    for (let j = 0; j < group.props.length; j++) {
-                        groupValues.push(arguments[j + 1])
-                    }
+                groups[group.name] = (component: EcsComponent, ...values: any[]) => {
+                    appendManualGroup(this, component.nid, group, values, 0, ntype)
                 }
             }
             addAlias(group.name, groups[group.name])

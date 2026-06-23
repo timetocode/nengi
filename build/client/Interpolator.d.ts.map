@@ -1,1 +1,0 @@
-{"version":3,"file":"Interpolator.d.ts","sourceRoot":"","sources":["../../src/client/Interpolator.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,MAAM,EAAE,MAAM,UAAU,CAAA;AACjC,OAAO,EAAE,YAAY,EAAE,MAAM,SAAS,CAAA;AAEtC,qBAAa,YAAY;IACrB,MAAM,EAAE,MAAM,CAAA;gBAEF,MAAM,EAAE,MAAM;IAI1B,oBAAoB,CAAC,WAAW,EAAE,MAAM,GAAG,YAAY,EAAE;CAG5D"}

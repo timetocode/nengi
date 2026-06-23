@@ -1,8 +1,7 @@
 # Local Prototype Scaffold
 
 Use this guide when creating a new browser game prototype inside this R&D
-workspace. The goal is to let the game come from the docs, not from copying an
-existing complex example.
+workspace. The goal is to let the game come from the docs.
 
 ## Environment
 
@@ -10,7 +9,7 @@ existing complex example.
 - Use Node 24 if available.
 - Use Vite for the browser client.
 - Use `tsx` for the Node server during development.
-- Create the game under `examples/<game-name>`.
+- Create the game under `prototypes/<game-name>`.
 - Do not install `nengi` from npm in this workspace. Use local `file:`
   dependencies or the `#nengi` shim shown below.
 
@@ -43,9 +42,9 @@ Run later commands through the same pattern if direct PowerShell commands cannot
 see npm:
 
 ```powershell
-wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/examples/my-game && npm install"
-wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/examples/my-game && npm run typecheck"
-wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/examples/my-game && npm run dev"
+wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/prototypes/my-game && npm install"
+wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/prototypes/my-game && npm run typecheck"
+wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/prototypes/my-game && npm run dev"
 ```
 
 If commands fail with a sandbox/tool setup error such as
@@ -54,7 +53,7 @@ a Codex tool-execution problem, not as proof that Node/npm or the project are
 missing. If the Codex UI supports escalation/approval for shell commands,
 request escalation and rerun the same explicit `wsl -d Ubuntu -- bash -ic "..."`
 command. If escalation is unavailable or still fails, continue by reading the
-docs and creating the example if file editing still works. Create `AI_NOTES.md`
+docs and creating the game if file editing still works. Create `AI_NOTES.md`
 early and record the exact sandbox error under environment notes. Skip runtime
 verification until command execution works.
 
@@ -79,7 +78,7 @@ stale.
 Start with this shape:
 
 ```text
-examples/my-game/
+prototypes/my-game/
   client/
     index.html
     main.ts
@@ -105,7 +104,7 @@ Use local dependencies while nengi is still in R&D:
 
 ```json
 {
-  "name": "nengi-example-my-game",
+  "name": "nengi-prototype-my-game",
   "private": true,
   "type": "module",
   "imports": {
@@ -371,7 +370,7 @@ Keep the first client simple:
 
 ## Install And Run
 
-From the new example directory:
+From the new game directory:
 
 ```bash
 npm install
@@ -389,8 +388,7 @@ npm run dev
 
 ## What Not To Do In The First Prototype
 
-- Do not copy `examples/player-arena`; it is a stress lab with many experimental
-  systems.
+- Do not copy an unrelated project as the base architecture.
 - Do not start with prediction, inventories, ECS, historian lag compensation, or
   manual mutation channels unless the prompt specifically asks for them.
 - Do not use a spatial channel only because it sounds faster. Use it when the

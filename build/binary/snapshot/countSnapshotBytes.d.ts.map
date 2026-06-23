@@ -1,1 +1,0 @@
-{"version":3,"file":"countSnapshotBytes.d.ts","sourceRoot":"","sources":["../../../src/binary/snapshot/countSnapshotBytes.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,sBAAsB,CAAA;AAG9C,OAAO,EAAoB,cAAc,EAAyB,MAAM,8BAA8B,CAAA;AAMtG,OAAO,EAAE,YAAY,EAAE,MAAM,gBAAgB,CAAA;AA4M7C,wBAAgB,kBAAkB,CAAC,IAAI,EAAE,YAAY,EAAE,OAAO,EAAE,OAAO,EAAE,QAAQ,GAAE,cAAiC,UAgBnH"}

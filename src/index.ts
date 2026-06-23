@@ -23,6 +23,7 @@ export {
     localComponentType as gameLocalComponentType,
     resourceKey as gameResourceKey
 } from './ecs/GameEcsWorld'
+export * from './ecs/applyEcsChannelFrameToWorld'
 export type {
     Pid as GameEcsPid,
     Nid as GameEcsNid,
@@ -48,8 +49,6 @@ export * from './server/adapter/MockAdapter'
 // client
 export * from './client/Client'
 export * from './client/ClientNetwork'
-export * from './client/ClientEntityMode'
-export * from './client/ClientReplica'
 export * from './client/EntityHistory'
 export * from './client/EntityStore'
 export * from './client/FixedStepInterpolator'

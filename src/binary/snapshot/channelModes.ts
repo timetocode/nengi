@@ -27,7 +27,7 @@ export type EcsSnapshotChannel = EcsManualUpdateLog & {
     broadcastMessages: any[]
     interpolatedBroadcastMessages?: any[]
     createdRoots: number[]
-    deletedRoots: number[]
+    deletedEntities: number[]
     createdComponents: any[]
     deletedComponents: number[]
     manualGroupNTypes: number[]
@@ -70,7 +70,13 @@ export type CellFragmentChannel = {
     }
     getStableVisibleCellKeys(userId: number): string[] | null
     rememberVisibleCells(userId: number): void
-    rememberSnapshotVisibility(userId: number): void
+    rememberSnapshotVisibility(userId: number, visibility?: {
+        toCreate: number[]
+        toUpdate: number[]
+        toDelete: number[]
+        previous: Set<number>
+        visibleCellKeys?: string[]
+    }): void
     getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
     hasStructuralDeltas(): boolean
 }

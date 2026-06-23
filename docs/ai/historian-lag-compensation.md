@@ -118,7 +118,7 @@ For hitscan weapons, apply the shooter's command first, then rewind targets. Do
 not rewind the shooter after applying its command, because that double-counts
 latency and makes the judged ray differ from the client-predicted shot.
 
-The player-arena demo currently follows this shape:
+A typical arena shooter can follow this shape:
 
 1. Process the player's movement command.
 2. Run weapon simulation and ammo prediction logic.
@@ -127,10 +127,31 @@ The player-arena demo currently follows this shape:
 5. Apply damage if the historical target sample intersects the ray.
 6. Send a shot message that includes a debug ghost of the historical hitbox.
 
-Today the demo ray query is a full scan. If a future broadphase accelerates ray
-queries, it must cover the whole ray segment from source to target. Sampling only
-the cells around the shooter or only the cells around the cursor will miss valid
-mid-segment hits.
+If a future broadphase accelerates ray queries, it must cover the whole ray
+segment from source to target. Sampling only the cells around the shooter or
+only the cells around the cursor will miss valid mid-segment hits.
+
+The core timing and query shape can stay small:
+
+```ts
+const queryTimeMs = getCommandViewTimeMs(timing, {
+    nowMs,
+    fallbackRewindMs: user.oneWayMs + user.interpolationDelayMs,
+    maxRewindMs
+})
+
+const hit = history.queryRayInterpolated(
+    queryTimeMs,
+    shooter.rawX,
+    shooter.rawY,
+    command.aimX,
+    command.aimY
+).find(candidate => candidate.sample.nid !== shooter.nid)
+
+if (hit) {
+    applyDamage(hit.sample.nid)
+}
+```
 
 Use nearest-frame queries when you want simpler and cheaper behavior. Use
 interpolated queries when the visuals are close enough that players can notice
@@ -238,13 +259,24 @@ Do not delay channel deletion inside nengi merely because an entity has
 historical samples. If deletion should be delayed, delay it in the game's own
 entity lifecycle and replicate that lifecycle state normally.
 
-## Reference code
+## Inline pattern
 
-The player-arena example is experimental but useful:
+For player-authored hazard dodges, keep the timing policy explicit and query
+only the historical facts the collision needs:
 
-- `examples/player-arena/server/index.ts`: shot command flow and
-  `resolveHistoricalRay`
-- `examples/player-arena/server/BulletHellSystem.ts`: player-owned collision
-  against historical hazard positions
-- `examples/player-arena/client/main.ts`: interpolation timing report and debug
-  visualization of historical hitboxes
+```ts
+const queryTimeMs = getCommandViewTimeMs(latestMoveTiming, {
+    nowMs,
+    fallbackRewindMs: user.oneWayMs + user.interpolationDelayMs,
+    maxRewindMs
+})
+
+const hazardSample = history.getSpatialInterpolated(hazard.nid, queryTimeMs)
+const hazardX = hazardSample?.x ?? hazard.x
+const hazardY = hazardSample?.y ?? hazard.y
+const hazardRadius = hazardSample?.radius ?? hazard.radius
+
+if (circleOverlaps(player.rawX, player.rawY, player.radius, hazardX, hazardY, hazardRadius)) {
+    damagePlayer(player)
+}
+```

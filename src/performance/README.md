@@ -30,7 +30,7 @@ PROFILE_CELL_SIZE=50
 PROFILE_VIEW_HALF=47
 PROFILE_CHURN=100
 PROFILE_CHILDREN=1
-PROFILE_SPATIAL_DISTRIBUTION=homogeneous  # default | single-cell | centered-cell | homogeneous | clustered
+PROFILE_SPATIAL_DISTRIBUTION=homogeneous  # default | single-cell | centered-cell | cell-corner | cell-crossing | homogeneous | clustered
 PROFILE_SPATIAL_PLANE=xy       # xy | xz
 PROFILE_VIEW_SHAPE=aabb        # aabb | circle | sphere
 PROFILE_WORLD_SIZE=5000
@@ -44,6 +44,7 @@ PROFILE_TICKS=300
 PROFILE_WARMUP=60
 PROFILE_SHARED_UPDATES=0
 PROFILE_GROUPS_OFF=0
+PROFILE_OUTPUT=summary        # optional: compact JSON for quick comparisons
 npm run profile:snapshot
 ```
 
@@ -148,6 +149,11 @@ Output is JSON and includes:
   `PROFILE_SHARED_UPDATES=1`
 - message/engine-message/response counts per snapshot
 - average update prop/group counts
+
+Set `PROFILE_OUTPUT=summary` to print only the scenario/config identity and
+the highest-signal timing, byte, fragment, and update-count fields. This is
+better for quick local comparison and AI-assisted review; omit it when you need
+the full breakdown.
 
 Examples:
 

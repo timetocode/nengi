@@ -7,6 +7,7 @@ import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
 import { createManualChannelOutput } from './ManualChannelOutput'
+import { appendManualGroup, appendManualGroup1, appendManualGroup2, appendManualGroup3, appendManualGroup4, appendManualProp } from './EcsSpatialManualLog'
 
 export type ManualPropWriter = (entity: IEntity, value: any) => void
 export type ManualGroupWriter = (entity: IEntity, ...values: any[]) => void
@@ -43,6 +44,9 @@ export class ManualChannel extends Channel {
     manualGroupSchemas: SchemaUpdateGroup[] = []
     manualGroupValueOffsets: number[] = []
     manualGroupValues: any[] = []
+    manualOpTypes: number[] = []
+    manualOpIndexes: number[] = []
+    manualNeedsCoalesce = false
     private snapshotVisibilityByUser: Map<number, RememberedManualChannelVisibility> = new Map()
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
@@ -56,7 +60,7 @@ export class ManualChannel extends Channel {
     collectSnapshotVisibility(userOrId: User | number): ManualChannelSnapshotVisibility {
         const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
         const visibleRef = this.getVisibleNetworkedNids(userId)
-        let previous = this.snapshotVisibilityByUser.get(userId)
+        const previous = this.snapshotVisibilityByUser.get(userId)
         if (previous && previous.visibleRef === visibleRef) {
             return {
                 toCreate: [],
@@ -127,9 +131,6 @@ export class ManualChannel extends Channel {
             writers[name] = writer
         }
 
-        const propNids = this.manualPropNids
-        const propSchemas = this.manualPropSchemas
-        const propValues = this.manualPropValues
         // Generated closures close over the channel arrays directly. This is
         // deliberately small and unsafe: validation belongs in separate debug
         // modes, while the default writer path should be just array appends.
@@ -137,56 +138,33 @@ export class ManualChannel extends Channel {
         for (let i = 0; i < propNames.length; i++) {
             const name = propNames[i]
             const prop = schema.props[name]
-            props[name] = function writeManualProp(entity: IEntity, value: any) {
-                propNids.push(entity.nid)
-                propSchemas.push(prop)
-                propValues.push(value)
+            props[name] = (entity: IEntity, value: any) => {
+                appendManualProp(this, entity.nid, prop, value)
             }
             addAlias(name, props[name])
         }
 
-        const groupNids = this.manualGroupNids
-        const groupSchemas = this.manualGroupSchemas
-        const groupValueOffsets = this.manualGroupValueOffsets
-        const groupValues = this.manualGroupValues
         for (let i = 0; i < schema.updateGroups.length; i++) {
             const group = schema.updateGroups[i]
             if (group.props.length === 1) {
-                groups[group.name] = function writeManualGroup1(entity: IEntity, v0: any) {
-                    groupNids.push(entity.nid)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0)
+                groups[group.name] = (entity: IEntity, v0: any) => {
+                    appendManualGroup1(this, entity.nid, group, v0)
                 }
             } else if (group.props.length === 2) {
-                groups[group.name] = function writeManualGroup2(entity: IEntity, v0: any, v1: any) {
-                    groupNids.push(entity.nid)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0, v1)
+                groups[group.name] = (entity: IEntity, v0: any, v1: any) => {
+                    appendManualGroup2(this, entity.nid, group, v0, v1)
                 }
             } else if (group.props.length === 3) {
-                groups[group.name] = function writeManualGroup3(entity: IEntity, v0: any, v1: any, v2: any) {
-                    groupNids.push(entity.nid)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0, v1, v2)
+                groups[group.name] = (entity: IEntity, v0: any, v1: any, v2: any) => {
+                    appendManualGroup3(this, entity.nid, group, v0, v1, v2)
                 }
             } else if (group.props.length === 4) {
-                groups[group.name] = function writeManualGroup4(entity: IEntity, v0: any, v1: any, v2: any, v3: any) {
-                    groupNids.push(entity.nid)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    groupValues.push(v0, v1, v2, v3)
+                groups[group.name] = (entity: IEntity, v0: any, v1: any, v2: any, v3: any) => {
+                    appendManualGroup4(this, entity.nid, group, v0, v1, v2, v3)
                 }
             } else {
-                groups[group.name] = function writeManualGroup(entity: IEntity) {
-                    groupNids.push(entity.nid)
-                    groupSchemas.push(group)
-                    groupValueOffsets.push(groupValues.length)
-                    for (let j = 0; j < group.props.length; j++) {
-                        groupValues.push(arguments[j + 1])
-                    }
+                groups[group.name] = (entity: IEntity, ...values: any[]) => {
+                    appendManualGroup(this, entity.nid, group, values)
                 }
             }
             addAlias(group.name, groups[group.name])
@@ -204,6 +182,9 @@ export class ManualChannel extends Channel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.manualOpTypes.length = 0
+        this.manualOpIndexes.length = 0
+        this.manualNeedsCoalesce = false
     }
 
     destroy() {
@@ -215,6 +196,9 @@ export class ManualChannel extends Channel {
         this.manualGroupSchemas.length = 0
         this.manualGroupValueOffsets.length = 0
         this.manualGroupValues.length = 0
+        this.manualOpTypes.length = 0
+        this.manualOpIndexes.length = 0
+        this.manualNeedsCoalesce = false
         this.snapshotVisibilityByUser.clear()
     }
 }

@@ -1,1 +1,0 @@
-{"version":3,"file":"countEntity.d.ts","sourceRoot":"","sources":["../../../src/binary/entity/countEntity.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,aAAa,EAAyB,MAAM,8BAA8B,CAAA;AACnF,OAAO,EAAE,MAAM,EAAE,MAAM,mCAAmC,CAAA;AAE1D,iBAAS,WAAW,CAAC,MAAM,EAAE,MAAM,EAAE,MAAM,EAAE,GAAG,EAAE,SAAS,GAAE,aAA4B,EAAE,OAAO,GAAE,aAA4B,UAM/H;AAED,eAAe,WAAW,CAAA"}

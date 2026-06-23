@@ -61,29 +61,46 @@ const header = client.network.store.getChannelHeaderById(channelId)
 Raw state is the authority that prediction reconciles against. Interpolated
 state is a render sample, not the canonical game state.
 
+## Plain Object Channels
+
+Plain nengi channels replicate ordinary objects with `nid`, `ntype`, and schema
+properties. This is the path for `Channel`, `Channel2D`, `Channel3D`, and the
+matching manual channels.
+
+On the server, add entities to the channel and either let automatic channels
+diff object properties or call manual writers at the game's mutation points.
+On the client, nengi applies snapshot CRUD into `EntityStore`; userland reads
+the resulting channel-scoped facts from `Frame`.
+
+For non-ECS games, use the raw store plus frame facts directly. The store is the
+authoritative network state; sprites, view models, UI rows, audio events, and
+prediction state stay in userland.
+
 ## Frame Facts
 
 Each processed snapshot returns a `Frame`:
 
 ```ts
 for (const frame of client.network.drainFrames()) {
-    for (const entity of frame.createEntities) {
-        createSprite(entity)
-    }
+    frame.channels.forEach(channel => {
+        channel.createEntities.forEach(entity => {
+            createSprite(entity)
+        })
 
-    for (const update of frame.updateEntities) {
-        const entity = client.network.store.get(update.nid)
-        markSpriteDirty(entity, update.prop)
-    }
+        channel.updateEntities.forEach(update => {
+            const entity = client.network.store.get(update.nid)
+            markSpriteDirty(entity, update.prop)
+        })
 
-    for (const deleted of frame.deletedEntities) {
-        destroySprite(deleted.nid)
-    }
+        channel.deletedEntities.forEach(deleted => {
+            destroySprite(deleted.nid)
+        })
+    })
 }
 ```
 
-`frame.updateEntities` contains applied changes with `previous` and `value`.
-`frame.deletedEntities` includes the last known entity when available.
+`channel.updateEntities` contains applied changes with `previous` and `value`.
+`channel.deletedEntities` includes the last known entity when available.
 
 ## Channel Scope
 
@@ -178,8 +195,25 @@ interpolated entity motion.
 
 ## ECS Channels
 
-For nengi ECS channels, use the same frame/store principle but apply channel
-ECS CRUD to a `GameEcsWorld`:
+For nengi ECS channels, use the same frame/store principle, but the natural
+destination is a `GameEcsWorld` instead of plain presentation records.
+
+ECS channel frames still contain normal component creates, updates, and deletes,
+but they also include ECS root lifecycle facts. Prefer the core applier when a
+client maintains a `GameEcsWorld`:
+
+```ts
+const channel = frame.getChannel(arenaChannelId)
+if (channel) {
+    const changes = applyEcsChannelFrameToWorld(ecs, channel)
+    changes.createdComponents.forEach(createSpriteForComponent)
+    changes.updatedComponents.forEach(markSpriteDirty)
+    changes.deletedComponents.forEach(removeSpriteForComponent)
+    changes.deletedEntities.forEach(removeRootPresentation)
+}
+```
+
+Manual application is also possible when a game has a very small ECS bridge:
 
 ```ts
 const channel = frame.getChannel(arenaChannelId)
@@ -191,16 +225,16 @@ if (channel) {
 }
 ```
 
-This can be wrapped as a tiny `ClientEcsSync`, but it should only apply CRUD and
-record facts. It should not create sprites, bind roles, or decide prediction.
+Keep any ECS sync wrapper tiny: CRUD in, ECS mutation plus facts out. It should
+not create sprites, bind roles, or decide prediction.
 
 ## What Not To Add
 
-Avoid recreating `ClientReplica`-style layers:
+Avoid recreating legacy replica-style layers:
 
 - no type-to-callback binding DSL as the default path
 - no second entity store
-- no generic replica refs
+- no generic replicated-object refs
 - no renderer ownership
 - no inventory-specific client framework
 - no automatic prediction policy

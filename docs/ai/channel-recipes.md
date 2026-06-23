@@ -14,7 +14,7 @@ world.addEntity(player)
 ```
 
 Use this when the game design really is shared visibility, not merely because it
-is the smallest example.
+is the smallest snippet.
 
 ## Large 2D world
 

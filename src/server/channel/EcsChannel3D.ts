@@ -138,7 +138,7 @@ export class EcsChannel3D {
     get rootNids() { return this.entities.rootNids }
     get componentNids() { return this.entities.componentNids }
     get createdRoots() { return this.entities.createdRoots }
-    get deletedRoots() { return this.entities.deletedRoots }
+    get deletedEntities() { return this.entities.deletedEntities }
     get createdComponents() { return this.entities.createdComponents }
     get deletedComponents() { return this.entities.deletedComponents }
 
@@ -254,7 +254,7 @@ export class EcsChannel3D {
 
     private hasLifecycleDeltas() {
         return this.createdRoots.length > 0 ||
-            this.deletedRoots.length > 0 ||
+            this.deletedEntities.length > 0 ||
             this.createdComponents.length > 0 ||
             this.deletedComponents.length > 0
     }

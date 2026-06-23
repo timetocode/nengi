@@ -6,7 +6,7 @@ Use this prompt in a fresh VS Code Codex session rooted at
 ```text
 You are working in `/home/neuron/nengi-all` in the local nengi R&D workspace.
 
-Build a small multiplayer browser game under `examples/<short-game-name>`.
+Build a small multiplayer browser game under `prototypes/<short-game-name>`.
 Use TypeScript, Vite, PIXI.js, a Node server run with `tsx`, and the local nengi
 workspace packages. Do not install nengi from npm.
 
@@ -72,6 +72,5 @@ Use the local prototype package/import shape from `local-prototype.md`. Run:
 - `npm run dev`
 
 If a command fails, investigate and record the exact issue in `AI_NOTES.md`.
-Do not copy `examples/player-arena`; it is a stress/demo lab, not the template
-for a fresh game.
+Do not copy an unrelated project as the base architecture.
 ```

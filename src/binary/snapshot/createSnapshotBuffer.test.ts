@@ -517,6 +517,40 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame!.requireChannel(channel.nid).updateEntities.map(update => update.prop)).toEqual(['label'])
     })
 
+    it('coalesces repeated ManualChannel writes to final prop values', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new ManualChannel(instance.localState)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'manual'
+        })
+
+        stepClient(instance, user, clientNetwork)
+
+        Entity.position(entity, 10, 10)
+        Entity.props.x(entity, 20)
+        Entity.position(entity, 30, 30)
+        Entity.props.y(entity, 40)
+        const frame = stepClient(instance, user, clientNetwork)
+
+        expect(frame.requireChannel(channel.nid).updateEntities).toEqual([
+            { nid: entity.nid, prop: 'x', previous: 5, value: 30 },
+            { nid: entity.nid, prop: 'y', previous: 6, value: 40 }
+        ])
+        expect(clientNetwork.store.get(entity.nid)?.x).toBe(30)
+        expect(clientNetwork.store.get(entity.nid)?.y).toBe(40)
+    })
+
     it('does not scan ManualChannel entities in the mixed-channel fallback', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
@@ -602,6 +636,38 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.sharedUpdateFragments.size).toBe(1)
     })
 
+    it('coalesces repeated ManualChannel2D writes to final prop values', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new ManualChannel2D(instance.localState, 100)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB2D(50, 50, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            label: 'manual-2d'
+        })
+
+        stepClient(instance, user, clientNetwork)
+
+        Entity.position(entity, 10, 10)
+        Entity.props.x(entity, 20)
+        Entity.position(entity, 30, 30)
+        Entity.props.y(entity, 40)
+        const frame = stepClient(instance, user, clientNetwork)
+
+        expect(frame.requireChannel(channel.nid).updateEntities).toEqual([
+            { nid: entity.nid, prop: 'x', previous: 5, value: 30 },
+            { nid: entity.nid, prop: 'y', previous: 6, value: 40 }
+        ])
+    })
+
     it('does not scan ManualChannel2D entities in the generic fallback', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
@@ -685,6 +751,40 @@ describe('server snapshot pipeline', () => {
         clientNetwork.processNextFrame()
 
         expect(clientNetwork.store.entities.has(entity.nid)).toBe(false)
+    })
+
+    it('coalesces repeated ManualChannel3D writes to final prop values', () => {
+        const context = createGroupedContext3D()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new ManualChannel3D(instance.localState, 100)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(50, 50, 50, 60, 60, 60))
+        const entity = channel.addEntity({
+            nid: 0,
+            ntype: NType.Entity,
+            x: 5,
+            y: 6,
+            z: 7,
+            label: 'manual-3d'
+        })
+
+        stepClient(instance, user, clientNetwork)
+
+        Entity.transform(entity, 10, 10, 10)
+        Entity.props.x(entity, 20)
+        Entity.transform(entity, 30, 30, 30)
+        Entity.props.z(entity, 40)
+        const frame = stepClient(instance, user, clientNetwork)
+
+        expect(frame.requireChannel(channel.nid).updateEntities).toEqual([
+            { nid: entity.nid, prop: 'x', previous: 5, value: 30 },
+            { nid: entity.nid, prop: 'y', previous: 6, value: 30 },
+            { nid: entity.nid, prop: 'z', previous: 7, value: 40 }
+        ])
     })
 
     it('writes manual spatial grouped child mutations through the parent cell fragment', () => {
@@ -828,6 +928,40 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.store.get(transform.nid)?.x).toBe(7)
         expect(clientNetwork.store.get(transform.nid)?.y).toBe(8)
+    })
+
+    it('coalesces repeated EcsChannel writes to final prop values', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const channel = new EcsChannel(instance.localState)
+        const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+        instance.users.set(user.id, user)
+        channel.subscribe(user)
+        const pid = channel.createEntity()
+        const transform = channel.addComponent(pid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 5,
+            y: 6
+        })
+
+        stepClient(instance, user, clientNetwork)
+
+        Transform.position(transform, 10, 10)
+        Transform.props.x(transform, 20)
+        Transform.position(transform, 30, 30)
+        Transform.props.y(transform, 40)
+        const frame = stepClient(instance, user, clientNetwork)
+
+        expect(frame.requireChannel(channel.nid).updateEntities).toEqual([
+            { nid: transform.nid, prop: 'x', previous: 5, value: 30 },
+            { nid: transform.nid, prop: 'y', previous: 6, value: 40 }
+        ])
+        expect(clientNetwork.store.get(transform.nid)?.x).toBe(30)
+        expect(clientNetwork.store.get(transform.nid)?.y).toBe(40)
     })
 
     it('can compose ECS and regular channels in one user snapshot', () => {

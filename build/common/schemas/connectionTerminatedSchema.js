@@ -1,8 +1,0 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.connectionTerminatedSchema = void 0;
-const defineSchema_1 = require("../binary/schema/defineSchema");
-const Binary_1 = require("../binary/Binary");
-exports.connectionTerminatedSchema = (0, defineSchema_1.defineMessageSchema)({
-    reason: Binary_1.Binary.String,
-});

@@ -1,4 +1,6 @@
 import { GameEcsWorld, componentType, localComponentType, type Component } from './GameEcsWorld'
+import { applyEcsChannelFrameToWorld } from './applyEcsChannelFrameToWorld'
+import type { ChannelFrame } from '../client/Frame'
 
 type Position = Component & {
     ntype: 1
@@ -20,6 +22,22 @@ type LocalMarker = Component & {
 const Position = componentType<Position>(1, 'Position')
 const Velocity = componentType<Velocity>(2, 'Velocity')
 const LocalMarker = localComponentType<LocalMarker>('LocalMarker')
+
+function createChannelFrame(partial: Partial<ChannelFrame>): ChannelFrame {
+    return {
+        channelId: 1,
+        ecsCreateEntities: [],
+        ecsCreateComponents: [],
+        ecsDeleteEntities: [],
+        createEntities: [],
+        updateEntities: [],
+        deleteEntities: [],
+        deletedEntities: [],
+        messages: [],
+        interpolatedMessages: [],
+        ...partial
+    }
+}
 
 describe('GameEcsWorld', () => {
     it('uses one local id pool for entity ids and component nids', () => {
@@ -62,5 +80,70 @@ describe('GameEcsWorld', () => {
         expect(ecs.get(pid, Position)).toBe(original)
         expect(ecs.getByNid(10)).toBe(original)
         expect(ecs.getByNid(11)).toBeUndefined()
+    })
+
+    it('applies ECS channel frame creates and updates to the world', () => {
+        const ecs = new GameEcsWorld()
+        const frame = createChannelFrame({
+            channelId: 7,
+            ecsCreateEntities: [100],
+            ecsCreateComponents: [
+                { pid: 100, nid: 10, ntype: Position.ntype, x: 1, y: 2 }
+            ],
+            updateEntities: [
+                { nid: 10, prop: 'x', previous: 1, value: 5 }
+            ]
+        })
+
+        const changes = applyEcsChannelFrameToWorld(ecs, frame)
+
+        expect(changes.channelId).toBe(7)
+        expect(changes.createdEntities).toEqual([100])
+        expect(changes.createdComponents.map(component => component.nid)).toEqual([10])
+        expect(changes.updatedComponents).toEqual([
+            {
+                component: ecs.getByNid(10),
+                nid: 10,
+                prop: 'x',
+                previous: 1,
+                value: 5
+            }
+        ])
+        expect(ecs.require(100, Position).x).toBe(5)
+    })
+
+    it('applies ECS component deletes before root deletes', () => {
+        const ecs = new GameEcsWorld()
+        const pid = ecs.createEntity(100)
+        ecs.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
+        ecs.add(Velocity.create({ pid, nid: 11, x: 3, y: 4 }))
+
+        const changes = applyEcsChannelFrameToWorld(ecs, createChannelFrame({
+            deleteEntities: [10],
+            ecsDeleteEntities: [100]
+        }))
+
+        expect(changes.deletedComponents.map(component => component.nid)).toEqual([10, 11])
+        expect(changes.deletedEntities).toEqual([100])
+        expect(ecs.entityCount()).toBe(0)
+        expect(ecs.getByNid(10)).toBeUndefined()
+        expect(ecs.getByNid(11)).toBeUndefined()
+    })
+
+    it('preserves local components when an ECS root is deleted', () => {
+        const ecs = new GameEcsWorld()
+        const pid = ecs.createEntity(100)
+        ecs.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
+        const local = ecs.add(LocalMarker.create({ pid, label: 'render' }))
+
+        const changes = applyEcsChannelFrameToWorld(ecs, createChannelFrame({
+            ecsDeleteEntities: [100]
+        }))
+
+        expect(changes.deletedComponents.map(component => component.nid)).toEqual([10])
+        expect(changes.deletedEntities).toEqual([100])
+        expect(ecs.getByNid(10)).toBeUndefined()
+        expect(ecs.getByNid(local.nid!)).toBe(local)
+        expect(ecs.entityCount()).toBe(1)
     })
 })

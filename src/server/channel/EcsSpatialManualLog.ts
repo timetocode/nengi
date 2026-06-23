@@ -1,17 +1,21 @@
 import { SchemaProp, SchemaUpdateGroup } from '../../common/binary/schema/Schema'
 
-export type EcsSpatialManualUpdateLog = {
+export type CoalescingManualUpdateLog = {
     manualPropNids: number[]
     manualPropSchemas: SchemaProp[]
     manualPropValues: any[]
     manualGroupNids: number[]
-    manualGroupNTypes: number[]
+    manualGroupNTypes?: number[]
     manualGroupSchemas: SchemaUpdateGroup[]
     manualGroupValueOffsets: number[]
     manualGroupValues: any[]
     manualOpTypes: number[]
     manualOpIndexes: number[]
     manualNeedsCoalesce: boolean
+}
+
+export type EcsSpatialManualUpdateLog = CoalescingManualUpdateLog & {
+    manualGroupNTypes: number[]
 }
 
 export function createEcsSpatialManualUpdateLog(): EcsSpatialManualUpdateLog {
@@ -44,8 +48,8 @@ export function clearEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog) {
     log.manualNeedsCoalesce = false
 }
 
-export function appendEcsSpatialManualProp(
-    log: EcsSpatialManualUpdateLog,
+export function appendManualProp(
+    log: CoalescingManualUpdateLog,
     nid: number,
     prop: SchemaProp,
     value: any
@@ -58,6 +62,107 @@ export function appendEcsSpatialManualProp(
     log.manualNeedsCoalesce = true
 }
 
+export function appendManualGroup(
+    log: CoalescingManualUpdateLog,
+    nid: number,
+    group: SchemaUpdateGroup,
+    values: IArguments | any[],
+    valueOffset = 0,
+    ntype?: number
+) {
+    log.manualOpTypes.push(1)
+    log.manualOpIndexes.push(log.manualGroupNids.length)
+    log.manualGroupNids.push(nid)
+    if (log.manualGroupNTypes) {
+        log.manualGroupNTypes.push(ntype ?? 0)
+    }
+    log.manualGroupSchemas.push(group)
+    log.manualGroupValueOffsets.push(log.manualGroupValues.length)
+    for (let i = 0; i < group.props.length; i++) {
+        log.manualGroupValues.push(values[i + valueOffset])
+    }
+    log.manualNeedsCoalesce = true
+}
+
+function appendManualGroupHeader(
+    log: CoalescingManualUpdateLog,
+    nid: number,
+    group: SchemaUpdateGroup,
+    ntype?: number
+) {
+    log.manualOpTypes.push(1)
+    log.manualOpIndexes.push(log.manualGroupNids.length)
+    log.manualGroupNids.push(nid)
+    if (log.manualGroupNTypes) {
+        log.manualGroupNTypes.push(ntype ?? 0)
+    }
+    log.manualGroupSchemas.push(group)
+    log.manualGroupValueOffsets.push(log.manualGroupValues.length)
+}
+
+export function appendManualGroup1(
+    log: CoalescingManualUpdateLog,
+    nid: number,
+    group: SchemaUpdateGroup,
+    v0: any,
+    ntype?: number
+) {
+    appendManualGroupHeader(log, nid, group, ntype)
+    log.manualGroupValues.push(v0)
+    log.manualNeedsCoalesce = true
+}
+
+export function appendManualGroup2(
+    log: CoalescingManualUpdateLog,
+    nid: number,
+    group: SchemaUpdateGroup,
+    v0: any,
+    v1: any,
+    ntype?: number
+) {
+    appendManualGroupHeader(log, nid, group, ntype)
+    log.manualGroupValues.push(v0, v1)
+    log.manualNeedsCoalesce = true
+}
+
+export function appendManualGroup3(
+    log: CoalescingManualUpdateLog,
+    nid: number,
+    group: SchemaUpdateGroup,
+    v0: any,
+    v1: any,
+    v2: any,
+    ntype?: number
+) {
+    appendManualGroupHeader(log, nid, group, ntype)
+    log.manualGroupValues.push(v0, v1, v2)
+    log.manualNeedsCoalesce = true
+}
+
+export function appendManualGroup4(
+    log: CoalescingManualUpdateLog,
+    nid: number,
+    group: SchemaUpdateGroup,
+    v0: any,
+    v1: any,
+    v2: any,
+    v3: any,
+    ntype?: number
+) {
+    appendManualGroupHeader(log, nid, group, ntype)
+    log.manualGroupValues.push(v0, v1, v2, v3)
+    log.manualNeedsCoalesce = true
+}
+
+export function appendEcsSpatialManualProp(
+    log: EcsSpatialManualUpdateLog,
+    nid: number,
+    prop: SchemaProp,
+    value: any
+) {
+    appendManualProp(log, nid, prop, value)
+}
+
 export function appendEcsSpatialManualGroup(
     log: EcsSpatialManualUpdateLog,
     ntype: number,
@@ -65,23 +170,14 @@ export function appendEcsSpatialManualGroup(
     group: SchemaUpdateGroup,
     values: IArguments | any[]
 ) {
-    log.manualOpTypes.push(1)
-    log.manualOpIndexes.push(log.manualGroupNids.length)
-    log.manualGroupNids.push(nid)
-    log.manualGroupNTypes.push(ntype)
-    log.manualGroupSchemas.push(group)
-    log.manualGroupValueOffsets.push(log.manualGroupValues.length)
-    for (let i = 0; i < group.props.length; i++) {
-        log.manualGroupValues.push(values[i + 1])
-    }
-    log.manualNeedsCoalesce = true
+    appendManualGroup(log, nid, group, values, 1, ntype)
 }
 
 function manualMutationKey(nid: number, key: number) {
     return nid * 256 + key
 }
 
-function manualLogHasCoalesceConflict(log: EcsSpatialManualUpdateLog) {
+function manualLogHasCoalesceConflict(log: CoalescingManualUpdateLog) {
     if (log.manualOpTypes.length < 2) {
         return false
     }
@@ -144,7 +240,7 @@ function manualLogHasCoalesceConflict(log: EcsSpatialManualUpdateLog) {
     return false
 }
 
-export function coalesceEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog) {
+export function coalesceManualUpdateLog(log: CoalescingManualUpdateLog) {
     if (!log.manualNeedsCoalesce) {
         return
     }
@@ -156,7 +252,7 @@ export function coalesceEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog
     }
 
     const props = new Map<number, { nid: number, prop: SchemaProp, value: any }>()
-    const groups = new Map<number, { nid: number, ntype: number, group: SchemaUpdateGroup, values: any[] }>()
+    const groups = new Map<number, { nid: number, ntype: number | undefined, group: SchemaUpdateGroup, values: any[] }>()
     const splitGroupsForProp = (nid: number, prop: SchemaProp) => {
         groups.forEach((entry, key) => {
             if (entry.nid !== nid) {
@@ -206,7 +302,7 @@ export function coalesceEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog
         }
         groups.set(manualMutationKey(nid, group.key), {
             nid,
-            ntype: log.manualGroupNTypes[index],
+            ntype: log.manualGroupNTypes?.[index],
             group,
             values
         })
@@ -222,13 +318,17 @@ export function coalesceEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog
     })
 
     log.manualGroupNids.length = 0
-    log.manualGroupNTypes.length = 0
+    if (log.manualGroupNTypes) {
+        log.manualGroupNTypes.length = 0
+    }
     log.manualGroupSchemas.length = 0
     log.manualGroupValueOffsets.length = 0
     log.manualGroupValues.length = 0
     groups.forEach(entry => {
         log.manualGroupNids.push(entry.nid)
-        log.manualGroupNTypes.push(entry.ntype)
+        if (log.manualGroupNTypes) {
+            log.manualGroupNTypes.push(entry.ntype ?? 0)
+        }
         log.manualGroupSchemas.push(entry.group)
         log.manualGroupValueOffsets.push(log.manualGroupValues.length)
         for (let i = 0; i < entry.values.length; i++) {
@@ -239,4 +339,8 @@ export function coalesceEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog
     log.manualOpTypes.length = 0
     log.manualOpIndexes.length = 0
     log.manualNeedsCoalesce = false
+}
+
+export function coalesceEcsSpatialManualUpdateLog(log: EcsSpatialManualUpdateLog) {
+    coalesceManualUpdateLog(log)
 }

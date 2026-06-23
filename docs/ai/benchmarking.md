@@ -2,7 +2,10 @@
 
 Do not guess performance from channel names. Benchmark the game shape.
 
-Nengi has performance tests for snapshot construction and examples for bot/end-to-end testing. A game can also add its own local benchmark that creates the same kinds of entities, users, visibility views, mutation rates, and churn patterns as the real game.
+Nengi has performance tests for snapshot construction and bot/end-to-end load.
+A game can also add its own local benchmark that creates the same kinds of
+entities, users, visibility views, mutation rates, and churn patterns as the
+real game.
 
 ## Benchmark levels
 

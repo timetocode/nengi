@@ -113,6 +113,52 @@ describe('manual and spatial channels', () => {
         expect(channel.getManualCellUpdateLog(cellKey)).toBeNull()
     })
 
+    it('keeps ManualChannel2D grouped visibility for movement inside the visible cell set', () => {
+        const localState = new LocalState()
+        const channel = new ManualChannel2D(localState, 10)
+        const user = createUser(localState)
+        const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
+        const entity = channel.addEntity(createEntity(9.9, 9.9))
+
+        channel.subscribe(user, { x: 10, y: 10, halfWidth: 10, halfHeight: 10 })
+        channel.rememberSnapshotVisibility(user.id)
+        channel.clearSnapshotDeltas()
+
+        entity.x = 10.1
+        entity.y = 10.1
+        writer.groups.position(entity, 10.1, 10.1)
+
+        const snapshot = channel.getChannelSnapshot(user, 1)
+
+        expect(snapshot).not.toBeNull()
+        expect(snapshot!.toCreate).toEqual([])
+        expect(snapshot!.toDelete).toEqual([])
+        expect(snapshot!.previous.has(entity.nid)).toBe(true)
+    })
+
+    it('diffs ManualChannel2D visibility when movement leaves the visible cell set', () => {
+        const localState = new LocalState()
+        const channel = new ManualChannel2D(localState, 10)
+        const user = createUser(localState)
+        const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
+        const entity = channel.addEntity(createEntity(9.9, 9.9))
+
+        channel.subscribe(user, { x: 10, y: 10, halfWidth: 10, halfHeight: 10 })
+        channel.rememberSnapshotVisibility(user.id)
+        channel.clearSnapshotDeltas()
+
+        entity.x = 35
+        entity.y = 35
+        writer.groups.position(entity, 35, 35)
+
+        const snapshot = channel.getChannelSnapshot(user, 1)
+
+        expect(snapshot).not.toBeNull()
+        expect(snapshot!.toCreate).toEqual([])
+        expect(snapshot!.toDelete).toEqual([entity.nid])
+        expect(snapshot!.previous.has(entity.nid)).toBe(true)
+    })
+
     it('records manual spatial 3D updates by visible cell', () => {
         const localState = new LocalState()
         const channel = new ManualChannel3D(localState, 10)

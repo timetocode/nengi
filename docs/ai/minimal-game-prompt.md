@@ -28,9 +28,9 @@ commands should `cd` to Linux paths under `/home/neuron/nengi-all`.
 For later commands from PowerShell, use the same pattern, replacing the command
 inside the quotes:
 
-wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/examples/<game-name> && npm install"
-wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/examples/<game-name> && npm run typecheck"
-wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/examples/<game-name> && npm run dev"
+wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/prototypes/<game-name> && npm install"
+wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/prototypes/<game-name> && npm run typecheck"
+wsl -d Ubuntu -- bash -ic "cd /home/neuron/nengi-all/prototypes/<game-name> && npm run dev"
 
 If commands fail with a sandbox/tool setup error such as
 `windows sandbox: helper_unknown_error: setup refresh had errors`, treat that as
@@ -38,7 +38,7 @@ a Codex tool-execution problem, not as proof that Node/npm or the project are
 missing. If the Codex UI supports escalation/approval for shell commands,
 request escalation and rerun the same explicit `wsl -d Ubuntu -- bash -ic "..."`
 command. If escalation is unavailable or still fails, continue by reading the
-docs and creating the example if file editing still works. Create `AI_NOTES.md`
+docs and creating the game if file editing still works. Create `AI_NOTES.md`
 early and record the exact sandbox error under environment notes. Skip runtime
 verification until command execution works.
 
@@ -49,7 +49,7 @@ blocked in `AI_NOTES.md`.
 
 Build a minimal multiplayer browser game prototype under:
 
-examples/<choose-a-short-game-name>
+prototypes/<choose-a-short-game-name>
 
 Use TypeScript, Vite for the browser client, and a Node server run with tsx.
 Do not install nengi from npm. Use the local workspace packages and the local
@@ -67,10 +67,8 @@ Start by reading:
 5. nengi/docs/ai/client-router.md
 6. nengi/docs/ai/minimal-spatial-game.md
 
-Treat those docs as the source of truth. Do not copy examples/player-arena as
-your implementation model; it is a complex stress/demo lab. You may inspect an
-existing example only if you are blocked on mundane local workspace mechanics,
-and if you do, record exactly why in your notes.
+Treat those docs as the source of truth. Do not copy an unrelated project as
+your implementation model.
 
 Game requirements:
 
@@ -88,7 +86,7 @@ Implementation requirements:
 
 - Create a package.json, tsconfig.json, vite.config.ts, client files, server
   files, and shared schema/context files.
-- Add an AI_NOTES.md file in the example directory before or near the beginning
+- Add an AI_NOTES.md file in the game directory before or near the beginning
   of implementation.
 - Update AI_NOTES.md as you work, not only at the end.
 - In AI_NOTES.md, record:
@@ -104,7 +102,7 @@ Implementation requirements:
 
 Verification requirements:
 
-- Run npm install in the new example if needed.
+- Run npm install in the new game directory if needed.
 - If local package builds may be stale, run npm run rebuild:local.
 - Run npm run typecheck.
 - Run or start the dev server/client if feasible. Prefer npm run dev:fresh when

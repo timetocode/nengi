@@ -35,8 +35,8 @@ Default recommendation for bots and command-line clients: use
 
 ## Install Shape
 
-During this R&D workspace, packages often use local `file:` dependencies so
-examples can run against the current source:
+During this R&D workspace, packages often use local `file:` dependencies so new
+prototype projects can run against the current source:
 
 ```json
 {
@@ -67,7 +67,7 @@ AI sees duplicate private-field TypeScript errors involving `User`,
 different nengi copies or is mixing `nengi/src` imports with adapter package
 types from `nengi/build`.
 
-For local R&D examples that use official adapter packages, prefer importing
+For local R&D projects that use official adapter packages, prefer importing
 nengi through package `nengi` everywhere. Do not re-export from
 `../../../nengi/src` in `shared/nengi.ts` while also importing
 `nengi-ws-instance-adapter`, `nengi-websocket-client-adapter`, or other adapter

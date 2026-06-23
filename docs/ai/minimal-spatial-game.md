@@ -90,15 +90,17 @@ Create and destroy local presentation from frame facts:
 
 ```ts
 function applyFrame(frame: Frame) {
-    frame.createEntities.forEach(entity => {
-        if (entity.ntype === NType.Player) {
-            sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))
-        }
-    })
+    frame.channels.forEach(channel => {
+        channel.createEntities.forEach(entity => {
+            if (entity.ntype === NType.Player) {
+                sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))
+            }
+        })
 
-    frame.deletedEntities.forEach(deleted => {
-        sprites.get(deleted.nid)?.destroy()
-        sprites.delete(deleted.nid)
+        channel.deletedEntities.forEach(deleted => {
+            sprites.get(deleted.nid)?.destroy()
+            sprites.delete(deleted.nid)
+        })
     })
 }
 ```
@@ -110,7 +112,7 @@ interpolated rendering and drive it with local prediction:
 let controlledNid: number | null = null
 ```
 
-Each render frame. This example sends commands at a fixed 30 Hz command rate
+Each render frame. This loop sends commands at a fixed 30 Hz command rate
 even if the renderer runs faster or slower:
 
 ```ts

@@ -216,11 +216,12 @@ class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
     }
 
     send(user: User, buffer: Buffer) {
+        void user
         this.sends++
         this.bytes += buffer.byteLength
     }
 
-    disconnect(user: User, reason: any): void {
+    disconnect(): void {
     }
 }
 
@@ -239,7 +240,7 @@ class FixedVisibleChannel implements IChannel {
         this.entities = { array: [], size: 0 }
     }
 
-    addMessage(message: any): void {
+    addMessage(): void {
     }
 
     addEntity(entity: IEntity): IEntity {
@@ -248,7 +249,7 @@ class FixedVisibleChannel implements IChannel {
         return entity
     }
 
-    removeEntity(entity: IEntity): void {
+    removeEntity(): void {
     }
 
     removeAllEntities(): void {
@@ -441,17 +442,6 @@ function createWideEntity(index: number): WideEntity {
     }
 }
 
-function createEcsRoot(index: number): EcsRoot {
-    const entity = createEntity(index)
-    return {
-        nid: 0,
-        ntype: NType.EcsRoot,
-        x: entity.x,
-        y: entity.y,
-        z: entity.z
-    }
-}
-
 function createEcsBundle(index: number): EcsBundle {
     const entity = createWideEntity(index)
     return {
@@ -519,6 +509,40 @@ function spreadEntitiesCellCorner(entities: TestEntity[], config: ScenarioConfig
     }
 }
 
+function spreadEntitiesCellCrossing(entities: TestEntity[], config: ScenarioConfig) {
+    const columns = Math.ceil(Math.sqrt(entities.length))
+    const spread = Math.min(0.4, config.cellSize * 0.001)
+    const spacing = spread / Math.max(1, columns)
+    const boundary = config.cellSize
+    for (let i = 0; i < entities.length; i++) {
+        const col = i % columns
+        const row = Math.floor(i / columns)
+        const sideX = (i & 1) === 0 ? -1 : 1
+        const sideY = (i & 2) === 0 ? -1 : 1
+        entities[i].x = boundary + sideX * (0.1 + col * spacing)
+        entities[i].y = boundary + sideY * (0.1 + row * spacing)
+    }
+}
+
+function spreadEntitiesCellCrossing3D(entities: TestEntity[], config: ScenarioConfig) {
+    const columns = Math.ceil(Math.cbrt(entities.length))
+    const spread = Math.min(0.4, config.cellSize * 0.001)
+    const spacing = spread / Math.max(1, columns)
+    const layerSize = columns * columns
+    const boundary = config.cellSize
+    for (let i = 0; i < entities.length; i++) {
+        const col = i % columns
+        const row = Math.floor(i / columns) % columns
+        const layer = Math.floor(i / layerSize)
+        const sideX = (i & 1) === 0 ? -1 : 1
+        const sideY = (i & 2) === 0 ? -1 : 1
+        const sideZ = (i & 4) === 0 ? -1 : 1
+        entities[i].x = boundary + sideX * (0.1 + col * spacing)
+        entities[i].y = boundary + sideY * (0.1 + row * spacing)
+        entities[i].z = boundary + sideZ * (0.1 + layer * spacing)
+    }
+}
+
 function spreadEntitiesHomogeneous(entities: TestEntity[], config: ScenarioConfig) {
     const columns = Math.ceil(Math.sqrt(entities.length))
     const spacing = config.worldSize / Math.max(1, columns)
@@ -559,7 +583,11 @@ function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig
         config.scenario === 'channel-3d' ||
         config.scenario === 'manual-channel-3d'
     ) {
-        spreadEntitiesHomogeneous3D(entities, config)
+        if (config.spatialDistribution === 'cell-crossing') {
+            spreadEntitiesCellCrossing3D(entities, config)
+        } else {
+            spreadEntitiesHomogeneous3D(entities, config)
+        }
         return
     }
 
@@ -569,6 +597,8 @@ function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig
         spreadEntitiesCenteredCell(entities, config)
     } else if (config.spatialDistribution === 'cell-corner') {
         spreadEntitiesCellCorner(entities, config)
+    } else if (config.spatialDistribution === 'cell-crossing') {
+        spreadEntitiesCellCrossing(entities, config)
     } else if (config.spatialDistribution === 'homogeneous') {
         spreadEntitiesHomogeneous(entities, config)
     } else if (config.spatialDistribution === 'clustered') {
@@ -1331,6 +1361,18 @@ function createSpatialView(userIndex: number, entities: TestEntity[], config: Sc
         }
         return new AABB2D(config.cellSize * 0.5, config.cellSize * 0.5, config.viewHalf, config.viewHalf)
     }
+    if (config.spatialDistribution === 'cell-crossing') {
+        if (config.spatialViewShape === 'circle' || config.spatialViewShape === 'sphere') {
+            if (config.spatialPlane === 'xz') {
+                return { x: config.cellSize, z: config.cellSize, radius: config.viewHalf }
+            }
+            return { x: config.cellSize, y: config.cellSize, radius: config.viewHalf }
+        }
+        if (config.spatialPlane === 'xz') {
+            return { x: config.cellSize, z: config.cellSize, halfX: config.viewHalf, halfZ: config.viewHalf }
+        }
+        return new AABB2D(config.cellSize, config.cellSize, config.viewHalf, config.viewHalf)
+    }
     const entity = entities[(userIndex * Math.max(1, Math.floor(entities.length / Math.max(1, config.users)))) % entities.length]
     if (config.spatialViewShape === 'circle' || config.spatialViewShape === 'sphere') {
         if (config.spatialPlane === 'xz') {
@@ -1345,6 +1387,13 @@ function createSpatialView(userIndex: number, entities: TestEntity[], config: Sc
 }
 
 function createSpatialView3D(userIndex: number, entities: TestEntity[], config: ScenarioConfig) {
+    if (config.spatialDistribution === 'cell-crossing') {
+        if (config.spatialViewShape === 'sphere' || config.spatialViewShape === 'circle') {
+            return { x: config.cellSize, y: config.cellSize, z: config.cellSize, radius: config.viewHalf }
+        }
+        return new AABB3D(config.cellSize, config.cellSize, config.cellSize, config.viewHalf, config.viewHalf, config.viewHalf)
+    }
+
     const entity = entities[(userIndex * Math.max(1, Math.floor(entities.length / Math.max(1, config.users)))) % entities.length]
     if (config.spatialViewShape === 'sphere' || config.spatialViewShape === 'circle') {
         return { x: entity.x, y: entity.y, z: entity.z, radius: config.viewHalf }
@@ -1710,6 +1759,7 @@ function runScenario(config: ScenarioConfig) {
 }
 
 function run() {
+    const summarizeOutput = process.env.PROFILE_OUTPUT === 'summary'
     const suiteName = process.env.PROFILE_SUITE as SuiteName | undefined
     if (suiteName) {
         const scenarios = SUITES[suiteName]
@@ -1719,12 +1769,45 @@ function run() {
         const results = scenarios.map(scenario => runScenario(readConfig(scenario)))
         console.log(JSON.stringify({
             suite: suiteName,
-            results
+            results: summarizeOutput ? results.map(summarizeProfileOutput) : results
         }, null, 2))
         return
     }
 
-    console.log(JSON.stringify(runScenario(readConfig()), null, 2))
+    const result = runScenario(readConfig())
+    console.log(JSON.stringify(summarizeOutput ? summarizeProfileOutput(result) : result, null, 2))
+}
+
+type ProfileOutput = ReturnType<typeof runScenario>
+
+function summarizeProfileOutput(result: ProfileOutput) {
+    return {
+        scenario: result.scenario,
+        users: result.users,
+        entities: result.entities,
+        networkedEntities: result.networkedEntities,
+        ticks: result.ticks,
+        warmup: result.warmup,
+        sharedUpdates: result.sharedUpdates,
+        manualEmitMode: result.manualEmitMode,
+        spatialDistribution: result.spatialDistribution,
+        stepMs: result.stepMs,
+        preStepMs: result.preStepMs,
+        totalMs: result.totalMs,
+        bytesPerSnapshot: result.bytesPerSnapshot,
+        bytesPerTick: result.bytesPerTick,
+        collectMsPerSnapshot: result.collectMsPerSnapshot,
+        countMsPerSnapshot: result.countMsPerSnapshot,
+        writeMsPerSnapshot: result.writeMsPerSnapshot,
+        sharedFragmentBuilds: result.sharedFragmentBuilds,
+        sharedFragmentHits: result.sharedFragmentHits,
+        sharedFragmentCopyMsPerSnapshot: result.sharedFragmentCopyMsPerSnapshot,
+        updatePropsPerSnapshot: result.updatePropsPerSnapshot,
+        updateGroupsPerSnapshot: result.updateGroupsPerSnapshot,
+        groupedPropsPerSnapshot: result.groupedPropsPerSnapshot,
+        createsPerSnapshot: result.createsPerSnapshot,
+        deletesPerSnapshot: result.deletesPerSnapshot
+    }
 }
 
 run()

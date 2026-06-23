@@ -12,6 +12,7 @@ import {
     countManualUpdateBytes,
     writeManualUpdates
 } from '../../binary/snapshot/manualUpdates'
+import { coalesceManualUpdateLog } from './EcsSpatialManualLog'
 import {
     createChannelScopeChunk,
     createPayloadCopyChunk
@@ -128,6 +129,7 @@ export function createManualChannelOutput(
     protocol: ProtocolConfig
 ): ChannelSnapshotOutput {
     const visibility = channel.collectSnapshotVisibility(user)
+    coalesceManualUpdateLog(channel)
     const plan = createEmptySnapshotPlan()
     for (let i = 0; i < visibility.toCreate.length; i++) {
         addRegularCreate(plan, instance, visibility.toCreate[i])
@@ -169,7 +171,7 @@ export function createManualChannelOutput(
                 writeManualLogDirectly ? channel.manualGroupNids.length : plan.updateEntityGroups.length,
             groupedUpdateProps: fragment ? fragment.groupedUpdateProps :
                 writeManualLogDirectly ? countManualGroupedProps(channel) :
-                plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
+                    plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
             deletes: plan.deleteEntities.length,
             messages: countPlanMessages(plan),
             usedSharedFragments: !!fragment

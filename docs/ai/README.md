@@ -20,10 +20,11 @@ small so the docs, not the prompt, carry most of the API guidance.
 To test whether an AI can self-stage a more creative game request, use
 [staged-beaver-game-prompt.md](./staged-beaver-game-prompt.md).
 
-Existing examples are validation targets and labs. Do not treat a complex
-example as the primary architecture guide for a new game. Use the docs first;
-inspect examples only when you need to resolve a concrete local workspace or
-build detail.
+## Documentation policy
+
+These docs should teach reusable nengi shapes. Prefer small inline snippets over
+references to existing projects. A new game should be buildable from these docs
+without inspecting another project.
 
 ## First principles
 
@@ -89,7 +90,7 @@ coding:
 - One-frame effects, sounds, hit markers, chat lines, and short notifications
   are messages.
 
-If the game combines several spaces, use several channels. For example, a
+If the game combines several spaces, use several channels. A
 survival game might have a spatial world channel, one private inventory channel
 per player, and one shared headered channel per opened chest or crafting
 station.
@@ -123,6 +124,10 @@ Do not build a second store or binding layer by default. Userland should create
 sprites, UI records, sounds, and local prediction state directly from frame
 facts and raw store lookups.
 
+For plain object channels, this raw path is the normal client model: server
+channels emit channel-scoped create/update/delete facts, `EntityStore` holds the
+latest authoritative objects, and userland owns presentation.
+
 For nengi ECS channels, apply the frame's ECS CRUD to a `GameEcsWorld`. Keep that
 sync layer tiny: CRUD in, ECS mutation plus facts out.
 
@@ -147,14 +152,15 @@ Use this map instead of reading every file every time.
 - If deciding which channel to use, read [channel-selection.md](./channel-selection.md).
 - If creating a new local prototype in this workspace, read [local-prototype.md](./local-prototype.md).
 - If deciding between entities, messages, commands, and requests, read [networking-primitives.md](./networking-primitives.md).
-- If wiring client state into a renderer, read [client-router.md](./client-router.md).
+- If wiring plain object channels or ECS channels into client game state, read [client-router.md](./client-router.md).
+- If the game uses ordinary replicated objects instead of ECS components, read [plain-channels.md](./plain-channels.md), which includes a small canonical server/client shape.
 - If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).
 - If wiring sockets or local test transports, read [adapters.md](./adapters.md).
 - If adding common game features, read [channel-recipes.md](./channel-recipes.md).
 - If adding lag compensation, hit validation, rewind queries, or server-authoritative fairness rules, read [historian-lag-compensation.md](./historian-lag-compensation.md).
 - If optimizing explicit updates, read [manual-mutations.md](./manual-mutations.md).
 - If visibility depends on position, read [spatial-channels.md](./spatial-channels.md).
-- If the game uses ECS-style roots and components, read [ecs-channels.md](./ecs-channels.md).
+- If the game uses ECS-style roots and components, read [ecs-channels.md](./ecs-channels.md), which includes a small canonical server/client ECS shape.
 - If deciding whether an optimization helped, read [benchmarking.md](./benchmarking.md).
 - If the design feels suspicious or you are auditing for common bugs, read [anti-patterns.md](./anti-patterns.md).
 - If asking another AI to make a first tiny game, use [minimal-game-prompt.md](./minimal-game-prompt.md).
