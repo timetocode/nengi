@@ -8,7 +8,7 @@ enum BinarySection {
     Commands,
     Requests,
     Responses,
-    ClientTick,
+    CommandFrameNumber,
     UpdateEntityGroups,
     EcsCreateEntities,
     EcsCreateComponents,

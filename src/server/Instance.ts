@@ -116,8 +116,8 @@ export class Instance {
             }
 
             user.queueEngineMessage({
-                ntype: EngineMessage.ClientTick,
-                tick: user.lastReceivedClientTick
+                ntype: EngineMessage.CommandFrameNumber,
+                commandFrameNumber: user.lastReceivedCommandFrameNumber
             })
 
             const buffer = createSnapshotBuffer(user, this)

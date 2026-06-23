@@ -92,6 +92,43 @@ server to simulate a bounded amount of time. Do not accidentally make movement
 speed depend on browser render frame rate by sending one command per
 `requestAnimationFrame` and applying a fixed movement step per command.
 
+## Command payloads and sequencing
+
+Command payloads should describe the game input for that command: movement
+axes, aim direction, selected tool, fire button, or another gameplay choice.
+
+Nengi supplies command-frame sequencing separately from the payload. Each client
+flush has a numeric `commandFrameNumber`, and every command in that flush has a
+numeric `commandIndex`. On the server, `CommandRouter` passes both numbers to
+the handler:
+
+```ts
+commands.on<MoveCommand>(NType.MoveCommand, ({ user, command, commandFrameNumber, commandIndex }) => {
+    movePlayer(user, command)
+    recordInput(commandFrameNumber, commandIndex)
+})
+```
+
+The server confirms processed command frames back to the client. Each applied
+frame exposes that numeric confirmation as `frame.confirmedCommandFrameNumber`.
+
+```ts
+for (const frame of client.network.drainFrames()) {
+    reconcilePredictionThrough(frame.confirmedCommandFrameNumber)
+}
+```
+
+Nengi's prediction helpers use the same tick flow. `client.predictCommand(...)`
+and `CommandReplayPrediction` record the command against the current
+`commandFrameNumber`; when a later frame confirms that number, the helper knows
+which commands are confirmed and which commands are still pending.
+
+Use an app-level command id only when the game itself needs one, such as a
+custom ability id, a UI correlation id, or a later custom message that refers to
+one specific command. Ordinary movement and fire commands can usually let the
+payload stay focused on gameplay input while `commandFrameNumber` and
+`commandIndex` handle sequencing and prediction bookkeeping.
+
 For commands that need server-side lag compensation, use
 `client.addCommandWithTiming(command, options)` or
 `client.predictCommandWithTiming(command, predictionOptions, timingOptions)`.

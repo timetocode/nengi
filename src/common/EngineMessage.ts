@@ -13,7 +13,7 @@ export enum EngineMessage {
 
 
     Pong,
-    ClientTick,
+    CommandFrameNumber,
     Protocol,
     CommandTiming,
     InterpolationDelay,

@@ -25,7 +25,7 @@ export type PredictionStateMismatch = {
 
 export type PredictionReconciliationEvent = {
     frame: Frame
-    confirmedClientTick: number
+    confirmedCommandFrameNumber: number
     store: EntityStore
     target: PredictionTarget
     authority: any
@@ -70,21 +70,21 @@ class Predictor {
         this.reconciliationHandlers = new Set()
     }
 
-    cleanUp(tick: number) {
+    cleanUp(commandFrameNumber: number) {
         this.predictionFrames.forEach(predictionFrame => {
-            if (predictionFrame.tick < tick - 50) {
+            if (predictionFrame.tick < commandFrameNumber - 50) {
                 this.predictionFrames.delete(predictionFrame.tick)
             }
         })
-        this.log.pruneResolvedBefore(tick - 50)
+        this.log.pruneResolvedBefore(commandFrameNumber - 50)
     }
 
-    addCommand(command: any, tick: number, options: PredictionOperationOptions = {}) {
-        return this.log.addCommand(command, tick, options)
+    addCommand(command: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
+        return this.log.addCommand(command, commandFrameNumber, options)
     }
 
-    addState(payload: any, tick: number, options: PredictionOperationOptions = {}) {
-        return this.log.addState(payload, tick, options)
+    addState(payload: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
+        return this.log.addState(payload, commandFrameNumber, options)
     }
 
     onReconcile(handler: PredictionReconciliationHandler) {
@@ -98,10 +98,10 @@ class Predictor {
         requestId: number,
         endpointId: number,
         payload: any,
-        tick: number,
+        commandFrameNumber: number,
         options: PredictionOperationOptions<Response> = {}
     ) {
-        return this.log.addRequest(requestId, endpointId, payload, tick, options)
+        return this.log.addRequest(requestId, endpointId, payload, commandFrameNumber, options)
     }
 
     resolveRequest<Response = any>(requestId: number, response: Response, frame?: Frame, store?: EntityStore) {
@@ -113,7 +113,7 @@ class Predictor {
     }
 
     resolveFrame(frame: Frame, store: EntityStore) {
-        const resolutions = this.log.confirmTick(frame.confirmedClientTick, frame, store)
+        const resolutions = this.log.confirmCommandFrameNumber(frame.confirmedCommandFrameNumber, frame, store)
         this.emitReconciliations(frame, store, resolutions)
         return resolutions
     }
@@ -150,10 +150,10 @@ class Predictor {
     }
 
     getErrors(frame: Frame, entities: Map<number, any>) {
-        const predictionErrorFrame = new PredictionErrorFrame(frame.confirmedClientTick)
+        const predictionErrorFrame = new PredictionErrorFrame(frame.confirmedCommandFrameNumber)
         if (frame) {
             // predictions for this frame
-            const predictionFrame = this.predictionFrames.get(frame.confirmedClientTick)
+            const predictionFrame = this.predictionFrames.get(frame.confirmedCommandFrameNumber)
 
             if (predictionFrame) {
                 predictionFrame.entityPredictions.forEach(entityPrediction => {
@@ -178,7 +178,7 @@ class Predictor {
                 })
             }
         }
-        this.latestTick = frame.confirmedClientTick
+        this.latestTick = frame.confirmedCommandFrameNumber
         return predictionErrorFrame
     }
 
@@ -208,7 +208,7 @@ class Predictor {
             const mismatches = this.collectMismatches(entry.confirmed, entry.target, authority)
             const event: PredictionReconciliationEvent = {
                 frame,
-                confirmedClientTick: frame.confirmedClientTick,
+                confirmedCommandFrameNumber: frame.confirmedCommandFrameNumber,
                 store,
                 target: entry.target,
                 authority,
@@ -235,7 +235,7 @@ class Predictor {
             return mismatches
         }
         const latestExpected = new Map<string, { operation: PredictionOperation, value: any }>()
-        const sorted = operations.slice().sort((a, b) => a.clientTick - b.clientTick || a.id - b.id)
+        const sorted = operations.slice().sort((a, b) => a.commandFrameNumber - b.commandFrameNumber || a.id - b.id)
         for (let i = 0; i < sorted.length; i++) {
             const operation = sorted[i]
             const expected = operation.options.expected || []

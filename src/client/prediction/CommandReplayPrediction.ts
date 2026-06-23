@@ -52,7 +52,7 @@ function defaultShouldCorrect(error: number) {
 /**
  * Small movement-style helper over PredictionLog. It predicts commands
  * immediately, then rebuilds local state from latest authority plus still
- * unconfirmed commands when the server confirms a client tick.
+ * unconfirmed commands when the server confirms a command frame number.
  */
 export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = any, TCommand = any> {
     private client: Client
@@ -145,7 +145,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
         }
         return this.client.predictor.log.getPendingByNid(nid)
             .filter(operation => operation.kind === PredictionOperationKind.Command)
-            .sort((a, b) => a.clientTick - b.clientTick || a.id - b.id)
+            .sort((a, b) => a.commandFrameNumber - b.commandFrameNumber || a.id - b.id)
     }
 
     private resolveNid() {

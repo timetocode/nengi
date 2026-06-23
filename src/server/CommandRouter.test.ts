@@ -7,8 +7,8 @@ describe('CommandRouter', () => {
         const events: string[] = []
         const user = { id: 7 } as any
 
-        router.on<{ ntype: number, value: string }>(1, ({ user, command, clientTick }) => {
-            events.push(`${user.id}:${clientTick}:${command.value}`)
+        router.on<{ ntype: number, value: string }>(1, ({ user, command, commandFrameNumber, commandIndex }) => {
+            events.push(`${user.id}:${commandFrameNumber}:${commandIndex}:${command.value}`)
         })
         router.on<{ ntype: number, value: string }>(2, ({ command }) => {
             events.push(`two:${command.value}`)
@@ -17,7 +17,7 @@ describe('CommandRouter', () => {
         const count = router.process({
             type: NetworkEvent.CommandSet,
             user,
-            clientTick: 123,
+            commandFrameNumber: 456,
             commands: [
                 { ntype: 1, value: 'a' },
                 { ntype: 2, value: 'b' },
@@ -27,9 +27,9 @@ describe('CommandRouter', () => {
 
         expect(count).toBe(3)
         expect(events).toEqual([
-            '7:123:a',
+            '7:456:0:a',
             'two:b',
-            '7:123:c'
+            '7:456:2:c'
         ])
     })
 
@@ -44,7 +44,7 @@ describe('CommandRouter', () => {
         router.process({
             type: NetworkEvent.CommandSet,
             user: { id: 1 } as any,
-            clientTick: 1,
+            commandFrameNumber: 1,
             commands: [
                 { ntype: 9 }
             ]
@@ -80,7 +80,7 @@ describe('CommandRouter', () => {
         router.process({
             type: NetworkEvent.CommandSet,
             user: { id: 1 } as any,
-            clientTick: 1,
+            commandFrameNumber: 1,
             commands: [
                 { ntype: 1 },
                 { ntype: 1 }

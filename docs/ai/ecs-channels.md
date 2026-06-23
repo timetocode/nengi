@@ -21,6 +21,12 @@ Component:
 - Has schema properties.
 - Has `pid`, the parent/root id.
 
+Define each replicated ECS component type beside its nengi schema, component
+type descriptor, and create function. See [shared-state.md](./shared-state.md)
+for the recommended file shape. Do not give the root entity a schema; networked
+state lives on components. Do not put component writers in shared component
+files because writers are bound to a specific server channel instance.
+
 ## Basic ECS channel
 
 ```ts

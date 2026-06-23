@@ -4,7 +4,7 @@ import { Schema } from './binary/schema/Schema'
 import { connectionAcceptedSchema } from './schemas/connectionAcceptedSchema'
 import { connectionDeniedSchema } from './schemas/connectionDeniedSchema'
 import { connectionTerminatedSchema } from './schemas/connectionTerminatedSchema'
-import { clientTickSchema } from './schemas/clientTickSchema'
+import { commandFrameNumberSchema } from './schemas/commandFrameNumberSchema'
 import { timeSyncSchema } from './schemas/timeSyncSchema'
 import { pingSchema } from './schemas/pingSchema'
 import { pongSchema } from './schemas/pongSchema'
@@ -36,7 +36,7 @@ export class Context {
         this.engineSchemas.set(EngineMessage.ConnectionAccepted, connectionAcceptedSchema)
         this.engineSchemas.set(EngineMessage.ConnectionDenied, connectionDeniedSchema)
         this.engineSchemas.set(EngineMessage.ConnectionTerminated, connectionTerminatedSchema)
-        this.engineSchemas.set(EngineMessage.ClientTick, clientTickSchema)
+        this.engineSchemas.set(EngineMessage.CommandFrameNumber, commandFrameNumberSchema)
         this.engineSchemas.set(EngineMessage.TimeSync, timeSyncSchema)
         this.engineSchemas.set(EngineMessage.Ping, pingSchema)
         this.engineSchemas.set(EngineMessage.Pong, pongSchema)

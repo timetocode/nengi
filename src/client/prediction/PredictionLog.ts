@@ -59,7 +59,7 @@ export type PredictionResolution<Response = any> = {
 export type PredictionOperation<Response = any> = {
     id: number
     kind: PredictionOperationKind
-    clientTick: number
+    commandFrameNumber: number
     payload: any
     affected: PredictionTarget[]
     status: PredictionOperationStatus
@@ -86,20 +86,20 @@ function targetsOverlap(a: PredictionTarget, b: PredictionTarget) {
 export class PredictionLog {
     nextId = 1
     operations = new Map<number, PredictionOperation>()
-    byTick = new Map<number, PredictionOperation[]>()
+    byCommandFrameNumber = new Map<number, PredictionOperation[]>()
     byRequestId = new Map<number, PredictionOperation>()
     resolutions: PredictionResolution[] = []
 
-    addCommand(command: any, clientTick: number, options: PredictionOperationOptions = {}) {
-        const operation = this.createOperation(PredictionOperationKind.Command, clientTick, command, options)
-        this.addToTick(operation)
+    addCommand(command: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
+        const operation = this.createOperation(PredictionOperationKind.Command, commandFrameNumber, command, options)
+        this.addToCommandFrameNumber(operation)
         this.applyLocal(operation)
         return operation
     }
 
-    addState(payload: any, clientTick: number, options: PredictionOperationOptions = {}) {
-        const operation = this.createOperation(PredictionOperationKind.State, clientTick, payload, options)
-        this.addToTick(operation)
+    addState(payload: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
+        const operation = this.createOperation(PredictionOperationKind.State, commandFrameNumber, payload, options)
+        this.addToCommandFrameNumber(operation)
         this.applyLocal(operation)
         return operation
     }
@@ -108,25 +108,25 @@ export class PredictionLog {
         requestId: number,
         endpointId: number,
         payload: any,
-        clientTick: number,
+        commandFrameNumber: number,
         options: PredictionOperationOptions<Response> = {}
     ) {
-        const operation = this.createOperation<Response>(PredictionOperationKind.Request, clientTick, payload, options)
+        const operation = this.createOperation<Response>(PredictionOperationKind.Request, commandFrameNumber, payload, options)
         operation.requestId = requestId
         operation.endpointId = endpointId
         this.byRequestId.set(requestId, operation)
-        this.addToTick(operation)
+        this.addToCommandFrameNumber(operation)
         this.applyLocal(operation)
         return operation
     }
 
-    confirmTick(confirmedClientTick: number, frame?: Frame, store?: EntityStore) {
+    confirmCommandFrameNumber(confirmedCommandFrameNumber: number, frame?: Frame, store?: EntityStore) {
         const resolutions: PredictionResolution[] = []
         this.operations.forEach(operation => {
             if (
                 operation.status === PredictionOperationStatus.Pending &&
                 (operation.kind === PredictionOperationKind.Command || operation.kind === PredictionOperationKind.State) &&
-                operation.clientTick <= confirmedClientTick
+                operation.commandFrameNumber <= confirmedCommandFrameNumber
             ) {
                 resolutions.push(this.resolve(operation, { frame, store }))
             }
@@ -186,25 +186,25 @@ export class PredictionLog {
         })
     }
 
-    pruneResolvedBefore(clientTick: number) {
+    pruneResolvedBefore(commandFrameNumber: number) {
         this.operations.forEach(operation => {
-            if (operation.status !== PredictionOperationStatus.Pending && operation.clientTick < clientTick) {
+            if (operation.status !== PredictionOperationStatus.Pending && operation.commandFrameNumber < commandFrameNumber) {
                 this.deleteOperation(operation)
             }
         })
-        this.resolutions = this.resolutions.filter(resolution => resolution.operation.clientTick >= clientTick)
+        this.resolutions = this.resolutions.filter(resolution => resolution.operation.commandFrameNumber >= commandFrameNumber)
     }
 
     private createOperation<Response>(
         kind: PredictionOperationKind,
-        clientTick: number,
+        commandFrameNumber: number,
         payload: any,
         options: PredictionOperationOptions<Response>
     ): PredictionOperation<Response> {
         const operation: PredictionOperation<Response> = {
             id: this.nextId++,
             kind,
-            clientTick,
+            commandFrameNumber,
             payload,
             affected: options.affected || [],
             status: PredictionOperationStatus.Pending,
@@ -214,10 +214,10 @@ export class PredictionLog {
         return operation
     }
 
-    private addToTick(operation: PredictionOperation) {
-        const operations = this.byTick.get(operation.clientTick) || []
+    private addToCommandFrameNumber(operation: PredictionOperation) {
+        const operations = this.byCommandFrameNumber.get(operation.commandFrameNumber) || []
         operations.push(operation)
-        this.byTick.set(operation.clientTick, operations)
+        this.byCommandFrameNumber.set(operation.commandFrameNumber, operations)
     }
 
     private applyLocal(operation: PredictionOperation) {
@@ -289,14 +289,14 @@ export class PredictionLog {
         if (operation.requestId !== undefined) {
             this.byRequestId.delete(operation.requestId)
         }
-        const tickOperations = this.byTick.get(operation.clientTick)
-        if (tickOperations) {
-            const index = tickOperations.indexOf(operation)
+        const frameOperations = this.byCommandFrameNumber.get(operation.commandFrameNumber)
+        if (frameOperations) {
+            const index = frameOperations.indexOf(operation)
             if (index > -1) {
-                tickOperations.splice(index, 1)
+                frameOperations.splice(index, 1)
             }
-            if (tickOperations.length === 0) {
-                this.byTick.delete(operation.clientTick)
+            if (frameOperations.length === 0) {
+                this.byCommandFrameNumber.delete(operation.commandFrameNumber)
             }
         }
     }

@@ -7,7 +7,8 @@ export type CommandRouterHandler<Command = any> = (args: {
     user: User
     command: Command
     event: INetworkEvent
-    clientTick: number
+    commandFrameNumber: number
+    commandIndex: number
     timing?: CommandTimingEstimate
 }) => void
 
@@ -15,7 +16,8 @@ export type CommandRouterUnhandledHandler = (args: {
     user: User
     command: any
     event: INetworkEvent
-    clientTick: number
+    commandFrameNumber: number
+    commandIndex: number
     timing?: CommandTimingEstimate
 }) => void
 
@@ -39,29 +41,29 @@ export class CommandRouter {
         if (event.type === NetworkEvent.CommandSet) {
             const commands = Array.isArray(event.commands) ? event.commands : []
             for (let i = 0; i < commands.length; i++) {
-                this.processCommand(event.user, commands[i], event, event.clientTick ?? -1, event.commandTimings?.[i])
+                this.processCommand(event.user, commands[i], event, event.commandFrameNumber ?? -1, i, event.commandTimings?.[i])
             }
             return commands.length
         }
 
         if (event.type === NetworkEvent.Command && event.commands) {
-            this.processCommand(event.user, event.commands, event, event.clientTick ?? -1, event.commandTimings?.[0])
+            this.processCommand(event.user, event.commands, event, event.commandFrameNumber ?? -1, 0, event.commandTimings?.[0])
             return 1
         }
 
         return 0
     }
 
-    processCommand(user: User, command: any, event: INetworkEvent, clientTick = -1, timing?: CommandTimingEstimate) {
+    processCommand(user: User, command: any, event: INetworkEvent, commandFrameNumber = -1, commandIndex = 0, timing?: CommandTimingEstimate) {
         const ntype = command?.ntype
         const handlers = typeof ntype === 'number' ? this.handlers.get(ntype) : undefined
         if (!handlers || handlers.length === 0) {
-            this.unhandled?.({ user, command, event, clientTick, timing })
+            this.unhandled?.({ user, command, event, commandFrameNumber, commandIndex, timing })
             return false
         }
 
         for (let i = 0; i < handlers.length; i++) {
-            handlers[i]({ user, command, event, clientTick, timing })
+            handlers[i]({ user, command, event, commandFrameNumber, commandIndex, timing })
         }
         return true
     }

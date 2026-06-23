@@ -3,7 +3,7 @@ import type { ChannelClose, ChannelHeaderUpdate, ChannelOpen, SnapshotChannel } 
 
 export type Snapshot = {
     timestamp: number
-    confirmedClientTick: number,
+    confirmedCommandFrameNumber: number,
     messages: any[],
     interpolatedMessages?: any[],
     channels?: SnapshotChannel[],

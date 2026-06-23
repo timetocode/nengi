@@ -37,7 +37,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
     const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
     return {
         timestamp: -1,
-        confirmedClientTick: -1,
+        confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
         channelOpens: hasEntityCrud
@@ -62,7 +62,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
 }
 
 describe('client prediction', () => {
-    it('sends predicted commands and resolves them when their client tick is confirmed', () => {
+    it('sends predicted commands and resolves them when their command frame number is confirmed', () => {
         const client = createClient()
         const localPlayer = { x: 0 }
         const events: string[] = []
@@ -79,13 +79,13 @@ describe('client prediction', () => {
         })
 
         expect(localPlayer.x).toBe(1)
-        expect(client.network.outbound.getCommands(0)).toEqual([{ ntype: 2, dx: 1 }])
+        expect(client.network.outbound.getCommands(1)).toEqual([{ ntype: 2, dx: 1 }])
         expect(client.predictor.log.getPendingCommands().map(op => op.id)).toEqual([operation!.id])
-        expect(operation!.clientTick).toBe(1)
+        expect(operation!.commandFrameNumber).toBe(1)
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 1,
+            confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1 }],
             updateEntities: [],
@@ -104,7 +104,7 @@ describe('client prediction', () => {
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 0,
+            confirmedCommandFrameNumber: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0 }],
             updateEntities: [],
@@ -137,7 +137,7 @@ describe('client prediction', () => {
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1050,
-            confirmedClientTick: 1,
+            confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -156,7 +156,7 @@ describe('client prediction', () => {
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 0,
+            confirmedCommandFrameNumber: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0 }],
             updateEntities: [],
@@ -180,7 +180,7 @@ describe('client prediction', () => {
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1050,
-            confirmedClientTick: 1,
+            confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [],
             updateEntities: [{ nid: 1, prop: 'x', value: 2 }],
@@ -217,7 +217,7 @@ describe('client prediction', () => {
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 0,
+            confirmedCommandFrameNumber: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, semiAmmo: 6, autoAmmo: 22 }],
             updateEntities: [],
@@ -231,14 +231,14 @@ describe('client prediction', () => {
         })
 
         ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 1 }, { semiAmmo: 5 })
-        client.network.incrementClientTick()
+        client.network.incrementCommandFrameNumber()
         ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 2 }, { semiAmmo: 4 })
-        client.network.incrementClientTick()
+        client.network.incrementCommandFrameNumber()
         ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 3 }, { semiAmmo: 3 })
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1050,
-            confirmedClientTick: 2,
+            confirmedCommandFrameNumber: 2,
             messages: [],
             createEntities: [],
             updateEntities: [],
@@ -249,5 +249,38 @@ describe('client prediction', () => {
         expect(localPlayer.semiAmmo).toBe(5)
         expect(events).toEqual(['1:6:5:1'])
         expect(client.predictor.log.getPendingOperations()).toHaveLength(1)
+    })
+
+    it('confirms prediction with monotonic command frame numbers', () => {
+        const client = createClient()
+        const events: string[] = []
+
+        client.network.commandFrameNumber = 65535
+        client.network.outbound.tick = 65535
+
+        const first = client.predictCommand({ ntype: 2, dx: 1 }, {
+            reconcile: () => events.push('first')
+        })
+        client.network.incrementCommandFrameNumber()
+        const second = client.predictCommand({ ntype: 2, dx: 2 }, {
+            reconcile: () => events.push('second')
+        })
+
+        expect(first!.commandFrameNumber).toBe(65535)
+        expect(second!.commandFrameNumber).toBe(65536)
+        expect(client.network.commandFrameNumber).toBe(65536)
+
+        client.network.queueSnapshot(snapshot({
+            timestamp: 1050,
+            confirmedCommandFrameNumber: 65536,
+            messages: [],
+            createEntities: [],
+            updateEntities: [],
+            deleteEntities: []
+        }), 1050)
+        client.network.processNextFrame()
+
+        expect(events).toEqual(['first', 'second'])
+        expect(client.predictor.log.getPendingCommands()).toEqual([])
     })
 })

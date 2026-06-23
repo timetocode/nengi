@@ -22,7 +22,7 @@ export interface INetworkEvent {
     type: NetworkEvent
     user: User
     commands?: any
-    clientTick?: number
+    commandFrameNumber?: number
     commandTimings?: Array<CommandTimingEstimate | undefined>
     serverReceivedTimeMs?: number
     payload?: any
@@ -588,7 +588,7 @@ export class InstanceNetwork {
                 type: NetworkEvent.CommandSet,
                 user,
                 commands,
-                clientTick: -1,
+                commandFrameNumber: -1,
                 commandTimings: [] as Array<CommandTimingEstimate | undefined>,
                 serverReceivedTimeMs
             }
@@ -607,10 +607,8 @@ export class InstanceNetwork {
                             this.onHandshake(user, handshake, msg.schemaFingerprint || '')
                         }
 
-                        if (msg.ntype === EngineMessage.ClientTick) {
-                            const clientTick = msg.tick
-                            user.lastReceivedClientTick = clientTick
-                            commandSet.clientTick = clientTick
+                        if (msg.ntype === EngineMessage.CommandFrameNumber) {
+                            commandSet.commandFrameNumber = user.receiveCommandFrameNumber(msg.commandFrameNumber)
                         }
 
                         if (msg.ntype === EngineMessage.Pong) {

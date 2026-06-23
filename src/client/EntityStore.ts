@@ -147,7 +147,7 @@ export class EntityStore {
             tick,
             timestamp: snapshot.timestamp,
             receivedAt,
-            confirmedClientTick: snapshot.confirmedClientTick,
+            confirmedCommandFrameNumber: snapshot.confirmedCommandFrameNumber,
             channelOpens,
             channelHeaderUpdates,
             channelCloses,

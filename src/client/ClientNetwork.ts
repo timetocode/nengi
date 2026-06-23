@@ -137,7 +137,7 @@ export class ClientNetwork {
     requestTimeoutMs = 10000
     requestBacklogActive = false
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
-    clientTick = 1 // incremented each flush to the server
+    commandFrameNumber = 1 // monotonic public command-frame number
     previousSnapshot: Snapshot | null = null
     chronus = new Chronus()
     frameTick = 1 // incremented each frame that comes from server
@@ -161,7 +161,7 @@ export class ClientNetwork {
     }
     onRequestBacklog: (info: RequestBacklogInfo) => void = (info: RequestBacklogInfo) => {
         console.warn(
-            `nengi request backlog: ${info.remaining} requests remain queued after sending ${info.sent} of ${info.queued} for client frame ${info.frame}.`
+            `nengi request backlog: ${info.remaining} requests remain queued after sending ${info.sent} of ${info.queued} for command frame ${info.frame}.`
         )
     }
 
@@ -169,13 +169,11 @@ export class ClientNetwork {
         this.client = client
         this.store = new EntityStore(client.context)
         this.entityNTypes = new Map()
+        this.outbound.tick = this.commandFrameNumber
     }
 
-    incrementClientTick() {
-        this.clientTick++
-        if (this.clientTick > 65535) {
-            this.clientTick = 1
-        }
+    incrementCommandFrameNumber() {
+        this.commandFrameNumber++
     }
 
     addEngineCommand(command: any) {
@@ -222,19 +220,19 @@ export class ClientNetwork {
     }
 
     predictCommand(command: any, options: PredictionOperationOptions = {}) {
-        const tick = this.clientTick
+        const tick = this.commandFrameNumber
         this.addCommand(command)
         return this.client.predictor.addCommand?.(command, tick, options)
     }
 
     predictCommandWithTiming(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: CommandTimingOptions = {}) {
-        const tick = this.clientTick
+        const tick = this.commandFrameNumber
         this.addCommandWithTiming(command, timingOptions)
         return this.client.predictor.addCommand?.(command, tick, predictionOptions)
     }
 
     predictState(payload: any, options: PredictionOperationOptions = {}) {
-        return this.client.predictor.addState?.(payload, this.clientTick, options)
+        return this.client.predictor.addState?.(payload, this.commandFrameNumber, options)
     }
 
     flush() {
@@ -303,7 +301,7 @@ export class ClientNetwork {
         this.requestQueue.enqueue(obj)
         this.requests.set(obj.requestId, obj)
         if (options.prediction) {
-            this.client.predictor.addRequest?.(obj.requestId, obj.endpointId, payload, this.clientTick, options.prediction)
+            this.client.predictor.addRequest?.(obj.requestId, obj.endpointId, payload, this.commandFrameNumber, options.prediction)
         }
         return promise
     }
@@ -414,8 +412,8 @@ export class ClientNetwork {
         }
 
         this.client.predictor.resolveFrame?.(frame, this.store)
-        this.client.predictor.cleanUp(frame.confirmedClientTick)
-        this.outbound.confirmCommands(pending.snapshot.confirmedClientTick)
+        this.client.predictor.cleanUp(frame.confirmedCommandFrameNumber)
+        this.outbound.confirmCommands(pending.snapshot.confirmedCommandFrameNumber)
 
         pending.pendingResponses.forEach(pendingResponse => {
             if (pendingResponse.status === ResponseStatus.Ok) {
@@ -573,8 +571,8 @@ export class ClientNetwork {
     }
 
     createOutbound<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
-        const tick = this.clientTick
-        this.addEngineCommand({ ntype: EngineMessage.ClientTick, tick })
+        const commandFrameNumber = this.commandFrameNumber
+        this.addEngineCommand({ ntype: EngineMessage.CommandFrameNumber, commandFrameNumber })
         const timedCommands = this.outbound.getCommandTiming(this.outbound.tick)
         for (let i = 0; i < timedCommands.length; i++) {
             const timing = timedCommands[i]
@@ -678,17 +676,17 @@ export class ClientNetwork {
             queued: queuedRequests,
             sent: requests.length,
             remaining: this.requestQueue.length,
-            frame: tick
+            frame: commandFrameNumber
         })
 
         if (isDebug) {
-            debug.tick = tick
+            debug.commandFrameNumber = commandFrameNumber
             console.log({ debug })
         }
 
 
-        this.outbound.tick = tick
-        this.incrementClientTick()
+        this.incrementCommandFrameNumber()
+        this.outbound.tick = this.commandFrameNumber
         return dw.payload
     }
 
@@ -706,7 +704,7 @@ export class ClientNetwork {
         const receivedAtEpoch = Date.now()
         const snapshot: Snapshot = {
             timestamp: -1,
-            confirmedClientTick: -1,
+            confirmedCommandFrameNumber: -1,
             messages: [],
             interpolatedMessages: [],
             channels: [],
@@ -765,9 +763,9 @@ export class ClientNetwork {
                         // @ts-ignore
                         snapshot.timestamp = engineMessage.timestamp
                     }
-                    if (engineMessage.ntype === EngineMessage.ClientTick) {
+                    if (engineMessage.ntype === EngineMessage.CommandFrameNumber) {
                         // @ts-ignore
-                        snapshot.confirmedClientTick = engineMessage.tick
+                        snapshot.confirmedCommandFrameNumber = engineMessage.commandFrameNumber
                     }
 
                     if (engineMessage.ntype === EngineMessage.Protocol) {

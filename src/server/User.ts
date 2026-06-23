@@ -84,7 +84,7 @@ export class User {
     private pendingChannelOpens: Set<number> = new Set()
     private pendingChannelCloses: Set<number> = new Set()
     lastSentInstanceTick = 0
-    lastReceivedClientTick = 0
+    lastReceivedCommandFrameNumber = 0
     nextPingId = 1
     lastSentPingId = 0
     latency = 0
@@ -131,6 +131,17 @@ export class User {
         }
         this.lastSentPingId = pingId
         return pingId
+    }
+
+    receiveCommandFrameNumber(commandFrameNumber: number) {
+        if (commandFrameNumber <= 0) {
+            return this.lastReceivedCommandFrameNumber
+        }
+
+        if (commandFrameNumber > this.lastReceivedCommandFrameNumber) {
+            this.lastReceivedCommandFrameNumber = commandFrameNumber
+        }
+        return this.lastReceivedCommandFrameNumber
     }
 
     recordClockSyncPong(

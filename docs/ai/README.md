@@ -73,6 +73,10 @@ Prefer primitive patterns that can be remixed:
 Reach for a larger game-template pattern only after these primitive choices are
 clear.
 
+When defining replicated state, keep the TypeScript type and nengi schema beside
+each other. Use [shared-state.md](./shared-state.md) for the recommended plain
+object, ECS component, message, command, and request file shapes.
+
 ## If the game request is vague
 
 When the developer asks for a broad prototype such as "make a multiplayer
@@ -151,6 +155,7 @@ Use this map instead of reading every file every time.
 
 - If deciding which channel to use, read [channel-selection.md](./channel-selection.md).
 - If creating a new local prototype in this workspace, read [local-prototype.md](./local-prototype.md).
+- If defining replicated state and schemas, read [shared-state.md](./shared-state.md).
 - If deciding between entities, messages, commands, and requests, read [networking-primitives.md](./networking-primitives.md).
 - If wiring plain object channels or ECS channels into client game state, read [client-router.md](./client-router.md).
 - If the game uses ordinary replicated objects instead of ECS components, read [plain-channels.md](./plain-channels.md), which includes a small canonical server/client shape.

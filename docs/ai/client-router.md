@@ -236,7 +236,7 @@ Avoid recreating legacy replica-style layers:
 - no second entity store
 - no generic replicated-object refs
 - no renderer ownership
-- no inventory-specific client framework
+- no inventory-specific command framework
 - no automatic prediction policy
 
 The clean surface is small: raw store, frame facts, interpolation samples, and

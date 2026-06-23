@@ -24,7 +24,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
     const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
     return {
         timestamp: -1,
-        confirmedClientTick: -1,
+        confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
         channelOpens: hasEntityCrud
@@ -49,7 +49,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
 }
 
 describe('PredictionLog', () => {
-    it('keeps command predictions pending until their client tick is confirmed', () => {
+    it('keeps command predictions pending until their command frame number is confirmed', () => {
         const store = createStore()
         const log = new PredictionLog()
         const local = { x: 0 }
@@ -67,18 +67,18 @@ describe('PredictionLog', () => {
         })
 
         expect(local.x).toBe(1)
-        expect(log.confirmTick(6)).toEqual([])
+        expect(log.confirmCommandFrameNumber(6)).toEqual([])
         expect(log.getPendingCommands().map(op => op.id)).toEqual([operation.id])
 
         const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 7,
+            confirmedCommandFrameNumber: 7,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
             updateEntities: [],
             deleteEntities: []
         }), 1)
-        const resolutions = log.confirmTick(7, frame, store)
+        const resolutions = log.confirmCommandFrameNumber(7, frame, store)
 
         expect(resolutions).toHaveLength(1)
         expect(resolutions[0].accepted).toBe(true)
@@ -107,13 +107,13 @@ describe('PredictionLog', () => {
 
         const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 10,
+            confirmedCommandFrameNumber: 10,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
             updateEntities: [],
             deleteEntities: []
         }), 1)
-        const resolutions = log.confirmTick(10, frame, store)
+        const resolutions = log.confirmCommandFrameNumber(10, frame, store)
 
         expect(resolutions[0].accepted).toBe(false)
         expect(local.x).toBe(1)
@@ -139,7 +139,7 @@ describe('PredictionLog', () => {
 
         const frame = store.applySnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 99,
+            confirmedCommandFrameNumber: 99,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, open: false }],
             updateEntities: [],
@@ -147,7 +147,7 @@ describe('PredictionLog', () => {
         }), 1)
 
         expect(localSwitch.open).toBe(true)
-        const commandResolutions = log.confirmTick(99, frame, store)
+        const commandResolutions = log.confirmCommandFrameNumber(99, frame, store)
         expect(commandResolutions).toEqual([])
         expect(log.getPendingRequests()).toHaveLength(1)
 

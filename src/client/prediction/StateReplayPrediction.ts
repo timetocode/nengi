@@ -34,7 +34,7 @@ function defaultApplyReplayState(local: any, replayState: any) {
 /**
  * State-change replay helper over PredictionLog. It predicts a local state
  * payload immediately, then rebuilds local state from latest authority plus
- * still-unconfirmed state payloads when the server confirms a client tick.
+ * still-unconfirmed state payloads when the server confirms a command frame number.
  */
 export class StateReplayPrediction<TLocal = any, TAuthority = any, TState = any, TPayload = any> {
     private client: Client
@@ -115,7 +115,7 @@ export class StateReplayPrediction<TLocal = any, TAuthority = any, TState = any,
         const operations = event ? event.pending : this.getPendingByNid()
         return operations
             .filter(operation => operation.kind === PredictionOperationKind.State)
-            .sort((a, b) => a.clientTick - b.clientTick || a.id - b.id)
+            .sort((a, b) => a.commandFrameNumber - b.commandFrameNumber || a.id - b.id)
     }
 
     private getPendingByNid() {

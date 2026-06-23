@@ -50,7 +50,7 @@ export function createTestSnapshot(args: Partial<Snapshot>): Snapshot {
 
     return {
         timestamp: -1,
-        confirmedClientTick: -1,
+        confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
         channelOpens: args.channelOpens || (hasEntityCrud

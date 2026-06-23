@@ -160,6 +160,13 @@ client sends commands at a fixed command rate. If the client sends commands from
 `requestAnimationFrame`, a 144 Hz client can otherwise move more often than a
 30 Hz client.
 
+The movement command payload only needs the gameplay input. Nengi already
+associates sent commands with the current numeric `commandFrameNumber`, exposes
+that number to server command handlers, and confirms processed command frames
+back on `frame.confirmedCommandFrameNumber`. See
+[networking-primitives.md](./networking-primitives.md#command-payloads-and-sequencing)
+for the prediction and sequencing shape.
+
 ## Gameplay queries
 
 `Channel2D` is network visibility. It is not a gameplay query engine. The

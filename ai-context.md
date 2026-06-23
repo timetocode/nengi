@@ -143,7 +143,7 @@ Snapshot writing is now chunk-oriented: the envelope is written first, followed 
 
 ## Client state model
 
-The client applies snapshot diffs into one authoritative `EntityStore`. This store is the latest known server state for visible entities. Applied frames are compact per-snapshot change records: creates, updates with previous/value, deletes, messages, timestamps, and confirmed client ticks. They do not clone the full visible world every frame.
+The client applies snapshot diffs into one authoritative `EntityStore`. This store is the latest known server state for visible entities. Applied frames are compact per-snapshot change records: creates, updates with previous/value, deletes, messages, timestamps, and confirmed command frame numbers. They do not clone the full visible world every frame.
 
 Use `client.network.drainFrames()` for raw queued frame consumption, such as ECS adapters or custom simulators. The old interpolator is intentionally minimal while the newer store/frame model evolves.
 

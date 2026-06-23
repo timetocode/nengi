@@ -90,4 +90,12 @@ describe('User clock sync timing', () => {
         expect(accepted).toBe(false)
         expect(user.clockSyncSamples).toBe(0)
     })
+
+    it('tracks monotonic command frame numbers', () => {
+        const user = new User({} as any, {} as any)
+
+        expect(user.receiveCommandFrameNumber(41)).toBe(41)
+        expect(user.receiveCommandFrameNumber(40)).toBe(41)
+        expect(user.receiveCommandFrameNumber(42)).toBe(42)
+    })
 })

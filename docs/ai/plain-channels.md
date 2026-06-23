@@ -9,6 +9,11 @@ For a 2D world where visibility depends on position, use `Channel2D`. For a
 small arena where every subscribed user sees every object, use `Channel` with
 the same client shape.
 
+Define each replicated entity type beside its nengi schema and create function.
+See [shared-state.md](./shared-state.md) for the recommended file shape. For
+plain channels, the replicated object is the network entity: it has `nid`,
+`ntype`, schema properties, and a registered nengi schema.
+
 ## Canonical small server
 
 Assume `NType`, schemas, and factory functions such as `createPlayer` and

@@ -1,6 +1,6 @@
 import { defineMessageSchema } from '../binary/schema/defineSchema'
 import { Binary } from '../binary/Binary'
 
-export const clientTickSchema = defineMessageSchema({
-    tick: Binary.UInt16,
+export const commandFrameNumberSchema = defineMessageSchema({
+    commandFrameNumber: Binary.UInt32,
 })

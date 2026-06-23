@@ -36,7 +36,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
     const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
     return {
         timestamp: -1,
-        confirmedClientTick: -1,
+        confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
         channelOpens: hasEntityCrud
@@ -91,12 +91,12 @@ describe('CommandReplayPrediction', () => {
         const movement = createMovement(client, local)
 
         movement.predict({ ntype: 2, dx: 1, dy: 0 })
-        client.network.incrementClientTick()
+        client.network.incrementCommandFrameNumber()
         movement.predict({ ntype: 2, dx: 1, dy: 0 })
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 1,
+            confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, y: 0 }],
             updateEntities: [],
@@ -124,7 +124,7 @@ describe('CommandReplayPrediction', () => {
 
         client.network.queueSnapshot(snapshot({
             timestamp: 1000,
-            confirmedClientTick: 1,
+            confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0 }],
             updateEntities: [],

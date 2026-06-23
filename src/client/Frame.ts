@@ -52,12 +52,12 @@ export interface IEntityFrame {
     messages: any[]
     interpolatedMessages?: any[]
     channels?: ChannelFrame[]
-    confirmedClientTick: number
+    confirmedCommandFrameNumber: number
 }
 
 export class Frame implements IEntityFrame {
     tick: number
-    confirmedClientTick: number
+    confirmedCommandFrameNumber: number
     timestamp: number
     receivedAt: number
     channelOpens: ChannelOpen[]
@@ -72,7 +72,7 @@ export class Frame implements IEntityFrame {
 
     constructor(args: IEntityFrame) {
         this.tick = args.tick
-        this.confirmedClientTick = args.confirmedClientTick
+        this.confirmedCommandFrameNumber = args.confirmedCommandFrameNumber
         this.timestamp = args.timestamp
         this.receivedAt = args.receivedAt
         this.channelOpens = args.channelOpens || []
