@@ -1,77 +1,91 @@
 # nengi
 
-Nengi is a TypeScript networking framework for realtime multiplayer games. The
+Nengi is a TypeScript networking library for realtime multiplayer games. The
 server owns authoritative state, clients send commands and requests, and nengi
-replicates the relevant state to each client through snapshots.
+replicates relevant state to each client through compact binary snapshots.
 
-This branch is active research and development for the next nengi API. Names and
-patterns can still change before a release candidate.
+Nengi is renderer-agnostic and game-loop agnostic. Use it with canvas, Pixi,
+Three.js, Babylon.js, custom WebGL/WebGPU renderers, or non-game realtime apps.
+It does not own your physics, ECS scheduler, inventory system, renderer, UI, or
+game rules.
 
-## AI-assisted game development
+## Install
 
-The current documentation priority is helping AI agents build small game
-templates and then extend them into real games with a human developer. If you are
-an AI assistant, start here:
+```sh
+npm install nengi
+```
 
-- [AI guide for building games with nengi](./docs/ai/README.md)
+This package exposes a root-only public API:
 
-That guide links to focused notes on:
+```ts
+import { Channel2D, Client, Context, Instance, defineEntitySchema } from 'nengi'
+```
 
-- choosing channels
-- choosing entities, messages, commands, and requests
-- using raw `EntityStore` + `Frame` data on the client
-- building a minimal spatial game
-- wiring adapters/transports
-- spatial channels for 2D and 3D worlds
-- manual mutation channels
-- ECS channels
-- benchmarking game-specific workloads
-- common anti-patterns
+Deep imports are not part of the public package contract.
 
-Do not use old examples or old README snippets as authority if they conflict
-with `docs/ai`.
+## Core Model
 
-## Current mental model
+- Entity: persistent replicated state with `nid`, `ntype`, and schema fields.
+- Message: transient event payload.
+- Command: client-to-server input stream.
+- Request/response: client-to-server action that expects a result.
+- Channel: server-side visibility and subscription container.
+- Frame: client-side per-snapshot change report.
 
-- Use an entity for persistent replicated state.
-- Use a message for transient events.
-- Use a command for continuous or repeated client input.
-- Use request/response for client actions that need an accepted/rejected result.
-- Use a channel to describe who can see a set of entities or messages.
-- Use a channel header when the client needs context for channel-scoped CRUD,
-  such as an inventory, team channel, container, or remote map.
-- Start with automatic channels. Move to manual mutations only after the game
-  has a clear mutation point or benchmark evidence.
+Use automatic channels when nengi can scan object state. Use manual channels
+when game code already has reliable mutation points and wants explicit,
+high-performance writes. Use ECS channels when the game models state as roots
+and networked components.
 
-Common starting choices:
+Common channel choices:
 
-- Small arena or shared match state: `Channel`
-- Large 2D world: `Channel2D`
-- True 3D world: `Channel3D`
-- Hot explicit updates: `ManualChannel` or `ManualChannel2D/3D`
-- Nengi ECS roots/components: `EcsChannel` or `EcsChannel2D/3D`
+- `Channel`: all subscribed users see all objects in the channel.
+- `Channel2D` / `Channel3D`: spatial visibility.
+- `ManualChannel` / `ManualChannel2D` / `ManualChannel3D`: explicit mutation
+  writes.
+- `EcsChannel` / `EcsChannel2D` / `EcsChannel3D`: ECS roots and replicated
+  components.
 
-## Renderer and game engine
+## Client Shape
 
-Nengi is renderer-agnostic. It can be used with canvas, Pixi, Three.js,
-Babylon.js, custom WebGL/WebGPU renderers, or non-game realtime apps. It does not
-own your game loop, physics, ECS scheduler, inventory system, renderer, or UI.
+Clients receive snapshots, apply them to `EntityStore`, and drain `Frame`
+objects:
 
-## Examples
+```ts
+for (const frame of client.network.drainFrames()) {
+    frame.messages.forEach(handleMessage)
 
-Examples in this repository are R&D templates and experiments. They are useful
-for seeing patterns in context, but the current API guidance lives in
-[`docs/ai`](./docs/ai/README.md).
+    for (const channel of frame.channels) {
+        channel.createEntities.forEach(createPresentation)
+        channel.updateEntities.forEach(updatePresentation)
+        channel.deletedEntities.forEach(deletePresentation)
+    }
+}
+```
 
-Useful current examples:
+Fast action games can use command prediction helpers and interpolation:
 
-- `examples/player-arena`: prediction, interpolation, channel headers,
-  inventory channels, requests, world items, and experimental gameplay features.
-- `examples/survival-lol`: a larger 2D channel-2d template using Pixi,
-  server-authoritative survival mechanics, private inventory messages, commands,
-  and gameplay spatial queries.
+```ts
+import { AdaptiveInterpolator, CommandReplayPrediction } from 'nengi'
+```
+
+Prediction reconciles against raw authoritative state. Interpolation samples
+retained history for smooth rendering of non-predicted entities.
+
+## Documentation
+
+The AI-facing docs are the most complete current guide to building games with
+nengi. They are self-contained and do not require reading example projects:
+
+- [AI guide](./docs/ai/README.md)
+- [Channel selection](./docs/ai/channel-selection.md)
+- [Networking primitives](./docs/ai/networking-primitives.md)
+- [Plain channel client/server shape](./docs/ai/plain-channels.md)
+- [ECS channel client/server shape](./docs/ai/ecs-channels.md)
+- [Real-time movement prediction](./docs/ai/realtime-movement-prediction.md)
 
 ## Status
 
-The API is not stable yet. Prefer small templates, focused benchmarks, and
-documented patterns over assuming the current shape is final.
+Nengi is moving toward a release-candidate API. The root package exports are the
+intended public surface for RC work; examples and internal source paths are not
+part of the package contract.

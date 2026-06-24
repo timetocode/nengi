@@ -42,28 +42,11 @@ describe('FixedStepInterpolator', () => {
         expect(entity.x).toBe(10)
     })
 
-    it('does not use Chronus average time difference for interpolation playback', () => {
+    it('does not move the sampled target tick backward when samples jitter', () => {
         const harness = new InterpolationTestHarness()
         addMovingEntityFrames(harness)
 
-        harness.client.network.chronus.averageTimeDifference = 25
-
-        const sample = harness.sample(100, 1175)
-        const entity = sample.entities.get(1)!
-
-        expect(sample.status).toBe(InterpolationStatus.Ok)
-        expect(sample.targetTick).toBeCloseTo(2)
-        expect(entity.x).toBe(10)
-    })
-
-    it('does not move the sampled target tick backward when clock offset samples jitter', () => {
-        const harness = new InterpolationTestHarness()
-        addMovingEntityFrames(harness)
-
-        harness.client.network.chronus.averageTimeDifference = 0
         const first = harness.sample(100, 1125)
-
-        harness.client.network.chronus.averageTimeDifference = 30
         const second = harness.sample(100, 1135)
 
         expect(first.status).toBe(InterpolationStatus.Ok)
@@ -114,8 +97,6 @@ describe('FixedStepInterpolator', () => {
 
     it('uses static delay policy when requested by the policy api', () => {
         const harness = new InterpolationTestHarness({
-            adaptiveDelay: true,
-            minDelayMs: 10,
             delay: { mode: 'static' }
         })
         harness.receiveMovingFrames(1000)
@@ -126,21 +107,6 @@ describe('FixedStepInterpolator', () => {
         expect(sample.status).toBe(InterpolationStatus.Ok)
         expect(sample.desiredBufferMs).toBe(100)
         expect(sample.targetTick).toBeCloseTo(2)
-    })
-
-    it('keeps the legacy adaptive delay flag working while the api settles', () => {
-        const harness = new InterpolationTestHarness({
-            adaptiveDelay: true,
-            minDelayMs: 25,
-            adaptiveSafetyTicks: 0.25
-        })
-        harness.receiveMovingFrames(1000)
-
-        const sample = harness.sample(100, 1175)
-
-        expect(harness.interpolator.options.mode).toBe('adaptive')
-        expect(sample.status).toBe(InterpolationStatus.Ok)
-        expect(sample.desiredBufferMs).toBeCloseTo(37.5)
     })
 
     it('can adapt below the requested static delay when enabled', () => {
@@ -405,9 +371,9 @@ describe('ClientNetwork interpolation timestamps', () => {
         const first = createTestSnapshot({ timestamp: 1000 })
         const second = createTestSnapshot({ timestamp: -1 })
 
-        client.network.resolveSnapshotTimestamp(first, 1000)
+        client.network.resolveSnapshotTimestamp(first)
         client.network.previousSnapshot = first
-        client.network.resolveSnapshotTimestamp(second, 1050)
+        client.network.resolveSnapshotTimestamp(second)
 
         expect(first.timestamp).toBe(1000)
         expect(second.timestamp).toBe(1050)
@@ -420,7 +386,7 @@ describe('ClientNetwork interpolation timestamps', () => {
             timestamp: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         })
-        client.network.resolveSnapshotTimestamp(first, 1000)
+        client.network.resolveSnapshotTimestamp(first)
         const frame1 = applyTestSnapshot(client, first, 1000)
         client.network.previousSnapshot = first
 
@@ -428,7 +394,7 @@ describe('ClientNetwork interpolation timestamps', () => {
             timestamp: -1,
             updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
         })
-        client.network.resolveSnapshotTimestamp(second, 1050)
+        client.network.resolveSnapshotTimestamp(second)
         const frame2 = applyTestSnapshot(client, second, 1050)
         client.network.previousSnapshot = second
 
@@ -436,7 +402,7 @@ describe('ClientNetwork interpolation timestamps', () => {
             timestamp: 1104,
             updateEntities: [{ nid: 1, prop: 'x', value: 20 }]
         })
-        client.network.resolveSnapshotTimestamp(third, 1104)
+        client.network.resolveSnapshotTimestamp(third)
         const frame3 = applyTestSnapshot(client, third, 1104)
 
         expect(frame1.timestamp).toBe(1000)

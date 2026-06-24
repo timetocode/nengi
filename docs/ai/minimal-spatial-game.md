@@ -47,7 +47,7 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
     player.x += command.inputX * speedPerCommand
     player.y += command.inputY * speedPerCommand
 
-    world.updateEntity(player)
+    world.moveEntity(player)
     world.updateView(user, createView(player))
 })
 ```
@@ -72,7 +72,7 @@ while (!instance.queue.isEmpty()) {
 instance.step()
 ```
 
-For automatic spatial channels, call `updateEntity(entity)` after a spatial
+For automatic spatial channels, call `moveEntity(entity)` after a spatial
 entity moves. Call `updateView(user, view)` when the user's interest area moves.
 
 ## Client
@@ -80,6 +80,8 @@ entity moves. Call `updateView(user, view)` when the user's interest area moves.
 Create a client, interpolator, and local presentation records:
 
 ```ts
+import type { Frame } from 'nengi'
+
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
 const sprites = new Map<number, Sprite>()
@@ -91,6 +93,12 @@ Create and destroy local presentation from frame facts:
 ```ts
 function applyFrame(frame: Frame) {
     frame.channels.forEach(channel => {
+        channel.messages.forEach(message => {
+            if (message.ntype === NType.Impact) {
+                spawnImpactEffect(message.x, message.y)
+            }
+        })
+
         channel.createEntities.forEach(entity => {
             if (entity.ntype === NType.Player) {
                 sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))
@@ -166,6 +174,11 @@ that number to server command handlers, and confirms processed command frames
 back on `frame.confirmedCommandFrameNumber`. See
 [networking-primitives.md](./networking-primitives.md#command-payloads-and-sequencing)
 for the prediction and sequencing shape.
+
+If the local player should be predicted, also read
+[real-time movement prediction](./realtime-movement-prediction.md). The minimal
+example above sends commands but does not show the full replay/reconciliation
+pattern.
 
 ## Gameplay queries
 

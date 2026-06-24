@@ -8,7 +8,7 @@ import writeDiff from '../entity/writeDiff'
 import writeUpdateGroup from '../entity/writeUpdateGroup'
 import { writeMessage } from '../message/writeMessage'
 import { SnapshotPlan } from './SnapshotPlan'
-import { createBinaryDebugError, BinaryDebugFields } from '../BinaryDebugError'
+import { createBinaryDiagnosticError, BinaryDiagnosticFields } from '../BinaryDiagnosticError'
 import { Schema } from '../../common/binary/schema/Schema'
 import { IEntity } from '../../common/IEntity'
 import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
@@ -260,29 +260,29 @@ export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBin
     writeDeleteEntities(plan, writer, protocol)
 }
 
-export function writeSnapshotDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
-    writeEngineMessagesDebug(plan, context, writer)
-    writeMessagesDebug(plan, context, writer, protocol)
-    writeInterpolatedMessagesDebug(plan, context, writer, protocol)
-    writeResponsesDebug(plan, writer)
+export function writeSnapshotDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
+    writeEngineMessagesDiagnostic(plan, context, writer)
+    writeMessagesDiagnostic(plan, context, writer, protocol)
+    writeInterpolatedMessagesDiagnostic(plan, context, writer, protocol)
+    writeResponsesDiagnostic(plan, writer)
     writeChannelOpens(plan, context, writer, protocol)
     writeChannelHeaderUpdates(plan, writer, protocol)
     writeChannelCloses(plan, writer, protocol)
     writeSkipInterpolation(plan, writer, protocol)
-    writeEcsCreateEntitiesDebug(plan, writer, protocol)
-    writeEcsCreateComponentsDebug(plan, context, writer, protocol)
-    writeCreateEntitiesDebug(plan, context, writer, protocol)
-    writeUpdateEntitiesDebug(plan, writer, protocol)
-    writeUpdateEntityGroupsDebug(plan, writer, protocol)
-    writeEcsDeleteEntitiesDebug(plan, writer, protocol)
-    writeDeleteEntitiesDebug(plan, writer, protocol)
+    writeEcsCreateEntitiesDiagnostic(plan, writer, protocol)
+    writeEcsCreateComponentsDiagnostic(plan, context, writer, protocol)
+    writeCreateEntitiesDiagnostic(plan, context, writer, protocol)
+    writeUpdateEntitiesDiagnostic(plan, writer, protocol)
+    writeUpdateEntityGroupsDiagnostic(plan, writer, protocol)
+    writeEcsDeleteEntitiesDiagnostic(plan, writer, protocol)
+    writeDeleteEntitiesDiagnostic(plan, writer, protocol)
 }
 
-function wrapBinaryWrite(context: BinaryDebugFields, write: () => void) {
+function wrapBinaryWrite(context: BinaryDiagnosticFields, write: () => void) {
     try {
         write()
     } catch (err) {
-        throw createBinaryDebugError(err, context)
+        throw createBinaryDiagnosticError(err, context)
     }
 }
 
@@ -290,7 +290,7 @@ function offsetOf(writer: IBinaryWriter) {
     return writer.offset
 }
 
-function writeMessageDebug(obj: any, schema: Schema, writer: IBinaryWriter, section: string, index: number, ntypeType?: any) {
+function writeMessageDiagnostic(obj: any, schema: Schema, writer: IBinaryWriter, section: string, index: number, ntypeType?: any) {
     wrapBinaryWrite({ phase: 'write', section, index, ntype: obj.ntype, offset: offsetOf(writer) }, () => {
         writeNetworkId(obj.ntype, ntypeType ?? DEFAULT_PROTOCOL.ntypeType, writer)
     })
@@ -311,7 +311,7 @@ function writeMessageDebug(obj: any, schema: Schema, writer: IBinaryWriter, sect
     }
 }
 
-function writeEntityDebug(entity: IEntity, schema: Schema, writer: IBinaryWriter, index: number, protocol: ProtocolConfig, section = 'CreateEntities') {
+function writeEntityDiagnostic(entity: IEntity, schema: Schema, writer: IBinaryWriter, index: number, protocol: ProtocolConfig, section = 'CreateEntities') {
     wrapBinaryWrite({ phase: 'write', section, index, ntype: entity.ntype, nid: entity.nid, offset: offsetOf(writer) }, () => {
         writeNetworkId(entity.ntype, protocol.ntypeType, writer)
         writeNetworkId(entity.nid, protocol.nidType, writer)
@@ -334,7 +334,7 @@ function writeEntityDebug(entity: IEntity, schema: Schema, writer: IBinaryWriter
     }
 }
 
-function writeDiffDebug(diff: any, writer: IBinaryWriter, index: number, protocol: ProtocolConfig) {
+function writeDiffDiagnostic(diff: any, writer: IBinaryWriter, index: number, protocol: ProtocolConfig) {
     const prop = diff.nschema.props[diff.prop]
     wrapBinaryWrite({ phase: 'write', section: 'UpdateEntities', index, nid: diff.nid, prop: diff.prop, propKey: prop.key, binaryType: prop.type, offset: offsetOf(writer), value: diff.value }, () => {
         writeNetworkId(diff.nid, protocol.nidType, writer)
@@ -343,13 +343,13 @@ function writeDiffDebug(diff: any, writer: IBinaryWriter, index: number, protoco
     })
 }
 
-function writeUpdateGroupDebug(update: any, writer: IBinaryWriter, index: number, protocol: ProtocolConfig) {
+function writeUpdateGroupDiagnostic(update: any, writer: IBinaryWriter, index: number, protocol: ProtocolConfig) {
     wrapBinaryWrite({ phase: 'write', section: 'UpdateEntityGroups', index, nid: update.nid, prop: update.group.name, propKey: update.group.key, offset: offsetOf(writer), value: update.values }, () => {
         writeUpdateGroup(update, writer, protocol.nidType)
     })
 }
 
-function writeEngineMessagesDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter) {
+function writeEngineMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter) {
     if (plan.engineMessages.length === 0) {
         return
     }
@@ -357,11 +357,11 @@ function writeEngineMessagesDebug(plan: SnapshotPlan, context: Context, writer: 
     writer.writeUInt8(plan.engineMessages.length)
     for (let i = 0; i < plan.engineMessages.length; i++) {
         const engineMessage = plan.engineMessages[i]
-        writeMessageDebug(engineMessage, context.getEngineSchema(engineMessage.ntype)!, writer, 'EngineMessages', i)
+        writeMessageDiagnostic(engineMessage, context.getEngineSchema(engineMessage.ntype)!, writer, 'EngineMessages', i)
     }
 }
 
-function writeMessagesDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.messages.length === 0) {
         return
     }
@@ -369,11 +369,11 @@ function writeMessagesDebug(plan: SnapshotPlan, context: Context, writer: IBinar
     writer.writeUInt32(plan.messages.length)
     for (let i = 0; i < plan.messages.length; i++) {
         const message = plan.messages[i]
-        writeMessageDebug(message, context.getSchema(message.ntype)!, writer, 'Messages', i, protocol.ntypeType)
+        writeMessageDiagnostic(message, context.getSchema(message.ntype)!, writer, 'Messages', i, protocol.ntypeType)
     }
 }
 
-function writeInterpolatedMessagesDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeInterpolatedMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.interpolatedMessages.length === 0) {
         return
     }
@@ -381,11 +381,11 @@ function writeInterpolatedMessagesDebug(plan: SnapshotPlan, context: Context, wr
     writer.writeUInt32(plan.interpolatedMessages.length)
     for (let i = 0; i < plan.interpolatedMessages.length; i++) {
         const message = plan.interpolatedMessages[i]
-        writeMessageDebug(message, context.getSchema(message.ntype)!, writer, 'InterpolatedMessages', i, protocol.ntypeType)
+        writeMessageDiagnostic(message, context.getSchema(message.ntype)!, writer, 'InterpolatedMessages', i, protocol.ntypeType)
     }
 }
 
-function writeResponsesDebug(plan: SnapshotPlan, writer: IBinaryWriter) {
+function writeResponsesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter) {
     if (plan.responses.length === 0) {
         return
     }
@@ -401,7 +401,7 @@ function writeResponsesDebug(plan: SnapshotPlan, writer: IBinaryWriter) {
     }
 }
 
-function writeCreateEntitiesDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeCreateEntitiesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.createEntities.length === 0) {
         return
     }
@@ -409,11 +409,11 @@ function writeCreateEntitiesDebug(plan: SnapshotPlan, context: Context, writer: 
     writer.writeUInt32(plan.createEntities.length)
     for (let i = 0; i < plan.createEntities.length; i++) {
         const entity = plan.createEntities[i]
-        writeEntityDebug(entity, context.getSchema(entity.ntype)!, writer, i, protocol)
+        writeEntityDiagnostic(entity, context.getSchema(entity.ntype)!, writer, i, protocol)
     }
 }
 
-function writeEcsCreateEntitiesDebug(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsCreateEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.ecsCreateEntities.length === 0) {
         return
     }
@@ -426,7 +426,7 @@ function writeEcsCreateEntitiesDebug(plan: SnapshotPlan, writer: IBinaryWriter, 
     }
 }
 
-function writeEcsCreateComponentsDebug(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsCreateComponentsDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.ecsCreateComponents.length === 0) {
         return
     }
@@ -437,33 +437,33 @@ function writeEcsCreateComponentsDebug(plan: SnapshotPlan, context: Context, wri
         wrapBinaryWrite({ phase: 'write', section: 'EcsCreateComponents', index: i, nid: component.nid, offset: offsetOf(writer) }, () => {
             writeNetworkId(component.pid, protocol.nidType, writer)
         })
-        writeEntityDebug(component, context.getSchema(component.ntype)!, writer, i, protocol, 'EcsCreateComponents')
+        writeEntityDiagnostic(component, context.getSchema(component.ntype)!, writer, i, protocol, 'EcsCreateComponents')
     }
 }
 
-function writeUpdateEntitiesDebug(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeUpdateEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.updateEntities.length === 0) {
         return
     }
     writer.writeUInt8(BinarySection.UpdateEntities)
     writer.writeUInt32(plan.updateEntities.length)
     for (let i = 0; i < plan.updateEntities.length; i++) {
-        writeDiffDebug(plan.updateEntities[i], writer, i, protocol)
+        writeDiffDiagnostic(plan.updateEntities[i], writer, i, protocol)
     }
 }
 
-function writeUpdateEntityGroupsDebug(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeUpdateEntityGroupsDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.updateEntityGroups.length === 0) {
         return
     }
     writer.writeUInt8(BinarySection.UpdateEntityGroups)
     writer.writeUInt32(plan.updateEntityGroups.length)
     for (let i = 0; i < plan.updateEntityGroups.length; i++) {
-        writeUpdateGroupDebug(plan.updateEntityGroups[i], writer, i, protocol)
+        writeUpdateGroupDiagnostic(plan.updateEntityGroups[i], writer, i, protocol)
     }
 }
 
-function writeDeleteEntitiesDebug(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeDeleteEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.deleteEntities.length === 0) {
         return
     }
@@ -476,7 +476,7 @@ function writeDeleteEntitiesDebug(plan: SnapshotPlan, writer: IBinaryWriter, pro
     }
 }
 
-function writeEcsDeleteEntitiesDebug(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsDeleteEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.ecsDeleteEntities.length === 0) {
         return
     }

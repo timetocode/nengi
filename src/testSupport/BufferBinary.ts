@@ -142,6 +142,22 @@ class TestBufferReader implements IBinaryReader {
         return this.buffer.byteLength
     }
 
+    private assertReadable(byteLength: number) {
+        if (!Number.isSafeInteger(byteLength) || byteLength < 0 || this.offset + byteLength > this.byteLength) {
+            throw new Error(`Cannot read ${byteLength} bytes from binary payload at offset ${this.offset}.`)
+        }
+    }
+
+    private readArrayLength(bytesPerElement: number) {
+        const length = this.readUInt32()
+        const byteLength = length * bytesPerElement
+        if (!Number.isSafeInteger(byteLength)) {
+            throw new Error(`Cannot read binary array with length ${length}.`)
+        }
+        this.assertReadable(byteLength)
+        return length
+    }
+
     readUInt8(): number {
         const value = this.buffer.readUInt8(this.offset)
         this.offset += 1
@@ -192,13 +208,14 @@ class TestBufferReader implements IBinaryReader {
 
     readString(): string {
         const length = this.readUInt32()
+        this.assertReadable(length)
         const value = this.buffer.toString('utf8', this.offset, this.offset + length)
         this.offset += length
         return value
     }
 
     readUInt8Array(): Uint8Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(1)
         const arr = new Uint8Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readUInt8()
@@ -207,7 +224,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readInt8Array(): Int8Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(1)
         const arr = new Int8Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readInt8()
@@ -216,7 +233,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readUInt16Array(): Uint16Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(2)
         const arr = new Uint16Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readUInt16()
@@ -225,7 +242,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readInt16Array(): Int16Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(2)
         const arr = new Int16Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readInt16()
@@ -234,7 +251,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readUInt32Array(): Uint32Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(4)
         const arr = new Uint32Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readUInt32()
@@ -243,7 +260,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readInt32Array(): Int32Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(4)
         const arr = new Int32Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readInt32()
@@ -252,7 +269,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readFloat32Array(): Float32Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(4)
         const arr = new Float32Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readFloat32()
@@ -261,7 +278,7 @@ class TestBufferReader implements IBinaryReader {
     }
 
     readFloat64Array(): Float64Array {
-        const length = this.readUInt32()
+        const length = this.readArrayLength(8)
         const arr = new Float64Array(length)
         for (let i = 0; i < length; i++) {
             arr[i] = this.readFloat64()

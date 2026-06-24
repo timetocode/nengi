@@ -41,8 +41,12 @@ Good fits:
 
 Messages are not persistent. A user who was not subscribed or connected when the message was sent does not reconstruct that message later from state.
 
-On the client, messages may be handled immediately from processed frames or on
-the interpolation timeline:
+Messages have the same scope as the server API that sent them. Messages queued
+directly to a user are top-level frame messages. Messages added to a channel are
+channel-scoped and must be read from that channel's `ChannelFrame`.
+
+On the client, top-level messages may be handled immediately from processed
+frames or on the interpolation timeline:
 
 ```ts
 for (const frame of client.network.drainFrames()) {
@@ -54,6 +58,17 @@ for (const frame of client.network.drainFrames()) {
 }
 ```
 
+Handle channel-scoped messages from the matching channel frame:
+
+```ts
+const worldFrame = frame.getChannel(worldChannelId)
+worldFrame?.messages.forEach(message => {
+    if (message.ntype === NType.Impact) {
+        spawnImpactEffect(message.x, message.y)
+    }
+})
+```
+
 Use ordinary messages for UI/control context, chat, notifications, and other
 logic that should run after the snapshot's authoritative state has been applied.
 Use interpolated messages for transient effects that should line up with
@@ -63,11 +78,11 @@ moving entities.
 Server APIs:
 
 ```ts
-channel.addMessage(message)
-user.queueMessage(message)
+user.queueMessage(message)       // top-level frame.messages
+channel.addMessage(message)      // channelFrame.messages
 
-channel.addInterpolatedMessage(message)
-user.queueInterpolatedMessage(message)
+user.queueInterpolatedMessage(message)  // top-level frame.interpolatedMessages
+channel.addInterpolatedMessage(message) // channelFrame.interpolatedMessages
 ```
 
 These are separate lanes. Do not send the same side effect through both unless
@@ -92,15 +107,22 @@ server to simulate a bounded amount of time. Do not accidentally make movement
 speed depend on browser render frame rate by sending one command per
 `requestAnimationFrame` and applying a fixed movement step per command.
 
+For predicted real-time movement, read
+[real-time movement prediction](./realtime-movement-prediction.md). The movement
+command handler is usually the right place to apply player-authored movement and
+the collision rules caused by that movement.
+
 ## Command payloads and sequencing
 
 Command payloads should describe the game input for that command: movement
 axes, aim direction, selected tool, fire button, or another gameplay choice.
 
 Nengi supplies command-frame sequencing separately from the payload. Each client
-flush has a numeric `commandFrameNumber`, and every command in that flush has a
-numeric `commandIndex`. On the server, `CommandRouter` passes both numbers to
-the handler:
+flush has a numeric `commandFrameNumber`. Every command in that flush also has a
+numeric `commandIndex`, which identifies the command's position inside that one
+flush. It is not a second timeline; Nengi uses it to attach optional sparse
+timing metadata to the matching command. On the server, `CommandRouter` passes
+both numbers to the handler:
 
 ```ts
 commands.on<MoveCommand>(NType.MoveCommand, ({ user, command, commandFrameNumber, commandIndex }) => {

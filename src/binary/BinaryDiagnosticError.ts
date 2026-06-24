@@ -1,4 +1,4 @@
-export type BinaryDebugFields = {
+export type BinaryDiagnosticFields = {
     phase?: 'count' | 'write' | 'read'
     section?: string
     index?: number
@@ -11,25 +11,25 @@ export type BinaryDebugFields = {
     value?: any
 }
 
-export class BinaryDebugError extends Error {
+export class BinaryDiagnosticError extends Error {
     originalError: any
-    context: BinaryDebugFields
+    context: BinaryDiagnosticFields
 
-    constructor(message: string, originalError: any, context: BinaryDebugFields) {
+    constructor(message: string, originalError: any, context: BinaryDiagnosticFields) {
         super(message)
-        this.name = 'BinaryDebugError'
+        this.name = 'BinaryDiagnosticError'
         this.originalError = originalError
         this.context = context
     }
 }
 
-export function createBinaryDebugError(originalError: any, context: BinaryDebugFields) {
+export function createBinaryDiagnosticError(originalError: any, context: BinaryDiagnosticFields) {
     const detail = Object.entries(context)
         .filter(([, value]) => value !== undefined)
         .map(([key, value]) => `${key}: ${formatValue(value)}`)
         .join('\n')
     const originalMessage = originalError instanceof Error ? originalError.message : String(originalError)
-    return new BinaryDebugError(
+    return new BinaryDiagnosticError(
         `nengi binary ${context.phase || 'operation'} failed\n${detail}\nOriginal error: ${originalMessage}`,
         originalError,
         { ...context }

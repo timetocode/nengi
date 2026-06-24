@@ -40,4 +40,31 @@ describe('EntityCache', () => {
         const nextTickDiffs = cache.getAndDiff(3, entity, schema)
         expect(nextTickDiffs[0].value).toEqual({ x: 20, y: 2 })
     })
+
+    it('throws clearly when diffing before a tick cache is initialized', () => {
+        const schema = defineEntitySchema({ x: Binary.Int16 })
+        const cache = new EntityCache()
+        const entity = { nid: 1, ntype: 1, x: 1 }
+
+        cache.cacheify(1, entity, schema)
+
+        expect(() => cache.getAndDiff(2, entity, schema)).toThrow(
+            'EntityCache tick 2 has not been initialized.'
+        )
+    })
+
+    it('throws clearly when diffing an entity that was never cached', () => {
+        const schema = defineEntitySchema({ x: Binary.Int16 })
+        const cache = new EntityCache()
+        const entity = { nid: 1, ntype: 1, x: 1 }
+
+        cache.createCachesForTick(1)
+
+        expect(() => cache.getAndDiff(1, entity, schema)).toThrow(
+            'EntityCache is missing cached state for nid 1.'
+        )
+        expect(() => cache.getAndDiffGrouped(1, entity, schema)).toThrow(
+            'EntityCache is missing cached state for nid 1.'
+        )
+    })
 })

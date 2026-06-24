@@ -25,7 +25,7 @@ import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { TestBufferWriter, testBinaryAdapter } from '../../testSupport/BufferBinary'
 import { createEndpointPayload } from '../endpoint/EndpointPayload'
-import { BinaryDebugError } from '../BinaryDebugError'
+import { BinaryDiagnosticError } from '../BinaryDiagnosticError'
 import { createEmptySnapshotPlan } from './SnapshotPlan'
 import { writeChannelScope } from './writeSnapshot'
 
@@ -1525,6 +1525,69 @@ describe('server snapshot pipeline', () => {
             expect(game.clientNetwork.store.get(transform.nid)?.y).toBe(40)
         })
 
+        it('keeps overlapping ECS spatial views synchronized for clustered cell-junction movement', () => {
+            const context = createEcsContext()
+            const instance = new Instance(context)
+            instance.network.sharedUpdateFragmentsEnabled = true
+            const firstUser = createUser(instance)
+            const secondUser = createUser(instance)
+            secondUser.id = 2
+            const firstClient = createClientNetwork(context)
+            const secondClient = createClientNetwork(context)
+            const channel = new EcsChannel2D(instance.localState, 10)
+            const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+
+            instance.users.set(firstUser.id, firstUser)
+            instance.users.set(secondUser.id, secondUser)
+            channel.subscribe(firstUser, new AABB2D(10, 10, 10, 10))
+            channel.subscribe(secondUser, new AABB2D(11, 11, 10, 10))
+            const roots = [
+                addEcsRoot(channel, 9.9, 9.9),
+                addEcsRoot(channel, 10.1, 9.9),
+                addEcsRoot(channel, 9.9, 10.1),
+                addEcsRoot(channel, 10.1, 10.1)
+            ]
+            const finals = [
+                [10.5, 10.5],
+                [9.5, 10.5],
+                [10.5, 9.5],
+                [9.5, 9.5]
+            ] as const
+
+            instance.step()
+            firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+            firstClient.processNextFrame()
+            secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+            secondClient.processNextFrame()
+
+            for (let i = 0; i < roots.length; i++) {
+                const transform = roots[i].transform
+                transform.x = 20 - finals[i][0]
+                transform.y = 20 - finals[i][1]
+                Transform.position(transform, transform.x, transform.y)
+                transform.x = finals[i][0]
+                transform.y = finals[i][1]
+                Transform.position(transform, transform.x, transform.y)
+            }
+
+            instance.step()
+            firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+            firstClient.processNextFrame()
+            secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+            secondClient.processNextFrame()
+
+            for (const client of [firstClient, secondClient]) {
+                const updates = client.latestFrame!.requireChannel(channel.nid).updateEntities
+                    .filter(update => roots.some(root => root.transform.nid === update.nid))
+                expect(updates).toHaveLength(roots.length * 2)
+                expect(new Set(updates.map(update => `${update.nid}:${update.prop}`)).size).toBe(roots.length * 2)
+                for (let i = 0; i < roots.length; i++) {
+                    expect(client.store.get(roots[i].transform.nid)?.x).toBe(finals[i][0])
+                    expect(client.store.get(roots[i].transform.nid)?.y).toBe(finals[i][1])
+                }
+            }
+        })
+
         it('does not send stale ECS channel updates for components deleted in the same snapshot', () => {
             const game = createEcs2DTest(
                 new AABB2D(5, 5, 4, 4),
@@ -2142,6 +2205,69 @@ describe('server snapshot pipeline', () => {
         expect(secondClient.store.get(moverNid)?.x).toBe(150)
     })
 
+    it('keeps overlapping manual spatial views synchronized for clustered cell-junction movement', () => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = true
+        const firstUser = createUser(instance)
+        const secondUser = createUser(instance)
+        secondUser.id = 2
+        const firstClient = createClientNetwork(context)
+        const secondClient = createClientNetwork(context)
+        const channel = new ManualChannel2D(instance.localState, 10)
+        const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
+
+        instance.users.set(firstUser.id, firstUser)
+        instance.users.set(secondUser.id, secondUser)
+        channel.subscribe(firstUser, new AABB2D(10, 10, 10, 10))
+        channel.subscribe(secondUser, new AABB2D(11, 11, 10, 10))
+        const entities = [
+            channel.addEntity({ nid: 0, ntype: NType.Entity, x: 9.9, y: 9.9, label: 'nw' }),
+            channel.addEntity({ nid: 0, ntype: NType.Entity, x: 10.1, y: 9.9, label: 'ne' }),
+            channel.addEntity({ nid: 0, ntype: NType.Entity, x: 9.9, y: 10.1, label: 'sw' }),
+            channel.addEntity({ nid: 0, ntype: NType.Entity, x: 10.1, y: 10.1, label: 'se' })
+        ]
+        const finals = [
+            [10.5, 10.5],
+            [9.5, 10.5],
+            [10.5, 9.5],
+            [9.5, 9.5]
+        ] as const
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        for (let i = 0; i < entities.length; i++) {
+            const entity = entities[i]
+            entity.x = 20 - finals[i][0]
+            entity.y = 20 - finals[i][1]
+            Entity.position(entity, entity.x, entity.y)
+            entity.x = finals[i][0]
+            entity.y = finals[i][1]
+            Entity.position(entity, entity.x, entity.y)
+        }
+
+        instance.step()
+        firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
+        firstClient.processNextFrame()
+        secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
+        secondClient.processNextFrame()
+
+        for (const client of [firstClient, secondClient]) {
+            const updates = client.latestFrame!.requireChannel(channel.nid).updateEntities
+                .filter(update => entities.some(entity => entity.nid === update.nid))
+            expect(updates).toHaveLength(entities.length * 2)
+            expect(new Set(updates.map(update => `${update.nid}:${update.prop}`)).size).toBe(entities.length * 2)
+            for (let i = 0; i < entities.length; i++) {
+                expect(client.store.get(entities[i].nid)?.x).toBe(finals[i][0])
+                expect(client.store.get(entities[i].nid)?.y).toBe(finals[i][1])
+            }
+        }
+    })
+
     it('can use shared create and delete fragments for synchronized all-visible channel deltas', () => {
         const context = createContext()
         const instance = new Instance(context)
@@ -2335,10 +2461,10 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.messages).toEqual([
+        expect(firstClient.latestFrame?.messages).toEqual([
             { ntype: NType.Message, text: 'private' }
         ])
-        expect(secondClient.messages).toEqual([])
+        expect(secondClient.latestFrame?.messages).toEqual([])
         expect(firstClient.latestFrame?.interpolatedMessages).toEqual([])
         expect(secondClient.latestFrame?.interpolatedMessages).toEqual([])
         expect(firstClient.latestFrame?.channels).toEqual([
@@ -2355,7 +2481,7 @@ describe('server snapshot pipeline', () => {
         expect(instance.network.snapshotPerformance.messagesTotal).toBe(5)
     })
 
-    it('can use reusable cell update fragments without userland updateEntity calls', () => {
+    it('can use reusable cell update fragments without userland moveEntity calls', () => {
         const context = createGroupedContext()
         const instance = new Instance(context)
         instance.network.sharedUpdateFragmentsEnabled = true
@@ -2422,7 +2548,7 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.get(entity.nid)?.y).toBe(500)
 
         entity.z = 200
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
         instance.step()
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
@@ -2489,7 +2615,7 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0'])
 
         entity.x = 80
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
         instance.step()
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
@@ -2524,7 +2650,7 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0:0'])
 
         entity.x = 80
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
         instance.step()
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
@@ -2560,7 +2686,7 @@ describe('server snapshot pipeline', () => {
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0:0'])
 
         entity.y = 200
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
         instance.step()
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
@@ -2591,9 +2717,9 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.messages).toEqual([])
+        expect(firstClient.latestFrame?.messages).toEqual([])
         expect(firstClient.latestFrame!.requireChannel(channel.nid).messages).toEqual([{ ntype: NType.Message, text: 'near-3d' }])
-        expect(secondClient.messages).toEqual([])
+        expect(secondClient.latestFrame?.messages).toEqual([])
     })
 
     it('diffs Channel2D entity updates without dirty hints', () => {
@@ -2712,7 +2838,7 @@ describe('server snapshot pipeline', () => {
 
         const keys = channel.getVisibleCellKeys(user.id)
         first.x = 130
-        channel.updateEntity(first)
+        channel.moveEntity(first)
 
         expect(channel.getVisibleCellKeys(user.id)).toBe(keys)
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0', '1:0'])
@@ -2735,7 +2861,7 @@ describe('server snapshot pipeline', () => {
 
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['0:0'])
         entity.x = 130
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
 
         expect(channel.getVisibleCellKeys(user.id)).toEqual(['1:0'])
     })
@@ -2762,9 +2888,9 @@ describe('server snapshot pipeline', () => {
         secondClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(secondUser)))
         secondClient.processNextFrame()
 
-        expect(firstClient.messages).toEqual([])
+        expect(firstClient.latestFrame?.messages).toEqual([])
         expect(firstClient.latestFrame!.requireChannel(channel.nid).messages).toEqual([{ ntype: NType.Message, text: 'near' }])
-        expect(secondClient.messages).toEqual([])
+        expect(secondClient.latestFrame?.messages).toEqual([])
     })
 
     it('keeps same-cell Channel2D creates on the normal create path', () => {
@@ -2913,7 +3039,7 @@ describe('server snapshot pipeline', () => {
 
         const nid = entity.nid
         entity.x = 60
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
         instance.step()
         firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
         firstClient.processNextFrame()
@@ -2950,7 +3076,7 @@ describe('server snapshot pipeline', () => {
 
         const nid = entity.nid
         entity.x = 60
-        channel.updateEntity(entity)
+        channel.moveEntity(entity)
         channel.updateView(user, new AABB2D(60, 10, 5, 5))
         instance.step()
 
@@ -2990,7 +3116,7 @@ describe('server snapshot pipeline', () => {
         const positions = [60, 110, 160, 210, 260]
         positions.forEach(x => {
             entity.x = x
-            channel.updateEntity(entity)
+            channel.moveEntity(entity)
             channel.updateView(user, new AABB2D(x, 10, 5, 5))
             instance.step()
         })
@@ -3048,12 +3174,12 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(childNid)).toBe(false)
     })
 
-    it('reruns snapshot writes with binary debug context after a write failure', () => {
+    it('reruns snapshot writes with binary diagnostic context after a write failure', () => {
         const context = createContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const channel = new Channel(instance.localState)
-        instance.network.debugBinaryWrites = true
+        instance.network.diagnosticBinaryWrites = true
 
         channel.subscribe(user)
         channel.addEntity({
@@ -3071,7 +3197,7 @@ describe('server snapshot pipeline', () => {
             createSnapshotBuffer(user, instance)
             throw new Error('Expected snapshot write to fail.')
         } catch (err: any) {
-            expect(err).toBeInstanceOf(BinaryDebugError)
+            expect(err).toBeInstanceOf(BinaryDiagnosticError)
             expect(err.context).toEqual(expect.objectContaining({
                 phase: 'write',
                 section: 'CreateEntities',
@@ -3085,12 +3211,12 @@ describe('server snapshot pipeline', () => {
         }
     })
 
-    it('reruns ECS component snapshot writes with binary debug context after a write failure', () => {
+    it('reruns ECS component snapshot writes with binary diagnostic context after a write failure', () => {
         const context = createEcsContext()
         const instance = new Instance(context)
         const user = createUser(instance)
         const channel = new EcsChannel(instance.localState)
-        instance.network.debugBinaryWrites = true
+        instance.network.diagnosticBinaryWrites = true
 
         channel.subscribe(user)
         const pid = channel.createEntity()
@@ -3105,7 +3231,7 @@ describe('server snapshot pipeline', () => {
             createSnapshotBuffer(user, instance)
             throw new Error('Expected ECS snapshot write to fail.')
         } catch (err: any) {
-            expect(err).toBeInstanceOf(BinaryDebugError)
+            expect(err).toBeInstanceOf(BinaryDiagnosticError)
             expect(err.context).toEqual(expect.objectContaining({
                 phase: 'write',
                 section: 'EcsCreateComponents',
@@ -3235,7 +3361,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(createBuffer))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.messages).toEqual([
+        expect(clientNetwork.latestFrame?.messages).toEqual([
             { ntype: NType.Message, text: 'created' }
         ])
         expect(clientNetwork.latestFrame?.interpolatedMessages).toEqual([

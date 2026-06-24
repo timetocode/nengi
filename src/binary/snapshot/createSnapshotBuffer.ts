@@ -132,7 +132,7 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
     }
 
     const writeOptions = {
-        debug: instance.network.debugBinaryWrites,
+        diagnostic: instance.network.diagnosticBinaryWrites,
         createWriter: (byteLength: number) => user.networkAdapter.binary.createWriter(byteLength)
     }
     writeSnapshotChunks(envelopeChunks, writer, writeOptions)

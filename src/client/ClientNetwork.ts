@@ -9,7 +9,7 @@ import { connectionAttemptSchema } from '../common/schemas/connectAttemptSchema'
 import readMessage from '../binary/message/readMessage'
 import readDiff from '../binary/entity/readDiff'
 import readUpdateGroup from '../binary/entity/readUpdateGroup'
-import { IBinaryWriter, IBinaryWriterClass } from '../common/binary/IBinaryWriter'
+import { IBinaryWriter } from '../common/binary/IBinaryWriter'
 import { IBinaryReader } from '../common/binary/IBinaryReader'
 import { BinaryAdapter, BinaryPayload } from '../common/binary/BinaryAdapter'
 import { DEFAULT_PROTOCOL, ProtocolConfig, assertNetworkIdType, readNetworkId } from '../common/binary/Protocol'
@@ -17,7 +17,6 @@ import { EngineMessage } from '../common/EngineMessage'
 import { BinarySection } from '../common/binary/BinarySection'
 import count from '../binary/message/count'
 import readEngineMessage from '../binary/message/readEngineMessage'
-import { Chronus } from './Chronus'
 import { Outbound } from './Outbound'
 import { Frame } from './Frame'
 import { EntityStore } from './EntityStore'
@@ -120,16 +119,23 @@ type PendingServerFrame = {
     pendingResponses: PendingResponse[]
 }
 
+type OutboundRollback = {
+    commandFrameNumber: number
+    outboundTick: number
+    outboundEngineCommands: Map<number, any[]>
+    outboundCommands: Map<number, any[]>
+    outboundCommandTiming: Map<number, any[]>
+    requestQueue: ClientRequest[]
+    requestBacklogActive: boolean
+}
+
 export class ClientNetwork {
     client: Client
     store: EntityStore
     entityNTypes: Map<number, number>
     frames: Frame[] = []
-    rawFrames: Frame[] = []
     pendingFrames: PendingServerFrame[] = []
     latestFrame: Frame | null = null
-    messages: any[] = []
-    predictionErrorFrames: any[] = []
     outbound = new Outbound()
     requestId = 1
     requestQueue = new NQueue<ClientRequest>()
@@ -139,7 +145,6 @@ export class ClientNetwork {
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
     commandFrameNumber = 1 // monotonic public command-frame number
     previousSnapshot: Snapshot | null = null
-    chronus = new Chronus()
     frameTick = 1 // incremented each frame that comes from server
     maxFrameHistory = 240
     latency = 0
@@ -149,12 +154,16 @@ export class ClientNetwork {
     private lastReportedInterpolationDelayMs = Number.NaN
     private lastInterpolationDelayReportAt = Number.NEGATIVE_INFINITY
     sendSchemaFingerprint = false
+    private pendingOutboundRollback: OutboundRollback | null = null
 
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
         this.rejectPendingRequests(new RequestError('Disconnected before request completed.', 'DISCONNECTED', {
             payload: reason
         }))
         this.client.disconnectHandler(reason, event)
+    }
+    onMalformedSnapshot: (error: unknown) => void = (error: unknown) => {
+        this.onSocketError(error)
     }
     onSocketError: (event: any) => void = (event: any) => {
         this.client.websocketErrorHandler(event)
@@ -236,6 +245,7 @@ export class ClientNetwork {
     }
 
     flush() {
+        this.pendingOutboundRollback = null
         this.outbound.flush()
     }
 
@@ -404,12 +414,6 @@ export class ClientNetwork {
             this.store.history.pruneBefore(this.frames[0].tick)
         }
         this.latestFrame = frame
-        frame.messages.forEach(message => this.messages.push(message))
-
-        const predictionErrorFrame = this.client.predictor.getErrors(frame, this.store.entities)
-        if (predictionErrorFrame.entities.size > 0) {
-            this.client.network.predictionErrorFrames.push(predictionErrorFrame)
-        }
 
         this.client.predictor.resolveFrame?.(frame, this.store)
         this.client.predictor.cleanUp(frame.confirmedCommandFrameNumber)
@@ -438,12 +442,11 @@ export class ClientNetwork {
         })
     }
 
-    resolveSnapshotTimestamp(snapshot: Snapshot, receivedAtEpoch = Date.now()) {
+    resolveSnapshotTimestamp(snapshot: Snapshot) {
         const tickMs = 1000 / this.client.serverTickRate
         const actualTimestamp = snapshot.timestamp
 
         if (actualTimestamp !== -1) {
-            this.chronus.register(actualTimestamp, receivedAtEpoch)
             snapshot.timestamp = actualTimestamp
             return
         }
@@ -457,15 +460,8 @@ export class ClientNetwork {
     }
 
     shiftInterpolationTimestamps(shift: number) {
-        const shifted = new Set<Frame>()
         this.frames.forEach(frame => {
             if (frame.timestamp !== -1) {
-                frame.timestamp += shift
-                shifted.add(frame)
-            }
-        })
-        this.rawFrames.forEach(frame => {
-            if (!shifted.has(frame) && frame.timestamp !== -1) {
                 frame.timestamp += shift
             }
         })
@@ -516,51 +512,49 @@ export class ClientNetwork {
         return dw.payload
     }
 
-    createHandshakeBuffer<Payload extends BinaryPayload>(handshake: any, binaryWriterCtor: IBinaryWriterClass<Payload>): Payload {
-        return this.createHandshake(handshake, {
-            createWriter: (byteLength: number) => binaryWriterCtor.create(byteLength),
-            createReader: () => {
-                throw new Error('createHandshakeBuffer compatibility binary adapter cannot create readers.')
-            }
-        })
-    }
-
     readHandshakeResponse(reader: IBinaryReader): HandshakeResponse {
-        const section = reader.readUInt8()
-        if (section !== BinarySection.EngineMessages) {
-            return {
-                accepted: false,
-                reason: new Error('Connection response did not contain engine messages.')
-            }
-        }
-
-        let accepted = false
-        const count = reader.readUInt8()
-        for (let i = 0; i < count; i++) {
-            const engineMessage: any = readEngineMessage(reader, this.client.context)
-            if (engineMessage.ntype === EngineMessage.ConnectionAccepted) {
-                accepted = true
-                continue
-            }
-            if (engineMessage.ntype === EngineMessage.Protocol) {
-                this.setProtocol(engineMessage.nidType, engineMessage.ntypeType)
-                continue
-            }
-            if (engineMessage.ntype === EngineMessage.ConnectionDenied) {
+        try {
+            const section = reader.readUInt8()
+            if (section !== BinarySection.EngineMessages) {
                 return {
                     accepted: false,
-                    reason: JSON.parse(reader.readString())
+                    reason: new Error('Connection response did not contain engine messages.')
                 }
             }
-        }
 
-        if (accepted) {
-            return { accepted: true }
-        }
+            let accepted = false
+            const count = reader.readUInt8()
+            for (let i = 0; i < count; i++) {
+                const engineMessage: any = readEngineMessage(reader, this.client.context)
+                if (engineMessage.ntype === EngineMessage.ConnectionAccepted) {
+                    accepted = true
+                    continue
+                }
+                if (engineMessage.ntype === EngineMessage.Protocol) {
+                    this.setProtocol(engineMessage.nidType, engineMessage.ntypeType)
+                    continue
+                }
+                if (engineMessage.ntype === EngineMessage.ConnectionDenied) {
+                    return {
+                        accepted: false,
+                        reason: JSON.parse(reader.readString())
+                    }
+                }
+            }
 
-        return {
-            accepted: false,
-            reason: new Error('Connection response did not include an accepted or denied message.')
+            if (accepted) {
+                return { accepted: true }
+            }
+
+            return {
+                accepted: false,
+                reason: new Error('Connection response did not include an accepted or denied message.')
+            }
+        } catch (err) {
+            return {
+                accepted: false,
+                reason: err
+            }
         }
     }
 
@@ -571,6 +565,7 @@ export class ClientNetwork {
     }
 
     createOutbound<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
+        this.pendingOutboundRollback = this.createOutboundRollback()
         const commandFrameNumber = this.commandFrameNumber
         this.addEngineCommand({ ntype: EngineMessage.CommandFrameNumber, commandFrameNumber })
         const timedCommands = this.outbound.getCommandTiming(this.outbound.tick)
@@ -690,18 +685,45 @@ export class ClientNetwork {
         return dw.payload
     }
 
-    createOutboundBuffer<Payload extends BinaryPayload>(binaryWriterCtor: IBinaryWriterClass<Payload>): Payload {
-        return this.createOutbound({
-            createWriter: (byteLength: number) => binaryWriterCtor.create(byteLength),
-            createReader: () => {
-                throw new Error('createOutboundBuffer compatibility binary adapter cannot create readers.')
-            }
-        })
+    createOutboundRollback(): OutboundRollback {
+        return {
+            commandFrameNumber: this.commandFrameNumber,
+            outboundTick: this.outbound.tick,
+            outboundEngineCommands: cloneCommandMap(this.outbound.outboundEngineCommands),
+            outboundCommands: cloneCommandMap(this.outbound.outboundCommands),
+            outboundCommandTiming: cloneCommandMap(this.outbound.outboundCommandTiming),
+            requestQueue: this.requestQueue.arr.slice(),
+            requestBacklogActive: this.requestBacklogActive
+        }
+    }
+
+    rollbackOutbound() {
+        const rollback = this.pendingOutboundRollback
+        if (!rollback) {
+            return false
+        }
+
+        this.commandFrameNumber = rollback.commandFrameNumber
+        this.outbound.tick = rollback.outboundTick
+        this.outbound.outboundEngineCommands = cloneCommandMap(rollback.outboundEngineCommands)
+        this.outbound.outboundCommands = cloneCommandMap(rollback.outboundCommands)
+        this.outbound.outboundCommandTiming = cloneCommandMap(rollback.outboundCommandTiming)
+        this.requestQueue.arr = rollback.requestQueue.slice()
+        this.requestBacklogActive = rollback.requestBacklogActive
+        this.pendingOutboundRollback = null
+        return true
     }
 
     readSnapshot(dr: IBinaryReader) {
+        try {
+            this.readSnapshotUnsafe(dr)
+        } catch (err) {
+            this.onMalformedSnapshot(err)
+        }
+    }
+
+    readSnapshotUnsafe(dr: IBinaryReader) {
         const receivedAt = getLocalTime()
-        const receivedAtEpoch = Date.now()
         const snapshot: Snapshot = {
             timestamp: -1,
             confirmedCommandFrameNumber: -1,
@@ -958,10 +980,10 @@ export class ClientNetwork {
                     const nid = readNetworkId(this.protocol.nidType, dr)
                     for (let j = 0; j < group.props.length; j++) {
                         const prop = group.props[j]
-                            output.push({
-                                nid,
-                                prop: prop.prop,
-                                value: prop.binary.read(dr)
+                        output.push({
+                            nid,
+                            prop: prop.prop,
+                            value: prop.binary.post(prop.binary.read(dr))
                         })
                     }
                 }
@@ -986,17 +1008,24 @@ export class ClientNetwork {
                 break
             }
             default: {
-                console.log('hit unknown section while readding binary')
-                break
+                throw new Error(`Unknown snapshot binary section ${section}.`)
             }
             }
         }
 
         // client engine level state
 
-        this.resolveSnapshotTimestamp(snapshot, receivedAtEpoch)
+        this.resolveSnapshotTimestamp(snapshot)
 
         this.pendingFrames.push({ snapshot, receivedAt, pendingResponses })
         this.previousSnapshot = snapshot
     }
+}
+
+function cloneCommandMap<T>(map: Map<number, T[]>) {
+    const clone = new Map<number, T[]>()
+    map.forEach((value, key) => {
+        clone.set(key, value.slice())
+    })
+    return clone
 }

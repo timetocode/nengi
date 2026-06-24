@@ -16,7 +16,7 @@ function readUpdateGroup(reader: IBinaryReader, context: Context, ntypes: Map<nu
         diffs.push({
             nid,
             prop: propData.prop,
-            value: propData.binary.read(reader)
+            value: propData.binary.post(propData.binary.read(reader))
         })
     }
 

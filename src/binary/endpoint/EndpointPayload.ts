@@ -90,15 +90,28 @@ function readEndpointPayload(reader: IBinaryReader, schema?: Schema) {
     return JSON.parse(reader.readString())
 }
 
+function getEndpointPayloadEnd(reader: IBinaryReader, byteLength: number) {
+    if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
+        throw new Error(`Invalid endpoint payload byte length ${byteLength}.`)
+    }
+    const endOffset = reader.offset + byteLength
+    if (endOffset > reader.byteLength) {
+        throw new Error(`Endpoint payload byte length ${byteLength} exceeds the remaining packet bytes.`)
+    }
+    return endOffset
+}
+
 function readSizedEndpointPayload(reader: IBinaryReader, byteLength: number, schema?: Schema) {
-    const startOffset = reader.offset
+    const endOffset = getEndpointPayloadEnd(reader, byteLength)
     const value = readEndpointPayload(reader, schema)
-    reader.offset = startOffset + byteLength
+    if (reader.offset !== endOffset) {
+        throw new Error(`Endpoint payload consumed ${reader.offset > endOffset ? 'more' : 'fewer'} bytes than its declared byte length.`)
+    }
     return value
 }
 
 function skipEndpointPayload(reader: IBinaryReader, byteLength: number) {
-    reader.offset += byteLength
+    reader.offset = getEndpointPayloadEnd(reader, byteLength)
 }
 
 export {

@@ -1127,7 +1127,7 @@ function setupEcsManualChannel2D(instance: Instance, users: User[], bundles: Ecs
             )
             bundle.root.x = values.x
             bundle.root.y = values.y
-            channel.updateEntity(bundle.root as any)
+            channel.moveEntity(bundle.root as any)
             bundle.transform.x = values.x
             bundle.transform.y = values.y
             bundle.transform.z = values.z
@@ -1269,7 +1269,7 @@ function setupParentChildChannel2D(instance: Instance, users: User[], entities: 
         updateChannel2DIndex() {
             const movingRoots = Math.floor(entities.length * config.moveFraction)
             for (let i = 0; i < movingRoots; i++) {
-                channel.updateEntity(entities[i])
+                channel.moveEntity(entities[i])
             }
         }
     }
@@ -1418,7 +1418,7 @@ function setupChannel2D(instance: Instance, users: User[], entities: TestEntity[
     return () => {
         const moving = Math.floor(entities.length * config.moveFraction)
         for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
+            channel.moveEntity(entities[i])
         }
     }
 }
@@ -1439,7 +1439,7 @@ function setupChannel3D(instance: Instance, users: User[], entities: TestEntity[
     return () => {
         const moving = Math.floor(entities.length * config.moveFraction)
         for (let i = 0; i < moving; i++) {
-            channel.updateEntity(entities[i])
+            channel.moveEntity(entities[i])
         }
     }
 }

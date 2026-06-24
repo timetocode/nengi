@@ -3,7 +3,6 @@ import { IEntity } from '../common/IEntity'
 import { copyNObject } from '../common/binary/schema/util'
 import { NDictionary } from './NDictionary'
 
-// TODO measure performance of Map vs other structures
 export type HistorySnapshot = Map<number, IEntity>
 
 export class Historian {
@@ -34,14 +33,6 @@ export class Historian {
         this.history[tick] = snapshot
         this.tick = tick
         delete this.history[tick - (this.ticksToStore + 1)]
-
-        /*
-        let str = ''
-        for (const prop in this.history) {
-            str += `${prop}[${this.history[prop].size}]|`
-        }
-        console.log('historian states', str)
-        */
     }
 
     /**

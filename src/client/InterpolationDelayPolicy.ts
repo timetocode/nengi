@@ -18,19 +18,7 @@ export type AdaptiveInterpolationDelayConfig = {
 
 export type InterpolationDelayConfig = StaticInterpolationDelayConfig | AdaptiveInterpolationDelayConfig
 
-export type LegacyInterpolationDelayPolicyOptions = {
-    adaptiveDelay?: boolean
-    adaptiveWindowFrames?: number
-    adaptiveSafetyTicks?: number
-    minDelayMs?: number
-    maxDelayMs?: number
-    adaptiveMaxSampleGapMs?: number
-    adaptiveDecreaseStableMs?: number
-    adaptiveDecreaseStepMs?: number
-    adaptiveStableThresholdMs?: number
-}
-
-export type InterpolationDelayPolicyOptions = LegacyInterpolationDelayPolicyOptions & {
+export type InterpolationDelayPolicyOptions = {
     delay?: InterpolationDelayConfig
 }
 
@@ -56,18 +44,19 @@ export function resolveInterpolationDelayPolicyOptions(
     tickMs: number
 ): ResolvedInterpolationDelayPolicyOptions {
     const delay = options.delay
-    const adaptiveDelay = delay ? delay.mode === 'adaptive' : options.adaptiveDelay ?? false
     const adaptive = delay?.mode === 'adaptive' ? delay : null
+    const minMs = Math.max(0, adaptive?.minMs ?? 0)
+    const maxMs = Math.max(minMs, adaptive?.maxMs ?? Number.POSITIVE_INFINITY)
     return {
-        mode: adaptiveDelay ? 'adaptive' : 'static',
-        windowFrames: adaptive?.windowFrames ?? options.adaptiveWindowFrames ?? 20,
-        safetyTicks: adaptive?.safetyTicks ?? options.adaptiveSafetyTicks ?? 0.25,
-        minMs: adaptive?.minMs ?? options.minDelayMs ?? 0,
-        maxMs: adaptive?.maxMs ?? options.maxDelayMs ?? Number.POSITIVE_INFINITY,
-        maxSampleGapMs: adaptive?.maxSampleGapMs ?? options.adaptiveMaxSampleGapMs ?? (tickMs * 4),
-        decreaseStableMs: adaptive?.decreaseStableMs ?? options.adaptiveDecreaseStableMs ?? 30000,
-        decreaseStepMs: adaptive?.decreaseStepMs ?? options.adaptiveDecreaseStepMs ?? 5,
-        stableThresholdMs: adaptive?.stableThresholdMs ?? options.adaptiveStableThresholdMs ?? 2
+        mode: adaptive ? 'adaptive' : 'static',
+        windowFrames: Math.max(2, Math.floor(adaptive?.windowFrames ?? 20)),
+        safetyTicks: Math.max(0, adaptive?.safetyTicks ?? 0.25),
+        minMs,
+        maxMs,
+        maxSampleGapMs: Math.max(1, adaptive?.maxSampleGapMs ?? (tickMs * 4)),
+        decreaseStableMs: Math.max(0, adaptive?.decreaseStableMs ?? 30000),
+        decreaseStepMs: Math.max(0, adaptive?.decreaseStepMs ?? 5),
+        stableThresholdMs: Math.max(0, adaptive?.stableThresholdMs ?? 2)
     }
 }
 

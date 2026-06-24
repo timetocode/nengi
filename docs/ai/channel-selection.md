@@ -73,6 +73,9 @@ Avoid when:
 Use this when spatial visibility is the right model and game code can explicitly
 write mutations.
 
+Manual spatial writers refresh cell membership before snapshot output, so a
+normal position writer does not need a separate `moveEntity` call.
+
 Good fits:
 
 - Large 2D/projected worlds with rare or explicit mutations.
@@ -103,6 +106,9 @@ Avoid when:
 
 Use this for true 3D worlds where spatial culling and explicit mutation writes both matter.
 
+Like `ManualChannel2D`, manual spatial writers refresh cell membership before
+snapshot output.
+
 Good fits:
 
 - Large 3D worlds with high user counts and low mutation fractions.
@@ -113,6 +119,10 @@ Good fits:
 Use `EcsChannel` only if the game matches nengi's ECS contract: roots are network ids, and replicated state lives on component entities with `pid`.
 
 Use `EcsChannel2D/3D` when a component, usually a transform-like component, determines root visibility.
+
+Component writers refresh spatial membership for the root before snapshot
+output. Use `updateSpatialComponent` only for direct spatial changes that do not
+go through a writer.
 
 Do not use ECS channels just because the game has objects with child data. Parent/child entity trees and nengi ECS channels are different models.
 

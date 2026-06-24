@@ -15,6 +15,18 @@ describe('NDictionary', () => {
         expect(nDict.get(2).ntype).toBe(2)
     })
 
+    it('rejects duplicate nids', () => {
+        const nDict = new NDictionary()
+        const entity1: IEntity = { nid: 1, ntype: 1 }
+        const entity2: IEntity = { nid: 1, ntype: 2 }
+
+        nDict.add(entity1)
+
+        expect(() => nDict.add(entity2)).toThrow('NDictionary already contains nid 1.')
+        expect(nDict.size).toBe(1)
+        expect(nDict.get(1)).toBe(entity1)
+    })
+
     it('removes entities correctly', () => {
         const nDict = new NDictionary()
         const entity1: IEntity = { nid: 1, ntype: 1 }
@@ -26,6 +38,20 @@ describe('NDictionary', () => {
 
         expect(nDict.get(1)).toBeUndefined()
         expect(nDict.get(2).ntype).toBe(2)
+    })
+
+    it('ignores stale remove objects without corrupting indexes', () => {
+        const nDict = new NDictionary()
+        const entity1: IEntity = { nid: 1, ntype: 1 }
+        const entity2: IEntity = { nid: 2, ntype: 2 }
+
+        nDict.add(entity1)
+        nDict.add(entity2)
+
+        expect(nDict.remove({ nid: 1, ntype: 1 })).toBe(false)
+        expect(nDict.size).toBe(2)
+        expect(nDict.get(1)).toBe(entity1)
+        expect(nDict.get(2)).toBe(entity2)
     })
 
     it('maintains order after removal', () => {

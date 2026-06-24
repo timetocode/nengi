@@ -86,20 +86,16 @@ function targetsOverlap(a: PredictionTarget, b: PredictionTarget) {
 export class PredictionLog {
     nextId = 1
     operations = new Map<number, PredictionOperation>()
-    byCommandFrameNumber = new Map<number, PredictionOperation[]>()
     byRequestId = new Map<number, PredictionOperation>()
-    resolutions: PredictionResolution[] = []
 
     addCommand(command: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
         const operation = this.createOperation(PredictionOperationKind.Command, commandFrameNumber, command, options)
-        this.addToCommandFrameNumber(operation)
         this.applyLocal(operation)
         return operation
     }
 
     addState(payload: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
         const operation = this.createOperation(PredictionOperationKind.State, commandFrameNumber, payload, options)
-        this.addToCommandFrameNumber(operation)
         this.applyLocal(operation)
         return operation
     }
@@ -115,7 +111,6 @@ export class PredictionLog {
         operation.requestId = requestId
         operation.endpointId = endpointId
         this.byRequestId.set(requestId, operation)
-        this.addToCommandFrameNumber(operation)
         this.applyLocal(operation)
         return operation
     }
@@ -139,7 +134,9 @@ export class PredictionLog {
         if (!operation || operation.status !== PredictionOperationStatus.Pending) {
             return undefined
         }
-        return this.resolve(operation, { frame, store, response })
+        const resolution = this.resolve(operation, { frame, store, response })
+        this.deleteOperation(operation)
+        return resolution
     }
 
     rejectRequest(requestId: number, error: any, frame?: Frame, store?: EntityStore) {
@@ -147,7 +144,9 @@ export class PredictionLog {
         if (!operation || operation.status !== PredictionOperationStatus.Pending) {
             return undefined
         }
-        return this.resolve(operation, { frame, store, error, forceRejected: true })
+        const resolution = this.resolve(operation, { frame, store, error, forceRejected: true })
+        this.deleteOperation(operation)
+        return resolution
     }
 
     getPendingOperations() {
@@ -192,7 +191,6 @@ export class PredictionLog {
                 this.deleteOperation(operation)
             }
         })
-        this.resolutions = this.resolutions.filter(resolution => resolution.operation.commandFrameNumber >= commandFrameNumber)
     }
 
     private createOperation<Response>(
@@ -212,12 +210,6 @@ export class PredictionLog {
         }
         this.operations.set(operation.id, operation)
         return operation
-    }
-
-    private addToCommandFrameNumber(operation: PredictionOperation) {
-        const operations = this.byCommandFrameNumber.get(operation.commandFrameNumber) || []
-        operations.push(operation)
-        this.byCommandFrameNumber.set(operation.commandFrameNumber, operations)
     }
 
     private applyLocal(operation: PredictionOperation) {
@@ -265,7 +257,6 @@ export class PredictionLog {
             response: context.response,
             error: context.error
         }
-        this.resolutions.push(resolution)
         if (operation.options.reconcile) {
             operation.options.reconcile({
                 operation,
@@ -288,16 +279,6 @@ export class PredictionLog {
         this.operations.delete(operation.id)
         if (operation.requestId !== undefined) {
             this.byRequestId.delete(operation.requestId)
-        }
-        const frameOperations = this.byCommandFrameNumber.get(operation.commandFrameNumber)
-        if (frameOperations) {
-            const index = frameOperations.indexOf(operation)
-            if (index > -1) {
-                frameOperations.splice(index, 1)
-            }
-            if (frameOperations.length === 0) {
-                this.byCommandFrameNumber.delete(operation.commandFrameNumber)
-            }
         }
     }
 }

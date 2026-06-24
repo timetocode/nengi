@@ -61,4 +61,28 @@ describe('LocalAdapter', () => {
             y: 10
         })
     })
+
+    it('rejects denied handshakes and closes the local socket pair', async () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.onConnect = async () => false
+
+        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverSocket = serverAdapter.createMockConnect()
+        const client = new Client<LocalClientAdapter<Buffer, Buffer>>(
+            context,
+            LocalClientAdapter,
+            20,
+            { binary: testBinaryAdapter }
+        )
+
+        await expect(client.connect(serverSocket.clientSocket, { role: 'local' })).rejects.toMatchObject({
+            message: 'Connection denied.'
+        })
+
+        expect(client.adapter.connected).toBe(false)
+        expect(serverSocket.readyState).toBe(3)
+        expect(serverSocket.clientSocket.readyState).toBe(3)
+        expect(instance.users.size).toBe(0)
+    })
 })

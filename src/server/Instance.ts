@@ -1,13 +1,14 @@
 import { Context } from '../common/Context'
 import { LocalState } from './LocalState'
 import { INetworkEvent, InstanceNetwork } from './InstanceNetwork'
-import { User } from './User'
+import { User, UserConnectionState } from './User'
 import { EntityCache } from './EntityCache'
 import createSnapshotBuffer from '../binary/snapshot/createSnapshotBuffer'
 import { IEntity } from '../common/IEntity'
 import { NQueue } from '../NQueue'
 import { EngineMessage } from '../common/EngineMessage'
 import { Endpoint, EndpointDefinition, getEndpointDefinition, getEndpointId } from '../common/Endpoint'
+import { BinaryPayload } from '../common/binary/BinaryAdapter'
 
 type ResponseSender<Response = any> = (response: Response) => void
 type ResponseHandlerArgs<Request = any> = { user: User, body: Request }
@@ -15,6 +16,20 @@ type ResponseHandler<Request = any, Response = any> = (
     request: ResponseHandlerArgs<Request>,
     send: ResponseSender<Response>
 ) => Response | void | Promise<Response | void>
+export type InboundMessageError = {
+    user: User
+    error: unknown
+    byteLength: number
+    connectionState: UserConnectionState
+}
+export type InboundMessageErrorHandler = (event: InboundMessageError) => void
+export type SnapshotSendError = {
+    user: User
+    error: unknown
+    byteLength: number
+    tick: number
+}
+export type SnapshotSendErrorHandler = (event: SnapshotSendError) => void
 
 export type ResponseEndpoint = {
     endpoint: EndpointDefinition | null,
@@ -33,11 +48,24 @@ export class Instance {
     pingIntervalMs: number
     responseEndPoints: Map<number, ResponseEndpoint>
     /**
-     * Override this to accept or reject incoming connections.
+     * Observes malformed or otherwise unreadable inbound network messages before
+     * nengi disconnects the sender. The raw payload is intentionally not exposed.
+     */
+    onInboundMessageError: InboundMessageErrorHandler
+    /**
+     * Observes adapter send failures for completed snapshot buffers before nengi
+     * disconnects that user. The snapshot payload is intentionally not exposed.
+     */
+    onSnapshotSendError: SnapshotSendErrorHandler
+    /**
+     * Override this to accept or reject incoming connections. Return `false` to
+     * deny the connection. Any other resolved value accepts the connection and
+     * becomes the `payload` on the queued `UserConnected` event.
      *
      * ```ts
      * instance.onConnect = async (handshake: any) => {
-     *     return await authenticateUser(handshake)
+     *     const session = await authenticateUser(handshake)
+     *     return session || false
      * }
      * ```
      */
@@ -53,9 +81,11 @@ export class Instance {
         this.tick = 1
         this.pingIntervalMs = 10000
         this.responseEndPoints = new Map()
+        this.onInboundMessageError = () => {}
+        this.onSnapshotSendError = () => {}
 
         this.onConnect = (handshake: any) => {
-            console.warn(`Please define an instance.onConnect handler that returns a Promise<boolean>. Connection denied. Received handshake ${handshake}`)
+            console.warn(`Please define an instance.onConnect handler. Return false to deny, or return a payload to accept. Connection denied. Received handshake ${handshake}`)
             return Promise.resolve(false)
         }
 
@@ -90,7 +120,8 @@ export class Instance {
     }
 
     step() {
-        const timestamp = Date.now()
+        const timestamp = performance.now()
+        const wallTimestamp = Date.now()
         const timeSyncEngineMessage = {
             ntype: EngineMessage.TimeSync,
             timestamp
@@ -100,45 +131,76 @@ export class Instance {
         this.cache.createCachesForTick(this.tick)
         this.network.resetSharedUpdateFragments()
 
-        this.users.forEach(user => {
-            user.queueEngineMessage(timeSyncEngineMessage)
+        try {
+            this.users.forEach(user => {
+                user.queueEngineMessage(timeSyncEngineMessage)
 
-            if (user.lastSentPingTimestamp < timestamp - this.pingIntervalMs) {
-                const serverTimeMs = performance.now()
-                user.lastSentPingTimeMs = serverTimeMs
+                if (user.lastSentPingTimestamp < wallTimestamp - this.pingIntervalMs) {
+                    const serverTimeMs = timestamp
+                    user.lastSentPingTimeMs = serverTimeMs
+                    user.queueEngineMessage({
+                        ntype: EngineMessage.Ping,
+                        latency: Math.max(0, Math.min(65535, Math.round(user.roundTripMs))),
+                        pingId: user.nextPing(),
+                        serverTimeMs
+                    })
+                    user.lastSentPingTimestamp = wallTimestamp
+                }
+
                 user.queueEngineMessage({
-                    ntype: EngineMessage.Ping,
-                    latency: Math.max(0, Math.min(65535, Math.round(user.roundTripMs))),
-                    pingId: user.nextPing(),
-                    serverTimeMs
+                    ntype: EngineMessage.CommandFrameNumber,
+                    commandFrameNumber: user.lastReceivedCommandFrameNumber
                 })
-                user.lastSentPingTimestamp = timestamp
-            }
 
-            user.queueEngineMessage({
-                ntype: EngineMessage.CommandFrameNumber,
-                commandFrameNumber: user.lastReceivedCommandFrameNumber
+                const buffer = createSnapshotBuffer(user, this)
+                let sent = false
+                if (this.network.snapshotPerformanceEnabled) {
+                    // Keep adapter send timing separate from snapshot construction:
+                    // WebSocket implementations may queue synchronously while OS I/O
+                    // continues outside this measured server tick.
+                    const sendStart = performance.now()
+                    sent = this.sendSnapshotToUser(user, buffer)
+                    if (sent) {
+                        this.network.recordSnapshotSend(performance.now() - sendStart)
+                    }
+                } else {
+                    sent = this.sendSnapshotToUser(user, buffer)
+                }
+                if (sent) {
+                    user.lastSentInstanceTick = this.tick
+                }
             })
+        } finally {
+            this.cache.deleteCachesForTick(this.tick)
+            this.localState.channels.forEach(channel => {
+                channel.clearBroadcastMessages?.()
+                channel.clearSnapshotDeltas?.()
+            })
+            this.localState.releaseDeferredIds()
+        }
+    }
 
-            const buffer = createSnapshotBuffer(user, this)
-            if (this.network.snapshotPerformanceEnabled) {
-                // Keep adapter send timing separate from snapshot construction:
-                // WebSocket implementations may queue synchronously while OS I/O
-                // continues outside this measured server tick.
-                const sendStart = performance.now()
-                user.send(buffer)
-                this.network.recordSnapshotSend(performance.now() - sendStart)
-            } else {
-                user.send(buffer)
-            }
-            user.lastSentInstanceTick = this.tick
-        })
+    private sendSnapshotToUser(user: User, buffer: BinaryPayload) {
+        try {
+            user.send(buffer)
+            return true
+        } catch (err) {
+            this.notifySnapshotSendError(user, buffer, err)
+            this.network.disconnectSendFailedUser(user)
+            return false
+        }
+    }
 
-        this.cache.deleteCachesForTick(this.tick)
-        this.localState.channels.forEach(channel => {
-            channel.clearBroadcastMessages?.()
-            channel.clearSnapshotDeltas?.()
-        })
-        this.localState.releaseDeferredIds()
+    private notifySnapshotSendError(user: User, buffer: BinaryPayload, error: unknown) {
+        try {
+            this.onSnapshotSendError({
+                user,
+                error,
+                byteLength: buffer.byteLength,
+                tick: this.tick
+            })
+        } catch (observerError) {
+            // Send error observers are diagnostic only.
+        }
     }
 }

@@ -16,6 +16,10 @@
         "src/**/*"
     ],
     "exclude": [
-        "build/**/*"
+        "build/**/*",
+        "src/**/*.test.ts",
+        "src/client/InterpolationTestHarness.ts",
+        "src/performance/**/*",
+        "src/testSupport/**/*"
     ]
 }

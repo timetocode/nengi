@@ -423,7 +423,7 @@ export function createEcsCulledChannelOutput(
     const directLogs: EcsManualUpdateLog[] = []
     const groupFragment = blockedNids.size === 0 &&
         instance.network.sharedUpdateFragmentsEnabled &&
-        !instance.network.debugBinaryWrites
+        !instance.network.diagnosticBinaryWrites
         ? getEcsChannelGroupUpdateFragment(user, instance, channel, snapshot.group)
         : null
     if (groupFragment) {
@@ -434,7 +434,7 @@ export function createEcsCulledChannelOutput(
             if (!channel.cellHasManualUpdates(cellKey)) {
                 continue
             }
-            const fragment = instance.network.sharedUpdateFragmentsEnabled && !instance.network.debugBinaryWrites
+            const fragment = instance.network.sharedUpdateFragmentsEnabled && !instance.network.diagnosticBinaryWrites
                 ? getEcsChannelCellUpdateFragment(user, instance, channel, cellKey, blockedNids)
                 : null
             if (fragment) {

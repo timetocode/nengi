@@ -16,19 +16,19 @@ export type IdentifiedComponent = Component & {
     nid: Nid
 }
 
-export type ComponentDef<T extends { ntype: number }> = {
+export type ComponentDefinition<T extends { ntype: number }> = {
     readonly ntype: T['ntype']
     readonly debugName?: string
     create(state: Omit<T, 'ntype'>): T
 }
 
-export type ComponentOf<Def> = Def extends ComponentDef<infer T> ? T & Component : never
+export type ComponentOf<Def> = Def extends ComponentDefinition<infer T> ? T & Component : never
 
-export type QueryComponents<Defs extends readonly ComponentDef<any>[]> = {
+export type QueryComponents<Defs extends readonly ComponentDefinition<any>[]> = {
     [K in keyof Defs]: ComponentOf<Defs[K]>
 }
 
-export type Query<Defs extends readonly ComponentDef<any>[]> = {
+export type Query<Defs extends readonly ComponentDefinition<any>[]> = {
     all(fn: (pid: Pid, ...components: QueryComponents<Defs>) => void): void
     pids(out?: Pid[]): Pid[]
 }
@@ -37,7 +37,7 @@ type ComponentStore = Map<Pid, Component>
 
 let nextLocalComponentType = -1
 
-export function componentType<T extends { ntype: number }>(ntype: number, debugName?: string): ComponentDef<T> {
+export function defineComponent<T extends { ntype: number }>(ntype: number, debugName?: string): ComponentDefinition<T> {
     return {
         ntype: ntype as T['ntype'],
         debugName,
@@ -47,12 +47,12 @@ export function componentType<T extends { ntype: number }>(ntype: number, debugN
     }
 }
 
-export function localComponentType<T extends object>(debugName?: string): ComponentDef<T & { ntype: number }> {
+export function defineLocalComponent<T extends object>(debugName?: string): ComponentDefinition<T & { ntype: number }> {
     const ntype = nextLocalComponentType--
-    return componentType<T & { ntype: number }>(ntype, debugName)
+    return defineComponent<T & { ntype: number }>(ntype, debugName)
 }
 
-export class GameEcsWorld {
+export class EcsWorld {
     // Mirrors nengi: entity ids and component nids come from one id pool.
     private nextLocalId = -1
     private entities = new Set<Pid>()
@@ -60,10 +60,13 @@ export class GameEcsWorld {
     private byType = new Map<ComponentTypeId, ComponentStore>()
     private byNid = new Map<Nid, IdentifiedComponent>()
     private resources = new Map<any, any>()
-    private cachedQueries = new Set<CachedQuery<readonly ComponentDef<any>[]>>
+    private cachedQueries = new Set<CachedQuery<readonly ComponentDefinition<any>[]>>
     private touchedPids = new Set<Pid>()
 
     createEntity(pid = this.nextId()) {
+        if (!this.entities.has(pid) && this.byNid.has(pid)) {
+            throw new Error(`ECS id ${pid} is already used by a component.`)
+        }
         this.entities.add(pid)
         if (!this.byPid.has(pid)) {
             this.byPid.set(pid, new Map())
@@ -72,19 +75,23 @@ export class GameEcsWorld {
         return pid
     }
 
-    create(pid = this.nextId()) {
-        return this.createEntity(pid)
-    }
-
     add<T extends Component>(component: T): T {
-        this.createEntity(component.pid)
-        if (this.byPid.get(component.pid)!.has(component.ntype)) {
+        if (this.byPid.get(component.pid)?.has(component.ntype)) {
             throw new Error(`Entity ${component.pid} already has component ${component.ntype}`)
         }
         if (component.nid === undefined) {
             component.nid = this.nextId()
         }
+        if (component.nid !== 0) {
+            if (component.nid === component.pid || this.entities.has(component.nid)) {
+                throw new Error(`ECS id ${component.nid} is already used by an entity.`)
+            }
+            if (this.byNid.has(component.nid)) {
+                throw new Error(`ECS id ${component.nid} is already used by a component.`)
+            }
+        }
 
+        this.createEntity(component.pid)
         this.byPid.get(component.pid)!.set(component.ntype, component)
         this.typeStore(component.ntype).set(component.pid, component)
         if (component.nid !== 0) {
@@ -112,7 +119,7 @@ export class GameEcsWorld {
         return component
     }
 
-    removeComponent(pid: Pid, type: ComponentTypeId | ComponentDef<any>) {
+    removeComponent(pid: Pid, type: ComponentTypeId | ComponentDefinition<any>) {
         const ntype = typeId(type)
         const component = this.byPid.get(pid)?.get(ntype)
         if (!component) {
@@ -146,11 +153,11 @@ export class GameEcsWorld {
         return removed
     }
 
-    get<T extends { ntype: number }>(pid: Pid, def: ComponentDef<T>) {
+    get<T extends { ntype: number }>(pid: Pid, def: ComponentDefinition<T>) {
         return this.byPid.get(pid)?.get(def.ntype) as T & Component | undefined
     }
 
-    require<T extends { ntype: number }>(pid: Pid, def: ComponentDef<T>) {
+    require<T extends { ntype: number }>(pid: Pid, def: ComponentDefinition<T>) {
         const component = this.get(pid, def)
         if (!component) {
             throw new Error(`Entity ${pid} is missing ${def.debugName ?? def.ntype}`)
@@ -184,17 +191,17 @@ export class GameEcsWorld {
         return nids
     }
 
-    has(pid: Pid, type: ComponentTypeId | ComponentDef<any>) {
+    has(pid: Pid, type: ComponentTypeId | ComponentDefinition<any>) {
         return this.byPid.get(pid)?.has(typeId(type)) ?? false
     }
 
-    query<const Defs extends readonly ComponentDef<any>[]>(...defs: Defs): Query<Defs> {
+    query<const Defs extends readonly ComponentDefinition<any>[]>(...defs: Defs): Query<Defs> {
         return createQuery(this, defs)
     }
 
-    cachedQuery<const Defs extends readonly ComponentDef<any>[]>(...defs: Defs): Query<Defs> {
+    cachedQuery<const Defs extends readonly ComponentDefinition<any>[]>(...defs: Defs): Query<Defs> {
         const query = new CachedQuery(this, defs)
-        this.cachedQueries.add(query as CachedQuery<readonly ComponentDef<any>[]>)
+        this.cachedQueries.add(query as CachedQuery<readonly ComponentDefinition<any>[]>)
         query.refreshAll()
         return query
     }
@@ -223,7 +230,7 @@ export class GameEcsWorld {
         return value
     }
 
-    componentCount(type?: ComponentTypeId | ComponentDef<any>) {
+    componentCount(type?: ComponentTypeId | ComponentDefinition<any>) {
         if (type === undefined) {
             return Array.from(this.byPid.values()).reduce((sum, components) => sum + components.size, 0)
         }
@@ -258,7 +265,7 @@ export class GameEcsWorld {
         return out
     }
 
-    componentsFor<Defs extends readonly ComponentDef<any>[]>(pid: Pid, defs: Defs) {
+    componentsFor<Defs extends readonly ComponentDefinition<any>[]>(pid: Pid, defs: Defs) {
         const components = new Array(defs.length)
         for (let i = 0; i < defs.length; i++) {
             const component = this.byPid.get(pid)?.get(defs[i].ntype)
@@ -311,7 +318,11 @@ export class GameEcsWorld {
     }
 
     private nextId() {
-        return this.nextLocalId--
+        let id = this.nextLocalId--
+        while (this.entities.has(id) || this.byNid.has(id)) {
+            id = this.nextLocalId--
+        }
+        return id
     }
 }
 
@@ -324,12 +335,18 @@ export type ResourceToken<T> = {
 
 export type ResourceKey<T> = ResourceCtor<T> | ResourceToken<T>
 
-export function resourceKey<T>(name: string): ResourceToken<T> {
+export function defineResource<T>(name: string): ResourceToken<T> {
     return { name }
 }
 
-function createQuery<const Defs extends readonly ComponentDef<any>[]>(
-    ecs: GameEcsWorld,
+export const ecs = {
+    defineComponent,
+    defineLocalComponent,
+    defineResource
+}
+
+function createQuery<const Defs extends readonly ComponentDefinition<any>[]>(
+    ecs: EcsWorld,
     defs: Defs
 ): Query<Defs> {
     const types = defs.map(def => def.ntype)
@@ -349,16 +366,17 @@ function createQuery<const Defs extends readonly ComponentDef<any>[]>(
     }
 }
 
-class CachedQuery<Defs extends readonly ComponentDef<any>[]> implements Query<Defs> {
+class CachedQuery<Defs extends readonly ComponentDefinition<any>[]> implements Query<Defs> {
     private readonly types: ComponentTypeId[]
     private readonly matched = new Set<Pid>()
     private readonly pidsCache: Pid[] = []
 
-    constructor(private readonly ecs: GameEcsWorld, private readonly defs: Defs) {
+    constructor(private readonly ecs: EcsWorld, private readonly defs: Defs) {
         this.types = defs.map(def => def.ntype)
     }
 
     all(fn: (pid: Pid, ...components: QueryComponents<Defs>) => void) {
+        this.ecs.flushQueries()
         for (let i = 0; i < this.pidsCache.length; i++) {
             const pid = this.pidsCache[i]
             const components = this.ecs.componentsFor(pid, this.defs)
@@ -369,6 +387,7 @@ class CachedQuery<Defs extends readonly ComponentDef<any>[]> implements Query<De
     }
 
     pids(out: Pid[] = []) {
+        this.ecs.flushQueries()
         out.length = 0
         out.push(...this.pidsCache)
         return out
@@ -403,7 +422,7 @@ class CachedQuery<Defs extends readonly ComponentDef<any>[]> implements Query<De
     }
 }
 
-function typeId(type: ComponentTypeId | ComponentDef<any>) {
+function typeId(type: ComponentTypeId | ComponentDefinition<any>) {
     return typeof type === 'number' ? type : type.ntype
 }
 

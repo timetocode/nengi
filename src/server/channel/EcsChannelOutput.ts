@@ -108,7 +108,7 @@ export function createEcsChannelOutput(
     }
     const manualFragment = writeManualLogDirectly &&
         instance.network.sharedUpdateFragmentsEnabled &&
-        !instance.network.debugBinaryWrites
+        !instance.network.diagnosticBinaryWrites
         ? getManualUpdateFragment(user, instance, channel, 'ecs-manual')
         : null
 

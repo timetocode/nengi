@@ -61,7 +61,7 @@ function getSharedMessageFragment(user: User, instance: Instance, channel: Share
 }
 
 export function getSharedMessageFragments(user: User, instance: Instance) {
-    if (instance.network.debugBinaryWrites) {
+    if (instance.network.diagnosticBinaryWrites) {
         return []
     }
 

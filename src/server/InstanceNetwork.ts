@@ -215,12 +215,21 @@ function serializeConnectionError(err: any) {
     return JSON.stringify(err)
 }
 
+class ProtocolError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = 'ProtocolError'
+    }
+}
+
 export class InstanceNetwork {
     instance: Instance
     responseBacklogUsers = new Set<User>()
     requestQueue = new NQueue<INetworkRequest>()
     requireSchemaFingerprint = false
-    debugBinaryWrites = false
+    // Rerun failed snapshot writes with field-level context. Keep off for the
+    // normal fast path because it disables shared binary fragments.
+    diagnosticBinaryWrites = false
     sharedUpdateFragmentsEnabled = false
     sharedUpdateFragments: Map<string, SharedSnapshotFragment> = new Map()
     sharedCreateFragments: Map<string, SharedCreateFragment> = new Map()
@@ -243,10 +252,6 @@ export class InstanceNetwork {
 
     constructor(instance: Instance) {
         this.instance = instance
-    }
-
-    onRequest() {
-        // TODO
     }
 
     recordSnapshotPerformance(sample: SnapshotPerformanceSample) {
@@ -449,7 +454,7 @@ export class InstanceNetwork {
     runRequestHandler(user: User, requestId: number, endpoint: ResponseEndpoint, body: any) {
         let sent = false
         const send = (response: any) => {
-            if (sent) {
+            if (sent || user.connectionState !== UserConnectionState.Open) {
                 return
             }
             sent = true
@@ -466,7 +471,7 @@ export class InstanceNetwork {
                         }
                     })
                     .catch(err => {
-                        if (!sent) {
+                        if (!sent && user.connectionState === UserConnectionState.Open) {
                             this.queueErrorResponse(user, requestId, 'HANDLER_REJECTED', 'Request handler rejected.')
                         }
                     })
@@ -474,7 +479,7 @@ export class InstanceNetwork {
                 send(result)
             }
         } catch (err) {
-            if (!sent) {
+            if (!sent && user.connectionState === UserConnectionState.Open) {
                 this.queueErrorResponse(user, requestId, 'HANDLER_ERROR', 'Request handler errored.')
             }
         }
@@ -485,6 +490,9 @@ export class InstanceNetwork {
         while (processed < max && !this.requestQueue.isEmpty()) {
             const request = this.requestQueue.next()
             processed++
+            if (request.user.connectionState !== UserConnectionState.Open) {
+                continue
+            }
             if (!request.endpoint) {
                 this.queueErrorResponse(request.user, request.requestId, 'NO_ENDPOINT', 'No response handler is registered for this endpoint.')
                 continue
@@ -501,6 +509,9 @@ export class InstanceNetwork {
 
     async onHandshake(user: User, handshake: any, clientSchemaFingerprint = '') {
         try {
+            if (user.connectionState !== UserConnectionState.OpenPreHandshake) {
+                throw new Error('Connection attempt received when the connection is not awaiting its initial handshake.')
+            }
             user.connectionState = UserConnectionState.OpenAwaitingHandshake
             if (this.requireSchemaFingerprint) {
                 const serverSchemaFingerprint = createSchemaFingerprint(this.instance.context)
@@ -539,7 +550,12 @@ export class InstanceNetwork {
             user.protocol = { ...this.getProtocol() }
             this.onConnectionAccepted(user, connectionAccepted)
         } catch (err: any) {
-            this.onConnectionDenied(user, err)
+            if (
+                user.connectionState !== UserConnectionState.Open &&
+                user.connectionState !== UserConnectionState.Closed
+            ) {
+                this.onConnectionDenied(user, err)
+            }
 
             // NOTE: we are keeping the code between these cases duplicated
             // if these do turn out to be identical in production we will clean it up
@@ -573,6 +589,7 @@ export class InstanceNetwork {
                 bw.writeString(jsonErr)
                 user.send(bw.payload)
             }
+            this.disconnectDeniedUser(user)
         }
     }
 
@@ -638,6 +655,9 @@ export class InstanceNetwork {
                     break
                 }
                 case BinarySection.Commands: {
+                    if (user.connectionState !== UserConnectionState.Open) {
+                        throw new ProtocolError('Commands received before the connection was open.')
+                    }
                     const count = binaryReader.readUInt8()
                     for (let i = 0; i < count; i++) {
                         const msg = readMessage(binaryReader, this.instance.context, this.instance.context.ntypeType)
@@ -674,8 +694,7 @@ export class InstanceNetwork {
                     break
                 }
                 default: {
-                    console.log('network hit default case while reading')
-                    break
+                    throw new ProtocolError(`Unknown binary section ${section}.`)
                 }
                 }
             }
@@ -686,18 +705,79 @@ export class InstanceNetwork {
                     commandSet.commandTimings[input.commandIndex] = user.estimateCommandTiming(input, serverReceivedTimeMs)
                 }
             }
-            this.instance.queue.enqueue(commandSet)
-        } catch (err) {
-            // TODO there should be a way for a user to capture this error, perhaps a handler
-            //console.log('on message err triggered', err)
-            try {
-                user.networkAdapter.disconnect(user, {})
-            } catch (err2) {
-                // TODO this is only in the case of an error while disconnecting
-                // can these really occur?
+            if (commands.length > 0) {
+                this.instance.queue.enqueue(commandSet)
             }
+        } catch (err) {
+            this.notifyInboundMessageError(user, buffer, err)
+            this.disconnectMalformedInboundUser(user)
         }
 
+    }
+
+    disconnectMalformedInboundUser(user: User) {
+        if (user.connectionState === UserConnectionState.Closed) {
+            return
+        }
+        const wasOpen = user.connectionState === UserConnectionState.Open
+        try {
+            user.networkAdapter.disconnect(user, {})
+        } catch (err) {
+            // Keep malformed inbound payloads from escaping the network edge.
+        }
+        if (wasOpen) {
+            this.onClose(user)
+            return
+        }
+        user.connectionState = UserConnectionState.Closed
+    }
+
+    notifyInboundMessageError(user: User, buffer: BinaryPayload, error: unknown) {
+        try {
+            this.instance.onInboundMessageError({
+                user,
+                error,
+                byteLength: getPayloadByteLength(buffer),
+                connectionState: user.connectionState
+            })
+        } catch (observerError) {
+            // Error observers are diagnostic only; they must not let bad inbound
+            // payloads crash the server.
+        }
+    }
+
+    disconnectDeniedUser(user: User) {
+        if (user.connectionState === UserConnectionState.Closed) {
+            return
+        }
+        const wasOpen = user.connectionState === UserConnectionState.Open
+        try {
+            user.networkAdapter.disconnect(user, {})
+        } catch (err) {
+            // Denied connections are already outside normal game flow.
+        }
+        if (wasOpen) {
+            this.onClose(user)
+            return
+        }
+        user.connectionState = UserConnectionState.Closed
+    }
+
+    disconnectSendFailedUser(user: User) {
+        if (user.connectionState === UserConnectionState.Closed) {
+            return
+        }
+        const wasOpen = user.connectionState === UserConnectionState.Open
+        try {
+            user.networkAdapter.disconnect(user, {})
+        } catch (err) {
+            // The send path already failed; close cleanup should still complete.
+        }
+        if (wasOpen) {
+            this.onClose(user)
+            return
+        }
+        user.connectionState = UserConnectionState.Closed
     }
 
     onConnectionAccepted(user: User, payload: any) {
@@ -722,6 +802,7 @@ export class InstanceNetwork {
 
     onClose(user: User) {
         this.responseBacklogUsers.delete(user)
+        this.purgeRequestsForUser(user)
         if (user.connectionState === UserConnectionState.Open) {
             this.instance.queue.enqueue({
                 type: NetworkEvent.UserDisconnected,
@@ -731,4 +812,27 @@ export class InstanceNetwork {
         }
         user.connectionState = UserConnectionState.Closed
     }
+
+    purgeRequestsForUser(user: User) {
+        if (this.requestQueue.isEmpty()) {
+            return 0
+        }
+
+        let purged = 0
+        const kept = []
+        for (let i = 0; i < this.requestQueue.arr.length; i++) {
+            const request = this.requestQueue.arr[i]
+            if (request.user === user) {
+                purged++
+            } else {
+                kept.push(request)
+            }
+        }
+        this.requestQueue.arr = kept
+        return purged
+    }
+}
+
+function getPayloadByteLength(payload: BinaryPayload) {
+    return payload.byteLength
 }

@@ -162,23 +162,26 @@ player.y = nextY
 Player.position(player, nextX, nextY)
 ```
 
-For spatial manual writers, `strictManualWrites: true` makes writer calls throw
-when the entity or component cannot be resolved to a spatial cell. This is useful
-while proving the game mutation path; missed or misrouted writer calls are
-desync bugs, not harmless debug noise.
+For spatial manual writers, `validateManualWriteTargets: true` makes writer
+calls throw when the entity or component cannot be resolved to a spatial cell.
+This is useful while proving the game mutation path; missed or misrouted writer
+calls are desync bugs, not harmless diagnostic noise.
+
+The writer call also refreshes spatial membership before snapshot output, so a
+normal manual position mutation does not need a separate spatial update call.
 
 ## ECS character
 
 Use `EcsChannel` if all subscribed users see all ECS roots. Use `EcsChannel2D/3D` if roots need culling.
 
 ```ts
-const ecs = new EcsChannel(instance.localState)
-const Transform = ecs.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
-const Vitals = ecs.createComponentWriter(NType.Vitals, context.getSchema(NType.Vitals)!)
+const worldChannel = new EcsChannel(instance.localState)
+const Transform = worldChannel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+const Vitals = worldChannel.createComponentWriter(NType.Vitals, context.getSchema(NType.Vitals)!)
 
-const pid = ecs.createEntity()
-const transform = ecs.addComponent(pid, { nid: 0, ntype: NType.Transform, x: 0, y: 0 })
-const vitals = ecs.addComponent(pid, { nid: 0, ntype: NType.Vitals, hp: 100 })
+const pid = worldChannel.createEntity()
+const transform = worldChannel.addComponent(pid, { nid: 0, ntype: NType.Transform, x: 0, y: 0 })
+const vitals = worldChannel.addComponent(pid, { nid: 0, ntype: NType.Vitals, hp: 100 })
 
 transform.x = nextX
 transform.y = nextY

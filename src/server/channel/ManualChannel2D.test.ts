@@ -159,6 +159,31 @@ describe('manual and spatial channels', () => {
         expect(snapshot!.previous.has(entity.nid)).toBe(true)
     })
 
+    it('flushes repeated ManualChannel2D spatial writer movement as one cell move', () => {
+        const localState = new LocalState()
+        const channel = new ManualChannel2D(localState, 10)
+        const user = createUser(localState)
+        const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
+        const entity = channel.addEntity(createEntity(1, 1))
+
+        channel.subscribe(user, { x: 50, y: 1, halfWidth: 80, halfHeight: 20 })
+        channel.rememberSnapshotVisibility(user.id)
+        channel.clearSnapshotDeltas()
+
+        entity.x = 15
+        writer.groups.position(entity, 15, 1)
+        entity.x = 25
+        writer.groups.position(entity, 25, 1)
+        entity.x = 35
+        writer.groups.position(entity, 35, 1)
+
+        channel.getChannelSnapshot(user, 1)
+
+        expect(channel.getMovedRoots()).toEqual([
+            { entity, fromCell: '0:0', toCell: '3:0' }
+        ])
+    })
+
     it('records manual spatial 3D updates by visible cell', () => {
         const localState = new LocalState()
         const channel = new ManualChannel3D(localState, 10)
@@ -176,6 +201,31 @@ describe('manual and spatial channels', () => {
         expect(log.manualPropValues).toEqual([5])
     })
 
+    it('flushes repeated ManualChannel3D spatial writer movement as one cell move', () => {
+        const localState = new LocalState()
+        const channel = new ManualChannel3D(localState, 10)
+        const user = createUser(localState)
+        const writer = channel.createEntityWriter(NType.Entity, createGroupedSchema())
+        const entity = channel.addEntity(createEntity(1, 1, 1))
+
+        channel.subscribe(user, { x: 50, y: 1, z: 1, halfWidth: 80, halfHeight: 20, halfDepth: 20 })
+        channel.rememberSnapshotVisibility(user.id)
+        channel.clearSnapshotDeltas()
+
+        entity.x = 15
+        writer.groups.position(entity, 15, 1)
+        entity.x = 25
+        writer.groups.position(entity, 25, 1)
+        entity.x = 35
+        writer.groups.position(entity, 35, 1)
+
+        channel.getChannelSnapshot(user, 1)
+
+        expect(channel.getMovedRoots()).toEqual([
+            { entity, fromCell: '0:0:0', toCell: '3:0:0' }
+        ])
+    })
+
     it('uses Channel2D views and movement updates for direct visibility', () => {
         const localState = new LocalState()
         const channel = new Channel2D(localState, 10)
@@ -189,7 +239,7 @@ describe('manual and spatial channels', () => {
 
         outside.x = 2
         outside.y = 2
-        channel.updateEntity(outside)
+        channel.moveEntity(outside)
 
         expect(channel.getVisibleEntities(user.id).sort((a, b) => a - b)).toEqual([inside.nid, outside.nid].sort((a, b) => a - b))
     })
@@ -256,7 +306,7 @@ describe('manual and spatial channels', () => {
         expect(channel.getVisibleEntities(user.id)).toEqual([inside.nid])
 
         above.y = 2
-        channel.updateEntity(above)
+        channel.moveEntity(above)
 
         expect(channel.getVisibleEntities(user.id).sort((a, b) => a - b)).toEqual([inside.nid, above.nid].sort((a, b) => a - b))
     })

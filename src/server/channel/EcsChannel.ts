@@ -106,10 +106,6 @@ export class EcsChannel implements IChannel {
         return nid
     }
 
-    addEntity() {
-        return this.createEntity()
-    }
-
     syncHeader() {
         if (!hasSchemaBackedChannelHeader(this.header)) {
             return false

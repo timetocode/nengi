@@ -10,6 +10,7 @@ import {
     resolveInterpolationDelayPolicyOptions
 } from './InterpolationDelayPolicy'
 import { PlaybackCursor, PlaybackCursorOptions, ResolvedPlaybackCursorOptions, resolvePlaybackCursorOptions } from './PlaybackCursor'
+import { getLocalTime } from './time'
 
 export enum InterpolationStatus {
     Ok = 'ok',
@@ -91,16 +92,16 @@ export class FixedStepInterpolator {
         return 1000 / this.client.serverTickRate
     }
 
-    getRenderTimestamp(interpDelay: number, now = Date.now()) {
+    getRenderTimestamp(interpDelay: number, now = getLocalTime()) {
         return now - interpDelay
     }
 
-    getTargetTick(interpDelay: number, now = Date.now()) {
+    getTargetTick(interpDelay: number, now = getLocalTime()) {
         const diagnostics = this.getSampleDiagnostics(interpDelay, now)
         return diagnostics.targetTick
     }
 
-    getBounds(interpDelay: number, now = Date.now()): InterpolationBounds | null {
+    getBounds(interpDelay: number, now = getLocalTime()): InterpolationBounds | null {
         const sample = this.getSampleDiagnostics(interpDelay, now)
         if (sample.status !== InterpolationStatus.Ok || !sample.frameA || !sample.frameB) {
             return null
@@ -122,7 +123,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    getSampleDiagnostics(interpDelay: number, now = Date.now()): InterpolationDiagnostics {
+    getSampleDiagnostics(interpDelay: number, now = getLocalTime()): InterpolationDiagnostics {
         const frames = this.client.network.frames
         const first = frames[0] || null
         const last = frames[frames.length - 1] || null
@@ -265,7 +266,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    sample(interpDelay: number, now = Date.now()): InterpolationSample {
+    sample(interpDelay: number, now = getLocalTime()): InterpolationSample {
         const diagnostics = this.getSampleDiagnostics(interpDelay, now)
         if (diagnostics.status !== InterpolationStatus.Ok || !diagnostics.frameA || !diagnostics.frameB) {
             return {
@@ -297,7 +298,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    sampleEntities(nids: Iterable<number>, interpDelay: number, now = Date.now()): InterpolationSample {
+    sampleEntities(nids: Iterable<number>, interpDelay: number, now = getLocalTime()): InterpolationSample {
         const diagnostics = this.getSampleDiagnostics(interpDelay, now)
         if (diagnostics.status !== InterpolationStatus.Ok || !diagnostics.frameA || !diagnostics.frameB) {
             return {
@@ -313,7 +314,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    getEntity(nid: number, interpDelay: number, now = Date.now()): IEntity | null {
+    getEntity(nid: number, interpDelay: number, now = getLocalTime()): IEntity | null {
         const bounds = this.getBounds(interpDelay, now)
         if (!bounds) {
             return null
@@ -331,7 +332,7 @@ export class FixedStepInterpolator {
         return this.interpolateEntityForFrame(nid, entityA, entityB, bounds.frameB, bounds.alpha)
     }
 
-    getEntities(nids: Iterable<number>, interpDelay: number, now = Date.now()): Map<number, IEntity> {
+    getEntities(nids: Iterable<number>, interpDelay: number, now = getLocalTime()): Map<number, IEntity> {
         const bounds = this.getBounds(interpDelay, now)
         if (!bounds) {
             return new Map()
@@ -361,11 +362,11 @@ export class FixedStepInterpolator {
         return entities
     }
 
-    getAllEntities(interpDelay: number, now = Date.now()): Map<number, IEntity> {
+    getAllEntities(interpDelay: number, now = getLocalTime()): Map<number, IEntity> {
         return this.sample(interpDelay, now).entities
     }
 
-    getState(interpDelay: number, now = Date.now()): InterpolatedState | null {
+    getState(interpDelay: number, now = getLocalTime()): InterpolatedState | null {
         const sample = this.sample(interpDelay, now)
         if (sample.status !== InterpolationStatus.Ok || !sample.frameA || !sample.frameB) {
             return null
@@ -450,7 +451,7 @@ export class FixedStepInterpolator {
     }
 }
 
-export type StaticInterpolatorOptions = Omit<FixedStepInterpolatorOptions, 'delay' | 'adaptiveDelay'>
+export type StaticInterpolatorOptions = Omit<FixedStepInterpolatorOptions, 'delay'>
 
 export class StaticInterpolator extends FixedStepInterpolator {
     constructor(client: Client, options: StaticInterpolatorOptions = {}) {
@@ -463,16 +464,7 @@ export class StaticInterpolator extends FixedStepInterpolator {
 
 export type AdaptiveInterpolatorOptions = Omit<
     FixedStepInterpolatorOptions,
-    | 'delay'
-    | 'adaptiveDelay'
-    | 'adaptiveWindowFrames'
-    | 'adaptiveSafetyTicks'
-    | 'minDelayMs'
-    | 'maxDelayMs'
-    | 'adaptiveMaxSampleGapMs'
-    | 'adaptiveDecreaseStableMs'
-    | 'adaptiveDecreaseStepMs'
-    | 'adaptiveStableThresholdMs'
+    'delay'
 > & {
     windowFrames?: number
     safetyTicks?: number

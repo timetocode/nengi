@@ -19,7 +19,7 @@ export class LocalState {
      * Parent entity nid -> child entity nids. Children cascade visibility from
      * the parent, but userland still owns object lifetime and game semantics.
      */
-    children: Map<number, Set<number>>= new Map()
+    children: Map<number, Set<number>> = new Map()
     parentByNid: Map<number, number> = new Map()
     rootByNid: Map<number, number> = new Map()
     _entities: NDictionary = new NDictionary()
@@ -105,20 +105,21 @@ export class LocalState {
 
     registerEntity(entity: IEntity, ownerId: number) {
         let nid = entity.nid
-        if (nid !== 0 && this.ownerByNid.has(nid)) {
-            const ownerNid = this.ownerByNid.get(nid)!
+        if (nid !== 0) {
+            const ownerNid = this.ownerByNid.get(nid)
             if (ownerNid === ownerId) {
                 return nid
             }
-            throw new Error(`Entity nid ${nid} is already networked by another source.`)
+            if (ownerNid !== undefined) {
+                throw new Error(`Entity nid ${nid} is already networked by another source.`)
+            }
+            throw new Error(`Entity nid ${nid} is not managed by LocalState.`)
         }
 
-        if (!this.ownerByNid.has(nid)) {
-            nid = this.nextNetworkId()
-            entity.nid = nid
-            this._entities.add(entity)
-            this.rootByNid.set(nid, nid)
-        }
+        nid = this.nextNetworkId()
+        entity.nid = nid
+        this._entities.add(entity)
+        this.rootByNid.set(nid, nid)
         this.ownerByNid.set(nid, ownerId)
         return nid
     }

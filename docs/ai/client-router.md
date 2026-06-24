@@ -81,36 +81,59 @@ prediction state stay in userland.
 Each processed snapshot returns a `Frame`:
 
 ```ts
+import type { ChannelFrame, Frame } from 'nengi'
+
 for (const frame of client.network.drainFrames()) {
     frame.channels.forEach(channel => {
-        channel.createEntities.forEach(entity => {
-            createSprite(entity)
-        })
+        applyChannelFrame(channel)
+    })
+}
 
-        channel.updateEntities.forEach(update => {
-            const entity = client.network.store.get(update.nid)
-            markSpriteDirty(entity, update.prop)
-        })
+function applyChannelFrame(channel: ChannelFrame) {
+    channel.messages.forEach(handleChannelMessage)
 
-        channel.deletedEntities.forEach(deleted => {
-            destroySprite(deleted.nid)
-        })
+    channel.interpolatedMessages.forEach(queueChannelEffect)
+
+    channel.createEntities.forEach(entity => {
+        createSprite(entity)
+    })
+
+    channel.updateEntities.forEach(update => {
+        const entity = client.network.store.get(update.nid)
+        markSpriteDirty(entity, update.prop)
+    })
+
+    channel.deletedEntities.forEach(deleted => {
+        destroySprite(deleted.nid)
     })
 }
 ```
+
+`frame.messages` and `frame.interpolatedMessages` are top-level user/session
+messages, such as "you control this player" or a private notification.
+`channel.messages` and `channel.interpolatedMessages` are scoped to that
+channel, such as a world impact effect or an inventory item flash.
 
 `channel.updateEntities` contains applied changes with `previous` and `value`.
 `channel.deletedEntities` includes the last known entity when available.
 
 ## Channel Scope
 
-Channel-scoped data is available through `frame.channels`:
+Channel-scoped data is available through `frame.channels` or `frame.getChannel(id)`:
 
 ```ts
-const inventory = frame.getChannel(inventoryChannelId)
-if (inventory) {
+function applyInventoryFrame(frame: Frame, inventoryChannelId: number) {
+    const inventory = frame.getChannel(inventoryChannelId)
+    if (!inventory) {
+        return
+    }
+
+    inventory.messages.forEach(handleInventoryMessage)
+
     inventory.createEntities.forEach(createInventoryItem)
+
     inventory.updateEntities.forEach(updateInventoryItem)
+
     inventory.deletedEntities.forEach(removeInventoryItem)
 }
 ```
@@ -170,10 +193,16 @@ The helper sends commands, applies local prediction, and rebuilds local state
 from latest authority plus pending commands during reconciliation. The store
 remains the raw server truth.
 
+For fast action movement, read
+[real-time movement prediction](./realtime-movement-prediction.md). The short
+version is: send movement commands at a deliberate cadence, apply the same
+movement step on client and server, reconcile against raw authority, and keep
+presentation-only smoothing out of replay state.
+
 ## Messages
 
-Immediate messages are available on the frame after authoritative state has
-been applied:
+Immediate top-level messages are available on the frame after authoritative
+state has been applied:
 
 ```ts
 frame.messages.forEach(message => {
@@ -183,10 +212,22 @@ frame.messages.forEach(message => {
 })
 ```
 
+Channel-scoped messages are available on the matching channel frame:
+
+```ts
+const worldFrame = frame.getChannel(worldChannelId)
+worldFrame?.messages.forEach(message => {
+    if (message.ntype === NType.Impact) {
+        spawnImpactEffect(message.x, message.y)
+    }
+})
+```
+
 Interpolated messages use the interpolation timeline:
 
 ```ts
-frame.interpolatedMessages.forEach(queueEffectMessage)
+frame.interpolatedMessages.forEach(queueTopLevelEffect)
+worldFrame?.interpolatedMessages.forEach(queueWorldEffect)
 ```
 
 Use ordinary messages for UI/control context and notifications. Use
@@ -196,16 +237,17 @@ interpolated entity motion.
 ## ECS Channels
 
 For nengi ECS channels, use the same frame/store principle, but the natural
-destination is a `GameEcsWorld` instead of plain presentation records.
+destination is an `EcsWorld` instead of plain presentation records.
 
 ECS channel frames still contain normal component creates, updates, and deletes,
 but they also include ECS root lifecycle facts. Prefer the core applier when a
-client maintains a `GameEcsWorld`:
+client maintains an `EcsWorld`:
 
 ```ts
 const channel = frame.getChannel(arenaChannelId)
 if (channel) {
-    const changes = applyEcsChannelFrameToWorld(ecs, channel)
+    channel.messages.forEach(handleArenaMessage)
+    const changes = applyEcsChannelFrame(world, channel)
     changes.createdComponents.forEach(createSpriteForComponent)
     changes.updatedComponents.forEach(markSpriteDirty)
     changes.deletedComponents.forEach(removeSpriteForComponent)
@@ -213,20 +255,20 @@ if (channel) {
 }
 ```
 
-Manual application is also possible when a game has a very small ECS bridge:
+When an ECS channel closes, use the close counterpart:
 
 ```ts
-const channel = frame.getChannel(arenaChannelId)
-if (channel) {
-    channel.ecsCreateEntities.forEach(pid => ecs.createEntity(pid))
-    channel.ecsCreateComponents.forEach(component => ecs.add(component))
-    channel.updateEntities.forEach(update => setComponentProp(update))
-    channel.ecsDeleteEntities.forEach(pid => ecs.removeEntity(pid))
-}
+frame.closedChannels.forEach(channel => {
+    if (channel.channelId === arenaChannelId) {
+        const changes = applyEcsChannelClose(world, channel)
+        changes.deletedEntities.forEach(removeRootPresentation)
+    }
+})
 ```
 
-Keep any ECS sync wrapper tiny: CRUD in, ECS mutation plus facts out. It should
-not create sprites, bind roles, or decide prediction.
+Keep any custom ECS sync wrapper tiny: CRUD in, ECS mutation plus facts out. It
+should preserve local-only components on root deletes, and it should not create
+sprites, bind roles, or decide prediction.
 
 ## What Not To Add
 

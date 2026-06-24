@@ -3,7 +3,7 @@ import { defineMessageSchema } from '../common/binary/schema/defineSchema'
 import { NetworkEvent } from '../common/binary/NetworkEvent'
 import { Context } from '../common/Context'
 import { Instance } from '../server/Instance'
-import { User } from '../server/User'
+import { User, UserConnectionState } from '../server/User'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 import { ClientNetwork } from './ClientNetwork'
 import { Predictor } from './prediction/Predictor'
@@ -16,6 +16,7 @@ function createUser(instance: Instance) {
     } as any)
     user.id = 1
     user.instance = instance
+    user.connectionState = UserConnectionState.Open
     return user
 }
 

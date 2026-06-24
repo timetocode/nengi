@@ -70,6 +70,16 @@ describe('LocalState', () => {
         expect(() => localState.registerEntity(firstChild, 789)).toThrow('already networked by another source')
     })
 
+    it('rejects entities with unmanaged prefilled nids', () => {
+        const localState = new LocalState()
+        const entity = { nid: 99, ntype: 1 }
+
+        expect(() => localState.registerEntity(entity, 123)).toThrow('Entity nid 99 is not managed by LocalState.')
+        expect(entity.nid).toBe(99)
+        expect(localState.ownerByNid.has(99)).toBe(false)
+        expect(localState.getByNid(99)).toBeUndefined()
+    })
+
     it('treats attaching the same child to the same parent as idempotent', () => {
         const localState = new LocalState()
         const parent = { nid: 0, ntype: 1 }

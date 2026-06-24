@@ -283,4 +283,52 @@ describe('client prediction', () => {
         expect(events).toEqual(['first', 'second'])
         expect(client.predictor.log.getPendingCommands()).toEqual([])
     })
+
+    it('keeps later command predictions and outbound commands pending after a stale confirmation', () => {
+        const client = createClient()
+        const events: string[] = []
+
+        const first = client.predictCommand({ ntype: 2, dx: 1 }, {
+            reconcile: () => events.push('first')
+        })
+        client.network.incrementCommandFrameNumber()
+        client.network.outbound.tick = client.network.commandFrameNumber
+        const second = client.predictCommand({ ntype: 2, dx: 2 }, {
+            reconcile: () => events.push('second')
+        })
+
+        expect(first!.commandFrameNumber).toBe(1)
+        expect(second!.commandFrameNumber).toBe(2)
+        expect(client.network.outbound.getUnconfirmedCommands().has(1)).toBe(true)
+        expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(true)
+
+        client.network.queueSnapshot(snapshot({
+            timestamp: 1050,
+            confirmedCommandFrameNumber: 1,
+            messages: [],
+            createEntities: [],
+            updateEntities: [],
+            deleteEntities: []
+        }), 1050)
+        client.network.processNextFrame()
+
+        expect(events).toEqual(['first'])
+        expect(client.predictor.log.getPendingCommands().map(op => op.id)).toEqual([second!.id])
+        expect(client.network.outbound.getUnconfirmedCommands().has(1)).toBe(false)
+        expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(true)
+
+        client.network.queueSnapshot(snapshot({
+            timestamp: 1100,
+            confirmedCommandFrameNumber: 2,
+            messages: [],
+            createEntities: [],
+            updateEntities: [],
+            deleteEntities: []
+        }), 1100)
+        client.network.processNextFrame()
+
+        expect(events).toEqual(['first', 'second'])
+        expect(client.predictor.log.getPendingCommands()).toEqual([])
+        expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(false)
+    })
 })

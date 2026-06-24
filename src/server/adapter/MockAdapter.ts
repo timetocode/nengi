@@ -1,7 +1,6 @@
 import { IServerNetworkAdapter } from './IServerNetworkAdapter'
 import { InstanceNetwork } from '../InstanceNetwork'
 import { User, UserConnectionState } from '../User'
-import { NQueue } from '../../NQueue'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
 import { BinaryAdapter, BinaryPayload } from '../../common/binary/BinaryAdapter'
@@ -20,12 +19,10 @@ class LocalInstanceAdapter<
     OutboundPayload extends BinaryPayload = InboundPayload
 > implements IServerNetworkAdapter<InboundPayload, OutboundPayload, void | { ready?: () => void }> {
     network: InstanceNetwork
-    serverSockets: MockServerSocket[]
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
 
     constructor(network: InstanceNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
         this.network = network
-        this.serverSockets = []
 
         if (!config?.binary) {
             throw new Error('LocalInstanceAdapter requires a config.binary to be created.')
@@ -49,12 +46,6 @@ class LocalInstanceAdapter<
         const user = new User(socket, this)
         socket.user = user
         this.network.onOpen(user)
-    }
-
-    message(socket: MockServerSocket, message: any) {
-        if (socket.user) {
-            // this.network.onBinaryMessage(socket.user, message)
-        }
     }
 
     close(socket: MockServerSocket) {
@@ -149,14 +140,12 @@ enum MockSocketReadyState {
 }
 
 class MockServerSocket {
-    inboundQueue: NQueue<any>
     readyState: MockSocketReadyState
     clientSocket: MockClientSocket
     user: User | null
     network: InstanceNetwork
 
     constructor(network: InstanceNetwork) {
-        this.inboundQueue = new NQueue()
         this.readyState = MockSocketReadyState.CONNECTING
         this.clientSocket = new MockClientSocket(this)
         this.user = null
@@ -170,7 +159,6 @@ class MockServerSocket {
     }
 
     receive(buffer: BinaryPayload) {
-        //this.inboundQueue.enqueue(buffer)
         this.network.onMessage(this.user!, buffer)
     }
 
@@ -182,13 +170,11 @@ class MockServerSocket {
 }
 
 class MockClientSocket {
-    inboundQueue: NQueue<any>
     readyState: MockSocketReadyState
     serverSocket: MockServerSocket
     adapter: LocalClientAdapter<any, any> | null = null
 
     constructor(serverSocket: MockServerSocket) {
-        this.inboundQueue = new NQueue()
         this.readyState = MockSocketReadyState.CONNECTING
         this.serverSocket = serverSocket
         this.readyState = MockSocketReadyState.OPEN
@@ -208,9 +194,7 @@ class MockClientSocket {
     receive(buffer: BinaryPayload) {
         if (this.adapter) {
             this.adapter.onMessage(buffer)
-            return
         }
-        this.inboundQueue.enqueue(buffer)
     }
 }
 

@@ -8,8 +8,8 @@ import { User } from '../User'
 import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialView'
 import {
-    appendEcsSpatialManualGroup,
     appendEcsSpatialManualProp,
+    appendManualGroup,
     clearEcsSpatialManualUpdateLog,
     coalesceEcsSpatialManualUpdateLog,
     createEcsSpatialManualUpdateLog,
@@ -41,7 +41,9 @@ export type EcsChannel2DOptions = {
     stableFragmentCellLimit?: number
     plane?: SpatialPlane
     spatialProps?: { x?: string, y?: string }
-    strictManualWrites?: boolean
+    // Development validation: throw when a component writer target cannot be
+    // mapped to this channel's spatial root cell.
+    validateManualWriteTargets?: boolean
 }
 
 function createUpdateLog(): Ecs2DUpdateLog {
@@ -123,12 +125,22 @@ export class EcsChannel2D {
     private structuralDeltas = false
     private spatialXProp: string
     private spatialYProp: string
-    private strictManualWrites: boolean
+    private validateManualWriteTargets: boolean
     plane: SpatialPlane
     private axes: SpatialPlaneAxes
     private visibilityPlan: EcsChannelVisibilityPlan | null = null
     private visibilityStateByUser: Map<number, EcsChannelVisibilityState> = new Map()
     private movedRootCells: EcsChannelCellMove[] = []
+    private pendingPropComponents: Ecs2DComponent[] = []
+    private pendingPropSchemas: SchemaProp[] = []
+    private pendingPropValues: any[] = []
+    private pendingGroupComponents: Ecs2DComponent[] = []
+    private pendingGroupNTypes: number[] = []
+    private pendingGroupSchemas: SchemaUpdateGroup[] = []
+    private pendingGroupValueOffsets: number[] = []
+    private pendingGroupValues: any[] = []
+    private pendingOpTypes: number[] = []
+    private pendingOpIndexes: number[] = []
 
     constructor(localState: LocalState, cellSize: number, options: EcsChannel2DOptions = {}) {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
@@ -150,7 +162,7 @@ export class EcsChannel2D {
         this.axes = getSpatialPlaneAxes(this.plane)
         this.spatialXProp = options.spatialProps?.x || this.axes.a
         this.spatialYProp = options.spatialProps?.y || this.axes.b
-        this.strictManualWrites = options.strictManualWrites === true
+        this.validateManualWriteTargets = options.validateManualWriteTargets === true
         this.grid = new SpatialGrid2D({
             cellSize,
             getX: component => component[this.spatialXProp],
@@ -331,34 +343,108 @@ export class EcsChannel2D {
         }
     }
 
-    private getComponentCell(component: Ecs2DComponent) {
+    private validatePendingWriteComponent(component: Ecs2DComponent) {
+        if (this.grid.objectCells.has(component.pid)) {
+            return true
+        }
+        if (this.validateManualWriteTargets) {
+            throw new Error(`EcsChannel2D cannot write mutation for component nid ${component.nid}; no spatial cell was found for pid ${component.pid}.`)
+        }
+        return false
+    }
+
+    private getCellForPendingWrite(component: Ecs2DComponent, updatedPids: Set<number>) {
         const pid = component.pid
-        const spatial = this.entities.getSpatialComponent(pid)
-        if (spatial) {
-            this.updateRootCell(pid)
+        if (!updatedPids.has(pid)) {
+            const spatial = this.entities.getSpatialComponent(pid)
+            if (spatial) {
+                this.updateRootCell(pid)
+            }
+            updatedPids.add(pid)
         }
         const ref = this.grid.objectCells.get(pid)
         return ref ? this.grid.cells.get(ref.key) as Cell || null : null
     }
 
-    private markCellDirtyForComponent(component: Ecs2DComponent) {
-        const cell = this.getComponentCell(component)
-        if (!cell) {
-            if (this.strictManualWrites) {
-                throw new Error(`EcsChannel2D cannot write mutation for component nid ${component.nid}; no spatial cell was found for pid ${component.pid}.`)
-            }
-            return null
+    private appendPendingProp(component: Ecs2DComponent, prop: SchemaProp, value: any) {
+        if (!this.validatePendingWriteComponent(component)) {
+            return
         }
-        this.dirtyCells.add(cell.key)
-        return cell
+        this.pendingOpTypes.push(0)
+        this.pendingOpIndexes.push(this.pendingPropComponents.length)
+        this.pendingPropComponents.push(component)
+        this.pendingPropSchemas.push(prop)
+        this.pendingPropValues.push(value)
+        this.onChannelStateChanged()
+    }
+
+    private appendPendingGroup(ntype: number, component: Ecs2DComponent, group: SchemaUpdateGroup, values: IArguments | any[], valueOffset = 0) {
+        if (!this.validatePendingWriteComponent(component)) {
+            return
+        }
+        this.pendingOpTypes.push(1)
+        this.pendingOpIndexes.push(this.pendingGroupComponents.length)
+        this.pendingGroupComponents.push(component)
+        this.pendingGroupNTypes.push(ntype)
+        this.pendingGroupSchemas.push(group)
+        this.pendingGroupValueOffsets.push(this.pendingGroupValues.length)
+        for (let i = 0; i < group.props.length; i++) {
+            this.pendingGroupValues.push(values[i + valueOffset])
+        }
+        this.onChannelStateChanged()
+    }
+
+    private clearPendingWrites() {
+        this.pendingPropComponents.length = 0
+        this.pendingPropSchemas.length = 0
+        this.pendingPropValues.length = 0
+        this.pendingGroupComponents.length = 0
+        this.pendingGroupNTypes.length = 0
+        this.pendingGroupSchemas.length = 0
+        this.pendingGroupValueOffsets.length = 0
+        this.pendingGroupValues.length = 0
+        this.pendingOpTypes.length = 0
+        this.pendingOpIndexes.length = 0
+    }
+
+    private flushPendingWrites() {
+        if (this.pendingOpTypes.length === 0) {
+            return
+        }
+
+        const updatedPids = new Set<number>()
+        for (let i = 0; i < this.pendingOpTypes.length; i++) {
+            const index = this.pendingOpIndexes[i]
+            if (this.pendingOpTypes[i] === 0) {
+                const component = this.pendingPropComponents[index]
+                const cell = this.getCellForPendingWrite(component, updatedPids)
+                if (cell) {
+                    this.dirtyCells.add(cell.key)
+                    this.writeManualPropMutation(cell, component, this.pendingPropSchemas[index], this.pendingPropValues[index])
+                }
+                continue
+            }
+
+            const component = this.pendingGroupComponents[index]
+            const cell = this.getCellForPendingWrite(component, updatedPids)
+            if (!cell) {
+                continue
+            }
+            this.dirtyCells.add(cell.key)
+            appendManualGroup(
+                cell,
+                component.nid,
+                this.pendingGroupSchemas[index],
+                this.pendingGroupValues,
+                this.pendingGroupValueOffsets[index],
+                this.pendingGroupNTypes[index]
+            )
+        }
+        this.clearPendingWrites()
     }
 
     private writeManualPropMutation(cell: Ecs2DUpdateLog, component: Ecs2DComponent, prop: SchemaProp, value: any) {
         appendEcsSpatialManualProp(cell, component.nid, prop, value)
-    }
-
-    private writeManualGroupMutation(cell: Ecs2DUpdateLog, ntype: number, component: Ecs2DComponent, group: SchemaUpdateGroup, values: IArguments | any[]) {
-        appendEcsSpatialManualGroup(cell, ntype, component.nid, group, values)
     }
 
     private buildVisibleCellKeys(userId: number) {
@@ -385,10 +471,6 @@ export class EcsChannel2D {
         this.invalidateVisibleNetworkedNidsCache()
         this.onChannelStateChanged()
         return nid
-    }
-
-    addEntity() {
-        return this.createEntity()
     }
 
     syncHeader() {
@@ -503,6 +585,7 @@ export class EcsChannel2D {
     }
 
     getVisibleEntities(userId: number) {
+        this.flushPendingWrites()
         const roots: number[] = []
         const keys = this.getVisibleCellKeys(userId)
         for (let i = 0; i < keys.length; i++) {
@@ -516,6 +599,7 @@ export class EcsChannel2D {
     }
 
     getVisibleNetworkedNids(userId: number) {
+        this.flushPendingWrites()
         const viewVersion = this.viewVersions.get(userId) || 0
         const cached = this.visibleNetworkedNidsCache.get(userId)
         if (cached && cached.viewVersion === viewVersion && cached.membershipVersion === this.membershipVersion) {
@@ -538,6 +622,7 @@ export class EcsChannel2D {
     }
 
     getVisibleCellKeys(userId: number) {
+        this.flushPendingWrites()
         const viewVersion = this.viewVersions.get(userId) || 0
         const cached = this.visibleCellKeyCache.get(userId)
         if (cached && cached.viewVersion === viewVersion && cached.membershipVersion === this.membershipVersion) {
@@ -554,6 +639,7 @@ export class EcsChannel2D {
     }
 
     getManualCellUpdateLog(key: string) {
+        this.flushPendingWrites()
         const cell = this.grid.cells.get(key) as Cell
         if (!cell) {
             return null
@@ -574,6 +660,7 @@ export class EcsChannel2D {
     }
 
     prepareVisibilityPlan(tick: number) {
+        this.flushPendingWrites()
         if (this.visibilityPlan && this.visibilityPlan.tick === tick) {
             return this.visibilityPlan
         }
@@ -687,6 +774,7 @@ export class EcsChannel2D {
     }
 
     clearSnapshotDeltas() {
+        this.clearPendingWrites()
         for (const key of this.dirtyCells) {
             const cell = this.grid.cells.get(key) as Cell
             if (cell) {
@@ -745,21 +833,13 @@ export class EcsChannel2D {
             const name = propNames[i]
             const prop = schema.props[name]
             props[name] = (component: Ecs2DComponent, value: any) => {
-                const cell = this.markCellDirtyForComponent(component)
-                if (!cell) {
-                    return
-                }
-                this.writeManualPropMutation(cell, component, prop, value)
+                this.appendPendingProp(component, prop, value)
             }
             addAlias(name, props[name])
         }
 
         const writeGroup = (component: Ecs2DComponent, group: SchemaUpdateGroup, values: IArguments | any[]) => {
-            const cell = this.markCellDirtyForComponent(component)
-            if (!cell) {
-                return
-            }
-            this.writeManualGroupMutation(cell, ntype, component, group, values)
+            this.appendPendingGroup(ntype, component, group, values, 1)
         }
 
         for (let i = 0; i < schema.updateGroups.length; i++) {

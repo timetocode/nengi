@@ -85,8 +85,8 @@ descriptor, and create function together.
 // shared/components/transform.ts
 import {
     Binary,
-    defineEntitySchema,
-    gameComponentType
+    ecs,
+    defineEntitySchema
 } from 'nengi'
 import { NType } from '../ntype'
 
@@ -107,7 +107,7 @@ export const TransformSchema = defineEntitySchema({
     radius: Binary.Float32
 })
 
-export const Transform = gameComponentType<TransformComponent>(
+export const Transform = ecs.defineComponent<TransformComponent>(
     NType.Transform,
     'Transform'
 )
@@ -128,12 +128,16 @@ export function createTransform(
 }
 ```
 
+Prefer plain object components for replicated state. A component may be a class
+instance if it exposes `pid`, `ntype`, optional `nid`, and schema fields directly,
+but hidden class methods should not obscure where channel writers are called.
+
 Do not put component writers in shared component files. Writers are bound to a
 specific server channel instance.
 
 ```ts
 // server/world.ts
-const TransformWriter = world.createComponentWriter(
+const TransformWriter = worldChannel.createComponentWriter(
     NType.Transform,
     context.getSchema(NType.Transform)!
 )
@@ -185,7 +189,7 @@ Use server-only files for authoritative state that clients never receive:
 - cooldown bookkeeping
 - connection indexes
 - server-only ECS components
-- historian or validation resources
+- ECS resources aka singletons, such as historian or validation state
 
 Use client-only files for local state that the server never receives:
 
@@ -195,6 +199,7 @@ Use client-only files for local state that the server never receives:
 - camera state
 - UI state
 - client-only ECS components
+- ECS resources aka singletons, such as renderer, scene, or UI service references
 
 Server-only and client-only state should not have a nengi schema. If it later
 needs to cross the network, move it to a shared replicated file and define the
@@ -235,4 +240,3 @@ client/
 For a tiny prototype, one `shared/schema.ts` file is acceptable. As soon as a
 game has several network types, colocate each type with its schema before the
 schema file becomes a dumping ground.
-

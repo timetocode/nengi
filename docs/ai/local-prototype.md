@@ -196,6 +196,11 @@ Use a local shim so game code has one stable import path. When using official
 adapter packages, re-export from package `nengi`, not from `../../../nengi/src`.
 This keeps core types aligned with adapter package types.
 
+This shim is workspace glue for local R&D prototypes. In a normal installed
+game, import directly from package `nengi`. The export list below is only a
+starter set; add any public nengi API the prototype actually uses, such as
+`Frame`, `ChannelFrame`, ECS channel APIs, or prediction helpers.
+
 ```ts
 export {
     AdaptiveInterpolator,
@@ -211,6 +216,11 @@ export {
     User,
     defineEntitySchema,
     defineMessageSchema
+} from 'nengi'
+
+export type {
+    ChannelFrame,
+    Frame
 } from 'nengi'
 ```
 
@@ -310,7 +320,7 @@ adapter.listen(PORT, () => {
 })
 ```
 
-Call `world.updateEntity(player)` after a spatial entity moves so the spatial
+Call `world.moveEntity(player)` after a spatial entity moves so the spatial
 grid can update its cell bookkeeping. Call `world.updateView(user, view)` when
 the user's interest area moves.
 

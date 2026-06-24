@@ -58,8 +58,13 @@ class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
     }
 
     flush() {
-        this.adapter.flush()
-        this.network.flush()
+        try {
+            this.adapter.flush()
+            this.network.flush()
+        } catch (err) {
+            this.network.rollbackOutbound()
+            throw err
+        }
     }
 
     addCommand(command: any) {

@@ -66,8 +66,8 @@ export function createChannelOutput(
     protocol: ProtocolConfig
 ): ChannelSnapshotOutput {
     const plan = createEmptySnapshotPlan()
-    const useSharedFragments = instance.network.sharedUpdateFragmentsEnabled && !instance.network.debugBinaryWrites
-    const useSharedMessageFragments = !instance.network.debugBinaryWrites
+    const useSharedFragments = instance.network.sharedUpdateFragmentsEnabled && !instance.network.diagnosticBinaryWrites
+    const useSharedMessageFragments = !instance.network.diagnosticBinaryWrites
     const visibility = useSharedFragments
         ? channel.collectChannelSharedDeltaVisibility(user) ?? channel.collectChannelSnapshotVisibility(user)
         : channel.collectChannelSnapshotVisibility(user)

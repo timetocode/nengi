@@ -142,7 +142,7 @@ export function createManualChannelOutput(
     }
     const fragment = writeManualLogDirectly &&
         instance.network.sharedUpdateFragmentsEnabled &&
-        !instance.network.debugBinaryWrites
+        !instance.network.diagnosticBinaryWrites
         ? getManualUpdateChannelFragment(user, instance, channel, protocol)
         : null
 

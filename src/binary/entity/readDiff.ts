@@ -15,7 +15,7 @@ function readDiff(reader: IBinaryReader, context: Context, ntypes: Map<number, n
     if (!propData) {
         throw new Error(`Cannot read diff prop ${propKey} for entity nid ${nid}; ntype=${ntype}.`)
     }
-    const value = propData.binary.read(reader)
+    const value = propData.binary.post(propData.binary.read(reader))
     return {
         nid,
         prop: propData.prop,

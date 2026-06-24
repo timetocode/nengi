@@ -156,5 +156,26 @@ describe('PredictionLog', () => {
         expect(resolution?.accepted).toBe(false)
         expect(localSwitch.open).toBe(false)
         expect(log.getPendingRequests()).toEqual([])
+        expect(log.operations.size).toBe(0)
+        expect(log.byRequestId.size).toBe(0)
+    })
+
+    it('removes rejected request predictions immediately after reconciliation', () => {
+        const log = new PredictionLog()
+        const events: string[] = []
+
+        log.addRequest(42, 8, { open: true }, 3, {
+            reconcile: ({ accepted, error }) => {
+                events.push(`${accepted}:${error.message}`)
+            }
+        })
+
+        const resolution = log.rejectRequest(42, new Error('denied'))
+
+        expect(resolution?.accepted).toBe(false)
+        expect(events).toEqual(['false:denied'])
+        expect(log.getPendingRequests()).toEqual([])
+        expect(log.operations.size).toBe(0)
+        expect(log.byRequestId.size).toBe(0)
     })
 })

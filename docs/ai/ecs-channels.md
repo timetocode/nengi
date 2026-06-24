@@ -27,6 +27,43 @@ for the recommended file shape. Do not give the root entity a schema; networked
 state lives on components. Do not put component writers in shared component
 files because writers are bound to a specific server channel instance.
 
+Use plain objects for canonical ECS components. They make the network schema,
+serialized fields, and explicit writer calls obvious:
+
+```ts
+const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
+
+const transform = Transform.create({
+    pid,
+    nid: 0,
+    x: 0,
+    y: 0
+})
+```
+
+Class instances are allowed when they expose the ECS fields directly and
+serialize like plain objects:
+
+```ts
+class TransformComponent {
+    readonly ntype = NType.Transform
+    nid?: number
+
+    constructor(
+        public pid: number,
+        public x: number,
+        public y: number
+    ) {}
+}
+
+const transform = world.add(new TransformComponent(pid, 0, 0))
+```
+
+Keep class behavior shallow. Hidden component methods that mutate networked
+state can obscure the required channel writer call. Use `nid: 0` only when
+passing a new component through an ECS channel that will assign its network id;
+leave `nid` undefined for local components added directly to an `EcsWorld`.
+
 ## Basic ECS channel
 
 ```ts
@@ -69,7 +106,6 @@ const transform = channel.addSpatialComponent(pid, {
 transform.x = nextX
 transform.y = nextY
 Transform.position(transform, nextX, nextY)
-channel.updateSpatialComponent(transform)
 ```
 
 Use `EcsChannel3D` when vertical culling matters.
@@ -77,7 +113,7 @@ Use `EcsChannel3D` when vertical culling matters.
 ## Canonical small server
 
 This is the intended minimal shape for a server-authoritative 2D ECS world.
-The server owns gameplay state in a `GameEcsWorld`, authors network state through
+The server owns gameplay state in an `EcsWorld`, authors network state through
 an `EcsChannel2D`, and calls component writers at explicit mutation points.
 
 Assume `NType`, schemas, and factory functions such as `createPlayer`,
@@ -87,22 +123,22 @@ Assume `NType`, schemas, and factory functions such as `createPlayer`,
 import {
     CommandRouter,
     EcsChannel2D,
-    GameEcsWorld,
+    EcsWorld,
     Instance,
     NetworkEvent,
     User,
-    gameComponentType
+    ecs
 } from 'nengi'
 
 const context = createContext()
 const instance = new Instance(context)
-const ecs = new GameEcsWorld()
-const world = new EcsChannel2D(instance.localState, 100, { name: 'world' })
+const world = new EcsWorld()
+const worldChannel = new EcsChannel2D(instance.localState, 100, { name: 'world' })
 
-const Player = gameComponentType<PlayerComponent>(NType.Player, 'Player')
-const Transform = gameComponentType<TransformComponent>(NType.Transform, 'Transform')
+const Player = ecs.defineComponent<PlayerComponent>(NType.Player, 'Player')
+const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
 
-const TransformWriter = world.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+const TransformWriter = worldChannel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
 const playerPidByUser = new Map<number, number>()
 const commands = new CommandRouter()
@@ -112,17 +148,17 @@ function viewFor(transform: TransformComponent) {
 }
 
 function spawnPlayer(user: User) {
-    const pid = world.createEntity()
-    ecs.createEntity(pid)
+    const pid = worldChannel.createEntity()
+    world.createEntity(pid)
 
-    const transform = world.addSpatialComponent(pid, createTransform(100, 100))
-    const player = world.addComponent(pid, createPlayer())
+    const transform = worldChannel.addSpatialComponent(pid, createTransform(100, 100))
+    const player = worldChannel.addComponent(pid, createPlayer())
 
-    ecs.add(transform)
-    ecs.add(player)
+    world.add(transform)
+    world.add(player)
 
     playerPidByUser.set(user.id, pid)
-    world.subscribe(user, viewFor(transform))
+    worldChannel.subscribe(user, viewFor(transform))
 }
 
 function removePlayer(user: User) {
@@ -135,8 +171,8 @@ function removePlayer(user: User) {
 
     // Remove from the game ECS before the channel unregisters components and
     // returns their nids to 0.
-    ecs.removeEntity(pid)
     world.removeEntity(pid)
+    worldChannel.removeEntity(pid)
 }
 
 commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
@@ -145,14 +181,13 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
         return
     }
 
-    const transform = ecs.require(pid, Transform)
+    const transform = world.require(pid, Transform)
     transform.x += command.inputX * 10
     transform.y += command.inputY * 10
 
     TransformWriter.props.x(transform, transform.x)
     TransformWriter.props.y(transform, transform.y)
-    world.updateSpatialComponent(transform)
-    world.updateView(user, viewFor(transform))
+    worldChannel.updateView(user, viewFor(transform))
 })
 
 function tick() {
@@ -176,35 +211,42 @@ The important boundaries:
 - The root `pid` is the gameplay entity id.
 - Networked state lives on components.
 - The channel creates/removes network ids.
-- `GameEcsWorld` is the game query surface.
+- `EcsWorld` is the game query surface.
+- ECS resources aka singletons live in `EcsWorld` when systems need shared
+  services or state that is not a component on one entity.
 - Component writers are the only way manual component mutations reach clients.
+- Spatial ECS writers also refresh the root's spatial cell before snapshot output.
+  Call `updateSpatialComponent` only for direct spatial changes that do not go
+  through a component writer.
 
 If the game has several ECS spaces, create several channels and give each
 channel a header or name that the client can classify.
 
 ## Canonical small client
 
-On the client, classify opened channels, apply ECS channel frames to a
-`GameEcsWorld`, and keep presentation code outside the network applier.
+On the client, classify opened channels, apply ECS channel frames to an
+`EcsWorld`, and keep presentation code outside the network applier.
 
 ```ts
 import {
     Client,
-    GameEcsWorld,
-    applyEcsChannelFrameToWorld,
-    gameComponentType
+    EcsWorld,
+    applyEcsChannelClose,
+    applyEcsChannelFrame,
+    ecs
 } from 'nengi'
+import type { Frame } from 'nengi'
 
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
-const ecs = new GameEcsWorld()
+const world = new EcsWorld()
 const channelByName = new Map<string, number>()
 
-const Player = gameComponentType<PlayerComponent>(NType.Player, 'Player')
-const Transform = gameComponentType<TransformComponent>(NType.Transform, 'Transform')
+const Player = ecs.defineComponent<PlayerComponent>(NType.Player, 'Player')
+const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
 
 await client.connect('ws://localhost:8079', handshake)
 
-function applyNetworkFrame(frame) {
+function applyNetworkFrame(frame: Frame) {
     frame.openedChannels.forEach(channel => {
         if (channel.header.name === 'world') {
             channelByName.set('world', channel.channelId)
@@ -216,7 +258,9 @@ function applyNetworkFrame(frame) {
             return
         }
 
-        const changes = applyEcsChannelFrameToWorld(ecs, channel)
+        channel.messages.forEach(handleWorldMessage)
+
+        const changes = applyEcsChannelFrame(world, channel)
         changes.createdComponents.forEach(component => {
             if (component.ntype === NType.Player) {
                 createPlayerPresentation(component.pid)
@@ -232,6 +276,10 @@ function applyNetworkFrame(frame) {
 
     frame.closedChannels.forEach(channel => {
         if (channel.channelId === channelByName.get('world')) {
+            const changes = applyEcsChannelClose(world, channel)
+            changes.deletedEntities.forEach(pid => {
+                destroyPresentation(pid)
+            })
             channelByName.delete('world')
         }
     })
@@ -242,7 +290,7 @@ function frame() {
         applyNetworkFrame(frame)
     }
 
-    ecs.query(Player, Transform).all((pid, player, transform) => {
+    world.query(Player, Transform).all((pid, player, transform) => {
         renderPlayer(pid, player, transform)
     })
 
@@ -252,8 +300,10 @@ function frame() {
 ```
 
 For multiple ECS channels, do not infer meaning from component type alone. Route
-by channel identity first, then apply the frame to the appropriate local world
-or feature system.
+by channel identity first, then apply the frame or close event to the appropriate
+local world or feature system. `applyEcsChannelClose()` removes the closed
+channel's network components from an `EcsWorld` while preserving local-only
+components.
 
 ## When to use ECS channels
 

@@ -91,10 +91,10 @@ function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecificati
     const { write, read, byteSize, compare, pre, post, interp, clone } = spec
 
     if (!write) {
-        throw new Error('A custom binary type was declared with no write function. Please declare a function write(value: T, bw: IBinaryWirter) => void that writes your custom binary type to an IBinaryWriter.')
+        throw new Error('A custom binary type was declared with no write function. Please declare a function write(value: T, bw: IBinaryWriter) => void that writes your custom binary type to an IBinaryWriter.')
     }
     if (!read) {
-        throw new Error('A custom binary type was declared with no read function. Please declare a function (readbr: IBinaryReader) => T that reads your custom binary tpe from an IBinaryReader.')
+        throw new Error('A custom binary type was declared with no read function. Please declare a function (reader: IBinaryReader) => T that reads your custom binary type from an IBinaryReader.')
     }
     if (!byteSize) {
         throw new Error('A custom binary type was declared with no byteSize function. Please declare a function byteSize(a: T) => number that returns the byte size of your value.')
@@ -207,7 +207,7 @@ declareBinaryType<string>(Binary.String, {
 
 function compareTypedArray(a: TypedArray, b: TypedArray) {
     if (a.length !== b.length) { return false }
-    for (let i = a.length; -1 < i; i -= 1) {
+    for (let i = a.length - 1; i >= 0; i -= 1) {
         if ((a[i] !== b[i])) { return false }
     }
     return true
@@ -270,7 +270,7 @@ declareBinaryType<Float64Array>(Binary.Float64Array, {
 })
 
 declareBinaryType<boolean>(Binary.Boolean, {
-    write: (value: any, bw: IBinaryWriter) => { bw.writeUInt8(value) },
+    write: (value: any, bw: IBinaryWriter) => { bw.writeUInt8(value ? 1 : 0) },
     read: (br: IBinaryReader) => { return 1 === br.readUInt8() },
     byteSize: () => { return 1 },
     compare: (a: boolean, b: boolean) => { return a === b }

@@ -147,7 +147,7 @@ export class Channel2D extends Channel implements ICulledChannel<SpatialEntity, 
         return entity
     }
 
-    updateEntity(entity: SpatialEntity) {
+    moveEntity(entity: SpatialEntity) {
         const move = this.grid.update(entity.nid, entity)
         if (!move) {
             return

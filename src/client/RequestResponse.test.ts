@@ -1,13 +1,16 @@
 import createSnapshotBuffer from '../binary/snapshot/createSnapshotBuffer'
 import { Buffer } from 'buffer'
 import { Binary } from '../common/binary/Binary'
+import { BinarySection } from '../common/binary/BinarySection'
 import { defineEntitySchema, defineMessageSchema, definePayloadSchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
+import { EngineMessage } from '../common/EngineMessage'
 import { MAX_UINT32, RequestPolicy, defineEndpoint } from '../common/Endpoint'
 import { Channel } from '../server/channel/Channel'
 import { Instance } from '../server/Instance'
 import { User, UserConnectionState } from '../server/User'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
+import { Client } from './Client'
 import { ClientNetwork } from './ClientNetwork'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 import { Predictor } from './prediction/Predictor'
@@ -38,6 +41,29 @@ function createClientNetwork(context: Context) {
     return network
 }
 
+class ThrowingSendAdapter {
+    binary = testBinaryAdapter
+    network: ClientNetwork
+
+    constructor(network: ClientNetwork) {
+        this.network = network
+    }
+
+    connect() {
+        return Promise.resolve({ accepted: true })
+    }
+
+    flush() {
+        this.network.createOutbound(this.binary)
+        throw new Error('send failed')
+    }
+}
+
+function setPreHandshake(user: User) {
+    user.connectionState = UserConnectionState.OpenPreHandshake
+    return user
+}
+
 function deliverRequestAndResponse(instance: Instance, user: User, clientNetwork: ClientNetwork) {
     const outbound = clientNetwork.createOutbound(testBinaryAdapter)
     instance.network.onMessage(user, outbound)
@@ -55,7 +81,7 @@ describe('request/response', () => {
             text: Binary.String
         }))
         const instance = new Instance(context)
-        const user = createUser(instance)
+        const user = setPreHandshake(createUser(instance))
         const clientNetwork = createClientNetwork(context)
         instance.onConnect = async () => true
 
@@ -77,7 +103,7 @@ describe('request/response', () => {
             text: Binary.String
         }))
         const instance = new Instance(context)
-        const user = createUser(instance)
+        const user = setPreHandshake(createUser(instance))
         const clientNetwork = createClientNetwork(context)
         clientNetwork.sendSchemaFingerprint = true
         instance.network.requireSchemaFingerprint = true
@@ -103,7 +129,7 @@ describe('request/response', () => {
             other: Binary.String
         }))
         const instance = new Instance(serverContext)
-        const user = createUser(instance)
+        const user = setPreHandshake(createUser(instance))
         const clientNetwork = createClientNetwork(clientContext)
         clientNetwork.sendSchemaFingerprint = true
         instance.network.requireSchemaFingerprint = true
@@ -125,7 +151,7 @@ describe('request/response', () => {
             text: Binary.String
         }))
         const instance = new Instance(context)
-        const user = createUser(instance)
+        const user = setPreHandshake(createUser(instance))
         const clientNetwork = createClientNetwork(context)
         instance.network.requireSchemaFingerprint = true
         instance.onConnect = async () => true
@@ -146,7 +172,7 @@ describe('request/response', () => {
             text: Binary.String
         }))
         const instance = new Instance(context)
-        const user = createUser(instance)
+        const user = setPreHandshake(createUser(instance))
         const clientNetwork = createClientNetwork(context)
         instance.onConnect = async () => true
 
@@ -157,6 +183,24 @@ describe('request/response', () => {
         const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
 
         expect(response.accepted).toBe(true)
+    })
+
+    it('returns a failed handshake response instead of throwing on malformed denial payloads', () => {
+        const context = new Context()
+        const clientNetwork = createClientNetwork(context)
+        const buffer = Buffer.from([
+            BinarySection.EngineMessages,
+            1,
+            EngineMessage.ConnectionDenied
+        ])
+
+        const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(buffer))
+
+        expect(response.accepted).toBe(false)
+        expect(response.reason).toMatchObject({
+            name: expect.any(String),
+            message: expect.any(String)
+        })
     })
 
     it('round trips plain numeric endpoints with UTF-8 JSON payloads', async () => {
@@ -500,26 +544,34 @@ describe('request/response', () => {
         const clientNetwork = createClientNetwork(context)
         clientNetwork.requestTimeoutMs = 1
 
-        const response = clientNetwork.request(7, {})
+        const response = clientNetwork.request(7, {}, {
+            prediction: {}
+        })
 
         await expect(response).rejects.toMatchObject({
             code: 'TIMEOUT'
         })
         expect(clientNetwork.requests.size).toBe(0)
         expect(clientNetwork.requestQueue.length).toBe(0)
+        expect(clientNetwork.client.predictor.log.getPendingRequests()).toEqual([])
+        expect(clientNetwork.client.predictor.log.operations.size).toBe(0)
     })
 
     it('rejects pending requests on disconnect', async () => {
         const context = new Context()
         const clientNetwork = createClientNetwork(context)
 
-        const response = clientNetwork.request(8, {})
+        const response = clientNetwork.request(8, {}, {
+            prediction: {}
+        })
         clientNetwork.onDisconnect('closed')
 
         await expect(response).rejects.toMatchObject({
             code: 'DISCONNECTED'
         })
         expect(clientNetwork.requests.size).toBe(0)
+        expect(clientNetwork.client.predictor.log.getPendingRequests()).toEqual([])
+        expect(clientNetwork.client.predictor.log.operations.size).toBe(0)
     })
 
     it('skips late binary responses after a timeout', async () => {
@@ -558,6 +610,41 @@ describe('request/response', () => {
         expect(() => {
             clientNetwork.readSnapshot(testBinaryAdapter.createReader(responseBuffer))
         }).not.toThrow()
+    })
+
+    it('reports malformed snapshots instead of throwing from the reader', () => {
+        const context = new Context()
+        const clientNetwork = createClientNetwork(context)
+        const onMalformedSnapshot = jest.fn()
+        clientNetwork.onMalformedSnapshot = onMalformedSnapshot
+
+        expect(() => {
+            clientNetwork.readSnapshot(testBinaryAdapter.createReader(Buffer.from([255])))
+        }).not.toThrow()
+
+        expect(onMalformedSnapshot).toHaveBeenCalledTimes(1)
+        expect(clientNetwork.getPendingFrameCount()).toBe(0)
+    })
+
+    it('rolls outbound state back when adapter flush fails before send completion', () => {
+        const context = new Context()
+        context.register(1, defineMessageSchema({
+            value: Binary.UInt8
+        }))
+        const client = new Client(context, ThrowingSendAdapter, 20)
+
+        const request = client.request(1, { value: 1 }, { timeoutMs: 0 })
+        request.catch(() => undefined)
+        client.addCommand({ ntype: 1, value: 7 })
+
+        expect(() => client.flush()).toThrow('send failed')
+
+        expect(client.network.commandFrameNumber).toBe(1)
+        expect(client.network.outbound.tick).toBe(1)
+        expect(client.network.requestQueue.length).toBe(1)
+        expect(client.network.requests.size).toBe(1)
+        expect(client.network.outbound.getCommands(1)).toEqual([{ ntype: 1, value: 7 }])
+        client.network.rejectPendingRequests(new Error('cleanup'))
     })
 
     it('allows duplicate request keys by default', () => {

@@ -14,6 +14,14 @@ import { interpolationDelaySchema } from './schemas/interpolationDelaySchema'
 import { Binary } from './binary/Binary'
 import { NetworkIdType, networkTypeForMaxValue } from './binary/Protocol'
 
+const MAX_SCHEMA_ID = 0xffffffff
+
+function assertValidSchemaId(ntype: number) {
+    if (!Number.isSafeInteger(ntype) || ntype <= 0 || ntype > MAX_SCHEMA_ID) {
+        throw new Error(`Schema id must be an integer from 1 to ${MAX_SCHEMA_ID}.`)
+    }
+}
+
 export class Context {
     /**
 	 * user-defined network schemas
@@ -46,6 +54,10 @@ export class Context {
     }
 
     register(ntype: number, schema: Schema) {
+        assertValidSchemaId(ntype)
+        if (this.schemas.has(ntype)) {
+            throw new Error(`Schema id ${ntype} is already registered.`)
+        }
         this.schemas.set(ntype, schema)
         this.ntypeType = networkTypeForMaxValue(Math.max(...this.schemas.keys()))
     }

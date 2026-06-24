@@ -1,20 +1,20 @@
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { DEFAULT_PROTOCOL, ProtocolConfig } from '../../common/binary/Protocol'
 import { Context } from '../../common/Context'
-import { BinaryDebugError, createBinaryDebugError } from '../BinaryDebugError'
+import { BinaryDiagnosticError, createBinaryDiagnosticError } from '../BinaryDiagnosticError'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { SnapshotPlan } from './SnapshotPlan'
-import { writeSnapshot, writeSnapshotDebug } from './writeSnapshot'
+import { writeSnapshot, writeSnapshotDiagnostic } from './writeSnapshot'
 
 export type SnapshotChunk = {
     label: string
     bytes: number
     write(writer: IBinaryWriter): void
-    writeDebug?: (writer: IBinaryWriter) => void
+    writeDiagnostic?: (writer: IBinaryWriter) => void
 }
 
 export type SnapshotChunkWriteOptions = {
-    debug?: boolean
+    diagnostic?: boolean
     createWriter?: (bytes: number) => IBinaryWriter
 }
 
@@ -33,12 +33,12 @@ export function createSnapshotPlanChunk(
         label,
         bytes,
         write: writer => writeSnapshot(plan, context, writer, protocol),
-        writeDebug: writer => writeSnapshotDebug(plan, context, writer, protocol)
+        writeDiagnostic: writer => writeSnapshotDiagnostic(plan, context, writer, protocol)
     }
 }
 
-export function createSnapshotChunk(label: string, bytes: number, write: (writer: IBinaryWriter) => void, writeDebug?: (writer: IBinaryWriter) => void): SnapshotChunk {
-    return { label, bytes, write, writeDebug }
+export function createSnapshotChunk(label: string, bytes: number, write: (writer: IBinaryWriter) => void, writeDiagnostic?: (writer: IBinaryWriter) => void): SnapshotChunk {
+    return { label, bytes, write, writeDiagnostic }
 }
 
 export function sumSnapshotChunkBytes(chunks: SnapshotChunk[]) {
@@ -53,20 +53,20 @@ export function writeSnapshotChunks(chunks: SnapshotChunk[], writer: IBinaryWrit
     try {
         writeChunks(chunks, writer, false, false)
     } catch (err) {
-        if (!options.debug) {
+        if (!options.diagnostic) {
             throw err
         }
 
         if (options.createWriter) {
-            const debugWriter = options.createWriter(sumSnapshotChunkBytes(chunks))
+            const diagnosticWriter = options.createWriter(sumSnapshotChunkBytes(chunks))
             try {
-                writeChunks(chunks, debugWriter, true, true)
-            } catch (debugErr) {
-                throw debugErr
+                writeChunks(chunks, diagnosticWriter, true, true)
+            } catch (diagnosticErr) {
+                throw diagnosticErr
             }
         }
 
-        throw createBinaryDebugError(err, {
+        throw createBinaryDiagnosticError(err, {
             phase: 'write',
             section: 'Snapshot',
             offset: writer.offset
@@ -74,12 +74,12 @@ export function writeSnapshotChunks(chunks: SnapshotChunk[], writer: IBinaryWrit
     }
 }
 
-function writeChunks(chunks: SnapshotChunk[], writer: IBinaryWriter, debug: boolean, wrapErrors: boolean) {
+function writeChunks(chunks: SnapshotChunk[], writer: IBinaryWriter, diagnostic: boolean, wrapErrors: boolean) {
     for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i]
         try {
-            if (debug && chunk.writeDebug) {
-                chunk.writeDebug(writer)
+            if (diagnostic && chunk.writeDiagnostic) {
+                chunk.writeDiagnostic(writer)
             } else {
                 chunk.write(writer)
             }
@@ -87,10 +87,10 @@ function writeChunks(chunks: SnapshotChunk[], writer: IBinaryWriter, debug: bool
             if (!wrapErrors) {
                 throw err
             }
-            if (err instanceof BinaryDebugError) {
+            if (err instanceof BinaryDiagnosticError) {
                 throw err
             }
-            throw createBinaryDebugError(err, {
+            throw createBinaryDiagnosticError(err, {
                 phase: 'write',
                 section: chunk.label,
                 index: i,

@@ -39,7 +39,7 @@ type ObjectChannelUnderTest = {
     removeEntity(entity: TestEntity): number
     subscribe(user: User, view?: any): void
     updateView?(user: User, view: any): void
-    updateEntity?(entity: TestEntity): void
+    moveEntity?(entity: TestEntity): void
     createEntityWriter?(ntype: number, schema: any): any
 }
 
@@ -377,7 +377,7 @@ function createScenario(
         if (manual) {
             writer.groups.position(entity, x, y, z)
         } else {
-            channel.updateEntity?.(entity)
+            channel.moveEntity?.(entity)
         }
     }
     const damage = (entity: TestEntity, hp: number) => {

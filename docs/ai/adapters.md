@@ -215,23 +215,25 @@ in-memory transports, not socket libraries.
 
 ```ts
 import { Client, Instance, LocalClientAdapter, LocalInstanceAdapter } from 'nengi'
-import { testBinaryAdapter } from './testBinaryAdapter'
+import { dataViewBinary } from 'nengi-dataviews'
 
 const instance = new Instance(context)
 const serverAdapter = new LocalInstanceAdapter(instance.network, {
-    binary: testBinaryAdapter
+    binary: dataViewBinary
 })
 const serverSocket = serverAdapter.createMockConnect()
 
 const client = new Client(context, LocalClientAdapter, 20, {
-    binary: testBinaryAdapter
+    binary: dataViewBinary
 })
 await client.connect(serverSocket.clientSocket, { role: 'local' })
 ```
 
 This still exercises the handshake, command, request, snapshot, and binary
 reader/writer paths. Use it when a real socket would add noise without changing
-the behavior under test.
+the behavior under test. Browser-hosted local prototypes should usually use
+`nengi-dataviews`; Node-only tests can use `nengi-buffers` or an internal test
+binary adapter.
 
 ## Binary Backends
 

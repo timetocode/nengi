@@ -72,4 +72,13 @@ describe('defineSchema helpers', () => {
         expect(schema.props.x.updateGroup).toBe(schema.updateGroups[0])
         expect(schema.props.y.updateGroup).toBe(schema.updateGroups[0])
     })
+
+    it('rejects schemas with more properties than can be addressed by one-byte diff keys', () => {
+        const definition: any = {}
+        for (let i = 0; i < 257; i++) {
+            definition[`prop${i}`] = Binary.UInt8
+        }
+
+        expect(() => defineEntitySchema(definition)).toThrow('at most 256 properties')
+    })
 })

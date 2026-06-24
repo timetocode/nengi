@@ -1,5 +1,5 @@
 export class NQueue<T> {
-    arr: any[]
+    arr: T[]
 
     constructor() {
         this.arr = []
@@ -9,15 +9,15 @@ export class NQueue<T> {
         return this.arr.length === 0
     }
 
-    enqueue(item: any) {
+    enqueue(item: T) {
         this.arr.unshift(item)
     }
 
     dequeue(): T {
-        return this.arr.pop()
+        return this.arr.pop() as T
     }
 
-    peekNext() {
+    peekNext(): T | undefined {
         return this.arr[this.arr.length - 1]
     }
 

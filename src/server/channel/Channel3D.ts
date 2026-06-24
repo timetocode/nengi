@@ -143,7 +143,7 @@ export class Channel3D extends Channel implements ICulledChannel<SpatialEntity3D
         return entity
     }
 
-    updateEntity(entity: SpatialEntity3D) {
+    moveEntity(entity: SpatialEntity3D) {
         const move = this.grid.update(entity.nid, entity)
         if (!move) {
             return

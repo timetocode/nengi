@@ -10,8 +10,7 @@ import { IEntity } from '../common/IEntity'
 
 function diff(entity: IEntity, cache: IEntity, nschema: Schema) {
     if (!cache) {
-        console.log('no cache')
-        return []
+        throw new Error(`EntityCache is missing cached state for nid ${entity.nid}.`)
     }
     return compareAndUpdateNObject(entity, cache, nschema)
 }
@@ -20,13 +19,11 @@ export class EntityCache {
     cache: { [tick: number]: IEntity }
     diffCache: { [tick: number]: { [nid: number]: any[] } }
     groupedDiffCache: { [tick: number]: { [nid: number]: EntityDiffResult } }
-    //binaryDiffCache: { [tick: number]: { [nid: number]: any[] } }
 
     constructor() {
         this.cache = {}
         this.diffCache = {}
         this.groupedDiffCache = {}
-        //this.binaryDiffCache = {}
     }
 
     cacheContains(nid: number): boolean {
@@ -36,20 +33,22 @@ export class EntityCache {
     createCachesForTick(tick: number) {
         this.diffCache[tick] = {}
         this.groupedDiffCache[tick] = {}
-        //this.binaryDiffCache[tick] = {}
     }
 
     deleteCachesForTick(tick: number) {
         delete this.diffCache[tick]
         delete this.groupedDiffCache[tick]
-        //delete this.binaryDiffCache[tick]
     }
 
     getAndDiffGrouped(tick: number, entity: IEntity, nschema: Schema): EntityDiffResult {
+        this.requireTickCache(tick)
         if (this.groupedDiffCache[tick][entity.nid]) {
             return this.groupedDiffCache[tick][entity.nid]
         } else {
             const cacheObject = this.cache[entity.nid]
+            if (!cacheObject) {
+                throw new Error(`EntityCache is missing cached state for nid ${entity.nid}.`)
+            }
             const diffs = compareAndUpdateNObjectGrouped(entity, cacheObject, nschema)
             this.groupedDiffCache[tick][entity.nid] = diffs
             return diffs
@@ -57,7 +56,8 @@ export class EntityCache {
     }
 
     getAndDiff(tick: number, entity: IEntity, nschema: Schema) {
-        if (this.diffCache[tick][entity.nid]){
+        this.requireTickCache(tick)
+        if (this.diffCache[tick][entity.nid]) {
             return this.diffCache[tick][entity.nid]
         } else {
             const cacheObject = this.cache[entity.nid]
@@ -73,6 +73,15 @@ export class EntityCache {
 
     updateCache(tick: number, entity: IEntity, nschema: Schema) {
         const cacheObject = this.cache[entity.nid]
+        if (!cacheObject) {
+            throw new Error(`EntityCache is missing cached state for nid ${entity.nid}.`)
+        }
         updateNObject(entity, cacheObject, nschema)
+    }
+
+    private requireTickCache(tick: number) {
+        if (!this.diffCache[tick] || !this.groupedDiffCache[tick]) {
+            throw new Error(`EntityCache tick ${tick} has not been initialized.`)
+        }
     }
 }

@@ -72,7 +72,7 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
 
     // Automatic spatial channels still need to learn when an entity moves so
     // nengi can update cell membership and visibility.
-    world.updateEntity(player)
+    world.moveEntity(player)
     world.updateView(user, viewFor(player))
 })
 
@@ -94,7 +94,7 @@ function tick() {
 
 The server object is the network object. Mutating `player.x` and `player.y`
 changes authoritative state. Nengi's automatic channel diffing sends schema
-property changes; `updateEntity` handles spatial membership.
+property changes; `moveEntity` handles spatial membership.
 
 If the game uses `ManualChannel2D` instead, keep the same object model but call
 manual writers at every networked mutation point.
@@ -110,6 +110,7 @@ import {
     AdaptiveInterpolator,
     Client
 } from 'nengi'
+import type { Frame } from 'nengi'
 
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
@@ -120,7 +121,7 @@ let controlledNid = 0
 
 await client.connect('ws://localhost:8079', handshake)
 
-function applyNetworkFrame(frame) {
+function applyNetworkFrame(frame: Frame) {
     frame.openedChannels.forEach(channel => {
         if (channel.header.name === 'world') {
             channelByName.set('world', channel.channelId)
@@ -136,6 +137,12 @@ function applyNetworkFrame(frame) {
     const worldId = channelByName.get('world')
     const worldFrame = worldId === undefined ? undefined : frame.getChannel(worldId)
     if (worldFrame) {
+        worldFrame.messages.forEach(message => {
+            if (message.ntype === NType.Impact) {
+                spawnImpactEffect(message.x, message.y)
+            }
+        })
+
         worldFrame.createEntities.forEach(entity => {
             if (entity.ntype === NType.Player) {
                 sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))

@@ -14,10 +14,6 @@ import { ChannelSnapshotOutput } from './ChannelSnapshotOutput'
 import { createCellFragmentChannelOutput } from './CellFragmentChannelOutput'
 import {
     appendManualGroup,
-    appendManualGroup1,
-    appendManualGroup2,
-    appendManualGroup3,
-    appendManualGroup4,
     appendManualProp,
     coalesceManualUpdateLog
 } from './EcsSpatialManualLog'
@@ -30,6 +26,7 @@ export type Manual2DSnapshotVisibility = {
     toDelete: number[]
     previous: Set<number>
     visibleCellKeys?: string[]
+    group?: Manual2DVisibilityGroup
     nextCellSignature?: string
     nextVisibleRef?: number[]
     nextVisibleSet?: Set<number>
@@ -88,7 +85,9 @@ export type ManualChannel2DOptions = ChannelOptions & {
     stableFragmentCellLimit?: number
     plane?: SpatialPlane
     spatialProps?: { x?: string, y?: string }
-    strictManualWrites?: boolean
+    // Development validation: throw when a writer target cannot be mapped to
+    // this channel's spatial entity/root cell.
+    validateManualWriteTargets?: boolean
 }
 
 function initializeManualCell(cell: SpatialGridCell<SpatialEntity>) {
@@ -137,11 +136,20 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     private spatialYProp: string
     plane: SpatialPlane
     private axes: SpatialPlaneAxes
-    private strictManualWrites: boolean
+    private validateManualWriteTargets: boolean
     private movedRoots: Manual2DMove[] = []
     private structuralDeltas = false
     private visibilityPlan: Manual2DVisibilityPlan | null = null
     private visibilityStateByUser: Map<number, Manual2DVisibilityState> = new Map()
+    private pendingPropEntities: SpatialEntity[] = []
+    private pendingPropSchemas: SchemaProp[] = []
+    private pendingPropValues: any[] = []
+    private pendingGroupEntities: SpatialEntity[] = []
+    private pendingGroupSchemas: SchemaUpdateGroup[] = []
+    private pendingGroupValueOffsets: number[] = []
+    private pendingGroupValues: any[] = []
+    private pendingOpTypes: number[] = []
+    private pendingOpIndexes: number[] = []
     skipInterpolationNids: number[] = []
 
     constructor(localState: LocalState, cellSize: number, options: ManualChannel2DOptions = {}) {
@@ -163,7 +171,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         this.axes = getSpatialPlaneAxes(this.plane)
         this.spatialXProp = options.spatialProps?.x || this.axes.a
         this.spatialYProp = options.spatialProps?.y || this.axes.b
-        this.strictManualWrites = options.strictManualWrites === true
+        this.validateManualWriteTargets = options.validateManualWriteTargets === true
         this.grid = new SpatialGrid2D({
             cellSize,
             getX: entity => entity[this.spatialXProp],
@@ -208,7 +216,21 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         }
     }
 
-    private markCellDirtyForEntity(entity: SpatialEntity) {
+    private validatePendingWriteEntity(entity: SpatialEntity) {
+        if (this.grid.objectCells.has(entity.nid)) {
+            return true
+        }
+        const rootNid = this.localState.getRootNid(entity.nid)
+        if (rootNid && rootNid !== entity.nid && this.grid.objectCells.has(rootNid)) {
+            return true
+        }
+        if (this.validateManualWriteTargets) {
+            throw new Error(`ManualChannel2D cannot write mutation for nid ${entity.nid}; no spatial cell was found for the entity or its root.`)
+        }
+        return false
+    }
+
+    private getCellForPendingWrite(entity: SpatialEntity) {
         let ref = this.grid.objectCells.get(entity.nid)
         if (ref) {
             this.updateSpatialCell(entity)
@@ -229,10 +251,77 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             }
         }
 
-        if (this.strictManualWrites) {
+        if (this.validateManualWriteTargets) {
             throw new Error(`ManualChannel2D cannot write mutation for nid ${entity.nid}; no spatial cell was found for the entity or its root.`)
         }
         return null
+    }
+
+    private appendPendingProp(entity: SpatialEntity, prop: SchemaProp, value: any) {
+        if (!this.validatePendingWriteEntity(entity)) {
+            return
+        }
+        this.pendingOpTypes.push(0)
+        this.pendingOpIndexes.push(this.pendingPropEntities.length)
+        this.pendingPropEntities.push(entity)
+        this.pendingPropSchemas.push(prop)
+        this.pendingPropValues.push(value)
+        this.clearVisibilityPlan()
+    }
+
+    private appendPendingGroup(entity: SpatialEntity, group: SchemaUpdateGroup, values: IArguments | any[], valueOffset = 0) {
+        if (!this.validatePendingWriteEntity(entity)) {
+            return
+        }
+        this.pendingOpTypes.push(1)
+        this.pendingOpIndexes.push(this.pendingGroupEntities.length)
+        this.pendingGroupEntities.push(entity)
+        this.pendingGroupSchemas.push(group)
+        this.pendingGroupValueOffsets.push(this.pendingGroupValues.length)
+        for (let i = 0; i < group.props.length; i++) {
+            this.pendingGroupValues.push(values[i + valueOffset])
+        }
+        this.clearVisibilityPlan()
+    }
+
+    private clearPendingWrites() {
+        this.pendingPropEntities.length = 0
+        this.pendingPropSchemas.length = 0
+        this.pendingPropValues.length = 0
+        this.pendingGroupEntities.length = 0
+        this.pendingGroupSchemas.length = 0
+        this.pendingGroupValueOffsets.length = 0
+        this.pendingGroupValues.length = 0
+        this.pendingOpTypes.length = 0
+        this.pendingOpIndexes.length = 0
+    }
+
+    private flushPendingWrites() {
+        if (this.pendingOpTypes.length === 0) {
+            return
+        }
+
+        for (let i = 0; i < this.pendingOpTypes.length; i++) {
+            const index = this.pendingOpIndexes[i]
+            if (this.pendingOpTypes[i] === 0) {
+                const entity = this.pendingPropEntities[index]
+                const cell = this.getCellForPendingWrite(entity)
+                if (cell) {
+                    appendManualProp(cell, entity.nid, this.pendingPropSchemas[index], this.pendingPropValues[index])
+                }
+                continue
+            }
+
+            const entity = this.pendingGroupEntities[index]
+            const cell = this.getCellForPendingWrite(entity)
+            if (!cell) {
+                continue
+            }
+            const group = this.pendingGroupSchemas[index]
+            const offset = this.pendingGroupValueOffsets[index]
+            appendManualGroup(cell, entity.nid, group, this.pendingGroupValues, offset)
+        }
+        this.clearPendingWrites()
     }
 
     private invalidateVisibleEntityCache() {
@@ -289,6 +378,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     toDelete: EMPTY_NIDS,
                     previous: state.visibleSet,
                     visibleCellKeys: group.visibleCellKeys,
+                    group,
                     nextCellSignature: group.cellSignature,
                     nextVisibleRef: group.visibleNids,
                     nextVisibleSet: state.visibleSet
@@ -305,6 +395,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                     toDelete: EMPTY_NIDS,
                     previous: state.visibleSet,
                     visibleCellKeys: group.visibleCellKeys,
+                    group,
                     nextCellSignature: group.cellSignature,
                     nextVisibleRef: group.visibleNids,
                     nextVisibleSet: state.visibleSet
@@ -321,6 +412,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
                 toDelete: EMPTY_NIDS,
                 previous: new Set<number>(),
                 visibleCellKeys: group.visibleCellKeys,
+                group,
                 nextCellSignature: group.cellSignature,
                 nextVisibleRef: group.visibleNids,
                 nextVisibleSet: currentSet
@@ -349,6 +441,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             toDelete,
             previous,
             visibleCellKeys: group.visibleCellKeys,
+            group,
             nextCellSignature: group.cellSignature,
             nextVisibleRef: group.visibleNids,
             nextVisibleSet: currentSet
@@ -441,11 +534,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             const name = propNames[i]
             const prop = schema.props[name]
             props[name] = (entity: SpatialEntity, value: any) => {
-                const cell = this.markCellDirtyForEntity(entity)
-                if (!cell) {
-                    return
-                }
-                appendManualProp(cell, entity.nid, prop, value)
+                this.appendPendingProp(entity, prop, value)
             }
             addAlias(name, props[name])
         }
@@ -454,43 +543,23 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             const group = schema.updateGroups[i]
             if (group.props.length === 1) {
                 groups[group.name] = (entity: SpatialEntity, v0: any) => {
-                    const cell = this.markCellDirtyForEntity(entity)
-                    if (!cell) {
-                        return
-                    }
-                    appendManualGroup1(cell, entity.nid, group, v0)
+                    this.appendPendingGroup(entity, group, [v0])
                 }
             } else if (group.props.length === 2) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any) => {
-                    const cell = this.markCellDirtyForEntity(entity)
-                    if (!cell) {
-                        return
-                    }
-                    appendManualGroup2(cell, entity.nid, group, v0, v1)
+                    this.appendPendingGroup(entity, group, [v0, v1])
                 }
             } else if (group.props.length === 3) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any, v2: any) => {
-                    const cell = this.markCellDirtyForEntity(entity)
-                    if (!cell) {
-                        return
-                    }
-                    appendManualGroup3(cell, entity.nid, group, v0, v1, v2)
+                    this.appendPendingGroup(entity, group, [v0, v1, v2])
                 }
             } else if (group.props.length === 4) {
                 groups[group.name] = (entity: SpatialEntity, v0: any, v1: any, v2: any, v3: any) => {
-                    const cell = this.markCellDirtyForEntity(entity)
-                    if (!cell) {
-                        return
-                    }
-                    appendManualGroup4(cell, entity.nid, group, v0, v1, v2, v3)
+                    this.appendPendingGroup(entity, group, [v0, v1, v2, v3])
                 }
             } else {
                 groups[group.name] = (entity: SpatialEntity, ...values: any[]) => {
-                    const cell = this.markCellDirtyForEntity(entity)
-                    if (!cell) {
-                        return
-                    }
-                    appendManualGroup(cell, entity.nid, group, values)
+                    this.appendPendingGroup(entity, group, values)
                 }
             }
             addAlias(group.name, groups[group.name])
@@ -517,7 +586,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         return true
     }
 
-    updateEntity(entity: SpatialEntity) {
+    moveEntity(entity: SpatialEntity) {
         this.updateSpatialCell(entity)
     }
 
@@ -577,6 +646,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     clearSnapshotDeltas() {
+        this.clearPendingWrites()
         for (const key of this.dirtyCells) {
             const cell = this.grid.cells.get(key) as Cell
             if (!cell) {
@@ -636,6 +706,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     getVisibleCellKeys(userId: number) {
+        this.flushPendingWrites()
         const viewVersion = this.viewVersions.get(userId) || 0
         const cached = this.visibleCellKeyCache.get(userId)
         if (cached && cached.viewVersion === viewVersion) {
@@ -655,6 +726,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     getVisibleEntities(userId: number) {
+        this.flushPendingWrites()
         const viewVersion = this.viewVersions.get(userId) || 0
         const cached = this.visibleEntityCache.get(userId)
         if (cached && cached.viewVersion === viewVersion && cached.membershipVersion === this.membershipVersion) {
@@ -671,6 +743,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     getVisibleNetworkedNids(userId: number) {
+        this.flushPendingWrites()
         const entityTreeVersion = this.localState.entityTreeVersion
         const roots = this.getVisibleEntities(userId)
         if (entityTreeVersion === 0) {
@@ -714,6 +787,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     getManualCellUpdateLog(key: string) {
+        this.flushPendingWrites()
         const cell = this.grid.cells.get(key) as Cell
         if (!cell) {
             return null
@@ -787,6 +861,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     prepareVisibilityPlan(tick: number) {
+        this.flushPendingWrites()
         if (this.visibilityPlan && this.visibilityPlan.tick === tick) {
             return this.visibilityPlan
         }

@@ -85,6 +85,9 @@ function compileSchema(schema: SchemaDefinition, kind: SchemaKind): Schema {
         if (kind === 'entity' && prop === 'nid') {
             throw new Error('No need to define `nid` in an entity schema, this is added by the entity envelope.')
         }
+        if (index > 255) {
+            throw new Error('A schema may define at most 256 properties.')
+        }
 
         const spec = schema[prop]
         if (typeof spec === 'object' && spec !== null && 'type' in spec) {

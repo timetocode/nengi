@@ -12,30 +12,30 @@ export class NDictionary {
     }
 
     add(entity: IEntity) {
+        if (this.nidIndex.has(entity.nid)) {
+            throw new Error(`NDictionary already contains nid ${entity.nid}.`)
+        }
         const length = this.array.push(entity)
         this.nidIndex.set(entity.nid, length - 1)
     }
 
     remove(entity: IEntity) {
         const nid = entity.nid
-        const indexToRemove = this.nidIndex.get(nid)!
+        const indexToRemove = this.nidIndex.get(nid)
+        if (indexToRemove === undefined || this.array[indexToRemove] !== entity) {
+            return false
+        }
         const lastIndex = this.array.length - 1
 
-        // If the element to remove is not the last one, swap and pop.
         if (indexToRemove !== lastIndex) {
             const otherNid = this.array[lastIndex].nid
-            
-            // Swap
-            ;[this.array[indexToRemove], this.array[lastIndex]] = 
-                [this.array[lastIndex], this.array[indexToRemove]]
-
-            // Update nidIndex
+            this.array[indexToRemove] = this.array[lastIndex]
             this.nidIndex.set(otherNid, indexToRemove)
         }
-        
-        // Remove the entity
+
         this.array.pop()
         this.nidIndex.delete(nid)
+        return true
     }
 
     removeAll() {

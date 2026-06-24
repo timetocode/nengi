@@ -18,27 +18,25 @@ export * from './server/channel/EcsChannel'
 export * from './server/channel/EcsChannel2D'
 export * from './server/channel/EcsChannel3D'
 export {
-    GameEcsWorld,
-    componentType as gameComponentType,
-    localComponentType as gameLocalComponentType,
-    resourceKey as gameResourceKey
-} from './ecs/GameEcsWorld'
-export * from './ecs/applyEcsChannelFrameToWorld'
+    EcsWorld,
+    ecs
+} from './ecs/EcsWorld'
+export * from './ecs/applyEcsChannelFrame'
 export type {
-    Pid as GameEcsPid,
-    Nid as GameEcsNid,
-    ComponentTypeId as GameEcsComponentTypeId,
-    Component as GameEcsComponent,
-    NetworkComponent as GameEcsNetworkComponent,
-    IdentifiedComponent as GameEcsIdentifiedComponent,
-    ComponentDef as GameEcsComponentDef,
-    ComponentOf as GameEcsComponentOf,
-    QueryComponents as GameEcsQueryComponents,
-    Query as GameEcsQuery,
-    ResourceCtor as GameEcsResourceCtor,
-    ResourceToken as GameEcsResourceToken,
-    ResourceKey as GameEcsResourceKey
-} from './ecs/GameEcsWorld'
+    Pid as EcsPid,
+    Nid as EcsNid,
+    ComponentTypeId as EcsComponentTypeId,
+    Component as EcsComponent,
+    NetworkComponent as EcsNetworkComponent,
+    IdentifiedComponent as EcsIdentifiedComponent,
+    ComponentDefinition as EcsComponentDefinition,
+    ComponentOf as EcsComponentOf,
+    QueryComponents as EcsQueryComponents,
+    Query as EcsQuery,
+    ResourceCtor as EcsResourceCtor,
+    ResourceToken as EcsResourceToken,
+    ResourceKey as EcsResourceKey
+} from './ecs/EcsWorld'
 export * from './server/User'
 export * from './server/Historian'
 export * from './server/Historian2D'
@@ -53,16 +51,27 @@ export * from './client/EntityHistory'
 export * from './client/EntityStore'
 export * from './client/FixedStepInterpolator'
 export * from './client/InterpolationDelayPolicy'
-export * from './client/Interpolator'
 export * from './client/PlaybackCursor'
-export * from './client/prediction/Predictor'
-export * from './client/prediction/PredictionErrorFrame'
-export * from './client/prediction/PredictionErrorEntity'
-export * from './client/prediction/PredictionErrorProperty'
-export * from './client/prediction/PredictionFrame'
-export * from './client/prediction/PredictionEntity'
+export * from './client/Frame'
 export * from './client/prediction/CommandReplayPrediction'
 export * from './client/prediction/StateReplayPrediction'
+export type {
+    PredictionReconciliationEvent,
+    PredictionStateMismatch
+} from './client/prediction/Predictor'
+export {
+    PredictionOperationKind,
+    PredictionOperationStatus
+} from './client/prediction/PredictionLog'
+export type {
+    PredictionContext,
+    PredictionExpectedState,
+    PredictionOperation,
+    PredictionOperationOptions,
+    PredictionResolution,
+    PredictionTarget,
+    PredictionValidation
+} from './client/prediction/PredictionLog'
 
 // common
 export * from './common/binary/Binary'
@@ -85,8 +94,3 @@ export * from './common/binary/IBinaryReader'
 export * from './common/binary/IBinaryWriter'
 export * from './common/binary/BinaryAdapter'
 export * from './common/binary/Protocol'
-
-
-// benchmarks/tests
-export * from './binary/message/writeMessage'
-export * from './binary/entity/writeEntity'

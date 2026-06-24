@@ -87,10 +87,16 @@ Transform.position(transform, nextX, nextY)
 
 Mutate the game object and call the writer in the same logical mutation path. If game code mutates a property but does not call the writer, nengi will not send that manual update.
 
-For spatial manual paths, enable `strictManualWrites: true` during development
-when you want writer calls to throw if the target entity/component is not in a
-known spatial cell. Leave it off for the smallest hot path once the mutation
-surface is proven.
+For `ManualChannel2D/3D` and `EcsChannel2D/3D`, writer calls also refresh
+spatial membership before snapshot output. Do not add a separate
+`moveEntity` or `updateSpatialComponent` call after a normal spatial writer
+mutation. Use explicit spatial update methods only for direct spatial changes
+that intentionally do not emit a writer mutation.
+
+For spatial manual paths, enable `validateManualWriteTargets: true` during
+development when you want writer calls to throw if the target entity/component
+is not in a known spatial cell. Leave it off for the smallest hot path once the
+mutation surface is proven.
 
 ## Common mistakes
 
@@ -98,14 +104,21 @@ surface is proven.
 - Mutating manual entities in many systems without a shared mutation API.
 - Forgetting writer calls for less common properties.
 - Calling a writer for an entity that is not in the channel or visible cell.
-- Treating `strictManualWrites` as a runtime synchronization feature. It is a
-  validation aid; the game still has to route mutations through the right
-  channel/writer.
+- Treating `validateManualWriteTargets` as a runtime synchronization feature.
+  It is a validation aid; the game still has to route mutations through the
+  right channel/writer.
 - Using single prop writes for transform data that has a useful update group.
 
-## Debug strategy
+## Diagnostic strategy
 
-During development, consider wrapping game mutation APIs so game systems cannot mutate networked state without also calling the writer. For performance builds, keep the hot path direct.
+During development, consider wrapping game mutation APIs so game systems cannot
+mutate networked state without also calling the writer. For performance builds,
+keep the hot path direct.
+
+If binary snapshot writing throws and the raw error does not identify the
+failing field, enable `instance.network.diagnosticBinaryWrites = true`. This
+reruns failed snapshot writes with extra section, entity, property, and value
+context. Leave it off during normal play and benchmarks.
 
 ## Decision path
 

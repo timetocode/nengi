@@ -1,11 +1,11 @@
-import type { AppliedEntityChange, ChannelFrame } from '../client/Frame'
+import type { AppliedEntityChange, ChannelFrame, ClosedChannel } from '../client/Frame'
 import {
-    GameEcsWorld,
+    EcsWorld,
     type ComponentTypeId,
     type IdentifiedComponent,
     type Nid,
     type Pid
-} from './GameEcsWorld'
+} from './EcsWorld'
 
 export type AppliedEcsComponentUpdate = {
     component: IdentifiedComponent
@@ -39,20 +39,13 @@ function defaultIsNetworkComponent(component: IdentifiedComponent) {
     return component.ntype >= 0
 }
 
-export function applyEcsChannelFrameToWorld(
-    world: GameEcsWorld,
+export function applyEcsChannelFrame(
+    world: EcsWorld,
     channel: ChannelFrame,
     options: ApplyEcsChannelFrameOptions = {}
 ): AppliedEcsChannelFrame {
     const isNetworkComponent = options.isNetworkComponent || defaultIsNetworkComponent
-    const changes: AppliedEcsChannelFrame = {
-        channelId: channel.channelId,
-        createdEntities: [],
-        createdComponents: [],
-        updatedComponents: [],
-        deletedComponents: [],
-        deletedEntities: []
-    }
+    const changes = createAppliedEcsChannelFrame(channel.channelId)
 
     for (let i = 0; i < channel.ecsCreateEntities.length; i++) {
         const pid = channel.ecsCreateEntities[i]
@@ -85,7 +78,53 @@ export function applyEcsChannelFrameToWorld(
     return changes
 }
 
-function applyComponentUpdate(world: GameEcsWorld, update: AppliedEntityChange): AppliedEcsComponentUpdate {
+export function applyEcsChannelClose(
+    world: EcsWorld,
+    channel: ClosedChannel,
+    options: ApplyEcsChannelFrameOptions = {}
+): AppliedEcsChannelFrame {
+    const isNetworkComponent = options.isNetworkComponent || defaultIsNetworkComponent
+    const changes = createAppliedEcsChannelFrame(channel.channelId)
+    const affectedPids = new Set<Pid>()
+
+    for (let i = 0; i < channel.entityNids.length; i++) {
+        const nid = channel.entityNids[i]
+        const component = world.getByNid(nid)
+        if (component && isNetworkComponent(component)) {
+            affectedPids.add(component.pid)
+            changes.deletedComponents.push(deleteComponentByNid(world, nid))
+            continue
+        }
+
+        const deletedCount = changes.deletedComponents.length
+        deleteRemainingNetworkComponents(world, nid, isNetworkComponent, changes.deletedComponents)
+        if (changes.deletedComponents.length !== deletedCount || world.componentNidsForEntity(nid).length > 0) {
+            affectedPids.add(nid)
+        }
+    }
+
+    affectedPids.forEach(pid => {
+        if (world.componentNidsForEntity(pid).length === 0) {
+            world.removeEntity(pid)
+        }
+        changes.deletedEntities.push(pid)
+    })
+
+    return changes
+}
+
+function createAppliedEcsChannelFrame(channelId: number): AppliedEcsChannelFrame {
+    return {
+        channelId,
+        createdEntities: [],
+        createdComponents: [],
+        updatedComponents: [],
+        deletedComponents: [],
+        deletedEntities: []
+    }
+}
+
+function applyComponentUpdate(world: EcsWorld, update: AppliedEntityChange): AppliedEcsComponentUpdate {
     const component = world.getByNid(update.nid) as (IdentifiedComponent & Record<string, any>) | undefined
     if (!component) {
         throw new Error(`Cannot apply ECS update for missing component nid ${update.nid}.`)
@@ -102,7 +141,7 @@ function applyComponentUpdate(world: GameEcsWorld, update: AppliedEntityChange):
     }
 }
 
-function deleteComponentByNid(world: GameEcsWorld, nid: Nid): AppliedEcsComponentDelete {
+function deleteComponentByNid(world: EcsWorld, nid: Nid): AppliedEcsComponentDelete {
     const component = world.getByNid(nid)
     const deleted: AppliedEcsComponentDelete = {
         nid,
@@ -115,7 +154,7 @@ function deleteComponentByNid(world: GameEcsWorld, nid: Nid): AppliedEcsComponen
 }
 
 function deleteRemainingNetworkComponents(
-    world: GameEcsWorld,
+    world: EcsWorld,
     pid: Pid,
     isNetworkComponent: (component: IdentifiedComponent) => boolean,
     deletedComponents: AppliedEcsComponentDelete[]

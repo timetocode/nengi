@@ -51,10 +51,12 @@ For automatic spatial channels, update the spatial index when an entity moves:
 ```ts
 player.x = nextX
 player.y = nextY
-channel.updateEntity(player)
+channel.moveEntity(player)
 ```
 
-For manual spatial channels, writer calls update dirty cell bookkeeping for mutation logs. If the movement changes cells, make sure the channel learns about the movement through the intended update path.
+For manual spatial channels, writer calls refresh spatial membership before
+snapshot output. Do not also call `moveEntity` after a normal manual position
+writer.
 
 ## Cell size
 
@@ -76,7 +78,12 @@ Start with a cell size near the size of meaningful interest areas, then benchmar
 
 ## Messages
 
-Spatial channel messages are culled immediately. When you call `addMessage(message)`, the channel checks current subscribed user views and queues the message directly to matching users.
+Spatial channel messages are culled immediately. When you call `addMessage(message)`, the channel checks current subscribed user views and queues the message directly to matching users. On the client, read those messages from the matching `ChannelFrame`:
+
+```ts
+const worldFrame = frame.getChannel(worldChannelId)
+worldFrame?.messages.forEach(handleWorldMessage)
+```
 
 Use `addInterpolatedMessage(message)` for spatial effects that should be culled
 by the same view and delivered on the client interpolation timeline.
@@ -104,3 +111,7 @@ Spatial channels are usually the wrong model when:
 Use `ManualChannel2D/3D` when spatial culling is the right visibility
 model and hot mutations are explicit. This is often the highest-performance path
 for large worlds with low mutation fractions.
+
+Manual spatial writers refresh cell membership before snapshot output. If a
+position writer is called, do not also call the automatic-channel
+`moveEntity` method for that same mutation.

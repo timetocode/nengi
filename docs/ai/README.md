@@ -13,12 +13,10 @@ If you are creating a new local prototype in this repository, read
 is the setup source of truth for TypeScript, Vite, local imports, and workspace
 package dependencies.
 
-For a fresh AI evaluation run in this workspace, use
-[short-prototype-prompt.md](./short-prototype-prompt.md). It is intentionally
-small so the docs, not the prompt, carry most of the API guidance.
-
-To test whether an AI can self-stage a more creative game request, use
-[staged-beaver-game-prompt.md](./staged-beaver-game-prompt.md).
+If you need to see the canonical server/client flow without reading an example
+game, use [canonical-snippets.md](./canonical-snippets.md). It contains compact
+plain-channel, ECS-channel, and predicted movement snippets. These snippets are
+orientation material, not complete game templates.
 
 ## Documentation policy
 
@@ -121,8 +119,11 @@ client code.
 - `EntityStore` is the latest raw authoritative state.
 - `Frame` is the per-snapshot change report: creates, updates, deletes,
   messages, channel opens/closes, and channel-scoped CRUD.
+- `ChannelFrame` is the channel-scoped part of a `Frame`: channel entity/component
+  CRUD plus channel-scoped messages and interpolated messages.
 - Interpolators sample retained history for smooth rendering.
 - Prediction helpers reconcile local predicted state against raw store state.
+  For fast local movement, use [real-time movement prediction](./realtime-movement-prediction.md).
 
 Do not build a second store or binding layer by default. Userland should create
 sprites, UI records, sounds, and local prediction state directly from frame
@@ -132,7 +133,7 @@ For plain object channels, this raw path is the normal client model: server
 channels emit channel-scoped create/update/delete facts, `EntityStore` holds the
 latest authoritative objects, and userland owns presentation.
 
-For nengi ECS channels, apply the frame's ECS CRUD to a `GameEcsWorld`. Keep that
+For nengi ECS channels, apply the frame's ECS CRUD to an `EcsWorld`. Keep that
 sync layer tiny: CRUD in, ECS mutation plus facts out.
 
 ## Common mistakes to avoid
@@ -145,6 +146,8 @@ sync layer tiny: CRUD in, ECS mutation plus facts out.
 - Do not use spatial channels for permission-only visibility unless position is
   also part of the visibility rule.
 - Do not use requests for high-frequency movement input. Use commands.
+- Do not mix render-`dt` movement prediction with a server command-step movement
+  model. Pick one timing model and apply it consistently.
 - Do not use messages for persistent state that new subscribers must reconstruct.
 - Do not choose manual channels unless game code can reliably call mutation
   writers everywhere networked state changes.
@@ -158,8 +161,10 @@ Use this map instead of reading every file every time.
 - If defining replicated state and schemas, read [shared-state.md](./shared-state.md).
 - If deciding between entities, messages, commands, and requests, read [networking-primitives.md](./networking-primitives.md).
 - If wiring plain object channels or ECS channels into client game state, read [client-router.md](./client-router.md).
+- If making a fast action game with local movement prediction, read [realtime-movement-prediction.md](./realtime-movement-prediction.md).
 - If the game uses ordinary replicated objects instead of ECS components, read [plain-channels.md](./plain-channels.md), which includes a small canonical server/client shape.
 - If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).
+- If you need compact server/client wiring examples, read [canonical-snippets.md](./canonical-snippets.md).
 - If wiring sockets or local test transports, read [adapters.md](./adapters.md).
 - If adding common game features, read [channel-recipes.md](./channel-recipes.md).
 - If adding lag compensation, hit validation, rewind queries, or server-authoritative fairness rules, read [historian-lag-compensation.md](./historian-lag-compensation.md).
@@ -168,8 +173,6 @@ Use this map instead of reading every file every time.
 - If the game uses ECS-style roots and components, read [ecs-channels.md](./ecs-channels.md), which includes a small canonical server/client ECS shape.
 - If deciding whether an optimization helped, read [benchmarking.md](./benchmarking.md).
 - If the design feels suspicious or you are auditing for common bugs, read [anti-patterns.md](./anti-patterns.md).
-- If asking another AI to make a first tiny game, use [minimal-game-prompt.md](./minimal-game-prompt.md).
-
 ## Common nengi primitives
 
 - Entity: persistent replicated state with `nid`, `ntype`, and schema properties.
@@ -180,7 +183,8 @@ Use this map instead of reading every file every time.
 - Channel header: schema-backed client context for a channel.
 - EntityStore: client-side authoritative raw state, indexed by nid and channel.
 - Frame: per-snapshot change report returned after nengi applies a snapshot.
-- Interpolator: samples retained entity history for smooth rendering.
+- `StaticInterpolator` / `AdaptiveInterpolator`: sample retained entity history for smooth rendering.
+- `PublicPositionSmoother2D`: server-side helper for smoothing replicated public positions when predicted movement makes raw authority advance in client-command bursts.
 - Schema: binary definition of properties nengi can write over the network.
 
 ## Default recommendation
