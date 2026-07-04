@@ -3,6 +3,11 @@ import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 import { SnapshotPlan } from './SnapshotPlan'
 
 export function commitSnapshotPlan(user: User, plan: SnapshotPlan) {
+    for (let i = 0; i < plan.channelCloses.length; i++) {
+        user.knownChannelIds.delete(plan.channelCloses[i].channelId)
+        user.knownChannelHeaderVersions.delete(plan.channelCloses[i].channelId)
+    }
+
     for (let i = 0; i < plan.channelOpens.length; i++) {
         const open = plan.channelOpens[i]
         user.knownChannelIds.add(open.channelId)
@@ -16,11 +21,6 @@ export function commitSnapshotPlan(user: User, plan: SnapshotPlan) {
             plan.channelHeaderVersions[i].channelId,
             plan.channelHeaderVersions[i].version
         )
-    }
-
-    for (let i = 0; i < plan.channelCloses.length; i++) {
-        user.knownChannelIds.delete(plan.channelCloses[i].channelId)
-        user.knownChannelHeaderVersions.delete(plan.channelCloses[i].channelId)
     }
 
     if (plan.responses.length === 0) {

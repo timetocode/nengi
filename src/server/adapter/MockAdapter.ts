@@ -100,7 +100,7 @@ class LocalClientAdapter<
         this.network.readSnapshot(br)
     }
 
-    connect(target?: void | MockClientSocket, handshake?: any) {
+    connect(target?: void | MockClientSocket, handshake: any = {}) {
         this.socket = target || null
         if (!this.socket) {
             this.connected = true

@@ -61,6 +61,8 @@ and ordinary game code will express the feature clearly.
 
 Prefer primitive patterns that can be remixed:
 
+- auth token, selected character, or requested room at socket open: connection
+  handshake
 - world object with position and durable state: entity in a world channel
 - private count or HUD value: private message or one small private entity
 - shared container with item lifecycle: headered `Channel`
@@ -175,6 +177,8 @@ Use this map instead of reading every file every time.
 - If the design feels suspicious or you are auditing for common bugs, read [anti-patterns.md](./anti-patterns.md).
 ## Common nengi primitives
 
+- Connection handshake: client-provided setup data that `instance.onConnect`
+  validates before accepting a socket.
 - Entity: persistent replicated state with `nid`, `ntype`, and schema properties.
 - Message: transient payload for one-off events.
 - Command: client-to-server input that does not inherently expect a response.

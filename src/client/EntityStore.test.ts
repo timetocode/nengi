@@ -161,4 +161,72 @@ describe('EntityStore raw client surface', () => {
             createEntities: [{ nid: 1, ntype: NType.Player, x: 0, y: 0, hp: 10 }]
         }), 1)).toThrow('EntityStore requires channel-scoped entity CRUD.')
     })
+
+    it('applies a channel close before a same-id channel open and reused entity ids', () => {
+        const store = createStore()
+
+        store.applySnapshot(snapshot({
+            channelOpens: [{
+                channelId: 50,
+                header: createChannelHeader(50, ChannelType.Channel, {
+                    nid: 50,
+                    ntype: NType.InventoryHeader,
+                    inventoryId: 1,
+                    label: 'old'
+                })
+            }],
+            channels: [{
+                channelId: 50,
+                ecsCreateEntities: [],
+                ecsCreateComponents: [],
+                ecsDeleteEntities: [],
+                createEntities: [{ nid: 10, ntype: NType.InventoryItem, itemId: 3, quantity: 2 }],
+                updateEntities: [],
+                updateEntityGroups: [],
+                deleteEntities: [],
+                messages: [],
+                interpolatedMessages: []
+            }]
+        }), 1)
+
+        const frame = store.applySnapshot(snapshot({
+            channelCloses: [{ channelId: 50 }],
+            channelOpens: [{
+                channelId: 50,
+                header: createChannelHeader(50, ChannelType.Channel, {
+                    nid: 50,
+                    ntype: NType.InventoryHeader,
+                    inventoryId: 2,
+                    label: 'new'
+                })
+            }],
+            channels: [{
+                channelId: 50,
+                ecsCreateEntities: [],
+                ecsCreateComponents: [],
+                ecsDeleteEntities: [],
+                createEntities: [{ nid: 10, ntype: NType.InventoryItem, itemId: 9, quantity: 1 }],
+                updateEntities: [],
+                updateEntityGroups: [],
+                deleteEntities: [],
+                messages: [],
+                interpolatedMessages: []
+            }]
+        }), 2)
+
+        expect(frame.closedChannels).toEqual([{
+            channelId: 50,
+            header: expect.objectContaining({ inventoryId: 1, label: 'old' }),
+            entityNids: [10]
+        }])
+        expect(frame.openedChannels).toEqual([{
+            channelId: 50,
+            header: expect.objectContaining({ inventoryId: 2, label: 'new' })
+        }])
+        expect(store.get(10)).toEqual({ nid: 10, ntype: NType.InventoryItem, itemId: 9, quantity: 1 })
+        expect(store.getChannelHeaderById(50)).toEqual(expect.objectContaining({
+            inventoryId: 2,
+            label: 'new'
+        }))
+    })
 })

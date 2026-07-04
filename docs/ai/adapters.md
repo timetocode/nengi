@@ -95,8 +95,13 @@ import { Client } from 'nengi'
 import { WebSocketClientAdapter } from 'nengi-websocket-client-adapter'
 
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
-await client.connect('ws://localhost:8079', handshake)
+await client.connect('ws://localhost:8079')
 ```
+
+The optional second `connect` argument is the JSON-serializable connection setup
+payload that the adapter sends through nengi's normal connection attempt. Use it
+for auth or session selection data that `instance.onConnect` validates before
+accepting the socket.
 
 The adapter is responsible for:
 
@@ -264,7 +269,7 @@ For a server adapter:
 For a client adapter:
 
 - expose `binary`
-- implement `connect(target, handshake)`
+- implement `connect(target, handshake = {})`
 - send `client.network.createHandshake(handshake, binary)` after opening
 - read the handshake response before treating normal snapshots as game data
 - implement `flush()` by sending `client.network.createOutbound(binary)`

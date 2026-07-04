@@ -2,6 +2,79 @@
 
 Before choosing a channel, decide what kind of network data the feature needs.
 
+## Connection handshake
+
+Use the connection handshake for facts the server needs before accepting a
+socket:
+
+- auth token or session token
+- selected character, shard, room, or save slot
+- client build/version
+- requested display name or cosmetic profile id
+
+If the game has no connection setup data, the client can connect with only the
+target:
+
+```ts
+await client.connect('ws://localhost:8079')
+```
+
+When the server needs setup data, the client passes a JSON-serializable value
+to `connect`:
+
+```ts
+await client.connect('ws://localhost:8079', {
+    token,
+    characterId,
+    clientBuild: BUILD_ID
+})
+```
+
+The server validates that value in `instance.onConnect`. Treat handshake data as
+untrusted client input: use it to look up server-side facts, not as proof that a
+user is an admin or owns a character.
+
+```ts
+instance.onConnect = async handshake => {
+    const session = await verifySessionToken(handshake.token)
+    if (!session) {
+        return false
+    }
+
+    const character = await loadOwnedCharacter(session.accountId, handshake.characterId)
+    if (!character) {
+        return false
+    }
+
+    return {
+        accountId: session.accountId,
+        characterId: character.id,
+        isAdmin: session.roles.includes('admin')
+    }
+}
+```
+
+Returning `false` denies the connection. Any other return value accepts it and
+becomes `event.payload` on the server-side `NetworkEvent.UserConnected` event:
+
+```ts
+if (event.type === NetworkEvent.UserConnected) {
+    const session = event.payload as {
+        accountId: string
+        characterId: string
+        isAdmin: boolean
+    }
+
+    users.set(event.user.id, session)
+    spawnCharacter(event.user, session.characterId)
+}
+```
+
+The accepted payload is not a replicated client bootstrap message. If the client
+needs to know which entity it controls, what character loaded, or which UI mode
+to enter, send that with normal messages, channel headers, or initial replicated
+state after the connection is accepted.
+
 ## Entity
 
 Use an entity for persistent replicated state.

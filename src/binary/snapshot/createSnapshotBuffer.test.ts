@@ -1095,6 +1095,78 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.store.entities.has(itemNid)).toBe(false)
     })
 
+    it('sends close and open when a destroyed channel id is reused before the next snapshot', () => {
+        const context = createEcsContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        const firstChannel = new EcsChannel(instance.localState, { name: 'first' })
+
+        instance.users.set(user.id, user)
+        firstChannel.subscribe(user)
+
+        const firstPid = firstChannel.createEntity()
+        const firstTransform = firstChannel.addComponent(firstPid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 1,
+            y: 2
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const reusedChannelId = firstChannel.nid
+        const firstTransformNid = firstTransform.nid
+        firstChannel.destroy()
+        instance.localState.releaseDeferredIds()
+
+        let secondChannel = new EcsChannel(instance.localState, { name: 'second' })
+        while (secondChannel.nid !== reusedChannelId) {
+            secondChannel = new EcsChannel(instance.localState, { name: 'second' })
+        }
+        secondChannel.subscribe(user)
+
+        const secondPid = secondChannel.createEntity()
+        const secondTransform = secondChannel.addComponent(secondPid, {
+            nid: 0,
+            ntype: NType.Transform,
+            x: 10,
+            y: 20
+        })
+
+        instance.step()
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        clientNetwork.processNextFrame()
+
+        const frame = clientNetwork.latestFrame!
+        expect(frame.closedChannels).toEqual([{
+            channelId: reusedChannelId,
+            header: expect.objectContaining({ name: 'first' }),
+            entityNids: expect.arrayContaining([firstPid, firstTransformNid])
+        }])
+        expect(frame.openedChannels).toEqual([{
+            channelId: reusedChannelId,
+            header: expect.objectContaining({ name: 'second' })
+        }])
+        expect(frame.requireChannel(reusedChannelId).ecsCreateEntities).toEqual([secondPid])
+        expect(frame.requireChannel(reusedChannelId).ecsCreateComponents).toEqual([
+            expect.objectContaining({
+                nid: secondTransform.nid,
+                pid: secondPid,
+                x: 10,
+                y: 20
+            })
+        ])
+        expect(clientNetwork.store.get(secondTransform.nid)).toEqual(expect.objectContaining({
+            pid: secondPid,
+            x: 10,
+            y: 20
+        }))
+        expect(user.knownChannelIds.has(reusedChannelId)).toBe(true)
+    })
+
     it('spatially replicates ECS roots from component state', () => {
         const context = createEcsContext()
         const instance = new Instance(context)

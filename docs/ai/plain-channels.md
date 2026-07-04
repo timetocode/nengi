@@ -119,7 +119,7 @@ const sprites = new Map<number, Sprite>()
 
 let controlledNid = 0
 
-await client.connect('ws://localhost:8079', handshake)
+await client.connect('ws://localhost:8079')
 
 function applyNetworkFrame(frame: Frame) {
     frame.openedChannels.forEach(channel => {

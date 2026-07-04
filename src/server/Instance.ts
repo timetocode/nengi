@@ -85,7 +85,7 @@ export class Instance {
         this.onSnapshotSendError = () => {}
 
         this.onConnect = (handshake: any) => {
-            console.warn(`Please define an instance.onConnect handler. Return false to deny, or return a payload to accept. Connection denied. Received handshake ${handshake}`)
+            console.warn('Please define an instance.onConnect handler. Return false to deny, or return a payload to accept. Connection denied.')
             return Promise.resolve(false)
         }
 

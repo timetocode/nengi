@@ -84,6 +84,34 @@ nengi. They are self-contained and do not require reading example projects:
 - [ECS channel client/server shape](./docs/ai/ecs-channels.md)
 - [Real-time movement prediction](./docs/ai/realtime-movement-prediction.md)
 
+## Release Candidate Changelog
+
+Changes after `2.0.0-rc.121`:
+
+### 2.0.0-rc.123
+
+- Fixed channel id reuse across channel close/open lifecycles. If a channel id
+  is reused before the next snapshot, nengi now preserves both the close and the
+  open, applies the close before new channel creates on the client, and commits
+  the server's known-channel state in close-then-open order. This prevents
+  partial client application when large scoped channels such as puzzle or
+  inventory channels are destroyed and recreated.
+
+### 2.0.0-rc.122
+
+- Tightened ECS channel close semantics. `applyEcsChannelClose` now removes the
+  affected ECS root entity, including local-only client components, so network
+  id reuse after a channel closes cannot collide with stale local ECS state.
+- Added `beforeRemoveEntity` to ECS frame/close application so clients can
+  destroy render objects, colliders, and other local resources before an ECS
+  root is removed.
+- Clarified connection handshake usage in the docs. `client.connect(target)`
+  works without a payload, while `client.connect(target, handshake)` remains
+  the path for auth tokens, selected characters, requested rooms, build checks,
+  and other server-validated setup data.
+- Removed handshake contents from the default `instance.onConnect` warning so
+  accidental token logging is avoided.
+
 ## Status
 
 Nengi is moving toward a release-candidate API. The root package exports are the

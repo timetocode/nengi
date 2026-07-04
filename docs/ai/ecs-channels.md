@@ -244,7 +244,7 @@ const channelByName = new Map<string, number>()
 const Player = ecs.defineComponent<PlayerComponent>(NType.Player, 'Player')
 const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
 
-await client.connect('ws://localhost:8079', handshake)
+await client.connect('ws://localhost:8079')
 
 function applyNetworkFrame(frame: Frame) {
     frame.openedChannels.forEach(channel => {
@@ -260,7 +260,11 @@ function applyNetworkFrame(frame: Frame) {
 
         channel.messages.forEach(handleWorldMessage)
 
-        const changes = applyEcsChannelFrame(world, channel)
+        const changes = applyEcsChannelFrame(world, channel, {
+            beforeRemoveEntity(pid) {
+                destroyPresentation(pid)
+            }
+        })
         changes.createdComponents.forEach(component => {
             if (component.ntype === NType.Player) {
                 createPlayerPresentation(component.pid)
@@ -269,16 +273,14 @@ function applyNetworkFrame(frame: Frame) {
         changes.updatedComponents.forEach(update => {
             markPresentationDirty(update.component.pid, update.prop)
         })
-        changes.deletedEntities.forEach(pid => {
-            destroyPresentation(pid)
-        })
     })
 
     frame.closedChannels.forEach(channel => {
         if (channel.channelId === channelByName.get('world')) {
-            const changes = applyEcsChannelClose(world, channel)
-            changes.deletedEntities.forEach(pid => {
-                destroyPresentation(pid)
+            applyEcsChannelClose(world, channel, {
+                beforeRemoveEntity(pid) {
+                    destroyPresentation(pid)
+                }
             })
             channelByName.delete('world')
         }
@@ -301,9 +303,28 @@ function frame() {
 
 For multiple ECS channels, do not infer meaning from component type alone. Route
 by channel identity first, then apply the frame or close event to the appropriate
-local world or feature system. `applyEcsChannelClose()` removes the closed
-channel's network components from an `EcsWorld` while preserving local-only
-components.
+local world or feature system.
+
+When an ECS root is deleted, either by a normal channel frame or a channel close,
+the applier removes the whole root entity from the `EcsWorld`, including
+local-only components attached to that root. Use `beforeRemoveEntity` to destroy
+renderer, physics, debug, or UI resources before the components are removed:
+
+```ts
+applyEcsChannelClose(world, channel, {
+    beforeRemoveEntity(pid, components) {
+        destroyPresentation(pid)
+    }
+})
+```
+
+If local state should outlive the replicated root, move or copy it onto a
+separate local entity before applying the network delete/close.
+
+The returned `changes.deletedEntities` are network root delete facts. The
+returned `changes.removedEntities` are roots actually removed from the
+`EcsWorld`, and `changes.removedLocalComponents` lists local components removed
+because they were attached to those roots.
 
 ## When to use ECS channels
 

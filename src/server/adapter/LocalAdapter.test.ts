@@ -62,6 +62,26 @@ describe('LocalAdapter', () => {
         })
     })
 
+    it('sends an empty handshake when connect is called without connection data', async () => {
+        const context = createContext()
+        const instance = new Instance(context)
+        instance.onConnect = async handshake => Object.keys(handshake).length === 0
+
+        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverSocket = serverAdapter.createMockConnect()
+        const client = new Client<LocalClientAdapter<Buffer, Buffer>>(
+            context,
+            LocalClientAdapter,
+            20,
+            { binary: testBinaryAdapter }
+        )
+
+        const result = await client.connect(serverSocket.clientSocket)
+
+        expect(result.accepted).toBe(true)
+        expect(instance.users.size).toBe(1)
+    })
+
     it('rejects denied handshakes and closes the local socket pair', async () => {
         const context = createContext()
         const instance = new Instance(context)

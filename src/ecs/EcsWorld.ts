@@ -153,6 +153,14 @@ export class EcsWorld {
         return removed
     }
 
+    hasEntity(pid: Pid) {
+        return this.entities.has(pid)
+    }
+
+    componentsForEntity(pid: Pid) {
+        return Array.from(this.byPid.get(pid)?.values() ?? [])
+    }
+
     get<T extends { ntype: number }>(pid: Pid, def: ComponentDefinition<T>) {
         return this.byPid.get(pid)?.get(def.ntype) as T & Component | undefined
     }

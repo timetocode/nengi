@@ -219,7 +219,8 @@ export class User {
         if (alreadySubscribed) {
             return
         }
-        if (this.pendingChannelCloses.delete(channel.nid)) {
+        if (this.pendingChannelCloses.has(channel.nid)) {
+            this.pendingChannelOpens.add(channel.nid)
             return
         }
         if (!this.knownChannelIds.has(channel.nid)) {

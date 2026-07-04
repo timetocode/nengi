@@ -163,6 +163,47 @@ describe('InstanceNetwork', () => {
         expect(event.user).toBe(user)
     })
 
+    it('queues accepted handshake payload on the UserConnected event', async () => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        user.connectionState = UserConnectionState.OpenPreHandshake
+        instance.onConnect = async handshake => ({
+            accountId: 'account-7',
+            characterId: handshake.characterId,
+            isAdmin: true
+        })
+
+        await instance.network.onHandshake(user, {
+            token: 'secret',
+            characterId: 'knight'
+        })
+
+        expect(user.connectionState).toBe(UserConnectionState.Open)
+        const event = instance.queue.next()
+        expect(event.type).toBe(NetworkEvent.UserConnected)
+        expect(event.user).toBe(user)
+        expect(event.payload).toEqual({
+            accountId: 'account-7',
+            characterId: 'knight',
+            isAdmin: true
+        })
+    })
+
+    it('does not log handshake contents from the default onConnect handler', async () => {
+        const instance = new Instance(new Context())
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+        await instance.onConnect({
+            token: 'secret-token',
+            characterId: 'knight'
+        })
+
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(warn.mock.calls[0][0]).not.toContain('secret-token')
+        expect(warn.mock.calls[0][0]).not.toContain('knight')
+        warn.mockRestore()
+    })
+
     it('treats a second handshake from an open user as a disconnecting protocol violation', async () => {
         const instance = new Instance(new Context())
         const user = createOpenUser(instance)

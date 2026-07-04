@@ -6,7 +6,7 @@ interface IClientNetworkAdapter<
     ConnectTarget = unknown
 > {
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
-    connect(target: ConnectTarget, handshake: any): Promise<any>
+    connect(target: ConnectTarget, handshake?: any): Promise<any>
     flush(): void
     disconnect?(reason?: any): void
 }

@@ -235,21 +235,35 @@ describe('EcsWorld', () => {
         expect(world.getByNid(11)).toBeUndefined()
     })
 
-    it('preserves local components when an ECS root is deleted', () => {
+    it('removes local components when an ECS root is deleted', () => {
         const world = new EcsWorld()
         const pid = world.createEntity(100)
-        world.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
+        const position = world.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
         const local = world.add(LocalMarker.create({ pid, label: 'render' }))
+        const beforeRemove: Array<{ pid: number, components: Component[] }> = []
 
-        const changes = applyEcsChannelFrame(world, createChannelFrame({
-            ecsDeleteEntities: [100]
-        }))
+        const changes = applyEcsChannelFrame(
+            world,
+            createChannelFrame({
+                ecsDeleteEntities: [100]
+            }),
+            {
+                beforeRemoveEntity(pid, components) {
+                    beforeRemove.push({ pid, components })
+                }
+            }
+        )
 
         expect(changes.deletedComponents.map(component => component.nid)).toEqual([10])
         expect(changes.deletedEntities).toEqual([100])
+        expect(changes.removedEntities).toEqual([100])
+        expect(changes.removedLocalComponents).toEqual([local])
+        expect(beforeRemove).toEqual([
+            { pid: 100, components: [position, local] }
+        ])
         expect(world.getByNid(10)).toBeUndefined()
-        expect(world.getByNid(local.nid!)).toBe(local)
-        expect(world.entityCount()).toBe(1)
+        expect(world.getByNid(local.nid!)).toBeUndefined()
+        expect(world.entityCount()).toBe(0)
     })
 
     it('applies ECS channel close when the close list includes root and component ids', () => {
@@ -264,29 +278,62 @@ describe('EcsWorld', () => {
 
         expect(changes.deletedComponents.map(component => component.nid)).toEqual([10, 11])
         expect(changes.deletedEntities).toEqual([100])
+        expect(changes.removedEntities).toEqual([100])
         expect(world.entityCount()).toBe(0)
         expect(world.getByNid(10)).toBeUndefined()
         expect(world.getByNid(11)).toBeUndefined()
     })
 
-    it('applies ECS channel close to network components while preserving local components', () => {
+    it('applies ECS channel close by removing affected roots and local components', () => {
         const world = new EcsWorld()
         const pid = world.createEntity(100)
-        world.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
-        world.add(Velocity.create({ pid, nid: 11, x: 3, y: 4 }))
+        const position = world.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
+        const velocity = world.add(Velocity.create({ pid, nid: 11, x: 3, y: 4 }))
         const local = world.add(LocalMarker.create({ pid, label: 'render' }))
+        const beforeRemove: Array<{ pid: number, components: Component[] }> = []
 
-        const changes = applyEcsChannelClose(world, createClosedChannel({
-            channelId: 7,
-            entityNids: [10, 11]
-        }))
+        const changes = applyEcsChannelClose(
+            world,
+            createClosedChannel({
+                channelId: 7,
+                entityNids: [10, 11]
+            }),
+            {
+                beforeRemoveEntity(pid, components) {
+                    beforeRemove.push({ pid, components })
+                }
+            }
+        )
 
         expect(changes.channelId).toBe(7)
         expect(changes.deletedComponents.map(component => component.nid)).toEqual([10, 11])
         expect(changes.deletedEntities).toEqual([100])
+        expect(changes.removedEntities).toEqual([100])
+        expect(changes.removedLocalComponents).toEqual([local])
+        expect(beforeRemove).toEqual([
+            { pid: 100, components: [position, velocity, local] }
+        ])
         expect(world.getByNid(10)).toBeUndefined()
         expect(world.getByNid(11)).toBeUndefined()
-        expect(world.getByNid(local.nid!)).toBe(local)
-        expect(world.entityCount()).toBe(1)
+        expect(world.getByNid(local.nid!)).toBeUndefined()
+        expect(world.entityCount()).toBe(0)
+    })
+
+    it('allows network ids to be reused after ECS channel close removes local components', () => {
+        const world = new EcsWorld()
+        const pid = world.createEntity(7)
+        world.add(Position.create({ pid, nid: 8, x: 1, y: 2 }))
+        world.add(LocalMarker.create({ pid, label: 'render' }))
+
+        applyEcsChannelClose(world, createClosedChannel({
+            entityNids: [7, 8]
+        }))
+
+        world.createEntity(20)
+
+        expect(() => {
+            world.add(Position.create({ pid: 20, nid: 7, x: 3, y: 4 }))
+        }).not.toThrow()
+        expect(world.getByNid(7)).toBeDefined()
     })
 })

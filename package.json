@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-rc.121",
+  "version": "2.0.0-rc.123",
   "description": "High-performance realtime multiplayer networking for TypeScript games.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",

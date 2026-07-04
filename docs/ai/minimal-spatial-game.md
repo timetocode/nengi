@@ -85,7 +85,7 @@ import type { Frame } from 'nengi'
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
 const sprites = new Map<number, Sprite>()
-await client.connect('ws://localhost:8079', handshake)
+await client.connect('ws://localhost:8079')
 ```
 
 Create and destroy local presentation from frame facts:

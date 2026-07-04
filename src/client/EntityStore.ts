@@ -101,6 +101,18 @@ export class EntityStore {
         frameChannels.forEach(channel => channelFramesById.set(channel.channelId, channel))
         const changedNids = new Set<number>()
 
+        channelCloses.forEach(close => {
+            const previous = this.requireChannelHeader(close.channelId)
+            const entityNids = this.purgeChannel(close.channelId, tick)
+            closedChannels.push({
+                channelId: close.channelId,
+                header: cloneChannelHeader(previous),
+                entityNids
+            })
+            this.channelHeaders.delete(close.channelId)
+            this.channels.delete(close.channelId)
+        })
+
         channelOpens.forEach(open => {
             this.channels.add(open.channelId)
             const header = cloneChannelHeader(open.header)
@@ -129,18 +141,6 @@ export class EntityStore {
             if (entity) {
                 this.history.recordState(tick, entity)
             }
-        })
-
-        channelCloses.forEach(close => {
-            const previous = this.requireChannelHeader(close.channelId)
-            const entityNids = this.purgeChannel(close.channelId, tick)
-            closedChannels.push({
-                channelId: close.channelId,
-                header: cloneChannelHeader(previous),
-                entityNids
-            })
-            this.channelHeaders.delete(close.channelId)
-            this.channels.delete(close.channelId)
         })
 
         return new Frame({

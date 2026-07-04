@@ -1,6 +1,7 @@
 import type { AppliedEntityChange, ChannelFrame, ClosedChannel } from '../client/Frame'
 import {
     EcsWorld,
+    type Component,
     type ComponentTypeId,
     type IdentifiedComponent,
     type Nid,
@@ -29,10 +30,13 @@ export type AppliedEcsChannelFrame = {
     updatedComponents: AppliedEcsComponentUpdate[]
     deletedComponents: AppliedEcsComponentDelete[]
     deletedEntities: Pid[]
+    removedEntities: Pid[]
+    removedLocalComponents: Component[]
 }
 
 export type ApplyEcsChannelFrameOptions = {
     isNetworkComponent?: (component: IdentifiedComponent) => boolean
+    beforeRemoveEntity?: (pid: Pid, components: Component[]) => void
 }
 
 function defaultIsNetworkComponent(component: IdentifiedComponent) {
@@ -68,11 +72,8 @@ export function applyEcsChannelFrame(
 
     for (let i = 0; i < channel.ecsDeleteEntities.length; i++) {
         const pid = channel.ecsDeleteEntities[i]
-        deleteRemainingNetworkComponents(world, pid, isNetworkComponent, changes.deletedComponents)
-        if (world.componentNidsForEntity(pid).length === 0) {
-            world.removeEntity(pid)
-        }
         changes.deletedEntities.push(pid)
+        removeEcsRootEntity(world, pid, isNetworkComponent, changes, options)
     }
 
     return changes
@@ -92,22 +93,17 @@ export function applyEcsChannelClose(
         const component = world.getByNid(nid)
         if (component && isNetworkComponent(component)) {
             affectedPids.add(component.pid)
-            changes.deletedComponents.push(deleteComponentByNid(world, nid))
             continue
         }
 
-        const deletedCount = changes.deletedComponents.length
-        deleteRemainingNetworkComponents(world, nid, isNetworkComponent, changes.deletedComponents)
-        if (changes.deletedComponents.length !== deletedCount || world.componentNidsForEntity(nid).length > 0) {
+        if (world.hasEntity(nid) || world.componentNidsForEntity(nid).length > 0) {
             affectedPids.add(nid)
         }
     }
 
     affectedPids.forEach(pid => {
-        if (world.componentNidsForEntity(pid).length === 0) {
-            world.removeEntity(pid)
-        }
         changes.deletedEntities.push(pid)
+        removeEcsRootEntity(world, pid, isNetworkComponent, changes, options)
     })
 
     return changes
@@ -120,7 +116,9 @@ function createAppliedEcsChannelFrame(channelId: number): AppliedEcsChannelFrame
         createdComponents: [],
         updatedComponents: [],
         deletedComponents: [],
-        deletedEntities: []
+        deletedEntities: [],
+        removedEntities: [],
+        removedLocalComponents: []
     }
 }
 
@@ -153,17 +151,34 @@ function deleteComponentByNid(world: EcsWorld, nid: Nid): AppliedEcsComponentDel
     return deleted
 }
 
-function deleteRemainingNetworkComponents(
+function removeEcsRootEntity(
     world: EcsWorld,
     pid: Pid,
     isNetworkComponent: (component: IdentifiedComponent) => boolean,
-    deletedComponents: AppliedEcsComponentDelete[]
+    changes: AppliedEcsChannelFrame,
+    options: ApplyEcsChannelFrameOptions
 ) {
-    const nids = world.componentNidsForEntity(pid)
-    for (let i = 0; i < nids.length; i++) {
-        const component = world.getByNid(nids[i])
-        if (component && isNetworkComponent(component)) {
-            deletedComponents.push(deleteComponentByNid(world, nids[i]))
+    if (!world.hasEntity(pid)) {
+        return
+    }
+
+    const components = world.componentsForEntity(pid)
+    options.beforeRemoveEntity?.(pid, components.slice())
+    const removed = world.removeEntity(pid)
+
+    changes.removedEntities.push(pid)
+
+    for (let i = 0; i < removed.length; i++) {
+        const component = removed[i]
+        if (component.nid !== undefined && isNetworkComponent(component as IdentifiedComponent)) {
+            changes.deletedComponents.push({
+                nid: component.nid,
+                pid: component.pid,
+                ntype: component.ntype,
+                component: component as IdentifiedComponent
+            })
+        } else {
+            changes.removedLocalComponents.push(component)
         }
     }
 }

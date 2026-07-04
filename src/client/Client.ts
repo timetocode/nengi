@@ -41,7 +41,7 @@ class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
         }
     }
 
-    connect(target: Parameters<Adapter['connect']>[0], handshake: any): Promise<any> {
+    connect(target: Parameters<Adapter['connect']>[0], handshake: any = {}): Promise<any> {
         return this.adapter.connect(target, handshake)
     }
 

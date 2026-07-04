@@ -19,7 +19,7 @@ layer unless the game has a real local architecture reason for one.
 ```ts
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const interpolator = new AdaptiveInterpolator(client)
-await client.connect('ws://localhost:8079', handshake)
+await client.connect('ws://localhost:8079')
 
 function frame() {
     for (const frame of client.network.drainFrames()) {
@@ -247,11 +247,14 @@ client maintains an `EcsWorld`:
 const channel = frame.getChannel(arenaChannelId)
 if (channel) {
     channel.messages.forEach(handleArenaMessage)
-    const changes = applyEcsChannelFrame(world, channel)
+    const changes = applyEcsChannelFrame(world, channel, {
+        beforeRemoveEntity(pid) {
+            removeRootPresentation(pid)
+        }
+    })
     changes.createdComponents.forEach(createSpriteForComponent)
     changes.updatedComponents.forEach(markSpriteDirty)
     changes.deletedComponents.forEach(removeSpriteForComponent)
-    changes.deletedEntities.forEach(removeRootPresentation)
 }
 ```
 
@@ -260,15 +263,18 @@ When an ECS channel closes, use the close counterpart:
 ```ts
 frame.closedChannels.forEach(channel => {
     if (channel.channelId === arenaChannelId) {
-        const changes = applyEcsChannelClose(world, channel)
-        changes.deletedEntities.forEach(removeRootPresentation)
+        applyEcsChannelClose(world, channel, {
+            beforeRemoveEntity(pid) {
+                removeRootPresentation(pid)
+            }
+        })
     }
 })
 ```
 
 Keep any custom ECS sync wrapper tiny: CRUD in, ECS mutation plus facts out. It
-should preserve local-only components on root deletes, and it should not create
-sprites, bind roles, or decide prediction.
+should use the applier's `beforeRemoveEntity` hook for renderer/resource cleanup,
+and it should not create sprites, bind roles, or decide prediction.
 
 ## What Not To Add
 

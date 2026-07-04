@@ -497,7 +497,7 @@ export class ClientNetwork {
         }
     }
 
-    createHandshake<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(handshake: any, binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
+    createHandshake<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(handshake: any = {}, binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
         const handshakeMessage = {
             ntype: EngineMessage.ConnectionAttempt,
             handshake: JSON.stringify(handshake),

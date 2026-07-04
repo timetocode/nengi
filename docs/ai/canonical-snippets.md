@@ -10,8 +10,42 @@ need detail:
 
 - [plain-channels.md](./plain-channels.md) for ordinary replicated objects
 - [ecs-channels.md](./ecs-channels.md) for nengi ECS channels
+- [networking-primitives.md](./networking-primitives.md#connection-handshake) for
+  auth/session data passed during connection
 - [realtime-movement-prediction.md](./realtime-movement-prediction.md) for fast
   local movement prediction
+
+## Connection setup
+
+Use the handshake for server authorization and session selection. Omit the
+second `connect` argument when the game has no connection setup data. When a
+handshake payload is present, the returned payload is server-side context for
+`NetworkEvent.UserConnected`; client bootstrap still uses normal messages,
+channel headers, or replicated state.
+
+```ts
+// client
+await client.connect('ws://localhost:8079', {
+    token,
+    characterId,
+    clientBuild: BUILD_ID
+})
+```
+
+```ts
+// server
+instance.onConnect = async handshake => {
+    const session = await verifySessionToken(handshake.token)
+    if (!session) {
+        return false
+    }
+    return {
+        accountId: session.accountId,
+        characterId: handshake.characterId,
+        isAdmin: session.roles.includes('admin')
+    }
+}
+```
 
 ## Plain spatial server and client
 
@@ -224,13 +258,21 @@ function applyFrame(frame: Frame) {
     const worldId = channelByName.get('world')
     frame.channels.forEach(channelFrame => {
         if (channelFrame.channelId === worldId) {
-            applyEcsChannelFrame(world, channelFrame)
+            applyEcsChannelFrame(world, channelFrame, {
+                beforeRemoveEntity(pid) {
+                    destroySpriteForPid(pid)
+                }
+            })
         }
     })
 
     frame.closedChannels.forEach(channel => {
         if (channel.channelId === worldId) {
-            applyEcsChannelClose(world, channel)
+            applyEcsChannelClose(world, channel, {
+                beforeRemoveEntity(pid) {
+                    destroySpriteForPid(pid)
+                }
+            })
             channelByName.delete('world')
         }
     })
