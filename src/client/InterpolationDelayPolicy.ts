@@ -131,7 +131,7 @@ export class AdaptiveDelayPolicy implements InterpolationDelayPolicy {
         let maxGapMs = 0
 
         for (let i = start; i < frames.length; i++) {
-            const gapMs = frames[i].receivedAt - frames[i - 1].receivedAt
+            const gapMs = frames[i].receivedAtMs - frames[i - 1].receivedAtMs
             if (gapMs > this.options.maxSampleGapMs) {
                 continue
             }

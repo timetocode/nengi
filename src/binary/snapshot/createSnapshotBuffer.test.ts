@@ -28,6 +28,7 @@ import { createEndpointPayload } from '../endpoint/EndpointPayload'
 import { BinaryDiagnosticError } from '../BinaryDiagnosticError'
 import { createEmptySnapshotPlan } from './SnapshotPlan'
 import { writeChannelScope } from './writeSnapshot'
+import { SNAPSHOT_HEADER_BYTES, writeSnapshotHeader } from './snapshotHeader'
 
 enum NType {
     Entity = 1,
@@ -381,7 +382,8 @@ describe('server snapshot pipeline', () => {
             countSnapshotBytes(firstPlan, context) +
             CHANNEL_SCOPE_BYTES +
             countSnapshotBytes(secondPlan, context)
-        const writer = TestBufferWriter.create(byteLength)
+        const writer = TestBufferWriter.create(SNAPSHOT_HEADER_BYTES + byteLength)
+        writeSnapshotHeader(1000, writer)
         writeChannelScope(channel.nid, writer)
         writeSnapshot(firstPlan, context, writer)
         writeChannelScope(channel.nid, writer)
@@ -880,7 +882,6 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
         const deleteFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
         expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid])
         expect(deleteFrameChannel.deleteEntities).toEqual([componentNid])
@@ -1034,7 +1035,6 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
         const ecsDeleteFrame = clientNetwork.latestFrame!.requireChannel(ecsChannel.nid)
         const regularDeleteFrame = clientNetwork.latestFrame!.requireChannel(regularChannel.nid)
         expect(ecsDeleteFrame.ecsDeleteEntities).toEqual([pid])
@@ -1213,7 +1213,6 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
-        expect(clientNetwork.previousSnapshot?.deleteEntities).toEqual([])
         const deleteFrameChannel = clientNetwork.latestFrame!.requireChannel(channel.nid)
         expect(deleteFrameChannel.ecsDeleteEntities).toEqual([pid])
         expect(deleteFrameChannel.deleteEntities).toEqual([transform.nid])

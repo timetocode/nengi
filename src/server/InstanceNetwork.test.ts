@@ -5,6 +5,7 @@ import { NetworkEvent } from '../common/binary/NetworkEvent'
 import { defineMessageSchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
 import { EngineMessage } from '../common/EngineMessage'
+import { WIRE_PROTOCOL_VERSION } from '../common/binary/Protocol'
 import { ClientNetwork } from '../client/ClientNetwork'
 import { Predictor } from '../client/prediction/Predictor'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
@@ -29,6 +30,7 @@ function createClientNetwork(context: Context) {
         serverTickRate: 20,
         disconnectHandler: jest.fn(),
         websocketErrorHandler: jest.fn(),
+        disconnect: jest.fn(),
         predictor: new Predictor(),
         network: undefined as unknown as ClientNetwork
     }
@@ -38,6 +40,146 @@ function createClientNetwork(context: Context) {
 }
 
 describe('InstanceNetwork', () => {
+    it('disconnects open users after the Pong deadline', () => {
+        let nowMs = 0
+        const instance = new Instance(new Context(), {
+            now: () => nowMs,
+            pingIntervalMs: 1000,
+            pongTimeoutMs: 3000
+        })
+        const user = createOpenUser(instance)
+        instance.users.set(user.id, user)
+
+        instance.step()
+        expect(user.lastPingSentAtMs).toBe(0)
+
+        nowMs = 1000
+        instance.step()
+        nowMs = 2000
+        instance.step()
+        expect(user.connectionState).toBe(UserConnectionState.Open)
+
+        nowMs = 3000
+        instance.step()
+
+        expect(user.networkAdapter.disconnect).toHaveBeenCalledWith(user, { reason: 'pong_timeout' })
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        expect(instance.users.has(user.id)).toBe(false)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserDisconnected,
+            user,
+            reason: 'pong_timeout'
+        })
+    })
+
+    it('disconnects sockets that never send their initial handshake', () => {
+        let nowMs = 0
+        const instance = new Instance(new Context(), {
+            now: () => nowMs,
+            handshakeTimeoutMs: 2000
+        })
+        const user = new User(undefined, {
+            binary: testBinaryAdapter,
+            send: jest.fn(),
+            disconnect: jest.fn()
+        } as any)
+
+        instance.network.onOpen(user)
+        nowMs = 2000
+        instance.step()
+
+        expect(user.networkAdapter.disconnect).toHaveBeenCalledWith(user, { reason: 'handshake_timeout' })
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        expect(instance.network.pendingUsers.has(user)).toBe(false)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserConnectionDenied,
+            user,
+            payload: { reason: 'handshake_timeout' }
+        })
+        expect(instance.queue.length).toBe(0)
+    })
+
+    it('times out a handshake while the user onConnect handler is unresolved', async () => {
+        let nowMs = 0
+        let resolveConnect!: (value: any) => void
+        const instance = new Instance(new Context(), {
+            now: () => nowMs,
+            handshakeTimeoutMs: 2000
+        })
+        instance.onConnect = () => new Promise(resolve => {
+            resolveConnect = resolve
+        })
+        const user = new User(undefined, {
+            binary: testBinaryAdapter,
+            send: jest.fn(),
+            disconnect: jest.fn()
+        } as any)
+
+        instance.network.onOpen(user)
+        const handshake = instance.network.onHandshake(user, {})
+        await Promise.resolve()
+
+        nowMs = 2000
+        instance.step()
+
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserConnectionDenied,
+            user,
+            payload: { reason: 'handshake_timeout' }
+        })
+
+        resolveConnect(true)
+        await handshake
+        expect(instance.users.size).toBe(0)
+        expect(instance.queue.length).toBe(0)
+    })
+
+    it('rejects a mismatched wire protocol before calling user code', async () => {
+        const instance = new Instance(new Context())
+        const onConnect = jest.fn(async () => true)
+        instance.onConnect = onConnect
+        const user = new User(undefined, {
+            binary: testBinaryAdapter,
+            send: jest.fn(),
+            disconnect: jest.fn()
+        } as any)
+
+        instance.network.onOpen(user)
+        await instance.network.onHandshake(user, {}, '', WIRE_PROTOCOL_VERSION + 1)
+
+        expect(onConnect).not.toHaveBeenCalled()
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserConnectionDenied,
+            user
+        })
+        expect(instance.queue.length).toBe(0)
+    })
+
+    it('denies rather than disconnects when the acceptance response cannot be sent', async () => {
+        const instance = new Instance(new Context())
+        instance.onConnect = async () => true
+        const user = new User(undefined, {
+            binary: testBinaryAdapter,
+            send: jest.fn(() => {
+                throw new Error('acceptance send failed')
+            }),
+            disconnect: jest.fn()
+        } as any)
+
+        instance.network.onOpen(user)
+        await instance.network.onHandshake(user, {})
+
+        expect(instance.users.size).toBe(0)
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserConnectionDenied,
+            user
+        })
+        expect(instance.queue.length).toBe(0)
+    })
+
     it('observes malformed inbound messages and disconnects without exposing the payload', () => {
         const instance = new Instance(new Context())
         const user = createOpenUser(instance)
@@ -341,7 +483,6 @@ describe('InstanceNetwork', () => {
         const instance = new Instance(context)
         const user = createOpenUser(instance)
         const clientNetwork = createClientNetwork(context)
-        user.lastSentPingTimestamp = Number.NEGATIVE_INFINITY
         instance.users.set(user.id, user)
 
         instance.step()
@@ -350,10 +491,15 @@ describe('InstanceNetwork', () => {
         const sentBuffer = send.mock.calls[0][1] as Buffer
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(sentBuffer))
         const frame = clientNetwork.drainFrames()[0]
-        const pongCommands = clientNetwork.outbound.outboundEngineCommands.get(clientNetwork.commandFrameNumber)
-        const pong = pongCommands?.find(command => command.ntype === EngineMessage.Pong) as { serverTimeMs: number } | undefined
+        const outbound = clientNetwork.createOutbound(testBinaryAdapter)
+        const pongCommands = clientNetwork.outbound.outboundEngineCommands.get(1)
+        const pong = pongCommands?.find(command => command.ntype === EngineMessage.Pong) as { pingId: number } | undefined
 
-        expect(frame.timestamp).toBeGreaterThan(0)
-        expect(pong?.serverTimeMs).toBe(frame.timestamp)
+        expect(frame.serverTimeMs).toBeGreaterThan(0)
+        expect(pong?.pingId).toBeGreaterThan(0)
+        expect(pong).not.toHaveProperty('serverTimeMs')
+        expect(clientNetwork.getClockSync().samples).toBe(1)
+        expect(clientNetwork.getEstimatedServerTimeMs()).not.toBeNull()
+        expect(outbound.byteLength).toBeGreaterThan(0)
     })
 })

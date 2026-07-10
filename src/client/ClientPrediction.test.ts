@@ -36,7 +36,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
     const deleteEntities = args.deleteEntities || []
     const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
     return {
-        timestamp: -1,
+        serverTimeMs: 0,
         confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
@@ -84,7 +84,7 @@ describe('client prediction', () => {
         expect(operation!.commandFrameNumber).toBe(1)
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1 }],
@@ -103,7 +103,7 @@ describe('client prediction', () => {
         const events: string[] = []
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0 }],
@@ -136,7 +136,7 @@ describe('client prediction', () => {
         expect(localDoor.open).toBe(true)
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [],
@@ -155,7 +155,7 @@ describe('client prediction', () => {
         const mismatchCounts: number[] = []
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0 }],
@@ -179,7 +179,7 @@ describe('client prediction', () => {
         })
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [],
@@ -216,7 +216,7 @@ describe('client prediction', () => {
         })
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 0,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, semiAmmo: 6, autoAmmo: 22 }],
@@ -237,7 +237,7 @@ describe('client prediction', () => {
         ammoPrediction.predict({ kind: 'ammo-spend', weapon: 1, seq: 3 }, { semiAmmo: 3 })
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             confirmedCommandFrameNumber: 2,
             messages: [],
             createEntities: [],
@@ -271,7 +271,7 @@ describe('client prediction', () => {
         expect(client.network.commandFrameNumber).toBe(65536)
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             confirmedCommandFrameNumber: 65536,
             messages: [],
             createEntities: [],
@@ -303,7 +303,7 @@ describe('client prediction', () => {
         expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(true)
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             confirmedCommandFrameNumber: 1,
             messages: [],
             createEntities: [],
@@ -318,7 +318,7 @@ describe('client prediction', () => {
         expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(true)
 
         client.network.queueSnapshot(snapshot({
-            timestamp: 1100,
+            serverTimeMs: 1100,
             confirmedCommandFrameNumber: 2,
             messages: [],
             createEntities: [],

@@ -12,7 +12,7 @@ game rules.
 ## Install
 
 ```sh
-npm install nengi@2.0.0-rc.124
+npm install nengi@2.0.0-rc.125
 ```
 
 This package exposes a root-only public API. The application-facing surface is
@@ -89,6 +89,7 @@ self-contained and do not require another project:
 - [ECS world, resources, and query boundaries](./docs/ai/ecs-world.md)
 - [Architecture and tick flow](./docs/ai/architecture-and-ticks.md)
 - [Client state and presentation](./docs/ai/client-state.md)
+- [Timing and connection liveness](./docs/ai/timing-and-liveness.md)
 - [Service patterns](./docs/ai/service-patterns.md)
 - [Testing and correctness](./docs/ai/testing-and-correctness.md)
 - [Benchmarking and bot workloads](./docs/ai/benchmarking.md)
@@ -99,8 +100,26 @@ self-contained and do not require another project:
 
 Changes after `2.0.0-rc.121`:
 
-### 2.0.0-rc.124 (unpublished)
+### 2.0.0-rc.125
 
+- Replaced per-snapshot `TimeSync` engine messages with mandatory snapshot
+  `serverTimeMs` metadata.
+- Renamed client frame timing fields to `serverTimeMs` and `receivedAtMs` to
+  distinguish server and local clock domains.
+- Added injectable monotonic clocks, client server-time estimates, and explicit
+  clock-sync diagnostics.
+- Made the injected `Instance` clock the only server network-time source;
+  `instance.step()` no longer accepts a separate timestamp.
+- Changed Pong payloads to identify recent server-owned Ping records rather than
+  echoing server timestamps from the client.
+- Added configurable Ping/Pong and initial-handshake deadlines with explicit
+  disconnect reasons and immediate adapter termination support.
+- Added handshake wire-version validation and made malformed snapshots fatal on
+  clients.
+- Defined pre-acceptance failures as `UserConnectionDenied`; only users already
+  announced through `UserConnected` can emit `UserDisconnected`.
+- Default interpolation remains client-local and arrival-buffered; it does not
+  require synchronized server time.
 - Added optional `bindEcsChannel(world, channel, { context })` for servers
   that maintain authoritative state in `EcsWorld` alongside an ECS channel.
 - Added active-root queries to ECS channels.
@@ -111,8 +130,11 @@ Changes after `2.0.0-rc.121`:
   retaining raw channel writers as a lower-level API.
 - Added canonical architecture, service, testing, and bot-workload guidance to
   the AI manual.
-- Pinned the core and official adapter family to `2.0.0-rc.124`.
-- No existing public API was removed.
+- Pinned the core and official adapter family to `2.0.0-rc.125`.
+- The timing cleanup is intentionally wire-incompatible with earlier RC builds;
+  use matching core and adapter versions.
+- Added clean package-family release verification and resumable npm publishing
+  under the `rc` dist-tag.
 
 ### 2.0.0-rc.123
 

@@ -9,10 +9,15 @@ import { connectionAttemptSchema } from '../common/schemas/connectAttemptSchema'
 import readMessage from '../binary/message/readMessage'
 import readDiff from '../binary/entity/readDiff'
 import readUpdateGroup from '../binary/entity/readUpdateGroup'
-import { IBinaryWriter } from '../common/binary/IBinaryWriter'
 import { IBinaryReader } from '../common/binary/IBinaryReader'
 import { BinaryAdapter, BinaryPayload } from '../common/binary/BinaryAdapter'
-import { DEFAULT_PROTOCOL, ProtocolConfig, assertNetworkIdType, readNetworkId } from '../common/binary/Protocol'
+import {
+    DEFAULT_PROTOCOL,
+    ProtocolConfig,
+    WIRE_PROTOCOL_VERSION,
+    assertNetworkIdType,
+    readNetworkId
+} from '../common/binary/Protocol'
 import { EngineMessage } from '../common/EngineMessage'
 import { BinarySection } from '../common/binary/BinarySection'
 import count from '../binary/message/count'
@@ -40,6 +45,7 @@ import {
     getEndpointId,
     isValidUInt32
 } from '../common/Endpoint'
+import { readSnapshotHeader } from '../binary/snapshot/snapshotHeader'
 import { getLocalTime } from './time'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 import type { PredictionOperationOptions } from './prediction/Predictor'
@@ -115,8 +121,13 @@ type PendingResponse =
 
 type PendingServerFrame = {
     snapshot: Snapshot
-    receivedAt: number
+    receivedAtMs: number
     pendingResponses: PendingResponse[]
+}
+
+type PendingPong = {
+    pingId: number
+    clientReceiveTimeMs: number
 }
 
 type OutboundRollback = {
@@ -127,6 +138,7 @@ type OutboundRollback = {
     outboundCommandTiming: Map<number, any[]>
     requestQueue: ClientRequest[]
     requestBacklogActive: boolean
+    pendingPongs: PendingPong[]
 }
 
 export class ClientNetwork {
@@ -144,10 +156,12 @@ export class ClientNetwork {
     requestBacklogActive = false
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
     commandFrameNumber = 1 // monotonic public command-frame number
-    previousSnapshot: Snapshot | null = null
     frameTick = 1 // incremented each frame that comes from server
     maxFrameHistory = 240
     latency = 0
+    roundTripMs = 0
+    serverTimeOffsetMs = 0
+    serverTimeSyncSamples = 0
     interpolationDelayMs = 0
     interpolationDelayReportIntervalMs = 500
     interpolationDelayReportEpsilonMs = 1
@@ -155,8 +169,14 @@ export class ClientNetwork {
     private lastInterpolationDelayReportAt = Number.NEGATIVE_INFINITY
     sendSchemaFingerprint = false
     private pendingOutboundRollback: OutboundRollback | null = null
+    private pendingPongs: PendingPong[] = []
 
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
+        this.pendingPongs = []
+        this.serverTimeOffsetMs = 0
+        this.serverTimeSyncSamples = 0
+        this.roundTripMs = 0
+        this.latency = 0
         this.rejectPendingRequests(new RequestError('Disconnected before request completed.', 'DISCONNECTED', {
             payload: reason
         }))
@@ -181,6 +201,10 @@ export class ClientNetwork {
         this.outbound.tick = this.commandFrameNumber
     }
 
+    private nowMs() {
+        return this.client.now ? this.client.now() : getLocalTime()
+    }
+
     incrementCommandFrameNumber() {
         this.commandFrameNumber++
     }
@@ -195,7 +219,7 @@ export class ClientNetwork {
 
     addCommandWithTiming(command: any, options: CommandTimingOptions = {}) {
         this.outbound.addCommandWithTiming(command, {
-            clientTimeMs: options.inputTimeMs ?? getLocalTime(),
+            clientTimeMs: options.inputTimeMs ?? this.nowMs(),
             renderDelayMs: options.renderDelayMs ?? 0,
             viewTick: options.viewTick ?? -1,
             viewServerTimeMs: options.viewServerTimeMs ?? -1
@@ -206,7 +230,7 @@ export class ClientNetwork {
         if (!Number.isFinite(delayMs)) {
             return false
         }
-        const now = options.now ?? getLocalTime()
+        const now = options.now ?? this.nowMs()
         const minIntervalMs = options.minIntervalMs ?? this.interpolationDelayReportIntervalMs
         const epsilonMs = options.epsilonMs ?? this.interpolationDelayReportEpsilonMs
         const roundedDelayMs = Math.max(0, Math.round(delayMs))
@@ -247,6 +271,20 @@ export class ClientNetwork {
     flush() {
         this.pendingOutboundRollback = null
         this.outbound.flush()
+    }
+
+    private recordServerClockSample(serverTimeMs: number, clientReceiveTimeMs: number, roundTripMs: number) {
+        const oneWayMs = roundTripMs > 0 ? roundTripMs * 0.5 : 0
+        const sampleOffsetMs = serverTimeMs - clientReceiveTimeMs + oneWayMs
+        if (!Number.isFinite(sampleOffsetMs)) {
+            return
+        }
+        if (this.serverTimeSyncSamples === 0) {
+            this.serverTimeOffsetMs = sampleOffsetMs
+        } else {
+            this.serverTimeOffsetMs = (this.serverTimeOffsetMs * 0.85) + (sampleOffsetMs * 0.15)
+        }
+        this.serverTimeSyncSamples++
     }
 
     request<Request = any, Response = any>(
@@ -396,7 +434,7 @@ export class ClientNetwork {
             return null
         }
 
-        const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAt)
+        const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAtMs)
         frame.channels.forEach(channel => {
             channel.deleteEntities.forEach(nid => this.entityNTypes.delete(nid))
             channel.ecsDeleteEntities.forEach(pid => this.entityNTypes.delete(pid))
@@ -434,42 +472,27 @@ export class ClientNetwork {
         return this.pendingFrames.length
     }
 
-    queueSnapshot(snapshot: Snapshot, receivedAt = getLocalTime()) {
+    queueSnapshot(snapshot: Snapshot, receivedAtMs = this.nowMs()) {
         this.pendingFrames.push({
             snapshot,
-            receivedAt,
+            receivedAtMs,
             pendingResponses: []
         })
     }
 
-    resolveSnapshotTimestamp(snapshot: Snapshot) {
-        const tickMs = 1000 / this.client.serverTickRate
-        const actualTimestamp = snapshot.timestamp
-
-        if (actualTimestamp !== -1) {
-            snapshot.timestamp = actualTimestamp
-            return
+    getEstimatedServerTimeMs(nowMs = this.nowMs()) {
+        if (this.serverTimeSyncSamples === 0) {
+            return null
         }
-
-        if (!this.previousSnapshot || this.previousSnapshot.timestamp === -1) {
-            return
-        }
-
-        const expectedTimestamp = this.previousSnapshot.timestamp + tickMs
-        snapshot.timestamp = expectedTimestamp
+        return nowMs + this.serverTimeOffsetMs
     }
 
-    shiftInterpolationTimestamps(shift: number) {
-        this.frames.forEach(frame => {
-            if (frame.timestamp !== -1) {
-                frame.timestamp += shift
-            }
-        })
-        this.pendingFrames.forEach(frame => {
-            if (frame.snapshot.timestamp !== -1) {
-                frame.snapshot.timestamp += shift
-            }
-        })
+    getClockSync() {
+        return {
+            serverTimeOffsetMs: this.serverTimeOffsetMs,
+            roundTripMs: this.roundTripMs,
+            samples: this.serverTimeSyncSamples
+        }
     }
 
     getRequestsForNextFrame(): ClientRequest[] {
@@ -500,6 +523,7 @@ export class ClientNetwork {
     createHandshake<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(handshake: any = {}, binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
         const handshakeMessage = {
             ntype: EngineMessage.ConnectionAttempt,
+            wireProtocolVersion: WIRE_PROTOCOL_VERSION,
             handshake: JSON.stringify(handshake),
             schemaFingerprint: this.sendSchemaFingerprint ? createSchemaFingerprint(this.client.context) : ''
         }
@@ -527,6 +551,15 @@ export class ClientNetwork {
             for (let i = 0; i < count; i++) {
                 const engineMessage: any = readEngineMessage(reader, this.client.context)
                 if (engineMessage.ntype === EngineMessage.ConnectionAccepted) {
+                    if (engineMessage.wireProtocolVersion !== WIRE_PROTOCOL_VERSION) {
+                        return {
+                            accepted: false,
+                            reason: new Error(
+                                `Nengi wire protocol mismatch. Client ${WIRE_PROTOCOL_VERSION}, ` +
+                                `server ${engineMessage.wireProtocolVersion}.`
+                            )
+                        }
+                    }
                     accepted = true
                     continue
                 }
@@ -578,6 +611,17 @@ export class ClientNetwork {
                 renderDelayMs: timing.renderDelayMs,
                 viewTick: timing.viewTick,
                 viewServerTimeMs: timing.viewServerTimeMs
+            })
+        }
+
+        const pendingPongs = this.pendingPongs.splice(0)
+        for (let i = 0; i < pendingPongs.length; i++) {
+            const pong = pendingPongs[i]
+            this.addEngineCommand({
+                ntype: EngineMessage.Pong,
+                pingId: pong.pingId,
+                clientReceiveTimeMs: pong.clientReceiveTimeMs,
+                clientSendTimeMs: this.nowMs()
             })
         }
 
@@ -693,7 +737,8 @@ export class ClientNetwork {
             outboundCommands: cloneCommandMap(this.outbound.outboundCommands),
             outboundCommandTiming: cloneCommandMap(this.outbound.outboundCommandTiming),
             requestQueue: this.requestQueue.arr.slice(),
-            requestBacklogActive: this.requestBacklogActive
+            requestBacklogActive: this.requestBacklogActive,
+            pendingPongs: this.pendingPongs.slice()
         }
     }
 
@@ -710,6 +755,7 @@ export class ClientNetwork {
         this.outbound.outboundCommandTiming = cloneCommandMap(rollback.outboundCommandTiming)
         this.requestQueue.arr = rollback.requestQueue.slice()
         this.requestBacklogActive = rollback.requestBacklogActive
+        this.pendingPongs = rollback.pendingPongs.slice()
         this.pendingOutboundRollback = null
         return true
     }
@@ -718,14 +764,27 @@ export class ClientNetwork {
         try {
             this.readSnapshotUnsafe(dr)
         } catch (err) {
-            this.onMalformedSnapshot(err)
+            try {
+                this.onMalformedSnapshot(err)
+            } catch (observerError) {
+                // Diagnostics must not prevent the fatal transport cleanup.
+            }
+            try {
+                this.client.disconnect({ reason: 'malformed_snapshot' })
+            } catch (disconnectError) {
+                // The transport may already be closed or otherwise unusable.
+            }
         }
     }
 
     readSnapshotUnsafe(dr: IBinaryReader) {
-        const receivedAt = getLocalTime()
+        const receivedAtMs = this.nowMs()
+        const serverTimeMs = readSnapshotHeader(dr)
+        if (!Number.isFinite(serverTimeMs)) {
+            throw new Error('Snapshot serverTimeMs must be finite.')
+        }
         const snapshot: Snapshot = {
-            timestamp: -1,
+            serverTimeMs,
             confirmedCommandFrameNumber: -1,
             messages: [],
             interpolatedMessages: [],
@@ -776,38 +835,27 @@ export class ClientNetwork {
             case BinarySection.EngineMessages: {
                 const count = dr.readUInt8()
                 for (let i = 0; i < count; i++) {
-                    const engineMessage = readEngineMessage(dr, this.client.context)
+                    const engineMessage: any = readEngineMessage(dr, this.client.context)
                     if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
-                        // @ts-ignore
                         this.onDisconnect(engineMessage.reason)
                     }
-                    if (engineMessage.ntype === EngineMessage.TimeSync) {
-                        // @ts-ignore
-                        snapshot.timestamp = engineMessage.timestamp
-                    }
                     if (engineMessage.ntype === EngineMessage.CommandFrameNumber) {
-                        // @ts-ignore
                         snapshot.confirmedCommandFrameNumber = engineMessage.commandFrameNumber
                     }
 
                     if (engineMessage.ntype === EngineMessage.Protocol) {
-                        // @ts-ignore
                         this.setProtocol(engineMessage.nidType, engineMessage.ntypeType)
                     }
 
                     if (engineMessage.ntype === EngineMessage.Ping) {
-                        const clientReceiveTimeMs = getLocalTime()
-                        this.addEngineCommand({
-                            ntype: EngineMessage.Pong,
-                            // @ts-ignore
+                        const clientReceiveTimeMs = this.nowMs()
+                        this.pendingPongs.push({
                             pingId: engineMessage.pingId,
-                            // @ts-ignore
-                            serverTimeMs: engineMessage.serverTimeMs,
-                            clientReceiveTimeMs,
-                            clientSendTimeMs: getLocalTime()
+                            clientReceiveTimeMs
                         })
-                        // @ts-ignore
-                        this.latency = engineMessage.latency
+                        this.roundTripMs = engineMessage.latency
+                        this.latency = this.roundTripMs
+                        this.recordServerClockSample(engineMessage.serverTimeMs, clientReceiveTimeMs, engineMessage.latency)
                     }
                 }
                 break
@@ -1013,12 +1061,7 @@ export class ClientNetwork {
             }
         }
 
-        // client engine level state
-
-        this.resolveSnapshotTimestamp(snapshot)
-
-        this.pendingFrames.push({ snapshot, receivedAt, pendingResponses })
-        this.previousSnapshot = snapshot
+        this.pendingFrames.push({ snapshot, receivedAtMs, pendingResponses })
     }
 }
 

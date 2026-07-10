@@ -141,7 +141,7 @@ export class Channel implements IObjectChannel {
     collectChannelSnapshotVisibility(userOrId: User | number): ChannelSnapshotVisibility {
         const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
         const visibleRef = this.getVisibleNetworkedNids(userId)
-        let previous = this.channelSnapshotVisibilityByUser.get(userId)
+        const previous = this.channelSnapshotVisibilityByUser.get(userId)
         if (previous && previous.visibleRef === visibleRef) {
             return {
                 toCreate: [],
@@ -237,12 +237,14 @@ export class Channel implements IObjectChannel {
     }
 
     getVisibleEntities(userId: number) {
+        void userId
         // Plain channels are all-visible; returning the maintained nid list
         // avoids rebuilding identical arrays for every subscribed user.
         return this.entityNids
     }
 
     getVisibleNetworkedNids(userId: number) {
+        void userId
         const entityTreeVersion = this.localState.entityTreeVersion
         const cached = this.visibleNetworkedNidsCache
         if (

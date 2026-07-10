@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-rc.124",
+  "version": "2.0.0-rc.125",
   "description": "High-performance realtime multiplayer networking for TypeScript games.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -18,16 +18,31 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "npx jest",
-    "build": "npx tsc",
-    "typecheck": "npx tsc --project tsconfig.test.json",
+    "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+    "test": "jest",
+    "build": "npm run clean && tsc",
+    "build:family": "node scripts/build-package-family.mjs",
+    "typecheck": "tsc --project tsconfig.test.json",
     "verify:docs": "node scripts/verify-ai-docs.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
+    "release:check": "npm run lint && npm run typecheck && npm test -- --runInBand && npm run build:family && npm run verify:docs && npm run verify:release",
+    "release:publish": "node scripts/publish-package-family.mjs",
+    "release:publish:dry-run": "node scripts/publish-package-family.mjs --dry-run",
+    "prepack": "npm run build",
     "profile:snapshot": "node --import tsx src/performance/SnapshotPipeline.performance.ts",
     "lint": "npx eslint . --config .eslintrc.js",
     "lintfix": "npx eslint . --fix --config .eslintrc.js"
   },
   "author": "Alex // timetocode",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/timetocode/nengi.git"
+  },
+  "homepage": "https://github.com/timetocode/nengi#readme",
+  "bugs": {
+    "url": "https://github.com/timetocode/nengi/issues"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.8",

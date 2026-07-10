@@ -8,7 +8,7 @@ export enum EngineMessage {
     ChannelAddEntity,
     ChannelRemoveEntity,
     ConnectionTerminated,
-    TimeSync,
+    TimeSync, // reserved; snapshot serverTimeMs is now fixed metadata
     Ping,
 
 

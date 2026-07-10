@@ -1,7 +1,7 @@
 import { IEntity } from '../common/IEntity'
 import { Context } from '../common/Context'
 import { ChannelHeader, cloneChannelHeader } from '../common/ChannelHeader'
-import { AppliedEntityChange, ChannelFrame, ClosedChannel, DeletedEntity, Frame, OpenedChannel } from './Frame'
+import { ChannelFrame, ClosedChannel, Frame, OpenedChannel } from './Frame'
 import { Snapshot } from './Snapshot'
 import type { SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 import { getLocalTime } from './time'
@@ -77,7 +77,7 @@ export class EntityStore {
         return Array.from(this.entities.values()).filter(entity => entity[prop] === value)
     }
 
-    applySnapshot(snapshot: Snapshot, tick: number, receivedAt = getLocalTime()) {
+    applySnapshot(snapshot: Snapshot, tick: number, receivedAtMs = getLocalTime()) {
         this.assertNoTopLevelEntityCrud(snapshot)
         const openedChannels: OpenedChannel[] = []
         const closedChannels: ClosedChannel[] = []
@@ -145,8 +145,8 @@ export class EntityStore {
 
         return new Frame({
             tick,
-            timestamp: snapshot.timestamp,
-            receivedAt,
+            serverTimeMs: snapshot.serverTimeMs,
+            receivedAtMs,
             confirmedCommandFrameNumber: snapshot.confirmedCommandFrameNumber,
             channelOpens,
             channelHeaderUpdates,
@@ -164,7 +164,7 @@ export class EntityStore {
         this.requireChannelHeader(channel.channelId)
 
         channel.ecsCreateEntities.forEach(pid => {
-            this.createEcsEntity(channel.channelId, pid, frame, state)
+            this.createEcsEntity(channel.channelId, pid, frame)
         })
 
         channel.ecsCreateComponents.forEach(component => {
@@ -188,7 +188,7 @@ export class EntityStore {
         })
     }
 
-    private createEcsEntity(channelId: number, pid: number, frame: ChannelFrame, state: ApplyState) {
+    private createEcsEntity(channelId: number, pid: number, frame: ChannelFrame) {
         this.assertNidAvailable(pid, channelId)
         this.ecsEntities.add(pid)
         this.entityChannels.set(pid, channelId)

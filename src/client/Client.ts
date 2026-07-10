@@ -5,6 +5,7 @@ import type { InterpolationDelayReportOptions, CommandTimingOptions } from './Cl
 import { Predictor } from './prediction/Predictor'
 import type { PredictionOperationOptions } from './prediction/Predictor'
 import type { ClientAdapterConstructor, IClientNetworkAdapter } from './adapter/IClientNetworkAdapter'
+import { getMonotonicTime, TimeSource } from '../common/time'
 
 type StringOrParsedJSON = string | object
 export type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
@@ -21,20 +22,26 @@ export type RequestOptions<Response = any> = {
     prediction?: PredictionOperationOptions<Response>
 }
 
+export type ClientOptions = {
+    now?: TimeSource
+}
+
 class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
     context: Context
     network: ClientNetwork
     adapter: Adapter
     serverTickRate: number
     predictor: Predictor
+    readonly now: TimeSource
     disconnectHandler: DisconnectHandler
     websocketErrorHandler: WebsocketErrorHandler
 
-    constructor(context: Context, adapterCtor: ClientAdapterConstructor<Adapter>, serverTickRate: number, adapterConfig?: any) {
+    constructor(context: Context, adapterCtor: ClientAdapterConstructor<Adapter>, serverTickRate: number, adapterConfig?: any, options: ClientOptions = {}) {
         this.context = context
         this.network = new ClientNetwork(this)
         this.adapter = new adapterCtor(this.network, adapterConfig)
         this.serverTickRate = serverTickRate
+        this.now = options.now ?? getMonotonicTime
         this.predictor = new Predictor()
 
         this.disconnectHandler = (reason: StringOrParsedJSON, event: any) => {
@@ -86,6 +93,14 @@ class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
 
     reportInterpolationDelay(delayMs: number, options: InterpolationDelayReportOptions = {}) {
         return this.network.reportInterpolationDelay(delayMs, options)
+    }
+
+    getEstimatedServerTimeMs(nowMs?: number) {
+        return this.network.getEstimatedServerTimeMs(nowMs)
+    }
+
+    getClockSync() {
+        return this.network.getClockSync()
     }
 
     predictCommand(command: any, options: PredictionOperationOptions = {}) {

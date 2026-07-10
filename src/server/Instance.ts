@@ -9,6 +9,7 @@ import { NQueue } from '../NQueue'
 import { EngineMessage } from '../common/EngineMessage'
 import { Endpoint, EndpointDefinition, getEndpointDefinition, getEndpointId } from '../common/Endpoint'
 import { BinaryPayload } from '../common/binary/BinaryAdapter'
+import { getMonotonicTime, TimeSource } from '../common/time'
 
 export type ResponseSender<Response = any> = (response: Response) => void
 export type ResponseHandlerArgs<Request = any> = { user: User, body: Request }
@@ -36,6 +37,23 @@ export type ResponseEndpoint = {
     callback: ResponseHandler
 }
 
+export type InstanceOptions = {
+    now?: TimeSource
+    pingIntervalMs?: number
+    pongTimeoutMs?: number
+    handshakeTimeoutMs?: number
+}
+
+function positiveDuration(name: string, value: number | undefined, fallback: number) {
+    if (value === undefined) {
+        return fallback
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new Error(`${name} must be a finite value greater than zero.`)
+    }
+    return value
+}
+
 export class Instance {
     context: Context
     localState: LocalState
@@ -46,6 +64,9 @@ export class Instance {
     cache: EntityCache
     tick: number
     pingIntervalMs: number
+    pongTimeoutMs: number
+    handshakeTimeoutMs: number
+    readonly now: TimeSource
     responseEndPoints: Map<number, ResponseEndpoint>
     /**
      * Observes malformed or otherwise unreadable inbound network messages before
@@ -71,7 +92,7 @@ export class Instance {
      */
     onConnect: (handshake: any) => Promise<any>
 
-    constructor(context: Context) {
+    constructor(context: Context, options: InstanceOptions = {}) {
         this.context = context
         this.localState = new LocalState()
         this.users = new Map()
@@ -79,12 +100,15 @@ export class Instance {
         this.incrementalUserId = 0
         this.cache = new EntityCache()
         this.tick = 1
-        this.pingIntervalMs = 10000
+        this.now = options.now ?? getMonotonicTime
+        this.pingIntervalMs = positiveDuration('pingIntervalMs', options.pingIntervalMs, 2000)
+        this.pongTimeoutMs = positiveDuration('pongTimeoutMs', options.pongTimeoutMs, 6000)
+        this.handshakeTimeoutMs = positiveDuration('handshakeTimeoutMs', options.handshakeTimeoutMs, 5000)
         this.responseEndPoints = new Map()
         this.onInboundMessageError = () => {}
         this.onSnapshotSendError = () => {}
 
-        this.onConnect = (handshake: any) => {
+        this.onConnect = () => {
             console.warn('Please define an instance.onConnect handler. Return false to deny, or return a payload to accept. Connection denied.')
             return Promise.resolve(false)
         }
@@ -127,31 +151,27 @@ export class Instance {
     }
 
     step() {
-        const timestamp = performance.now()
-        const wallTimestamp = Date.now()
-        const timeSyncEngineMessage = {
-            ntype: EngineMessage.TimeSync,
-            timestamp
+        const serverTimeMs = this.now()
+        if (!Number.isFinite(serverTimeMs)) {
+            throw new Error('instance.now must return a finite monotonic server time.')
         }
+        this.network.disconnectTimedOutUsers(serverTimeMs)
 
         this.tick++
         this.cache.createCachesForTick(this.tick)
         this.network.resetSharedUpdateFragments()
 
         try {
-            this.users.forEach(user => {
-                user.queueEngineMessage(timeSyncEngineMessage)
-
-                if (user.lastSentPingTimestamp < wallTimestamp - this.pingIntervalMs) {
-                    const serverTimeMs = timestamp
-                    user.lastSentPingTimeMs = serverTimeMs
+            Array.from(this.users.values()).forEach(user => {
+                let pingId: number | null = null
+                if (user.shouldSendPing(serverTimeMs, this.pingIntervalMs)) {
+                    pingId = user.nextPing()
                     user.queueEngineMessage({
                         ntype: EngineMessage.Ping,
                         latency: Math.max(0, Math.min(65535, Math.round(user.roundTripMs))),
-                        pingId: user.nextPing(),
+                        pingId,
                         serverTimeMs
                     })
-                    user.lastSentPingTimestamp = wallTimestamp
                 }
 
                 user.queueEngineMessage({
@@ -159,21 +179,24 @@ export class Instance {
                     commandFrameNumber: user.lastReceivedCommandFrameNumber
                 })
 
-                const buffer = createSnapshotBuffer(user, this)
+                const buffer = createSnapshotBuffer(user, this, serverTimeMs)
                 let sent = false
                 if (this.network.snapshotPerformanceEnabled) {
                     // Keep adapter send timing separate from snapshot construction:
                     // WebSocket implementations may queue synchronously while OS I/O
                     // continues outside this measured server tick.
-                    const sendStart = performance.now()
+                    const sendStart = this.now()
                     sent = this.sendSnapshotToUser(user, buffer)
                     if (sent) {
-                        this.network.recordSnapshotSend(performance.now() - sendStart)
+                        this.network.recordSnapshotSend(this.now() - sendStart)
                     }
                 } else {
                     sent = this.sendSnapshotToUser(user, buffer)
                 }
                 if (sent) {
+                    if (pingId !== null) {
+                        user.recordPingSent(pingId, serverTimeMs, this.now())
+                    }
                     user.lastSentInstanceTick = this.tick
                 }
             })

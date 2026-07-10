@@ -2,7 +2,7 @@ import { IEntity } from '../common/IEntity'
 import type { ChannelClose, ChannelHeaderUpdate, ChannelOpen, SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 
 export type Snapshot = {
-    timestamp: number
+    serverTimeMs: number
     confirmedCommandFrameNumber: number,
     messages: any[],
     interpolatedMessages?: any[],

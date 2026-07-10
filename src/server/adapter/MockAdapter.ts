@@ -1,6 +1,6 @@
 import { IServerNetworkAdapter } from './IServerNetworkAdapter'
 import { InstanceNetwork } from '../InstanceNetwork'
-import { User, UserConnectionState } from '../User'
+import { User } from '../User'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
 import { BinaryAdapter, BinaryPayload } from '../../common/binary/BinaryAdapter'
@@ -55,6 +55,10 @@ class LocalInstanceAdapter<
     }
 
     disconnect(user: User, reason: any): void {
+        user.socket.end(reason)
+    }
+
+    terminate(user: User, reason: any): void {
         user.socket.end(reason)
     }
 
@@ -183,7 +187,7 @@ class MockClientSocket {
     close(reason?: any) {
         this.readyState = MockSocketReadyState.CLOSED
         if (this.serverSocket.user) {
-            this.serverSocket.network.onClose(this.serverSocket.user)
+            this.serverSocket.network.onClose(this.serverSocket.user, reason)
         }
     }
 

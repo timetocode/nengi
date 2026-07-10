@@ -8,19 +8,19 @@ import {
 
 function addMovingEntityFrames(harness: InterpolationTestHarness) {
     harness.receive({
-        timestamp: 1000,
+        serverTimeMs: 1000,
         createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
     }, 1000)
     harness.receive({
-        timestamp: 1050,
+        serverTimeMs: 1050,
         updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
     }, 1027)
     harness.receive({
-        timestamp: 1100,
+        serverTimeMs: 1100,
         updateEntities: [{ nid: 1, prop: 'x', value: 20 }]
     }, 1091)
     harness.receive({
-        timestamp: 1150,
+        serverTimeMs: 1150,
         updateEntities: [{ nid: 1, prop: 'x', value: 30 }]
     }, 1092)
 }
@@ -61,14 +61,14 @@ describe('FixedStepInterpolator', () => {
         expect(harness.sample(100, 1125).status).toBe(InterpolationStatus.InsufficientHistory)
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         }, 1000)
 
         expect(harness.sample(100, 1125).status).toBe(InterpolationStatus.InsufficientHistory)
 
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
         }, 1050)
 
@@ -159,24 +159,24 @@ describe('FixedStepInterpolator', () => {
         })
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
         }, 1050)
         harness.receive({
-            timestamp: 1100,
+            serverTimeMs: 1100,
             updateEntities: [{ nid: 1, prop: 'x', value: 20 }]
         }, 1130)
 
         const raised = harness.sample(100, 1130)
         expect(raised.desiredBufferMs).toBe(40)
 
-        harness.receive({ timestamp: 1150 }, 1180)
-        harness.receive({ timestamp: 1200 }, 1230)
-        harness.receive({ timestamp: 1250 }, 1280)
+        harness.receive({ serverTimeMs: 1150 }, 1180)
+        harness.receive({ serverTimeMs: 1200 }, 1230)
+        harness.receive({ serverTimeMs: 1250 }, 1280)
 
         const beforeStableWindow = harness.sample(100, 1280)
         const afterStableWindow = harness.sample(100, 1291)
@@ -197,19 +197,19 @@ describe('FixedStepInterpolator', () => {
         })
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
         }, 1050)
         harness.receive({
-            timestamp: 1100,
+            serverTimeMs: 1100,
             updateEntities: [{ nid: 1, prop: 'x', value: 20 }]
         }, 2050)
         harness.receive({
-            timestamp: 1150,
+            serverTimeMs: 1150,
             updateEntities: [{ nid: 1, prop: 'x', value: 30 }]
         }, 2100)
 
@@ -232,11 +232,11 @@ describe('FixedStepInterpolator', () => {
         })
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
         }, 2050)
 
@@ -253,7 +253,7 @@ describe('FixedStepInterpolator', () => {
         for (let i = 0; i < 90; i++) {
             const receivedAt = 1000 + (i * 47.5)
             harness.receive({
-                timestamp: 1000 + (i * 50),
+                serverTimeMs: 1000 + (i * 50),
                 createEntities: i === 0 ? [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }] : [],
                 updateEntities: i > 0 ? [{ nid: 1, prop: 'x', value: i }] : []
             }, receivedAt)
@@ -269,15 +269,15 @@ describe('FixedStepInterpolator', () => {
         const harness = new InterpolationTestHarness()
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
         }, 1000)
         harness.receive({
-            timestamp: 1100,
+            serverTimeMs: 1100,
             updateEntities: [{ nid: 1, prop: 'x', value: 20 }]
         }, 1000)
 
@@ -293,14 +293,14 @@ describe('FixedStepInterpolator', () => {
         const harness = new InterpolationTestHarness()
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [
                 { nid: 1, ntype: 1, x: 0, y: 0, label: 'a' },
                 { nid: 2, ntype: 1, x: 100, y: 100, label: 'b' }
             ]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             updateEntities: [
                 { nid: 1, prop: 'x', value: 10 },
                 { nid: 2, prop: 'x', value: 200 },
@@ -322,16 +322,16 @@ describe('FixedStepInterpolator', () => {
         const harness = new InterpolationTestHarness()
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             skipInterpolationNids: [1],
             updateEntities: [{ nid: 1, prop: 'x', value: 100 }]
         }, 1050)
         harness.receive({
-            timestamp: 1100,
+            serverTimeMs: 1100,
             updateEntities: [{ nid: 1, prop: 'x', value: 150 }]
         }, 1100)
 
@@ -347,14 +347,14 @@ describe('FixedStepInterpolator', () => {
         const harness = new InterpolationTestHarness()
 
         harness.receive({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 10, y: 20, label: 'a' }]
         }, 1000)
         harness.receive({
-            timestamp: 1050,
+            serverTimeMs: 1050,
             deleteEntities: [1]
         }, 1050)
-        harness.receive({ timestamp: 1100 }, 1100)
+        harness.receive({ serverTimeMs: 1100 }, 1100)
 
         const visible = harness.interpolator.getEntity(1, 100, 1125)
         const gone = harness.interpolator.getEntity(1, 100, 1250)
@@ -366,49 +366,31 @@ describe('FixedStepInterpolator', () => {
 })
 
 describe('ClientNetwork interpolation timestamps', () => {
-    it('synthesizes missing snapshot timestamps from the previous fixed server tick', () => {
-        const client = createInterpolationTestClient()
-        const first = createTestSnapshot({ timestamp: 1000 })
-        const second = createTestSnapshot({ timestamp: -1 })
-
-        client.network.resolveSnapshotTimestamp(first)
-        client.network.previousSnapshot = first
-        client.network.resolveSnapshotTimestamp(second)
-
-        expect(first.timestamp).toBe(1000)
-        expect(second.timestamp).toBe(1050)
-    })
-
-    it('uses real server timestamps when snapshots include them', () => {
-        const client = createInterpolationTestClient()
+	it('preserves mandatory server timestamps without driving local interpolation', () => {
+		const client = createInterpolationTestClient()
 
         const first = createTestSnapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             createEntities: [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }]
         })
-        client.network.resolveSnapshotTimestamp(first)
-        const frame1 = applyTestSnapshot(client, first, 1000)
-        client.network.previousSnapshot = first
+		const frame1 = applyTestSnapshot(client, first, 1000)
 
-        const second = createTestSnapshot({
-            timestamp: -1,
-            updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
-        })
-        client.network.resolveSnapshotTimestamp(second)
-        const frame2 = applyTestSnapshot(client, second, 1050)
-        client.network.previousSnapshot = second
+		const second = createTestSnapshot({
+			serverTimeMs: 1050,
+			updateEntities: [{ nid: 1, prop: 'x', value: 10 }]
+		})
+		const frame2 = applyTestSnapshot(client, second, 1050)
 
         const third = createTestSnapshot({
-            timestamp: 1104,
+            serverTimeMs: 1104,
             updateEntities: [{ nid: 1, prop: 'x', value: 20 }]
         })
-        client.network.resolveSnapshotTimestamp(third)
-        const frame3 = applyTestSnapshot(client, third, 1104)
+		const frame3 = applyTestSnapshot(client, third, 1104)
 
-        expect(frame1.timestamp).toBe(1000)
-        expect(frame2.timestamp).toBe(1050)
-        expect(frame3.timestamp).toBe(1104)
-        expect(frame2.timestamp - frame1.timestamp).toBe(50)
-        expect(frame3.timestamp - frame2.timestamp).toBe(54)
+        expect(frame1.serverTimeMs).toBe(1000)
+        expect(frame2.serverTimeMs).toBe(1050)
+        expect(frame3.serverTimeMs).toBe(1104)
+        expect(frame2.serverTimeMs - frame1.serverTimeMs).toBe(50)
+        expect(frame3.serverTimeMs - frame2.serverTimeMs).toBe(54)
     })
 })

@@ -59,11 +59,7 @@ export function writeSnapshotChunks(chunks: SnapshotChunk[], writer: IBinaryWrit
 
         if (options.createWriter) {
             const diagnosticWriter = options.createWriter(sumSnapshotChunkBytes(chunks))
-            try {
-                writeChunks(chunks, diagnosticWriter, true, true)
-            } catch (diagnosticErr) {
-                throw diagnosticErr
-            }
+            writeChunks(chunks, diagnosticWriter, true, true)
         }
 
         throw createBinaryDiagnosticError(err, {

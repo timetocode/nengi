@@ -7,10 +7,9 @@ function readEntity(reader: IBinaryReader, context: Context, ntypeType: NetworkI
     const ntype = readNetworkId(ntypeType, reader)
     const nid = readNetworkId(nidType, reader)
     const nschema = context.getSchema(ntype)!
-    const obj = { nid, ntype }
+    const obj: any = { nid, ntype }
     for (let i = 0; i < nschema.keys.length; i++) {
         const propData = nschema.keys[i]
-        // @ts-ignore
         obj[propData.prop] = propData.binary.post(propData.binary.read(reader))
     }
     return obj

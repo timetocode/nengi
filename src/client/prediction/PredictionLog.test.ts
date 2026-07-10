@@ -23,7 +23,7 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
     const deleteEntities = args.deleteEntities || []
     const hasEntityCrud = createEntities.length > 0 || updateEntities.length > 0 || deleteEntities.length > 0
     return {
-        timestamp: -1,
+        serverTimeMs: 0,
         confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
@@ -71,7 +71,7 @@ describe('PredictionLog', () => {
         expect(log.getPendingCommands().map(op => op.id)).toEqual([operation.id])
 
         const frame = store.applySnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 7,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
@@ -106,7 +106,7 @@ describe('PredictionLog', () => {
         })
 
         const frame = store.applySnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 10,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 1, open: false }],
@@ -138,7 +138,7 @@ describe('PredictionLog', () => {
         })
 
         const frame = store.applySnapshot(snapshot({
-            timestamp: 1000,
+            serverTimeMs: 1000,
             confirmedCommandFrameNumber: 99,
             messages: [],
             createEntities: [{ nid: 1, ntype: 1, x: 0, open: false }],

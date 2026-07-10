@@ -37,8 +37,17 @@ instance.onSnapshotSendError = ({ user, error, byteLength, tick }) => {
 
 On the client, use `client.network.onMalformedSnapshot`,
 `client.setDisconnectHandler`, and `client.setWebsocketErrorHandler` to connect
-transport failures to the application's diagnostics. These callbacks should be
-small and should not mutate authoritative state directly.
+transport failures to the application's diagnostics. A malformed snapshot is
+fatal because decoding may already have changed protocol bookkeeping; Nengi
+reports it and closes the client transport. These callbacks should be small and
+should not mutate authoritative state directly.
+
+For half-open sockets and clients that stop processing Nengi traffic, configure
+the server's `pingIntervalMs`, `pongTimeoutMs`, and `handshakeTimeoutMs`.
+Pre-acceptance handshake expiry emits `UserConnectionDenied`; Pong expiry after
+acceptance emits `UserDisconnected`. See
+[timing-and-liveness.md](./timing-and-liveness.md) for the clock domains and
+adapter termination contract.
 
 ## Request pressure
 

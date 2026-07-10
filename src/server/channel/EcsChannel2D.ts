@@ -869,14 +869,14 @@ export class EcsChannel2D {
             addAlias(name, props[name])
         }
 
-        const writeGroup = (component: Ecs2DComponent, group: SchemaUpdateGroup, values: IArguments | any[]) => {
-            this.appendPendingGroup(ntype, component, group, values, 1)
+        const writeGroup = (component: Ecs2DComponent, group: SchemaUpdateGroup, values: any[]) => {
+            this.appendPendingGroup(ntype, component, group, values, 0)
         }
 
         for (let i = 0; i < schema.updateGroups.length; i++) {
             const group = schema.updateGroups[i]
-            groups[group.name] = function writeEcsSpatialGroup(component: Ecs2DComponent) {
-                writeGroup(component, group, arguments)
+            groups[group.name] = (component: Ecs2DComponent, ...values: any[]) => {
+                writeGroup(component, group, values)
             }
             addAlias(group.name, groups[group.name])
         }

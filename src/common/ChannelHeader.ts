@@ -32,11 +32,12 @@ export function createChannelHeader(
             throw new Error(`Channel header nid must be 0 or match the channel id ${channelId}.`)
         }
         input.nid = channelId
-        ;(input as ChannelHeader).channelType = channelType
+        const header = input as ChannelHeader
+        header.channelType = channelType
         if (name !== undefined) {
-            ;(input as ChannelHeader).name = name
+            header.name = name
         }
-        return input as ChannelHeader
+        return header
     }
 
     const header: ChannelHeader = {

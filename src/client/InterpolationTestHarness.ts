@@ -49,7 +49,7 @@ export function createTestSnapshot(args: Partial<Snapshot>): Snapshot {
     }] : [])
 
     return {
-        timestamp: -1,
+        serverTimeMs: 0,
         confirmedCommandFrameNumber: -1,
         messages: [],
         ...args,
@@ -67,13 +67,12 @@ export function createInterpolationTestClient(tickRate = 20) {
     return new Client(createInterpolationTestContext(), MockAdapter, tickRate)
 }
 
-export function applyTestSnapshot(client: Client, snapshot: Partial<Snapshot>, receivedAt: number) {
+export function applyTestSnapshot(client: Client, snapshot: Partial<Snapshot>, receivedAtMs: number) {
     const fullSnapshot = createTestSnapshot(snapshot)
-    const frame = client.network.store.applySnapshot(fullSnapshot, client.network.frameTick, receivedAt)
+    const frame = client.network.store.applySnapshot(fullSnapshot, client.network.frameTick, receivedAtMs)
     client.network.frameTick++
     client.network.frames.push(frame)
     client.network.latestFrame = frame
-    client.network.previousSnapshot = fullSnapshot
     return frame
 }
 
@@ -95,14 +94,14 @@ export class InterpolationTestHarness {
         return this.now
     }
 
-    receive(snapshot: Partial<Snapshot>, receivedAt = this.now) {
-        return applyTestSnapshot(this.client, snapshot, receivedAt)
+    receive(snapshot: Partial<Snapshot>, receivedAtMs = this.now) {
+        return applyTestSnapshot(this.client, snapshot, receivedAtMs)
     }
 
     receiveMovingFrames(receivedAtStart: number, count = 4, spacingMs = 50) {
         for (let i = 0; i < count; i++) {
             this.receive({
-                timestamp: 1000 + (i * spacingMs),
+                serverTimeMs: 1000 + (i * spacingMs),
                 createEntities: i === 0 ? [{ nid: 1, ntype: 1, x: 0, y: 0, label: 'a' }] : [],
                 updateEntities: i > 0 ? [{ nid: 1, prop: 'x', value: i * 10 }] : []
             }, receivedAtStart + (i * spacingMs))

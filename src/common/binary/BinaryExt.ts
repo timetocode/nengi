@@ -113,7 +113,7 @@ function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecificati
         // use the post function or create a function that returns the value unchanged
         post: (post) ? post : (value: any) => { return value },
         // use the interp function or create a function that returns the most recent value uninterpolated
-        interp: (interp) ? interp : (a: any, b: any, t: number) => { return b },
+        interp: (interp) ? interp : (a: any, b: any) => { return b },
         clone: (clone) ? clone : (value: any) => { return value }
     })
 }
@@ -289,7 +289,7 @@ declareBinaryType<Vector2>(Binary.Vector2, {
         const y = br.readFloat64()
         return { x, y }
     },
-    byteSize: (value: Vector2) => {
+    byteSize: () => {
         return 16 // that's 2 float64s worth of bytes
     },
     compare(a: Vector2, b: Vector2) {
@@ -323,7 +323,7 @@ declareBinaryType<Vector3>(Binary.Vector3, {
         const z = br.readFloat64()
         return { x, y, z }
     },
-    byteSize: (value: Vector3) => {
+    byteSize: () => {
         return 24 // that's 3 float64s worth of bytes
     },
     compare(a: Vector3, b: Vector3) {
@@ -359,7 +359,7 @@ declareBinaryType<Vector4>(Binary.Vector4, {
         const w = br.readFloat64()
         return { x, y, z, w }
     },
-    byteSize: (value: Vector4) => {
+    byteSize: () => {
         return 32 // that's 4 float64s worth of bytes
     },
     compare(a: Vector4, b: Vector4) {
@@ -477,7 +477,7 @@ declareBinaryType<Quaternion>(Binary.Quaternion, {
         const w = br.readFloat64()
         return { x, y, z, w }
     },
-    byteSize: (value: Quaternion) => {
+    byteSize: () => {
         return 32 // that's 4 float64s worth of bytes
     },
     compare(a: Quaternion, b: Quaternion) {

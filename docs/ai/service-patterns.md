@@ -32,6 +32,11 @@ cycle is:
 5. Apply the accepted state transition.
 6. Emit entity, channel, message, and response changes.
 7. Call `instance.step()` at the snapshot boundary.
+
+Keep that network step on a regular cadence even when the service has no state
+changes to publish. Nengi evaluates connection deadlines and emits Pings at the
+step boundary; an event-driven service that steps only after mutations cannot
+provide heartbeat liveness.
 8. Flush transport output and metrics.
 
 The service may run this cycle after each event or on a short scheduled cadence.

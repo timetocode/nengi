@@ -11,7 +11,7 @@ import { writeMessage } from '../binary/message/writeMessage'
 import { BinaryPayload } from '../common/binary/BinaryAdapter'
 import { binaryGet } from '../common/binary/BinaryExt'
 import { Binary } from '../common/binary/Binary'
-import { ProtocolConfig } from '../common/binary/Protocol'
+import { ProtocolConfig, WIRE_PROTOCOL_VERSION } from '../common/binary/Protocol'
 import { createEndpointPayload, readSizedEndpointPayload, skipEndpointPayload } from '../binary/endpoint/EndpointPayload'
 import { ResponseStatus } from '../common/Endpoint'
 import type { ResponseEndpoint } from './Instance'
@@ -26,6 +26,7 @@ export interface INetworkEvent {
     commandTimings?: Array<CommandTimingEstimate | undefined>
     serverReceivedTimeMs?: number
     payload?: any
+    reason?: any
 }
 
 export interface INetworkRequest {
@@ -205,6 +206,10 @@ function errorPayload(code: string, message: string) {
     return { code, message }
 }
 
+function isUserClosed(user: User) {
+    return user.connectionState === UserConnectionState.Closed
+}
+
 function serializeConnectionError(err: any) {
     if (err instanceof Error) {
         return JSON.stringify({
@@ -224,6 +229,8 @@ class ProtocolError extends Error {
 
 export class InstanceNetwork {
     instance: Instance
+    pendingUsers = new Set<User>()
+    private deniedUsers = new WeakSet<User>()
     responseBacklogUsers = new Set<User>()
     requestQueue = new NQueue<INetworkRequest>()
     requireSchemaFingerprint = false
@@ -464,13 +471,14 @@ export class InstanceNetwork {
         try {
             const result = endpoint.callback({ user, body }, send)
             if (result && typeof (result as Promise<any>).then === 'function') {
-                ;(result as Promise<any>)
+                const pending = result as Promise<any>
+                pending
                     .then(response => {
                         if (response !== undefined) {
                             send(response)
                         }
                     })
-                    .catch(err => {
+                    .catch(() => {
                         if (!sent && user.connectionState === UserConnectionState.Open) {
                             this.queueErrorResponse(user, requestId, 'HANDLER_REJECTED', 'Request handler rejected.')
                         }
@@ -505,14 +513,28 @@ export class InstanceNetwork {
     onOpen(user: User) {
         user.connectionState = UserConnectionState.OpenPreHandshake
         user.network = this
+        user.openedAtMs = this.instance.now()
+        this.pendingUsers.add(user)
     }
 
-    async onHandshake(user: User, handshake: any, clientSchemaFingerprint = '') {
+    async onHandshake(
+        user: User,
+        handshake: any,
+        clientSchemaFingerprint = '',
+        clientWireProtocolVersion = WIRE_PROTOCOL_VERSION
+    ) {
         try {
             if (user.connectionState !== UserConnectionState.OpenPreHandshake) {
                 throw new Error('Connection attempt received when the connection is not awaiting its initial handshake.')
             }
             user.connectionState = UserConnectionState.OpenAwaitingHandshake
+            this.pendingUsers.add(user)
+            if (clientWireProtocolVersion !== WIRE_PROTOCOL_VERSION) {
+                throw new Error(
+                    `Nengi wire protocol mismatch. Server ${WIRE_PROTOCOL_VERSION}, ` +
+                    `client ${clientWireProtocolVersion}.`
+                )
+            }
             if (this.requireSchemaFingerprint) {
                 const serverSchemaFingerprint = createSchemaFingerprint(this.instance.context)
                 if (!clientSchemaFingerprint) {
@@ -529,74 +551,65 @@ export class InstanceNetwork {
                 throw new Error('Connection denied.')
             }
 
-            // @ts-ignore typescript is wrong that connectionState does not change, it changes during the await
-            if (user.connectionState === UserConnectionState.Closed) {
-                throw new Error('Connection closed before handshake completed.')
+            if (isUserClosed(user)) {
+                return
             }
 
-            user.connectionState = UserConnectionState.Open
-
-            // allow
-            const protocolMessage = this.createProtocolEngineMessage()
-            const protocolSchema = this.instance.context.getEngineSchema(protocolMessage.ntype)!
-            const bw = user.networkAdapter.binary.createWriter(3 + countMessage(protocolSchema, protocolMessage))
-            bw.writeUInt8(BinarySection.EngineMessages)
-            bw.writeUInt8(2)
-            bw.writeUInt8(EngineMessage.ConnectionAccepted)
-            writeMessage(protocolMessage, protocolSchema, bw)
-
-            user.send(bw.payload)
+            this.sendConnectionAccepted(user)
             user.instance = this.instance
             user.protocol = { ...this.getProtocol() }
             this.onConnectionAccepted(user, connectionAccepted)
         } catch (err: any) {
-            if (
-                user.connectionState !== UserConnectionState.Open &&
-                user.connectionState !== UserConnectionState.Closed
-            ) {
-                this.onConnectionDenied(user, err)
+            if (this.isUserlandConnected(user)) {
+                this.disconnectUser(user, {}, false)
+                return
             }
-
-            // NOTE: we are keeping the code between these cases duplicated
-            // if these do turn out to be identical in production we will clean it up
-            // but for now I am suspicious that there will be different logic
-            // in each of these later
-
-            if (user.connectionState === UserConnectionState.OpenAwaitingHandshake) {
-                // developer's code decided to reject this connection (rejected promise)
-                const jsonErr = serializeConnectionError(err)
-                const denyReasonByteLength = countStringBytes(jsonErr)
-
-                // deny and send reason
-                const bw = user.networkAdapter.binary.createWriter(3 + denyReasonByteLength)
-                bw.writeUInt8(BinarySection.EngineMessages)
-                bw.writeUInt8(1)
-                bw.writeUInt8(EngineMessage.ConnectionDenied)
-                bw.writeString(jsonErr)
-                user.send(bw.payload)
+            if (user.connectionState === UserConnectionState.Closed) {
+                return
             }
-
-            if (user.connectionState === UserConnectionState.Open) {
-                // a loss of connection after handshake is complete
-                const jsonErr = serializeConnectionError(err)
-                const denyReasonByteLength = countStringBytes(jsonErr)
-
-                // deny and send reason
-                const bw = user.networkAdapter.binary.createWriter(3 + denyReasonByteLength)
-                bw.writeUInt8(BinarySection.EngineMessages)
-                bw.writeUInt8(1)
-                bw.writeUInt8(EngineMessage.ConnectionDenied)
-                bw.writeString(jsonErr)
-                user.send(bw.payload)
-            }
+            this.onConnectionDenied(user, err)
+            this.sendConnectionDenied(user, err)
             this.disconnectDeniedUser(user)
+        }
+    }
+
+    private sendConnectionAccepted(user: User) {
+        const acceptedMessage = {
+            ntype: EngineMessage.ConnectionAccepted,
+            wireProtocolVersion: WIRE_PROTOCOL_VERSION
+        }
+        const protocolMessage = this.createProtocolEngineMessage()
+        const acceptedSchema = this.instance.context.getEngineSchema(acceptedMessage.ntype)!
+        const protocolSchema = this.instance.context.getEngineSchema(protocolMessage.ntype)!
+        const byteLength = 2 +
+            countMessage(acceptedSchema, acceptedMessage) +
+            countMessage(protocolSchema, protocolMessage)
+        const writer = user.networkAdapter.binary.createWriter(byteLength)
+        writer.writeUInt8(BinarySection.EngineMessages)
+        writer.writeUInt8(2)
+        writeMessage(acceptedMessage, acceptedSchema, writer)
+        writeMessage(protocolMessage, protocolSchema, writer)
+        user.send(writer.payload)
+    }
+
+    private sendConnectionDenied(user: User, error: unknown) {
+        try {
+            const jsonError = serializeConnectionError(error)
+            const writer = user.networkAdapter.binary.createWriter(3 + countStringBytes(jsonError))
+            writer.writeUInt8(BinarySection.EngineMessages)
+            writer.writeUInt8(1)
+            writer.writeUInt8(EngineMessage.ConnectionDenied)
+            writer.writeString(jsonError)
+            user.send(writer.payload)
+        } catch (sendError) {
+            // The denial event and transport cleanup remain authoritative.
         }
     }
 
     onMessage(user: User, buffer: BinaryPayload) {
 
         try {
-            const serverReceivedTimeMs = performance.now()
+            const serverReceivedTimeMs = this.instance.now()
             const binaryReader = user.networkAdapter.binary.createReader(buffer)
             const commands: any[] = []
             const commandTimingInputs: CommandTimingInput[] = []
@@ -621,7 +634,12 @@ export class InstanceNetwork {
 
                         if (msg.ntype === EngineMessage.ConnectionAttempt) {
                             const handshake = JSON.parse(msg.handshake)
-                            this.onHandshake(user, handshake, msg.schemaFingerprint || '')
+                            this.onHandshake(
+                                user,
+                                handshake,
+                                msg.schemaFingerprint || '',
+                                msg.wireProtocolVersion
+                            )
                         }
 
                         if (msg.ntype === EngineMessage.CommandFrameNumber) {
@@ -631,7 +649,6 @@ export class InstanceNetwork {
                         if (msg.ntype === EngineMessage.Pong) {
                             user.recordClockSyncPong({
                                 pingId: msg.pingId,
-                                serverTimeMs: msg.serverTimeMs,
                                 clientReceiveTimeMs: msg.clientReceiveTimeMs,
                                 clientSendTimeMs: msg.clientSendTimeMs
                             }, serverReceivedTimeMs)
@@ -716,20 +733,7 @@ export class InstanceNetwork {
     }
 
     disconnectMalformedInboundUser(user: User) {
-        if (user.connectionState === UserConnectionState.Closed) {
-            return
-        }
-        const wasOpen = user.connectionState === UserConnectionState.Open
-        try {
-            user.networkAdapter.disconnect(user, {})
-        } catch (err) {
-            // Keep malformed inbound payloads from escaping the network edge.
-        }
-        if (wasOpen) {
-            this.onClose(user)
-            return
-        }
-        user.connectionState = UserConnectionState.Closed
+        this.disconnectUser(user, {}, false)
     }
 
     notifyInboundMessageError(user: User, buffer: BinaryPayload, error: unknown) {
@@ -747,42 +751,68 @@ export class InstanceNetwork {
     }
 
     disconnectDeniedUser(user: User) {
-        if (user.connectionState === UserConnectionState.Closed) {
-            return
-        }
-        const wasOpen = user.connectionState === UserConnectionState.Open
-        try {
-            user.networkAdapter.disconnect(user, {})
-        } catch (err) {
-            // Denied connections are already outside normal game flow.
-        }
-        if (wasOpen) {
-            this.onClose(user)
-            return
-        }
-        user.connectionState = UserConnectionState.Closed
+        this.disconnectUser(user, {}, false)
     }
 
     disconnectSendFailedUser(user: User) {
+        this.disconnectUser(user, {}, false)
+    }
+
+    disconnectTimedOutUsers(nowMs: number) {
+        for (const user of Array.from(this.pendingUsers)) {
+            if (
+                (
+                    user.connectionState === UserConnectionState.OpenPreHandshake ||
+                    user.connectionState === UserConnectionState.OpenAwaitingHandshake
+                ) &&
+                user.openedAtMs !== null &&
+                nowMs - user.openedAtMs >= this.instance.handshakeTimeoutMs
+            ) {
+                const reason = { reason: 'handshake_timeout' }
+                this.onConnectionDenied(user, reason)
+                this.disconnectUser(user, reason, true)
+            }
+        }
+
+        for (const user of Array.from(this.instance.users.values())) {
+            if (
+                user.connectionState === UserConnectionState.Open &&
+                user.hasPongTimedOut(nowMs, this.instance.pongTimeoutMs)
+            ) {
+                this.disconnectUser(user, { reason: 'pong_timeout' }, true)
+            }
+        }
+    }
+
+    private disconnectUser(user: User, reason: any, force: boolean) {
         if (user.connectionState === UserConnectionState.Closed) {
             return
         }
-        const wasOpen = user.connectionState === UserConnectionState.Open
+
+        const wasConnected = this.isUserlandConnected(user)
         try {
-            user.networkAdapter.disconnect(user, {})
+            if (force && user.networkAdapter.terminate) {
+                user.networkAdapter.terminate(user, reason)
+            } else {
+                user.networkAdapter.disconnect(user, reason)
+            }
         } catch (err) {
-            // The send path already failed; close cleanup should still complete.
+            // Cleanup below remains authoritative when the transport is already broken.
         }
-        if (wasOpen) {
-            this.onClose(user)
-            return
+
+        if (wasConnected) {
+            this.onClose(user, reason)
+        } else {
+            this.pendingUsers.delete(user)
+            user.connectionState = UserConnectionState.Closed
         }
-        user.connectionState = UserConnectionState.Closed
     }
 
     onConnectionAccepted(user: User, payload: any) {
+        this.pendingUsers.delete(user)
         user.network = this
         user.id = ++this.instance.incrementalUserId
+        user.connectionState = UserConnectionState.Open
         this.instance.users.set(user.id, user)
 
         this.instance.queue.enqueue({
@@ -793,6 +823,10 @@ export class InstanceNetwork {
     }
 
     onConnectionDenied(user: User, payload: any) {
+        if (this.deniedUsers.has(user) || this.isUserlandConnected(user)) {
+            return
+        }
+        this.deniedUsers.add(user)
         this.instance.queue.enqueue({
             type: NetworkEvent.UserConnectionDenied,
             user,
@@ -800,17 +834,26 @@ export class InstanceNetwork {
         })
     }
 
-    onClose(user: User) {
+    onClose(user: User, reason?: any) {
+        this.pendingUsers.delete(user)
         this.responseBacklogUsers.delete(user)
         this.purgeRequestsForUser(user)
-        if (user.connectionState === UserConnectionState.Open) {
+        if (this.isUserlandConnected(user)) {
+            const eventReason = reason && typeof reason === 'object' && 'reason' in reason
+                ? reason.reason
+                : reason
             this.instance.queue.enqueue({
                 type: NetworkEvent.UserDisconnected,
                 user,
+                reason: eventReason
             })
             this.instance.users.delete(user.id)
         }
         user.connectionState = UserConnectionState.Closed
+    }
+
+    private isUserlandConnected(user: User) {
+        return this.instance.users.get(user.id) === user
     }
 
     purgeRequestsForUser(user: User) {

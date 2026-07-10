@@ -33,6 +33,7 @@ function createClientNetwork(context: Context) {
         serverTickRate: 20,
         disconnectHandler: jest.fn(),
         websocketErrorHandler: jest.fn(),
+        disconnect: jest.fn(),
         predictor: new Predictor(),
         network: undefined as unknown as ClientNetwork
     }
@@ -623,6 +624,7 @@ describe('request/response', () => {
         }).not.toThrow()
 
         expect(onMalformedSnapshot).toHaveBeenCalledTimes(1)
+        expect(clientNetwork.client.disconnect).toHaveBeenCalledWith({ reason: 'malformed_snapshot' })
         expect(clientNetwork.getPendingFrameCount()).toBe(0)
     })
 

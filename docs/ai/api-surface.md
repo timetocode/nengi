@@ -25,8 +25,9 @@ matches its job.
 Use these for ordinary game or service code:
 
 - `Context`, schemas, `defineEndpoint`, and protocol payload types
-- `Instance`, `User`, channels, `CommandRouter`, and `NetworkEvent`
-- `Client`, `ClientConnectResult`, `RequestOptions`, `Frame`, `EntityStore`, and interpolation/prediction helpers
+- `Instance`, `InstanceOptions`, `User`, channels, `CommandRouter`, and `NetworkEvent`
+- `Client`, `ClientOptions`, `ClientConnectResult`, `RequestOptions`, `Frame`, `EntityStore`, and interpolation/prediction helpers
+- `TimeSource`, `client.getEstimatedServerTimeMs()`, and `client.getClockSync()`
 - `EcsWorld`, `ecs`, `bindEcsChannel`, and ECS channel frame appliers
 
 The application owns the game loop, authoritative state, renderer, ECS systems,
@@ -39,7 +40,7 @@ Use these when implementing or configuring an adapter:
 - `IClientNetworkAdapter` and `ClientAdapterConstructor`
 - `IServerNetworkAdapter`
 - `BinaryAdapter`, `IBinaryReader`, and `IBinaryWriter`
-- `BinaryPayload` and `ProtocolConfig`
+- `BinaryPayload`, `ProtocolConfig`, and `WIRE_PROTOCOL_VERSION`
 
 Official socket and binary packages should be kept at the exact same RC version
 as `nengi`.
@@ -66,6 +67,6 @@ snapshot, and binary paths without opening a socket. `MockInstanceAdapter` and
 names.
 
 Keep a strict boundary around these tiers. Application code should not import
-internal serializer functions. Compose application-specific presentation and
+internal serializer or snapshot-header functions. Compose application-specific presentation and
 prediction code around the raw `EntityStore` and `Frame` APIs, while keeping
 snapshot order visible at the application boundary.

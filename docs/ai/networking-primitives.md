@@ -229,6 +229,8 @@ For commands that need server-side lag compensation, use
 `client.predictCommandWithTiming(command, predictionOptions, timingOptions)`.
 The timing metadata lets server code use `getCommandViewTimeMs(...)` to query a
 historian around what the client was viewing when the command was authored.
+Use `client.getEstimatedServerTimeMs()` when the command needs an explicit
+`viewServerTimeMs`; this estimate is not required for ordinary interpolation.
 
 Use `CommandRouter` on the server when a game has several command types and the
 raw `event.commands` loop becomes repetitive:

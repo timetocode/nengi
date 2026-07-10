@@ -15,8 +15,6 @@ export enum UserConnectionState {
 }
 
 type StringOrJSONStringifiable = string | object
-type nid = number
-type tick = number
 
 export type CommandTimingInput = {
     commandIndex: number
@@ -70,6 +68,7 @@ export class User {
     networkAdapter: IServerNetworkAdapter<any, any, any>
     network: InstanceNetwork | null = null
     remoteAddress: string | null = null
+    openedAtMs: number | null = null
     connectionState = UserConnectionState.NULL
     subscriptions = new Map<number, IChannel>()
     engineMessageQueue: any[] = []
@@ -88,8 +87,10 @@ export class User {
     nextPingId = 1
     lastSentPingId = 0
     latency = 0
-    lastSentPingTimestamp = 0
-    lastSentPingTimeMs = 0
+    lastPingSentAtMs: number | null = null
+    firstUnansweredPingSentAtMs: number | null = null
+    lastPongReceivedAtMs: number | null = null
+    pendingPings = new Map<number, { serverTimeMs: number, sentAtMs: number }>()
     recentLatencies: number[] = []
     latencySamples = 3
     roundTripMs = 0
@@ -105,24 +106,6 @@ export class User {
         this.networkAdapter = networkAdapter
     }
 
-    calculateLatency() {
-        const deltaMs = Date.now() - this.lastSentPingTimestamp
-        this.recentLatencies.push(deltaMs)
-
-        if (this.recentLatencies.length > 0) {
-            let curr = 0
-            for (let i = 0; i < this.recentLatencies.length; i++) {
-                curr += this.recentLatencies[i]
-            }
-
-            this.latency = curr / this.recentLatencies.length
-        }
-
-        while (this.recentLatencies.length > this.latencySamples) {
-            this.recentLatencies.shift()
-        }
-    }
-
     nextPing() {
         const pingId = this.nextPingId
         this.nextPingId++
@@ -131,6 +114,36 @@ export class User {
         }
         this.lastSentPingId = pingId
         return pingId
+    }
+
+    shouldSendPing(nowMs: number, intervalMs: number) {
+        return this.lastPingSentAtMs === null || nowMs - this.lastPingSentAtMs >= intervalMs
+    }
+
+    recordPingSent(pingId: number, serverTimeMs: number, sentAtMs: number) {
+        this.pendingPings.set(pingId, { serverTimeMs, sentAtMs })
+        this.lastPingSentAtMs = sentAtMs
+        if (this.firstUnansweredPingSentAtMs === null) {
+            this.firstUnansweredPingSentAtMs = sentAtMs
+        }
+
+        // Keep enough recent samples to accept delayed Pongs without allowing
+        // an unbounded connection lifetime queue.
+        while (this.pendingPings.size > 16) {
+            const oldestPingId = this.pendingPings.keys().next().value
+            if (oldestPingId === undefined) {
+                break
+            }
+            this.pendingPings.delete(oldestPingId)
+        }
+    }
+
+    hasPongTimedOut(nowMs: number, timeoutMs: number) {
+        const lastActivityAtMs = this.lastPongReceivedAtMs ?? this.firstUnansweredPingSentAtMs
+        if (lastActivityAtMs === null) {
+            return false
+        }
+        return nowMs - lastActivityAtMs >= timeoutMs
     }
 
     receiveCommandFrameNumber(commandFrameNumber: number) {
@@ -145,17 +158,30 @@ export class User {
     }
 
     recordClockSyncPong(
-        pong: { pingId?: number, serverTimeMs: number, clientReceiveTimeMs: number, clientSendTimeMs: number },
+        pong: { pingId: number, clientReceiveTimeMs: number, clientSendTimeMs: number },
         serverReceiveTimeMs: number
     ) {
-        if (pong.pingId !== undefined && this.lastSentPingId !== 0 && pong.pingId !== this.lastSentPingId) {
+        const pendingPing = this.pendingPings.get(pong.pingId)
+        if (!pendingPing) {
             return false
         }
-        const serverSendTimeMs = pong.serverTimeMs
+        if (
+            !Number.isFinite(serverReceiveTimeMs) ||
+            !Number.isFinite(pong.clientReceiveTimeMs) ||
+            !Number.isFinite(pong.clientSendTimeMs) ||
+            pong.clientSendTimeMs < pong.clientReceiveTimeMs
+        ) {
+            return false
+        }
+
+        this.pendingPings.delete(pong.pingId)
+        this.lastPongReceivedAtMs = serverReceiveTimeMs
+
+        const serverSendTimeMs = pendingPing.serverTimeMs
         const clientReceiveTimeMs = pong.clientReceiveTimeMs
         const clientSendTimeMs = pong.clientSendTimeMs
         const clientTurnaroundMs = Math.max(0, clientSendTimeMs - clientReceiveTimeMs)
-        const roundTripMs = Math.max(0, (serverReceiveTimeMs - serverSendTimeMs) - clientTurnaroundMs)
+        const roundTripMs = Math.max(0, (serverReceiveTimeMs - pendingPing.sentAtMs) - clientTurnaroundMs)
         const offsetMs = ((serverSendTimeMs - clientReceiveTimeMs) + (serverReceiveTimeMs - clientSendTimeMs)) * 0.5
 
         this.recentLatencies.push(roundTripMs)

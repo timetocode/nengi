@@ -5,7 +5,6 @@ import { NetworkIdType, byteSizeOfNetworkType } from '../../common/binary/Protoc
 function count(schema: Schema, message: any, ntypeType: NetworkIdType = Binary.UInt8) {
     let bytes = byteSizeOfNetworkType(ntypeType)
     schema.keys.forEach(propData => {
-        // @ts-ignore
         bytes += propData.binary.byteSize(message[propData.prop])
     })
     return bytes

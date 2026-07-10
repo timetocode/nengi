@@ -9,6 +9,8 @@ type ProtocolConfig = {
     ntypeType: NetworkIdType
 }
 
+const WIRE_PROTOCOL_VERSION = 1
+
 const DEFAULT_PROTOCOL: ProtocolConfig = {
     nidType: Binary.UInt8,
     ntypeType: Binary.UInt8
@@ -84,6 +86,7 @@ function readNetworkId(type: NetworkIdType, reader: IBinaryReader) {
 
 export {
     DEFAULT_PROTOCOL,
+    WIRE_PROTOCOL_VERSION,
     NetworkIdType,
     ProtocolConfig,
     assertNetworkIdType,

@@ -10,7 +10,6 @@ import {
     resolveInterpolationDelayPolicyOptions
 } from './InterpolationDelayPolicy'
 import { PlaybackCursor, PlaybackCursorOptions, ResolvedPlaybackCursorOptions, resolvePlaybackCursorOptions } from './PlaybackCursor'
-import { getLocalTime } from './time'
 
 export enum InterpolationStatus {
     Ok = 'ok',
@@ -92,16 +91,16 @@ export class FixedStepInterpolator {
         return 1000 / this.client.serverTickRate
     }
 
-    getRenderTimestamp(interpDelay: number, now = getLocalTime()) {
-        return now - interpDelay
+    getRenderTimestamp(interpDelay: number, now?: number) {
+        return (now ?? this.client.now()) - interpDelay
     }
 
-    getTargetTick(interpDelay: number, now = getLocalTime()) {
+    getTargetTick(interpDelay: number, now?: number) {
         const diagnostics = this.getSampleDiagnostics(interpDelay, now)
         return diagnostics.targetTick
     }
 
-    getBounds(interpDelay: number, now = getLocalTime()): InterpolationBounds | null {
+    getBounds(interpDelay: number, now?: number): InterpolationBounds | null {
         const sample = this.getSampleDiagnostics(interpDelay, now)
         if (sample.status !== InterpolationStatus.Ok || !sample.frameA || !sample.frameB) {
             return null
@@ -123,13 +122,14 @@ export class FixedStepInterpolator {
         }
     }
 
-    getSampleDiagnostics(interpDelay: number, now = getLocalTime()): InterpolationDiagnostics {
+    getSampleDiagnostics(interpDelay: number, now?: number): InterpolationDiagnostics {
+        const currentTimeMs = now ?? this.client.now()
         const frames = this.client.network.frames
         const first = frames[0] || null
         const last = frames[frames.length - 1] || null
         const availableFirstTick = first ? first.tick : null
         const availableLastTick = last ? last.tick : null
-        const desiredBufferMs = this.delayPolicy.getDelayMs(interpDelay, frames, now)
+        const desiredBufferMs = this.delayPolicy.getDelayMs(interpDelay, frames, currentTimeMs)
         const desiredBufferTicks = desiredBufferMs / this.tickMs
         let latestBufferTicks: number | null = null
         let bufferErrorTicks: number | null = null
@@ -156,7 +156,7 @@ export class FixedStepInterpolator {
             }
         }
 
-        const targetTick = this.playbackCursor.advance(availableLastTick!, desiredBufferTicks, this.tickMs, now)
+        const targetTick = this.playbackCursor.advance(availableLastTick!, desiredBufferTicks, this.tickMs, currentTimeMs)
         latestBufferTicks = availableLastTick! - targetTick
         bufferErrorTicks = latestBufferTicks - desiredBufferTicks
         latestBufferMs = latestBufferTicks * this.tickMs
@@ -266,7 +266,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    sample(interpDelay: number, now = getLocalTime()): InterpolationSample {
+    sample(interpDelay: number, now?: number): InterpolationSample {
         const diagnostics = this.getSampleDiagnostics(interpDelay, now)
         if (diagnostics.status !== InterpolationStatus.Ok || !diagnostics.frameA || !diagnostics.frameB) {
             return {
@@ -298,7 +298,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    sampleEntities(nids: Iterable<number>, interpDelay: number, now = getLocalTime()): InterpolationSample {
+    sampleEntities(nids: Iterable<number>, interpDelay: number, now?: number): InterpolationSample {
         const diagnostics = this.getSampleDiagnostics(interpDelay, now)
         if (diagnostics.status !== InterpolationStatus.Ok || !diagnostics.frameA || !diagnostics.frameB) {
             return {
@@ -314,7 +314,7 @@ export class FixedStepInterpolator {
         }
     }
 
-    getEntity(nid: number, interpDelay: number, now = getLocalTime()): IEntity | null {
+    getEntity(nid: number, interpDelay: number, now?: number): IEntity | null {
         const bounds = this.getBounds(interpDelay, now)
         if (!bounds) {
             return null
@@ -332,7 +332,7 @@ export class FixedStepInterpolator {
         return this.interpolateEntityForFrame(nid, entityA, entityB, bounds.frameB, bounds.alpha)
     }
 
-    getEntities(nids: Iterable<number>, interpDelay: number, now = getLocalTime()): Map<number, IEntity> {
+    getEntities(nids: Iterable<number>, interpDelay: number, now?: number): Map<number, IEntity> {
         const bounds = this.getBounds(interpDelay, now)
         if (!bounds) {
             return new Map()
@@ -362,11 +362,11 @@ export class FixedStepInterpolator {
         return entities
     }
 
-    getAllEntities(interpDelay: number, now = getLocalTime()): Map<number, IEntity> {
+    getAllEntities(interpDelay: number, now?: number): Map<number, IEntity> {
         return this.sample(interpDelay, now).entities
     }
 
-    getState(interpDelay: number, now = getLocalTime()): InterpolatedState | null {
+    getState(interpDelay: number, now?: number): InterpolatedState | null {
         const sample = this.sample(interpDelay, now)
         if (sample.status !== InterpolationStatus.Ok || !sample.frameA || !sample.frameB) {
             return null

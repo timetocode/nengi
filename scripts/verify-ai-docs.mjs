@@ -68,7 +68,8 @@ for (const required of [
     'ecs-world.md',
     'operations.md',
     'service-patterns.md',
-    'testing-and-correctness.md'
+    'testing-and-correctness.md',
+    'timing-and-liveness.md'
 ]) {
     if (!aiReadme.includes(required)) {
         errors.push(`AI guide does not link ${required}`)
@@ -110,6 +111,19 @@ for (const file of markdownFiles) {
         if (content.includes(stale)) {
             errors.push(`docs/ai/${file} contains stale API name ${stale}`)
         }
+    }
+}
+
+const apiSurface = read('docs/ai/api-surface.md')
+const timing = read('docs/ai/timing-and-liveness.md')
+for (const required of ['InstanceOptions', 'ClientOptions', 'TimeSource', 'WIRE_PROTOCOL_VERSION']) {
+    if (!apiSurface.includes(required)) {
+        errors.push(`API surface docs are missing ${required}`)
+    }
+}
+for (const required of ['UserConnectionDenied', 'UserDisconnected', 'instance.step()']) {
+    if (!timing.includes(required)) {
+        errors.push(`timing docs are missing ${required}`)
     }
 }
 

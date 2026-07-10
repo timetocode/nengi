@@ -31,7 +31,7 @@ function createStore() {
 
 function snapshot(args: Partial<Snapshot>): Snapshot {
     return {
-        timestamp: 1000,
+        serverTimeMs: 1000,
         confirmedCommandFrameNumber: -1,
         messages: [],
         createEntities: [],

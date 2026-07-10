@@ -3,9 +3,11 @@ import { User, getCommandViewTimeMs } from './User'
 describe('User clock sync timing', () => {
     it('estimates RTT, clock offset, input time, and view time', () => {
         const user = new User({} as any, {} as any)
+        user.nextPing()
+        user.recordPingSent(1, 1000, 1000)
 
         user.recordClockSyncPong({
-            serverTimeMs: 1000,
+            pingId: 1,
             clientReceiveTimeMs: 50,
             clientSendTimeMs: 60
         }, 1030)
@@ -75,14 +77,28 @@ describe('User clock sync timing', () => {
         expect(getCommandViewTimeMs(baseTiming, { nowMs: 5000, maxRewindMs: 40 })).toBe(4960)
     })
 
-    it('rejects stale pong ids', () => {
+    it('accepts delayed Pongs for recent Ping ids', () => {
         const user = new User({} as any, {} as any)
         user.nextPing()
+        user.recordPingSent(1, 1000, 1000)
         user.nextPing()
+        user.recordPingSent(2, 1100, 1100)
 
         const accepted = user.recordClockSyncPong({
             pingId: 1,
-            serverTimeMs: 1000,
+            clientReceiveTimeMs: 50,
+            clientSendTimeMs: 60
+        }, 1030)
+
+        expect(accepted).toBe(true)
+        expect(user.clockSyncSamples).toBe(1)
+    })
+
+    it('rejects Pongs for unknown Ping ids', () => {
+        const user = new User({} as any, {} as any)
+
+        const accepted = user.recordClockSyncPong({
+            pingId: 1,
             clientReceiveTimeMs: 50,
             clientSendTimeMs: 60
         }, 1030)

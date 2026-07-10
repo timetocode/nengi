@@ -185,6 +185,8 @@ Use this map instead of reading every file every time.
 - If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).
 - If you need compact server/client wiring, read [canonical-snippets.md](./canonical-snippets.md).
 - If wiring sockets or local test transports, read [adapters.md](./adapters.md).
+- If defining clocks, Ping/Pong, handshake deadlines, or disconnect liveness,
+  read [timing-and-liveness.md](./timing-and-liveness.md).
 - If adding common game features, read [channel-recipes.md](./channel-recipes.md).
 - If adding lag compensation, hit validation, rewind queries, or server-authoritative fairness rules, read [historian-lag-compensation.md](./historian-lag-compensation.md).
 - If optimizing explicit updates, read [manual-mutations.md](./manual-mutations.md).

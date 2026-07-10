@@ -16,16 +16,16 @@ The core package and every official Nengi adapter or binary package used by an
 application must have the exact same version. Do not use `^`, `~`, `latest`, or
 an unpinned range for release-candidate work.
 
-For this release candidate, the package version is `2.0.0-rc.124`:
+For this release candidate, the package version is `2.0.0-rc.125`:
 
 ```text
-nengi@2.0.0-rc.124
-nengi-websocket-client-adapter@2.0.0-rc.124
-nengi-ws-client-adapter@2.0.0-rc.124
-nengi-ws-instance-adapter@2.0.0-rc.124
-nengi-uws-instance-adapter@2.0.0-rc.124
-nengi-dataviews@2.0.0-rc.124
-nengi-buffers@2.0.0-rc.124
+nengi@2.0.0-rc.125
+nengi-websocket-client-adapter@2.0.0-rc.125
+nengi-ws-client-adapter@2.0.0-rc.125
+nengi-ws-instance-adapter@2.0.0-rc.125
+nengi-uws-instance-adapter@2.0.0-rc.125
+nengi-dataviews@2.0.0-rc.125
+nengi-buffers@2.0.0-rc.125
 ```
 
 When the core version changes, change every installed official package to that
@@ -67,9 +67,9 @@ Install the core, browser WebSocket adapter, and browser binary backend at the
 same version:
 
 ```bash
-npm install nengi@2.0.0-rc.124 \
-    nengi-websocket-client-adapter@2.0.0-rc.124 \
-    nengi-dataviews@2.0.0-rc.124
+npm install nengi@2.0.0-rc.125 \
+    nengi-websocket-client-adapter@2.0.0-rc.125 \
+    nengi-dataviews@2.0.0-rc.125
 ```
 
 Use the package root for core imports and the adapter package root for the
@@ -92,9 +92,9 @@ setup payload. Use it for authentication or session selection data that
 Install the core, `ws` server adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.124 \
-    nengi-ws-instance-adapter@2.0.0-rc.124 \
-    nengi-buffers@2.0.0-rc.124
+npm install nengi@2.0.0-rc.125 \
+    nengi-ws-instance-adapter@2.0.0-rc.125 \
+    nengi-buffers@2.0.0-rc.125
 ```
 
 Use this adapter when compatibility and simple deployment matter more than
@@ -120,9 +120,9 @@ adapter.listen(8079, () => {
 Install the core, uWS server adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.124 \
-    nengi-uws-instance-adapter@2.0.0-rc.124 \
-    nengi-buffers@2.0.0-rc.124
+npm install nengi@2.0.0-rc.125 \
+    nengi-uws-instance-adapter@2.0.0-rc.125 \
+    nengi-buffers@2.0.0-rc.125
 ```
 
 Use uWS when the deployment Node version is supported by the native
@@ -171,9 +171,9 @@ version.
 Install the core, Node client adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.124 \
-    nengi-ws-client-adapter@2.0.0-rc.124 \
-    nengi-buffers@2.0.0-rc.124
+npm install nengi@2.0.0-rc.125 \
+    nengi-ws-client-adapter@2.0.0-rc.125 \
+    nengi-buffers@2.0.0-rc.125
 ```
 
 ```ts
@@ -241,6 +241,9 @@ A server adapter must:
 - call `instance.network.onMessage(user, payload)` for binary input
 - call `instance.network.onClose(user)` on close
 - implement `send(user, payload)` and `disconnect(user, reason)`
+- implement `terminate(user, reason)` when the transport supports immediate
+  destruction of an unresponsive socket; Nengi uses it for heartbeat and
+  handshake deadline cleanup and falls back to `disconnect` when it is absent
 
 A client adapter must:
 

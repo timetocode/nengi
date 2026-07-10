@@ -31,7 +31,7 @@ export type PredictionContext<Response = any> = {
     error?: any
 }
 
-export type PredictionValidation<Response = any> =
+export type PredictionValidation =
     | boolean
     | {
         accepted: boolean
@@ -43,7 +43,7 @@ export type PredictionOperationOptions<Response = any> = {
     affected?: PredictionTarget[]
     expected?: PredictionExpectedState[]
     applyLocal?: (context: PredictionContext<Response>) => void
-    validate?: (context: PredictionContext<Response>) => PredictionValidation<Response>
+    validate?: (context: PredictionContext<Response>) => PredictionValidation
     reconcile?: (context: PredictionContext<Response> & { accepted: boolean, reason?: any, data?: any }) => void
 }
 

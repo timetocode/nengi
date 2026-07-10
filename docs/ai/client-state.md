@@ -11,6 +11,12 @@ what changed while one snapshot was applied. The application owns rendering,
 local UI state, prediction state, interpolation choices, sounds, and other
 presentation resources.
 
+Each frame also exposes `serverTimeMs`, the server's monotonic timestamp for the
+snapshot, and `receivedAtMs`, the local client arrival time. These are different
+clock domains. Server time is useful for command timing and lag compensation;
+the default interpolators use local playback and arrival history instead of
+requiring a synchronized server render clock.
+
 ## Basic loop
 
 ```ts

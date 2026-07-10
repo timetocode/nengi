@@ -10,6 +10,8 @@ interface IServerNetworkAdapter<
 	listen(options: ListenOptions, ready?: () => void): void
 	send(user: User, buffer: OutboundPayload): void
 	disconnect(user: User, reason: any): void
+	/** Immediately destroys an unresponsive transport when graceful close may hang. */
+	terminate?(user: User, reason: any): void
 }
 
 export { IServerNetworkAdapter }

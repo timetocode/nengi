@@ -41,8 +41,8 @@ export type ChannelFrame = {
 
 export interface IEntityFrame {
     tick: number
-    timestamp: number
-    receivedAt: number
+    serverTimeMs: number
+    receivedAtMs: number
     channelOpens?: ChannelOpen[]
     channelHeaderUpdates?: ChannelHeaderUpdate[]
     channelCloses?: ChannelClose[]
@@ -58,8 +58,8 @@ export interface IEntityFrame {
 export class Frame implements IEntityFrame {
     tick: number
     confirmedCommandFrameNumber: number
-    timestamp: number
-    receivedAt: number
+    serverTimeMs: number
+    receivedAtMs: number
     channelOpens: ChannelOpen[]
     channelHeaderUpdates: ChannelHeaderUpdate[]
     channelCloses: ChannelClose[]
@@ -73,8 +73,8 @@ export class Frame implements IEntityFrame {
     constructor(args: IEntityFrame) {
         this.tick = args.tick
         this.confirmedCommandFrameNumber = args.confirmedCommandFrameNumber
-        this.timestamp = args.timestamp
-        this.receivedAt = args.receivedAt
+        this.serverTimeMs = args.serverTimeMs
+        this.receivedAtMs = args.receivedAtMs
         this.channelOpens = args.channelOpens || []
         this.channelHeaderUpdates = args.channelHeaderUpdates || []
         this.channelCloses = args.channelCloses || []

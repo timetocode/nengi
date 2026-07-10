@@ -19,6 +19,7 @@ import {
 import { addPendingChannelHeaders } from './channelHeaders'
 import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelSnapshotOutput } from '../../server/channel/ChannelSnapshotOutput'
+import { SNAPSHOT_HEADER_BYTES, writeSnapshotHeader } from './snapshotHeader'
 
 type SnapshotOutputChannel = {
     nid: number
@@ -85,7 +86,7 @@ function protocolWillChange(user: User, instance: Instance) {
     return user.protocol.nidType !== protocol.nidType || user.protocol.ntypeType !== protocol.ntypeType
 }
 
-function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, channels: SnapshotOutputChannel[]) {
+function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, channels: SnapshotOutputChannel[], serverTimeMs: number) {
     const measure = instance.network.snapshotPerformanceEnabled
     let collectStart = 0
     let collectMs = 0
@@ -123,7 +124,7 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
     for (let i = 0; i < channelOutputs.length; i++) {
         channelBytes += channelOutputs[i].bytes
     }
-    const bytes = sumSnapshotChunkBytes(envelopeChunks) + channelBytes
+    const bytes = SNAPSHOT_HEADER_BYTES + sumSnapshotChunkBytes(envelopeChunks) + channelBytes
     const writer = user.networkAdapter.binary.createWriter(bytes)
 
     if (measure) {
@@ -135,6 +136,7 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
         diagnostic: instance.network.diagnosticBinaryWrites,
         createWriter: (byteLength: number) => user.networkAdapter.binary.createWriter(byteLength)
     }
+    writeSnapshotHeader(serverTimeMs, writer)
     writeSnapshotChunks(envelopeChunks, writer, writeOptions)
     for (let i = 0; i < channelOutputs.length; i++) {
         channelOutputs[i].write(writer, writeOptions)
@@ -196,12 +198,12 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
     return writer.payload
 }
 
-const createSnapshotBuffer = (user: User, instance: Instance) => {
+const createSnapshotBuffer = (user: User, instance: Instance, serverTimeMs = instance.now()) => {
     const outputChannels = getSubscribedOutputChannels(user)
     if (!outputChannels) {
         throw new Error('All subscribed channels must implement createSnapshotOutput().')
     }
-    return createChannelOutputsSnapshotBuffer(user, instance, outputChannels)
+    return createChannelOutputsSnapshotBuffer(user, instance, outputChannels, serverTimeMs)
 }
 
 export default createSnapshotBuffer

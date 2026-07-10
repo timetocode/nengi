@@ -1,6 +1,7 @@
 import { Binary } from '../../common/binary/Binary'
 import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
+import { NetworkEvent } from '../../common/binary/NetworkEvent'
 import { Client } from '../../client/Client'
 import { Instance } from '../Instance'
 import { Channel } from '../channel/Channel'
@@ -104,5 +105,50 @@ describe('LocalAdapter', () => {
         expect(serverSocket.readyState).toBe(3)
         expect(serverSocket.clientSocket.readyState).toBe(3)
         expect(instance.users.size).toBe(0)
+    })
+
+    it('keeps a flushing client alive and disconnects it after Pongs stop', async () => {
+        let nowMs = 0
+        const context = createContext()
+        const instance = new Instance(context, {
+            now: () => nowMs,
+            pingIntervalMs: 1000,
+            pongTimeoutMs: 3000
+        })
+        instance.onConnect = async () => true
+        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverSocket = serverAdapter.createMockConnect()
+        const client = new Client<LocalClientAdapter<Buffer, Buffer>>(
+            context,
+            LocalClientAdapter,
+            20,
+            { binary: testBinaryAdapter },
+            { now: () => nowMs }
+        )
+
+        await client.connect(serverSocket.clientSocket)
+        expect(instance.queue.next().type).toBe(NetworkEvent.UserConnected)
+
+        instance.step()
+        client.flush()
+        nowMs = 1000
+        instance.step()
+        client.flush()
+
+        expect(instance.users.size).toBe(1)
+
+        nowMs = 2000
+        instance.step()
+        nowMs = 3000
+        instance.step()
+        nowMs = 4000
+        instance.step()
+
+        expect(instance.users.size).toBe(0)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserDisconnected,
+            reason: 'pong_timeout'
+        })
+        expect(instance.queue.length).toBe(0)
     })
 })

@@ -105,7 +105,8 @@ canonical cycle is:
 5. Run authoritative simulation systems with an explicit `dt`.
 6. Apply channel view and spatial membership changes.
 7. Emit manual or ECS mutations that correspond to state changes.
-8. Call `instance.step()` to create the snapshot boundary.
+8. Call `instance.step()` to create the snapshot boundary and timestamp it in
+   the server's monotonic time domain.
 9. Let the adapter flush the resulting bytes.
 
 The exact stage order can differ when the game requires it. The order must be
@@ -153,6 +154,11 @@ authoritative transition.
 When a transition depends on time or randomness, inject the value or source at
 the shell boundary. This makes a server outcome reproducible from state, input,
 `dt`, and the chosen random values.
+
+Nengi's network clock is also injectable through `Instance` and `Client` options
+for deterministic tests. Keep the application simulation clock explicit even
+when Nengi supplies snapshot timestamps. Nengi's default interpolation cursor is
+client-local presentation state; it is not an authoritative server-time clock.
 
 ## Mutation ledger
 
