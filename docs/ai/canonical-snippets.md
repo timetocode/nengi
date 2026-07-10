@@ -1,7 +1,7 @@
 # Canonical snippets
 
 These snippets are for AI agents that need to see the shape of a complete
-nengi flow without reading an example game. They are intentionally small. Use
+nengi flow without relying on another project. They are intentionally small. Use
 them to orient server/client wiring, then keep the actual game code shaped by
 the game's model.
 
@@ -138,6 +138,7 @@ function tick() {
         }
     }
 
+    instance.processRequests()
     instance.step()
 }
 ```
@@ -204,22 +205,21 @@ function renderRemotePlayers() {
 ## ECS spatial server and client
 
 Use this shape when roots are ECS entities and networked state lives on
-components.
+components. The server binding keeps ECS root lifecycle and channel lifecycle
+paired while local-only components remain ordinary world state.
 
 ```ts
 // server/main.ts
-import { CommandRouter, EcsChannel2D, EcsWorld, Instance, NetworkEvent, ecs } from 'nengi'
+import { bindEcsChannel, CommandRouter, EcsChannel2D, EcsWorld, Instance, NetworkEvent, ecs } from 'nengi'
 
 const instance = new Instance(context)
 const world = new EcsWorld()
 const worldChannel = new EcsChannel2D(instance.localState, 64, { name: 'world' })
+const replicated = bindEcsChannel(world, worldChannel, { context })
 const commands = new CommandRouter()
 
 const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
-const transformWriter = worldChannel.createComponentWriter(
-    NType.Transform,
-    context.getSchema(NType.Transform)!
-)
+const TransformNet = replicated.component(Transform)
 
 const playerPidByUser = new Map<number, number>()
 
@@ -231,8 +231,7 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
 
     const transform = world.require(pid, Transform)
     applyMoveStep(transform, command)
-    transformWriter.props.x(transform, transform.x)
-    transformWriter.props.y(transform, transform.y)
+    TransformNet.mutate.patch(transform, { x: transform.x, y: transform.y })
     worldChannel.updateView(user, viewFor(transform))
 })
 ```

@@ -1,32 +1,40 @@
 import { Context } from '../../Context'
 import { Schema } from './Schema'
 
-function stableSchemaString(schemas: Map<number, Schema>) {
+function describeSchema(schema: Schema) {
+    const props = schema.keys.map(prop => [
+        prop.key,
+        prop.prop,
+        prop.type,
+        prop.interp ? 1 : 0
+    ].join(':')).join(',')
+    const updateGroups = schema.updateGroups.map(group => [
+        group.key,
+        group.name,
+        group.mode,
+        group.props.map(prop => prop.key).join('.')
+    ].join(':')).join(',')
+    return `${schema.kind}|${props}|${updateGroups}`
+}
+
+function stableSchemaString(context: Context) {
     // The fingerprint is not a globally unique proof. It is a deterministic
-    // checksum over the wire-relevant schema contract: ntype id, schema kind,
-    // property order/key, property name, binary type, and interp flag. Sorting
-    // by ntype makes registration order irrelevant, while preserving property
-    // order inside each schema because property order is wire-relevant. If the
-    // client and server compile the same schemas they produce the same string
-    // and hash; if they change a wire-relevant detail they should produce a
-    // different hash. This is meant to catch accidental schema drift during
-    // handshake, not to provide cryptographic collision resistance.
-    const entries = Array.from(schemas.entries()).sort((a, b) => a[0] - b[0])
-    return entries.map(([ntype, schema]) => {
-        const props = schema.keys.map(prop => [
-            prop.key,
-            prop.prop,
-            prop.type,
-            prop.interp ? 1 : 0
-        ].join(':')).join(',')
-        const updateGroups = schema.updateGroups.map(group => [
-            group.key,
-            group.name,
-            group.mode,
-            group.props.map(prop => prop.key).join('.')
-        ].join(':')).join(',')
-        return `${ntype}|${schema.kind}|${props}|${updateGroups}`
-    }).join(';')
+    // checksum over registered entity/message schemas and endpoint payload
+    // schemas. Sorting by id makes registration order irrelevant, while
+    // preserving property order inside each schema because property order is
+    // wire-relevant. This catches accidental protocol drift during handshake;
+    // it is not a cryptographic collision-resistant proof.
+    const schemas = Array.from(context.schemas.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([ntype, schema]) => `${ntype}|${describeSchema(schema)}`)
+    const endpoints = Array.from(context.endpointDefinitions.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([id, endpoint]) => [
+            id,
+            endpoint.requestSchema ? describeSchema(endpoint.requestSchema) : '-',
+            endpoint.responseSchema ? describeSchema(endpoint.responseSchema) : '-'
+        ].join('|'))
+    return `schemas:${schemas.join(';')};endpoints:${endpoints.join(';')}`
 }
 
 function fnv1a32(value: string) {
@@ -39,9 +47,9 @@ function fnv1a32(value: string) {
 }
 
 export function createSchemaFingerprint(context: Context) {
-    return fnv1a32(stableSchemaString(context.schemas))
+    return fnv1a32(stableSchemaString(context))
 }
 
 export function describeSchemaFingerprint(context: Context) {
-    return stableSchemaString(context.schemas)
+    return stableSchemaString(context)
 }

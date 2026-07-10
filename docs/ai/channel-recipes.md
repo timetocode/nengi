@@ -159,7 +159,7 @@ const Player = world.createEntityWriter(NType.Player, context.getSchema(NType.Pl
 
 player.x = nextX
 player.y = nextY
-Player.position(player, nextX, nextY)
+Player.groups.position(player, nextX, nextY)
 ```
 
 For spatial manual writers, `validateManualWriteTargets: true` makes writer
@@ -170,9 +170,18 @@ calls are desync bugs, not harmless diagnostic noise.
 The writer call also refreshes spatial membership before snapshot output, so a
 normal manual position mutation does not need a separate spatial update call.
 
-## ECS character
+## ECS character with a channel-owned state boundary
+
+Use `bindEcsChannel` when an `EcsWorld` is the authoritative state boundary and
+the ECS channel is its network projection. See [ecs-world.md](./ecs-world.md)
+for the binding lifecycle and mutation contracts.
+
+## ECS character without an EcsWorld
 
 Use `EcsChannel` if all subscribed users see all ECS roots. Use `EcsChannel2D/3D` if roots need culling.
+
+This lower-level shape is appropriate when the channel itself is the
+authoritative state boundary.
 
 ```ts
 const worldChannel = new EcsChannel(instance.localState)
@@ -185,7 +194,7 @@ const vitals = worldChannel.addComponent(pid, { nid: 0, ntype: NType.Vitals, hp:
 
 transform.x = nextX
 transform.y = nextY
-Transform.position(transform, nextX, nextY)
+Transform.groups.position(transform, nextX, nextY)
 ```
 
 ## Multiple composed channels

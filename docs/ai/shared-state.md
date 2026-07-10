@@ -132,19 +132,24 @@ Prefer plain object components for replicated state. A component may be a class
 instance if it exposes `pid`, `ntype`, optional `nid`, and schema fields directly,
 but hidden class methods should not obscure where channel writers are called.
 
-Do not put component writers in shared component files. Writers are bound to a
-specific server channel instance.
+Do not put channel-bound writers or ECS bindings in shared component files. A
+shared component definition describes data and schema; the server module that
+owns the channel creates the channel-specific projection.
 
 ```ts
 // server/world.ts
-const TransformWriter = worldChannel.createComponentWriter(
-    NType.Transform,
-    context.getSchema(NType.Transform)!
-)
+const replicated = bindEcsChannel(world, worldChannel, { context })
+const TransformNet = replicated.component(Transform)
+
+const transform = TransformNet.addSpatial(pid, createTransform(0, 0, 10))
+TransformNet.mutate.groups.pose(transform, nextX, nextY, rotation)
 ```
 
 The client and server can both import `Transform` for queries. The server alone
-creates writers for the channel it authors.
+creates `TransformNet` or lower-level writers for the channel it authors. Use
+`mutate` when the binding should assign component fields and emit the matching
+network mutation. Use `writer` only when code deliberately manages assignment
+itself and wants to append the network mutation separately.
 
 ## Messages, commands, and requests
 
@@ -171,6 +176,25 @@ export const ShotEventSchema = defineMessageSchema({
 
 Use the same pattern for high-frequency commands and request/response bodies.
 The payload type and schema should tell the same story.
+
+Request and response payload schemas belong to a shared `defineEndpoint` object,
+not to a message/entity `ntype` registration. Register that endpoint definition
+with the shared `Context` before connecting so the optional schema fingerprint
+can detect endpoint drift:
+
+```ts
+import { Binary, defineEndpoint, definePayloadSchema } from 'nengi'
+
+const OpenChest = defineEndpoint<OpenChestRequest, OpenChestResponse>(20, {
+    requestSchema: definePayloadSchema({ chestNid: Binary.UInt32 }),
+    responseSchema: definePayloadSchema({ accepted: Binary.Boolean })
+})
+
+context.registerEndpoint(OpenChest)
+```
+
+Use the same endpoint definition on the server's `instance.respond` call and the
+client's `client.request` call. A numeric endpoint id is the schema-less form.
 
 ## Client-only and server-only state
 

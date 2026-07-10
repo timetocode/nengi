@@ -82,7 +82,7 @@ const transform = channel.addComponent(pid, {
 
 transform.x = nextX
 transform.y = nextY
-Transform.position(transform, nextX, nextY)
+Transform.groups.position(transform, nextX, nextY)
 ```
 
 ## Spatial ECS
@@ -105,7 +105,7 @@ const transform = channel.addSpatialComponent(pid, {
 
 transform.x = nextX
 transform.y = nextY
-Transform.position(transform, nextX, nextY)
+Transform.groups.position(transform, nextX, nextY)
 ```
 
 Use `EcsChannel3D` when vertical culling matters.
@@ -113,8 +113,8 @@ Use `EcsChannel3D` when vertical culling matters.
 ## Canonical small server
 
 This is the intended minimal shape for a server-authoritative 2D ECS world.
-The server owns gameplay state in an `EcsWorld`, authors network state through
-an `EcsChannel2D`, and calls component writers at explicit mutation points.
+The server owns gameplay state in an `EcsWorld`, binds selected roots to an
+`EcsChannel2D`, and uses bound mutators at explicit mutation points.
 
 Assume `NType`, schemas, and factory functions such as `createPlayer`,
 `createTransform`, and `createContext` are defined by the game.
@@ -127,6 +127,7 @@ import {
     Instance,
     NetworkEvent,
     User,
+    bindEcsChannel,
     ecs
 } from 'nengi'
 
@@ -134,11 +135,12 @@ const context = createContext()
 const instance = new Instance(context)
 const world = new EcsWorld()
 const worldChannel = new EcsChannel2D(instance.localState, 100, { name: 'world' })
+const replicated = bindEcsChannel(world, worldChannel, { context })
 
 const Player = ecs.defineComponent<PlayerComponent>(NType.Player, 'Player')
 const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
-
-const TransformWriter = worldChannel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
+const PlayerNet = replicated.component(Player)
+const TransformNet = replicated.component(Transform)
 
 const playerPidByUser = new Map<number, number>()
 const commands = new CommandRouter()
@@ -148,14 +150,15 @@ function viewFor(transform: TransformComponent) {
 }
 
 function spawnPlayer(user: User) {
-    const pid = worldChannel.createEntity()
-    world.createEntity(pid)
-
-    const transform = worldChannel.addSpatialComponent(pid, createTransform(100, 100))
-    const player = worldChannel.addComponent(pid, createPlayer())
-
-    world.add(transform)
-    world.add(player)
+    const pid = replicated.createEntity()
+    const transform = TransformNet.addSpatial(pid, {
+        x: 100,
+        y: 100,
+        z: 0,
+        rotation: 0,
+        radius: 10
+    })
+    PlayerNet.add(pid, createPlayerState())
 
     playerPidByUser.set(user.id, pid)
     worldChannel.subscribe(user, viewFor(transform))
@@ -169,10 +172,7 @@ function removePlayer(user: User) {
 
     playerPidByUser.delete(user.id)
 
-    // Remove from the game ECS before the channel unregisters components and
-    // returns their nids to 0.
-    world.removeEntity(pid)
-    worldChannel.removeEntity(pid)
+    replicated.removeEntity(pid)
 }
 
 commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
@@ -182,11 +182,8 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
     }
 
     const transform = world.require(pid, Transform)
-    transform.x += command.inputX * 10
-    transform.y += command.inputY * 10
-
-    TransformWriter.props.x(transform, transform.x)
-    TransformWriter.props.y(transform, transform.y)
+    applyMoveStep(transform, command)
+    TransformNet.mutate.patch(transform, { x: transform.x, y: transform.y })
     worldChannel.updateView(user, viewFor(transform))
 })
 
@@ -202,6 +199,7 @@ function tick() {
         }
     }
 
+    instance.processRequests()
     instance.step()
 }
 ```
@@ -210,11 +208,12 @@ The important boundaries:
 
 - The root `pid` is the gameplay entity id.
 - Networked state lives on components.
-- The channel creates/removes network ids.
+- The binding creates/removes network ids and keeps bound world roots aligned.
 - `EcsWorld` is the game query surface.
 - ECS resources aka singletons live in `EcsWorld` when systems need shared
   services or state that is not a component on one entity.
-- Component writers are the only way manual component mutations reach clients.
+- Bound mutators assign state and emit manual component mutations together.
+- Bound writers are append-only for code that manages assignment itself.
 - Spatial ECS writers also refresh the root's spatial cell before snapshot output.
   Call `updateSpatialComponent` only for direct spatial changes that do not go
   through a component writer.

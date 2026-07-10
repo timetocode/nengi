@@ -88,6 +88,7 @@ function tick() {
         }
     }
 
+    instance.processRequests()
     instance.step()
 }
 ```
@@ -101,9 +102,9 @@ manual writers at every networked mutation point.
 
 ## Canonical small client
 
-The non-ECS client should not build a second entity store. Nengi already applies
-snapshot CRUD into `client.network.store`; use `Frame` for what changed this
-snapshot and the store for current authoritative state.
+The non-ECS client uses `client.network.store` for current authoritative network
+state. Use `Frame` for what changed in each snapshot, then derive the game's
+presentation records from those facts and store lookups.
 
 ```ts
 import {
@@ -209,7 +210,9 @@ spectator, replay, or party channel may require different presentation.
 - Use `Frame` facts to create, mark dirty, and destroy presentation.
 - Use messages for one-shot context such as "you control this nid."
 - Use commands for repeated input.
-- Do not add a generic replica or binding layer by default.
+- Keep the client presentation bridge small and domain-specific. Use
+  `EntityStore` and `Frame` as the network-state boundary, and make any local
+  presentation records a direct derivation of those facts.
 
 If an entity moves between channels, model it as delete plus create. Do not
 expect one stable `nid` to transfer between channels.

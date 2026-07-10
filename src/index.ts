@@ -17,6 +17,7 @@ export * from './server/channel/ManualChannel3D'
 export * from './server/channel/EcsChannel'
 export * from './server/channel/EcsChannel2D'
 export * from './server/channel/EcsChannel3D'
+export * from './server/channel/EcsChannelBinding'
 export {
     EcsWorld,
     ecs

@@ -240,6 +240,16 @@ describe('InstanceNetwork', () => {
         expect(handler).not.toHaveBeenCalled()
     })
 
+    it('rejects duplicate response endpoint registration', () => {
+        const instance = new Instance(new Context())
+
+        instance.respond(12, () => ({ ok: true }))
+
+        expect(() => instance.respond(12, () => ({ ok: false }))).toThrow(
+            'Response endpoint 12 is already registered.'
+        )
+    })
+
     it('skips stale queued requests when processing if the user is no longer open', () => {
         const instance = new Instance(new Context())
         const user = createOpenUser(instance)

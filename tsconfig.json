@@ -6,6 +6,7 @@
         "noEmit": false,
         "declaration": true,
         "declarationMap": true,
+        "stripInternal": true,
         "strict": true,
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,

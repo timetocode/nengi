@@ -13,6 +13,7 @@ import { commandTimingSchema } from './schemas/commandTimingSchema'
 import { interpolationDelaySchema } from './schemas/interpolationDelaySchema'
 import { Binary } from './binary/Binary'
 import { NetworkIdType, networkTypeForMaxValue } from './binary/Protocol'
+import { EndpointDefinition, getEndpointId } from './Endpoint'
 
 const MAX_SCHEMA_ID = 0xffffffff
 
@@ -32,11 +33,13 @@ export class Context {
 	 * schemas internal to nengi
 	 */
     engineSchemas: Map<number, Schema>
+    endpointDefinitions: Map<number, EndpointDefinition>
     ntypeType: NetworkIdType
 
     constructor() {
         this.schemas = new Map()
         this.engineSchemas = new Map()
+        this.endpointDefinitions = new Map()
         this.ntypeType = Binary.UInt8
 
         // setup the engine schemas
@@ -62,11 +65,29 @@ export class Context {
         this.ntypeType = networkTypeForMaxValue(Math.max(...this.schemas.keys()))
     }
 
+    registerEndpoint(endpoint: EndpointDefinition) {
+        const id = getEndpointId(endpoint)
+        const existing = this.endpointDefinitions.get(id)
+        if (existing && existing !== endpoint) {
+            throw new Error(`Endpoint id ${id} is already registered.`)
+        }
+        this.endpointDefinitions.set(id, endpoint)
+        return endpoint
+    }
+
     getSchema(ntype: number) {
-        return this.schemas.get(ntype)!
+        const schema = this.schemas.get(ntype)
+        if (!schema) {
+            throw new Error(`Schema id ${ntype} is not registered.`)
+        }
+        return schema
     }
 
     getEngineSchema(ntype: number) {
-        return this.engineSchemas.get(ntype)!
+        const schema = this.engineSchemas.get(ntype)
+        if (!schema) {
+            throw new Error(`Engine schema id ${ntype} is not registered.`)
+        }
+        return schema
     }
 }

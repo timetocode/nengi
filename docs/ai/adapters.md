@@ -1,94 +1,79 @@
 # Adapters
 
 Nengi core does not own a socket library or a binary backing store. A runtime
-integration provides:
+integration supplies:
 
 - a server adapter implementing `IServerNetworkAdapter`
 - a client adapter implementing `IClientNetworkAdapter`
 - a binary adapter implementing `BinaryAdapter`
 
-This keeps the core usable in Node, browsers, Electron, tests, local
-single-player modes, bots, and future transports.
+This keeps the core usable in browsers, Node services, bots, tests, embedded
+servers, and future transports.
 
-## Quick Selection
+## Version Rule
 
-Choose the adapter based on where the code runs and what the game needs.
+The core package and every official Nengi adapter or binary package used by an
+application must have the exact same version. Do not use `^`, `~`, `latest`, or
+an unpinned range for release-candidate work.
 
-| Situation | Server adapter | Client adapter | Binary backend |
-| --- | --- | --- | --- |
-| Browser game client connecting to a Node server | `nengi-ws-instance-adapter` or `nengi-uws-instance-adapter` | `nengi-websocket-client-adapter` | server: `nengi-buffers`, browser: `nengi-dataviews` |
-| Performance-focused Node game server | `nengi-uws-instance-adapter` | browser or bot adapter | server: `nengi-buffers` |
-| Simple Node server or broad Node compatibility | `nengi-ws-instance-adapter` | browser or bot adapter | server: `nengi-buffers` |
-| Bot, load test, admin script, or Node tool | matching server adapter | `nengi-ws-client-adapter` | `nengi-buffers` |
-| Single-player mode, embedded server, or deterministic test | `LocalInstanceAdapter` from `nengi` | `LocalClientAdapter` from `nengi` | any matching `BinaryAdapter` |
-| Browser-hosted experiment with no Node socket | local/custom adapter | local/custom adapter | `nengi-dataviews` |
+For this release candidate, the package version is `2.0.0-rc.124`:
 
-Default recommendation for a real game server: use `nengi-uws-instance-adapter`
-when its Node support fits the deployment target; otherwise use
-`nengi-ws-instance-adapter`.
-
-Default recommendation for a browser game client: use
-`nengi-websocket-client-adapter`.
-
-Default recommendation for bots and command-line clients: use
-`nengi-ws-client-adapter`.
-
-## Install Shape
-
-During this R&D workspace, packages often use local `file:` dependencies so new
-prototype projects can run against the current source:
-
-```json
-{
-  "dependencies": {
-    "nengi": "file:../../nengi",
-    "nengi-uws-instance-adapter": "file:../../nengi-uws-instance-adapter"
-  }
-}
+```text
+nengi@2.0.0-rc.124
+nengi-websocket-client-adapter@2.0.0-rc.124
+nengi-ws-client-adapter@2.0.0-rc.124
+nengi-ws-instance-adapter@2.0.0-rc.124
+nengi-uws-instance-adapter@2.0.0-rc.124
+nengi-dataviews@2.0.0-rc.124
+nengi-buffers@2.0.0-rc.124
 ```
 
-For a published game project, install packages normally:
+When the core version changes, change every installed official package to that
+same version. Do not mix an older adapter with a newer core, even when the
+package manager accepts the dependency graph. Matching versions protect both
+the binary protocol contract and TypeScript's private type identities.
+
+Verify the installed graph with:
 
 ```bash
-npm install nengi nengi-websocket-client-adapter
-npm install nengi nengi-uws-instance-adapter
+npm ls nengi nengi-dataviews nengi-buffers \
+    nengi-websocket-client-adapter nengi-ws-client-adapter \
+    nengi-ws-instance-adapter nengi-uws-instance-adapter
 ```
 
-For a Node bot or load-test client:
+There should be one core `nengi` identity. Duplicate private-field TypeScript
+errors involving `User`, `InstanceNetwork`, `Channel`, or `IChannel` usually
+mean that the application has two copies of nengi or mixes package imports with
+deep source/build imports.
 
-```bash
-npm install nengi nengi-ws-client-adapter
-```
+## Package Roles
 
-Published official adapters should declare a compatible `nengi` peer dependency
-so a game does not accidentally install two separate copies of nengi core. If an
-AI sees duplicate private-field TypeScript errors involving `User`,
-`InstanceNetwork`, `Channel`, or `IChannel`, suspect that the project has two
-different nengi copies or is mixing `nengi/src` imports with adapter package
-types from `nengi/build`.
+| Package | Role |
+| --- | --- |
+| `nengi` | Core protocol, channels, client/server state, and in-memory adapters |
+| `nengi-websocket-client-adapter` | Browser WebSocket client |
+| `nengi-ws-client-adapter` | Node `ws` client for bots and tools |
+| `nengi-ws-instance-adapter` | Node `ws` server |
+| `nengi-uws-instance-adapter` | uWebSockets.js server |
+| `nengi-dataviews` | Browser/DataView binary backend |
+| `nengi-buffers` | Node Buffer binary backend |
 
-For local R&D projects that use official adapter packages, prefer importing
-nengi through package `nengi` everywhere. Do not re-export from
-`../../../nengi/src` in `shared/nengi.ts` while also importing
-`nengi-ws-instance-adapter`, `nengi-websocket-client-adapter`, or other adapter
-packages. The adapter packages compile against package `nengi`; the game should
-use the same package-facing type identity.
-
-## Current Packages
-
-The workspace contains these adapter-related packages:
-
-- `nengi-websocket-client-adapter`: browser WebSocket client adapter.
-- `nengi-ws-client-adapter`: Node `ws` client adapter for bots/tools.
-- `nengi-ws-instance-adapter`: Node `ws` server adapter.
-- `nengi-uws-instance-adapter`: Node `uWebSockets.js` server adapter.
-- `nengi-dataviews`: browser/DataView binary adapter.
-- `nengi-buffers`: Node Buffer binary adapter.
-
-`nengi-uws-instance-adapter` is important for performance-minded game
-developers. Keep it working unless there is a strong reason to remove it.
+Client and server adapters are not interchangeable. Binary backends are chosen
+from the payload type available at the transport boundary.
 
 ## Browser Client
+
+Install the core, browser WebSocket adapter, and browser binary backend at the
+same version:
+
+```bash
+npm install nengi@2.0.0-rc.124 \
+    nengi-websocket-client-adapter@2.0.0-rc.124 \
+    nengi-dataviews@2.0.0-rc.124
+```
+
+Use the package root for core imports and the adapter package root for the
+adapter import:
 
 ```ts
 import { Client } from 'nengi'
@@ -98,21 +83,22 @@ const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 await client.connect('ws://localhost:8079')
 ```
 
-The optional second `connect` argument is the JSON-serializable connection setup
-payload that the adapter sends through nengi's normal connection attempt. Use it
-for auth or session selection data that `instance.onConnect` validates before
-accepting the socket.
-
-The adapter is responsible for:
-
-- opening the socket
-- sending outbound binary payloads
-- reading inbound binary payloads
-- exposing its `binary` adapter so nengi can write/read packets
+The optional second `connect` argument is the JSON-serializable connection
+setup payload. Use it for authentication or session selection data that
+`instance.onConnect` validates before accepting the socket.
 
 ## Node Server With ws
 
-Use `ws` when compatibility and simplicity matter more than maximum throughput.
+Install the core, `ws` server adapter, and Node binary backend at one version:
+
+```bash
+npm install nengi@2.0.0-rc.124 \
+    nengi-ws-instance-adapter@2.0.0-rc.124 \
+    nengi-buffers@2.0.0-rc.124
+```
+
+Use this adapter when compatibility and simple deployment matter more than
+maximum socket throughput:
 
 ```ts
 import { Instance } from 'nengi'
@@ -126,13 +112,21 @@ adapter.listen(8079, () => {
 })
 ```
 
-`WsInstanceAdapter` accepts either a port number or an options object such as
+`WsInstanceAdapter.listen` accepts a port number or an options object such as
 `{ port, host }`.
 
 ## Node Server With uWS
 
-Use `uWebSockets.js` when server socket performance matters and the deployment
-Node version is supported by the pinned `uWebSockets.js` release.
+Install the core, uWS server adapter, and Node binary backend at one version:
+
+```bash
+npm install nengi@2.0.0-rc.124 \
+    nengi-uws-instance-adapter@2.0.0-rc.124 \
+    nengi-buffers@2.0.0-rc.124
+```
+
+Use uWS when the deployment Node version is supported by the native
+`uWebSockets.js` package selected by the adapter:
 
 ```ts
 import { Instance } from 'nengi'
@@ -148,7 +142,7 @@ adapter.listen({
 })
 ```
 
-For direct TLS:
+For direct TLS, pass the adapter's SSL options:
 
 ```ts
 adapter.listen({
@@ -161,46 +155,26 @@ adapter.listen({
 })
 ```
 
-`UwsInstanceAdapter` accepts:
+Before deploying a uWS server, verify the active Node version and ABI:
 
-- a port number, for example `adapter.listen(8079)`
-- or an object with `port`, optional `host`, optional `path`, optional `ssl`,
-  optional `appOptions`, and optional partial uWS websocket `behavior`
+```bash
+node -p "process.version + ' abi=' + process.versions.modules"
+```
 
-## uWS Node Support
+If the native module is unavailable, use a Node version supported by the
+installed uWS release or select a compatible adapter release. Do not change
+the native dependency tag without testing the target operating system and Node
+version.
 
-`uWebSockets.js` is a native package distributed from GitHub, not the npm
-registry. It ships `.node` binaries for selected Node/V8 ABI versions.
+## Node Client
 
-The nengi adapter lazy-loads `uWebSockets.js`. If the active Node version is not
-supported by the installed uWS release, the adapter should throw an error that
-includes:
+Install the core, Node client adapter, and Node binary backend at one version:
 
-- the active Node version, such as `v24.13.1`
-- the Node modules ABI, such as `137`
-- the underlying missing native binary, such as `uws_linux_x64_137.node`
-
-When this happens:
-
-1. Check `node -p "process.version + ' abi=' + process.versions.modules"`.
-2. Check the installed uWS package for matching native binaries:
-   `ls node_modules/uWebSockets.js | grep uws_linux_x64`.
-3. Prefer an even/LTS Node version supported by the installed uWS release.
-4. If the project needs a newer Node major, update the GitHub uWS tag and
-   retest.
-
-In this R&D workspace, `nengi-uws-instance-adapter` currently pins
-`uWebSockets.js#v20.66.0` because it includes Linux x64 binaries for:
-
-- Node 20 ABI `115`
-- Node 22 ABI `127`
-- Node 24 ABI `137`
-
-Do not assume the latest uWS tag supports the widest Node range. For example,
-newer tags may drop older ABIs while adding newer ones. Verify the actual
-binary files before changing the pinned tag.
-
-## Node Bot Client
+```bash
+npm install nengi@2.0.0-rc.124 \
+    nengi-ws-client-adapter@2.0.0-rc.124 \
+    nengi-buffers@2.0.0-rc.124
+```
 
 ```ts
 import { Client } from 'nengi'
@@ -210,13 +184,25 @@ const client = new Client(context, WsClientAdapter, serverTickRate)
 await client.connect('ws://localhost:8079', { role: 'bot' })
 ```
 
-Use this for bot benchmarks, admin tools, test clients, and Node-only tooling.
+This is the normal adapter shape for Node bots and command-line tools. A bot
+should use the regular `Client` receive path, drain frames, perform meaningful
+actions with `addCommand` or `request`, and call `flush` at its chosen cadence.
+Keep bot protocol definitions shared with the game client and keep all package
+versions exactly aligned with the server's Nengi installation. See
+[benchmarking.md](./benchmarking.md) for maintained bot scenarios, stress
+shapes, and connection churn.
 
-## Test And Local Modes
+## In-Memory Tests
 
-Use `LocalInstanceAdapter` and `LocalClientAdapter` from core for deterministic
-tests, single-player modes, and embedded simulations. These are dependency-free
-in-memory transports, not socket libraries.
+Use `LocalInstanceAdapter` and `LocalClientAdapter` from the core package for
+deterministic tests and embedded simulations. They exercise handshake,
+commands, requests, snapshots, and binary reader/writer paths without opening a
+socket.
+
+Choose a binary backend whose payload type matches the test environment:
+
+- browser-shaped tests: `nengi-dataviews`
+- Node-shaped tests: `nengi-buffers`
 
 ```ts
 import { Client, Instance, LocalClientAdapter, LocalInstanceAdapter } from 'nengi'
@@ -234,49 +220,36 @@ const client = new Client(context, LocalClientAdapter, 20, {
 await client.connect(serverSocket.clientSocket, { role: 'local' })
 ```
 
-This still exercises the handshake, command, request, snapshot, and binary
-reader/writer paths. Use it when a real socket would add noise without changing
-the behavior under test. Browser-hosted local prototypes should usually use
-`nengi-dataviews`; Node-only tests can use `nengi-buffers` or an internal test
-binary adapter.
+## Binary Boundary
 
-## Binary Backends
+For a browser or typed-array transport, use `nengi-dataviews`. For Node
+transports such as `ws`, uWS, bots, and command-line tools, use
+`nengi-buffers`.
 
-Use `nengi-dataviews` when the transport naturally delivers `ArrayBuffer` or
-typed-array payloads, usually browser WebSocket clients and browser-hosted
-experiments.
+The core contract is `BinaryAdapter<InboundPayload, OutboundPayload>`. An
+adapter translates transport payloads into the selected binary backend at the
+edge; core gameplay code should not depend on `Buffer`, `ArrayBuffer`, TCP,
+WebSocket, or uWS types.
 
-Use `nengi-buffers` when the transport naturally delivers Node `Buffer` payloads,
-usually `ws`, uWS, bots, and Node tools.
+## Adapter Contracts
 
-The core binary contract is `BinaryAdapter<InboundPayload, OutboundPayload>`.
-Adapter packages should translate their transport payload into the binary
-backend at the edge, then keep the rest of nengi unaware of transport-specific
-types.
-
-## Adapter Implementation Rules
-
-For a server adapter:
+A server adapter must:
 
 - expose `binary`
-- create `User` objects on accepted sockets
-- call `instance.network.onOpen(user)`
-- call `instance.network.onMessage(user, payload)` with the raw binary payload
+- create `User` objects for accepted sockets
+- call `instance.network.onOpen(user)` on connection
+- call `instance.network.onMessage(user, payload)` for binary input
 - call `instance.network.onClose(user)` on close
-- implement `send(user, payload)`
-- implement `disconnect(user, reason)`
+- implement `send(user, payload)` and `disconnect(user, reason)`
 
-For a client adapter:
+A client adapter must:
 
 - expose `binary`
 - implement `connect(target, handshake = {})`
-- send `client.network.createHandshake(handshake, binary)` after opening
-- read the handshake response before treating normal snapshots as game data
-- implement `flush()` by sending `client.network.createOutbound(binary)`
-- call `client.network.readSnapshot(binary.createReader(payload))` for inbound
-  snapshots
-- call `client.network.onDisconnect(...)` and `client.network.onSocketError(...)`
-  when appropriate
+- send the handshake through nengi after opening
+- implement `flush()` with `client.network.createOutbound(binary)`
+- pass inbound payloads to `client.network.readSnapshot(...)`
+- call the client network disconnect and socket-error hooks appropriately
 
-Core should not assume TCP, WebSocket, uWS, UDP, Node `Buffer`, browser
-`ArrayBuffer`, or any specific transport target.
+Core game code should import only from the package root. Deep imports into
+`nengi/src` or `nengi/build` are not part of the package contract.

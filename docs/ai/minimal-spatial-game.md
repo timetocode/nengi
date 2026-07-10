@@ -1,11 +1,10 @@
 # Minimal Spatial Game
 
-This is the current shape for a small 2D browser game with a server-authoritative
+This is a canonical shape for a small 2D browser game with a server-authoritative
 world, `Channel2D`, client commands, and interpolated remote entities.
 
-For package setup, TypeScript, Vite, and local workspace imports, use
-[local-prototype.md](./local-prototype.md). This file only describes the nengi
-gameplay shape.
+For package installation and adapter selection, use [adapters.md](./adapters.md).
+This file only describes the nengi gameplay shape.
 
 ## Server
 
@@ -69,6 +68,7 @@ while (!instance.queue.isEmpty()) {
     commands.process(event)
 }
 
+instance.processRequests()
 instance.step()
 ```
 
@@ -177,7 +177,7 @@ for the prediction and sequencing shape.
 
 If the local player should be predicted, also read
 [real-time movement prediction](./realtime-movement-prediction.md). The minimal
-example above sends commands but does not show the full replay/reconciliation
+version above sends commands but does not show the full replay/reconciliation
 pattern.
 
 ## Gameplay queries

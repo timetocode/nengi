@@ -1,4 +1,4 @@
-# AI guide for building games with nengi
+# AI guide for building with nengi
 
 This directory is for an AI assistant helping a developer build a game with
 nengi. It is not the internal nengi contributor guide. Use these files to choose
@@ -8,13 +8,11 @@ about tradeoffs when a multiplayer feature can be modeled several ways.
 Read this file first. Then open only the topic files that match the feature you
 are building.
 
-If you are creating a new local prototype in this repository, read
-[local-prototype.md](./local-prototype.md) before writing files. That document
-is the setup source of truth for TypeScript, Vite, local imports, and workspace
-package dependencies.
+If you are creating a new project, start with the pinned npm installation in
+[adapters.md](./adapters.md).
 
-If you need to see the canonical server/client flow without reading an example
-game, use [canonical-snippets.md](./canonical-snippets.md). It contains compact
+If you need to see the canonical server/client flow without relying on another
+project, use [canonical-snippets.md](./canonical-snippets.md). It contains compact
 plain-channel, ECS-channel, and predicted movement snippets. These snippets are
 orientation material, not complete game templates.
 
@@ -23,6 +21,10 @@ orientation material, not complete game templates.
 These docs should teach reusable nengi shapes. Prefer small inline snippets over
 references to existing projects. A new game should be buildable from these docs
 without inspecting another project.
+
+The source package and these AI docs are the canonical RC guidance. Do not copy
+deep imports, adapter shapes, or channel shapes from unrelated code when they
+conflict with the root package exports or these documents.
 
 ## First principles
 
@@ -112,7 +114,7 @@ For any requested feature, answer these questions:
 7. Are mutations automatic/diffable, or does game code already have a central mutation API?
 8. Is this feature likely hot enough to need a game-shaped benchmark?
 
-## Current recommended client shape
+## Canonical client state shape
 
 Use the raw client state surface as the normal bridge from snapshots to game
 client code.
@@ -127,9 +129,15 @@ client code.
 - Prediction helpers reconcile local predicted state against raw store state.
   For fast local movement, use [real-time movement prediction](./realtime-movement-prediction.md).
 
-Do not build a second store or binding layer by default. Userland should create
-sprites, UI records, sounds, and local prediction state directly from frame
-facts and raw store lookups.
+On the client, use `EntityStore` as the authoritative network-state boundary and
+derive sprites, UI records, sounds, and local prediction state from frame facts
+and raw store lookups. A small application-specific presentation adapter is
+fine when it makes that derivation clearer; it should not hide snapshot order or
+become a second authoritative network store.
+
+This client guidance is separate from the optional server-side
+`bindEcsChannel` projection. A server that owns an `EcsWorld` may use that
+binding to keep authoritative ECS state and channel state aligned.
 
 For plain object channels, this raw path is the normal client model: server
 channels emit channel-scoped create/update/delete facts, `EntityStore` holds the
@@ -153,26 +161,37 @@ sync layer tiny: CRUD in, ECS mutation plus facts out.
 - Do not use messages for persistent state that new subscribers must reconstruct.
 - Do not choose manual channels unless game code can reliably call mutation
   writers everywhere networked state changes.
+- When a server owns an `EcsWorld` and an ECS channel together, use
+  `bindEcsChannel` for bound roots instead of manually pairing root lifecycle
+  and component writers.
 
 ## Read next
 
 Use this map instead of reading every file every time.
 
 - If deciding which channel to use, read [channel-selection.md](./channel-selection.md).
-- If creating a new local prototype in this workspace, read [local-prototype.md](./local-prototype.md).
 - If defining replicated state and schemas, read [shared-state.md](./shared-state.md).
+- If deciding which package exports are appropriate, read [api-surface.md](./api-surface.md).
 - If deciding between entities, messages, commands, and requests, read [networking-primitives.md](./networking-primitives.md).
-- If wiring plain object channels or ECS channels into client game state, read [client-router.md](./client-router.md).
+- If wiring plain object channels or ECS channels into client game state, read [client-state.md](./client-state.md).
+- If deciding how state, commands, requests, and effects should flow through an
+  application, read [architecture-and-ticks.md](./architecture-and-ticks.md).
+- If using nengi in a service, hub, lobby, or other non-game process, read
+  [service-patterns.md](./service-patterns.md).
+- If defining correctness tests or validating a new network model, read
+  [testing-and-correctness.md](./testing-and-correctness.md).
 - If making a fast action game with local movement prediction, read [realtime-movement-prediction.md](./realtime-movement-prediction.md).
 - If the game uses ordinary replicated objects instead of ECS components, read [plain-channels.md](./plain-channels.md), which includes a small canonical server/client shape.
 - If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).
-- If you need compact server/client wiring examples, read [canonical-snippets.md](./canonical-snippets.md).
+- If you need compact server/client wiring, read [canonical-snippets.md](./canonical-snippets.md).
 - If wiring sockets or local test transports, read [adapters.md](./adapters.md).
 - If adding common game features, read [channel-recipes.md](./channel-recipes.md).
 - If adding lag compensation, hit validation, rewind queries, or server-authoritative fairness rules, read [historian-lag-compensation.md](./historian-lag-compensation.md).
 - If optimizing explicit updates, read [manual-mutations.md](./manual-mutations.md).
 - If visibility depends on position, read [spatial-channels.md](./spatial-channels.md).
 - If the game uses ECS-style roots and components, read [ecs-channels.md](./ecs-channels.md), which includes a small canonical server/client ECS shape.
+- If the game uses ECS resources, cached queries, or client/server ECS service boundaries, read [ecs-world.md](./ecs-world.md).
+- If hardening a deployment or diagnosing network failures, read [operations.md](./operations.md).
 - If deciding whether an optimization helped, read [benchmarking.md](./benchmarking.md).
 - If the design feels suspicious or you are auditing for common bugs, read [anti-patterns.md](./anti-patterns.md).
 ## Common nengi primitives
@@ -182,7 +201,8 @@ Use this map instead of reading every file every time.
 - Entity: persistent replicated state with `nid`, `ntype`, and schema properties.
 - Message: transient payload for one-off events.
 - Command: client-to-server input that does not inherently expect a response.
-- Request/response: client-to-server interaction that expects a result.
+- Request/response: client-to-server interaction that expects a result; it is
+  not server-to-client RPC.
 - Channel: server-side visibility/subscription container.
 - Channel header: schema-backed client context for a channel.
 - EntityStore: client-side authoritative raw state, indexed by nid and channel.

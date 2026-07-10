@@ -10,9 +10,9 @@ import { EngineMessage } from '../common/EngineMessage'
 import { Endpoint, EndpointDefinition, getEndpointDefinition, getEndpointId } from '../common/Endpoint'
 import { BinaryPayload } from '../common/binary/BinaryAdapter'
 
-type ResponseSender<Response = any> = (response: Response) => void
-type ResponseHandlerArgs<Request = any> = { user: User, body: Request }
-type ResponseHandler<Request = any, Response = any> = (
+export type ResponseSender<Response = any> = (response: Response) => void
+export type ResponseHandlerArgs<Request = any> = { user: User, body: Request }
+export type ResponseHandler<Request = any, Response = any> = (
     request: ResponseHandlerArgs<Request>,
     send: ResponseSender<Response>
 ) => Response | void | Promise<Response | void>
@@ -104,7 +104,14 @@ export class Instance {
         endpoint: Endpoint<Request, Response>,
         callback: ResponseHandler<Request, Response>
     ) {
-        this.responseEndPoints.set(getEndpointId(endpoint), {
+        const endpointId = getEndpointId(endpoint)
+        if (typeof endpoint !== 'number') {
+            this.context.registerEndpoint(endpoint)
+        }
+        if (this.responseEndPoints.has(endpointId)) {
+            throw new Error(`Response endpoint ${endpointId} is already registered.`)
+        }
+        this.responseEndPoints.set(endpointId, {
             endpoint: getEndpointDefinition(endpoint),
             callback: callback as ResponseHandler
         })

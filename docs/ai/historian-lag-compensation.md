@@ -1,8 +1,9 @@
 # Historian and lag compensation
 
 This document is for an AI assistant adding gameplay that needs server-side
-rewind, hit validation, or fairness rules. It describes the current nengi
-historian model, not a final public API contract.
+rewind, hit validation, or fairness rules. Historian behavior is an advanced RC
+surface: the source code and exported declarations define the contract, while
+the gameplay fairness policy remains userland responsibility.
 
 ## What the historian is
 
@@ -53,8 +54,8 @@ const history = new Historian2D({
 ```
 
 The index accelerates nearest-frame spatial queries without changing query
-results. Interpolated queries synthesize samples between frames and may still use
-the simpler scan path while the API is settling.
+results. Interpolated queries synthesize samples between retained frames while
+preserving the same temporal value and existence rules.
 
 Use `Historian2D` for 2D or projected-plane gameplay. Use `Historian3D` for true
 3D gameplay such as space games, voxel games, flight games, or vertical culling
@@ -181,7 +182,7 @@ collision or a separate visual smoothing policy.
 The historian should expose enough information for game code to make its own
 fairness rule. Do not assume there is only one netcode policy.
 
-Examples:
+Patterns:
 
 - Standard shooter rewind: honor what the shooter saw within a capped rewind
   window.

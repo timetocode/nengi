@@ -12,16 +12,19 @@ game rules.
 ## Install
 
 ```sh
-npm install nengi
+npm install nengi@2.0.0-rc.124
 ```
 
-This package exposes a root-only public API:
+This package exposes a root-only public API. The application-facing surface is
+documented first; adapter and protocol implementation types are also exported
+from the root for package authors and advanced integrations.
 
 ```ts
 import { Channel2D, Client, Context, Instance, defineEntitySchema } from 'nengi'
 ```
 
-Deep imports are not part of the public package contract.
+Deep imports are not part of the public package contract. Follow the package
+source and the AI-facing documentation when integrating Nengi.
 
 ## Core Model
 
@@ -74,8 +77,8 @@ retained history for smooth rendering of non-predicted entities.
 
 ## Documentation
 
-The AI-facing docs are the most complete current guide to building games with
-nengi. They are self-contained and do not require reading example projects:
+The AI-facing docs are the canonical guide to building with nengi. They are
+self-contained and do not require another project:
 
 - [AI guide](./docs/ai/README.md)
 - [Channel selection](./docs/ai/channel-selection.md)
@@ -83,10 +86,33 @@ nengi. They are self-contained and do not require reading example projects:
 - [Plain channel client/server shape](./docs/ai/plain-channels.md)
 - [ECS channel client/server shape](./docs/ai/ecs-channels.md)
 - [Real-time movement prediction](./docs/ai/realtime-movement-prediction.md)
+- [ECS world, resources, and query boundaries](./docs/ai/ecs-world.md)
+- [Architecture and tick flow](./docs/ai/architecture-and-ticks.md)
+- [Client state and presentation](./docs/ai/client-state.md)
+- [Service patterns](./docs/ai/service-patterns.md)
+- [Testing and correctness](./docs/ai/testing-and-correctness.md)
+- [Benchmarking and bot workloads](./docs/ai/benchmarking.md)
+- [Operational safeguards](./docs/ai/operations.md)
+- [API surface and import tiers](./docs/ai/api-surface.md)
 
 ## Release Candidate Changelog
 
 Changes after `2.0.0-rc.121`:
+
+### 2.0.0-rc.124 (unpublished)
+
+- Added optional `bindEcsChannel(world, channel, { context })` for servers
+  that maintain authoritative state in `EcsWorld` alongside an ECS channel.
+- Added active-root queries to ECS channels.
+- Added bound `mutate` and append-only `writer` namespaces.
+- Local-only ECS components remain ordinary `EcsWorld` state and are not
+  replicated.
+- Updated AI guidance to prefer the binding for server ECS roots while
+  retaining raw channel writers as a lower-level API.
+- Added canonical architecture, service, testing, and bot-workload guidance to
+  the AI manual.
+- Pinned the core and official adapter family to `2.0.0-rc.124`.
+- No existing public API was removed.
 
 ### 2.0.0-rc.123
 
@@ -115,5 +141,4 @@ Changes after `2.0.0-rc.121`:
 ## Status
 
 Nengi is moving toward a release-candidate API. The root package exports are the
-intended public surface for RC work; examples and internal source paths are not
-part of the package contract.
+intended public surface for RC work.

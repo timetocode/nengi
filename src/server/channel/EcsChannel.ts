@@ -106,6 +106,11 @@ export class EcsChannel implements IChannel {
         return nid
     }
 
+    /** Returns true only while the root is active in this channel. */
+    hasRoot(pid: number) {
+        return this.rootSet.has(pid)
+    }
+
     syncHeader() {
         if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
@@ -200,6 +205,22 @@ export class EcsChannel implements IChannel {
 
     removeComponent(componentOrNid: EcsComponent | number) {
         this.removeComponentInternal(componentOrNid)
+    }
+
+    /** @internal Used by the ECS/world binding after it has validated a mutation plan. */
+    appendBoundComponentProp(component: EcsComponent, prop: SchemaProp, value: any) {
+        if (this.getComponent(component.nid) !== component) {
+            throw new Error(`Cannot write an inactive ECS component nid ${component.nid}.`)
+        }
+        appendEcsSpatialManualProp(this, component.nid, prop, value)
+    }
+
+    /** @internal Used by the ECS/world binding after it has validated a mutation plan. */
+    appendBoundComponentGroup(component: EcsComponent, ntype: number, group: SchemaUpdateGroup, values: any[]) {
+        if (this.getComponent(component.nid) !== component) {
+            throw new Error(`Cannot write an inactive ECS component nid ${component.nid}.`)
+        }
+        appendManualGroup(this, component.nid, group, values, 0, ntype)
     }
 
     isRootNid(nid: number) {

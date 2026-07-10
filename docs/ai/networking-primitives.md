@@ -280,6 +280,68 @@ inside the open inventory channels are still entities. The client UI can also
 keep local-only state such as drag position, selected slot, pending/open/denied
 status, or optimistic visual feedback.
 
+Use one shared endpoint definition when the request or response has a binary
+schema. Register it in the context before connecting so schema fingerprinting
+can include the endpoint contract:
+
+```ts
+// shared/endpoints.ts
+import { Binary, defineEndpoint, definePayloadSchema } from 'nengi'
+
+export type OpenChestRequest = { chestNid: number }
+export type OpenChestResponse = { accepted: boolean, inventoryNid: number }
+
+export const OpenChest = defineEndpoint<OpenChestRequest, OpenChestResponse>(20, {
+    requestSchema: definePayloadSchema({
+        chestNid: Binary.UInt32
+    }),
+    responseSchema: definePayloadSchema({
+        accepted: Binary.Boolean,
+        inventoryNid: Binary.UInt32
+    })
+})
+```
+
+```ts
+// shared/context.ts
+const context = new Context()
+context.registerEndpoint(OpenChest)
+```
+
+The server queues inbound requests when it reads a packet. It does not invoke
+handlers from the adapter callback and `instance.step()` does not process the
+request queue automatically. Put request processing at an explicit point before
+the snapshot boundary:
+
+```ts
+instance.respond(OpenChest, ({ user, body }) => {
+    return openChestForUser(user, body.chestNid)
+})
+
+function tick() {
+    while (!instance.queue.isEmpty()) {
+        const event = instance.queue.next()
+        processConnectionOrCommandEvent(event)
+    }
+
+    instance.processRequests(100)
+    stepAuthoritativeSimulation()
+    instance.step()
+}
+```
+
+`processRequests(max)` returns the number of dequeued requests and can bound
+work per tick. A handler may return a response, call the supplied `send` callback
+once, or return a promise. Promise completion queues the response later; any
+authoritative mutation after `await` is outside the synchronous tick order and
+should be deliberately re-entered through the game's own queue if deterministic
+ordering matters.
+
+Passing a numeric endpoint id is the schema-less form. Prefer the shared endpoint
+definition object for typed request/response payloads. The current API is
+client-request/server-response, not bidirectional RPC: server-initiated actions
+should use a command-like client message, a normal message, or replicated state.
+
 ## Channel
 
 A channel answers "who can see these entities/messages?" It is not itself replicated state.

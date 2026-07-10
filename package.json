@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-rc.123",
+  "version": "2.0.0-rc.124",
   "description": "High-performance realtime multiplayer networking for TypeScript games.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -21,6 +21,7 @@
     "test": "npx jest",
     "build": "npx tsc",
     "typecheck": "npx tsc --project tsconfig.test.json",
+    "verify:docs": "node scripts/verify-ai-docs.mjs",
     "profile:snapshot": "node --import tsx src/performance/SnapshotPipeline.performance.ts",
     "lint": "npx eslint . --config .eslintrc.js",
     "lintfix": "npx eslint . --fix --config .eslintrc.js"

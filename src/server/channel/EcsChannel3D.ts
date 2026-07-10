@@ -451,6 +451,15 @@ export class EcsChannel3D {
         return nid
     }
 
+    /** Returns true only while the root is active in this channel. */
+    hasRoot(pid: number) {
+        return this.entities.hasRoot(pid)
+    }
+
+    hasSpatialComponent(pid: number) {
+        return this.entities.getSpatialComponent(pid) !== undefined
+    }
+
     syncHeader() {
         if (!hasSchemaBackedChannelHeader(this.header)) {
             return false
@@ -527,6 +536,28 @@ export class EcsChannel3D {
 
     removeComponent(componentOrNid: Ecs3DComponent | number) {
         this.removeComponentInternal(componentOrNid)
+    }
+
+    /** @internal Used by the ECS/world binding after it has validated a mutation plan. */
+    appendBoundComponentProp(component: Ecs3DComponent, prop: SchemaProp, value: any) {
+        if (this.getComponent(component.nid) !== component) {
+            throw new Error(`Cannot write an inactive ECS component nid ${component.nid}.`)
+        }
+        if (!this.grid.objectCells.has(component.pid)) {
+            throw new Error(`Cannot write ECS component nid ${component.nid}; root ${component.pid} has no spatial cell.`)
+        }
+        this.appendPendingProp(component, prop, value)
+    }
+
+    /** @internal Used by the ECS/world binding after it has validated a mutation plan. */
+    appendBoundComponentGroup(component: Ecs3DComponent, ntype: number, group: SchemaUpdateGroup, values: any[]) {
+        if (this.getComponent(component.nid) !== component) {
+            throw new Error(`Cannot write an inactive ECS component nid ${component.nid}.`)
+        }
+        if (!this.grid.objectCells.has(component.pid)) {
+            throw new Error(`Cannot write ECS component nid ${component.nid}; root ${component.pid} has no spatial cell.`)
+        }
+        this.appendPendingGroup(ntype, component, group, values)
     }
 
     setSpatialComponent(pid: number, componentOrNid: Ecs3DComponent | number) {

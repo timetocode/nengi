@@ -7,9 +7,13 @@ import type { PredictionOperationOptions } from './prediction/Predictor'
 import type { ClientAdapterConstructor, IClientNetworkAdapter } from './adapter/IClientNetworkAdapter'
 
 type StringOrParsedJSON = string | object
-type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
-type WebsocketErrorHandler = (event: any) => void
-type RequestOptions<Response = any> = {
+export type DisconnectHandler = (reason: StringOrParsedJSON, event?: any) => void
+export type WebsocketErrorHandler = (event: any) => void
+export type ClientConnectResult = {
+    accepted: boolean
+    reason?: unknown
+}
+export type RequestOptions<Response = any> = {
     timeoutMs?: number,
     key?: string,
     policy?: RequestPolicy,
@@ -41,7 +45,7 @@ class Client<Adapter extends IClientNetworkAdapter = IClientNetworkAdapter> {
         }
     }
 
-    connect(target: Parameters<Adapter['connect']>[0], handshake: any = {}): Promise<any> {
+    connect(target: Parameters<Adapter['connect']>[0], handshake: any = {}): Promise<ClientConnectResult> {
         return this.adapter.connect(target, handshake)
     }
 

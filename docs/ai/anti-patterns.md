@@ -64,7 +64,7 @@ Create game-level mutation functions when needed:
 function movePlayer(player: PlayerEntity, x: number, y: number) {
     player.x = x
     player.y = y
-    PlayerWriter.position(player, x, y)
+    PlayerWriter.groups.position(player, x, y)
 }
 ```
 

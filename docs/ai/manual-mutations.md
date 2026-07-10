@@ -29,7 +29,7 @@ Use `createEntityWriter(ntype, schema)` with:
 - `ManualChannel2D`
 - `ManualChannel3D`
 
-Example:
+Pattern:
 
 ```ts
 const channel = new ManualChannel(instance.localState)
@@ -45,14 +45,16 @@ const player = channel.addEntity({
 
 player.x = nextX
 player.y = nextY
-Player.position(player, nextX, nextY)
+Player.groups.position(player, nextX, nextY)
 ```
 
 Writers expose:
 
 - `writer.props.name(entity, value)` for explicit single-property writes.
 - `writer.groups.name(entity, ...values)` for explicit update groups.
-- Top-level aliases like `writer.position(...)` when the schema name does not collide with reserved fields or another writer.
+- Top-level aliases like `writer.position(...)` are convenience syntax when the
+  schema name does not collide with reserved fields or another writer. Prefer
+  the explicit `writer.props` and `writer.groups` namespaces in canonical code.
 
 Prefer group writers for common hot bundles.
 
@@ -64,7 +66,7 @@ Use `createComponentWriter(ntype, schema)` with:
 - `EcsChannel2D`
 - `EcsChannel3D`
 
-Example:
+Pattern:
 
 ```ts
 const channel = new EcsChannel(instance.localState)
@@ -80,7 +82,7 @@ const transform = channel.addComponent(pid, {
 
 transform.x = nextX
 transform.y = nextY
-Transform.position(transform, nextX, nextY)
+Transform.groups.position(transform, nextX, nextY)
 ```
 
 ## Important rule
@@ -108,6 +110,29 @@ mutation surface is proven.
   It is a validation aid; the game still has to route mutations through the
   right channel/writer.
 - Using single prop writes for transform data that has a useful update group.
+
+## Bound ECS mutators
+
+When a server owns an `EcsWorld` and an ECS channel together, prefer
+`bindEcsChannel` for selected networked roots. The returned component binding
+separates state assignment from append-only output:
+
+```ts
+const replicated = bindEcsChannel(world, worldChannel, { context })
+const TransformNet = replicated.component(Transform)
+
+TransformNet.mutate.props.x(transform, nextX)
+TransformNet.mutate.patch(transform, { x: nextX, y: nextY })
+TransformNet.mutate.groups.position(transform, nextX, nextY)
+
+TransformNet.writer.props.x(transform, nextX)
+```
+
+The mutator methods validate the active binding and schema properties before
+assigning state or appending output; group mutators also validate group arity.
+The writer methods validate the active binding but do not assign component
+fields. Local-only components remain outside the binding and can coexist on the
+same world root.
 
 ## Diagnostic strategy
 
