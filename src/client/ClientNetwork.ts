@@ -51,6 +51,7 @@ import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerpri
 import type { PredictionOperationOptions } from './prediction/Predictor'
 
 const MAX_REQUESTS_PER_FRAME = 255
+const MAX_ENGINE_MESSAGES_PER_SECTION = 255
 
 export type RequestBacklogInfo = {
     queued: number
@@ -729,6 +730,50 @@ export class ClientNetwork {
         return dw.payload
     }
 
+    /**
+     * Sends only queued Pong engine messages. The queue is committed after the
+     * adapter send succeeds, so a transport error leaves the Pongs available to
+     * the next control or application flush.
+     */
+    flushPongs<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(
+        binary: BinaryAdapter<InboundPayload, OutboundPayload>,
+        send: (payload: OutboundPayload) => void
+    ) {
+        let sent = 0
+        while (this.pendingPongs.length > 0) {
+            const pendingPongs = this.pendingPongs.slice(0, MAX_ENGINE_MESSAGES_PER_SECTION)
+            const commands = pendingPongs.map(pong => ({
+                ntype: EngineMessage.Pong,
+                pingId: pong.pingId,
+                clientReceiveTimeMs: pong.clientReceiveTimeMs,
+                clientSendTimeMs: this.nowMs()
+            }))
+            let bytes = 2
+            for (let i = 0; i < commands.length; i++) {
+                bytes += count(
+                    this.client.context.getEngineSchema(commands[i].ntype)!,
+                    commands[i]
+                )
+            }
+
+            const dw = binary.createWriter(bytes)
+            dw.writeUInt8(BinarySection.EngineMessages)
+            dw.writeUInt8(commands.length)
+            for (let i = 0; i < commands.length; i++) {
+                writeMessage(
+                    commands[i],
+                    this.client.context.getEngineSchema(commands[i].ntype)!,
+                    dw
+                )
+            }
+
+            send(dw.payload)
+            this.pendingPongs.splice(0, pendingPongs.length)
+            sent += pendingPongs.length
+        }
+        return sent
+    }
+
     createOutboundRollback(): OutboundRollback {
         return {
             commandFrameNumber: this.commandFrameNumber,
@@ -761,8 +806,16 @@ export class ClientNetwork {
     }
 
     readSnapshot(dr: IBinaryReader) {
+        const pendingPongCount = this.pendingPongs.length
         try {
             this.readSnapshotUnsafe(dr)
+            if (this.pendingPongs.length > pendingPongCount) {
+                try {
+                    this.client.adapter?.flushPongs?.()
+                } catch (error) {
+                    this.onSocketError(error)
+                }
+            }
         } catch (err) {
             try {
                 this.onMalformedSnapshot(err)

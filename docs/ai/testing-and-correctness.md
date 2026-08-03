@@ -24,6 +24,18 @@ Most behavior should be covered without a real socket. Use
 `LocalInstanceAdapter` and `LocalClientAdapter` to exercise the same protocol
 path in memory. Reserve real transport tests for transport-specific behavior.
 
+When timing behavior is part of the assertion, use the simulated local
+adapters with a shared manual clock. Test asymmetric delay, jitter, periodic
+stalls, handshake deadlines, Ping/Pong deadlines, prediction replay, and
+interpolation buffering through real encoded payloads. See
+[network-condition-simulation.md](./network-condition-simulation.md).
+
+Heartbeat tests should prove both sides of the client policy: a client remains
+connected while it processes snapshots without calling application
+`client.flush()`, and a runtime that stops processing inbound snapshots is
+disconnected after `pongTimeoutMs`. Also assert that a Pong-only send does not
+advance command frames or release queued application commands and requests.
+
 ## Maintained bots
 
 Keep a bot client in sync with the game during development. It should use the
@@ -138,6 +150,9 @@ resources before ECS root removal, then assert no stale resource remains.
 ## Connection churn and lifecycle
 
 Run repeated connect, authenticate, enter-world, act, and disconnect cycles.
+Nengi removes disconnected users from their subscribed channels before
+`UserDisconnected` is delivered. The application remains responsible for its
+own user-to-entity, room, timer, physics, and persistence state.
 After each window, assert the lifecycle counts that should be empty:
 
 - active users and subscriptions

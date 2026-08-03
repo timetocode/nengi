@@ -101,7 +101,8 @@ Keep connection lifecycle as an explicit part of the service cycle:
 - handshake data is validated before the user enters the service
 - connect allocates the user's scoped state and subscriptions
 - commands and requests verify that the user still owns the target
-- disconnect removes subscriptions and releases user-owned resources
+- nengi removes channel subscriptions before emitting `UserDisconnected`
+- the disconnect handler releases application-owned state and resources
 - channel close is treated as a state transition, not only a transport event
 
 Use private channels or headered channels when a service has scoped data. Do not

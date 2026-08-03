@@ -180,6 +180,8 @@ Use this map instead of reading every file every time.
   [service-patterns.md](./service-patterns.md).
 - If defining correctness tests or validating a new network model, read
   [testing-and-correctness.md](./testing-and-correctness.md).
+- If testing seeded latency, jitter, asymmetric links, or periodic stalls, read
+  [network-condition-simulation.md](./network-condition-simulation.md).
 - If making a fast action game with local movement prediction, read [realtime-movement-prediction.md](./realtime-movement-prediction.md).
 - If the game uses ordinary replicated objects instead of ECS components, read [plain-channels.md](./plain-channels.md), which includes a small canonical server/client shape.
 - If creating a small 2D spatial prototype, read [minimal-spatial-game.md](./minimal-spatial-game.md).

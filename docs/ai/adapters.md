@@ -16,16 +16,16 @@ The core package and every official Nengi adapter or binary package used by an
 application must have the exact same version. Do not use `^`, `~`, `latest`, or
 an unpinned range for release-candidate work.
 
-For this release candidate, the package version is `2.0.0-rc.125`:
+For this release candidate, the package version is `2.0.0-rc.126`:
 
 ```text
-nengi@2.0.0-rc.125
-nengi-websocket-client-adapter@2.0.0-rc.125
-nengi-ws-client-adapter@2.0.0-rc.125
-nengi-ws-instance-adapter@2.0.0-rc.125
-nengi-uws-instance-adapter@2.0.0-rc.125
-nengi-dataviews@2.0.0-rc.125
-nengi-buffers@2.0.0-rc.125
+nengi@2.0.0-rc.126
+nengi-websocket-client-adapter@2.0.0-rc.126
+nengi-ws-client-adapter@2.0.0-rc.126
+nengi-ws-instance-adapter@2.0.0-rc.126
+nengi-uws-instance-adapter@2.0.0-rc.126
+nengi-dataviews@2.0.0-rc.126
+nengi-buffers@2.0.0-rc.126
 ```
 
 When the core version changes, change every installed official package to that
@@ -67,9 +67,9 @@ Install the core, browser WebSocket adapter, and browser binary backend at the
 same version:
 
 ```bash
-npm install nengi@2.0.0-rc.125 \
-    nengi-websocket-client-adapter@2.0.0-rc.125 \
-    nengi-dataviews@2.0.0-rc.125
+npm install nengi@2.0.0-rc.126 \
+    nengi-websocket-client-adapter@2.0.0-rc.126 \
+    nengi-dataviews@2.0.0-rc.126
 ```
 
 Use the package root for core imports and the adapter package root for the
@@ -92,9 +92,9 @@ setup payload. Use it for authentication or session selection data that
 Install the core, `ws` server adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.125 \
-    nengi-ws-instance-adapter@2.0.0-rc.125 \
-    nengi-buffers@2.0.0-rc.125
+npm install nengi@2.0.0-rc.126 \
+    nengi-ws-instance-adapter@2.0.0-rc.126 \
+    nengi-buffers@2.0.0-rc.126
 ```
 
 Use this adapter when compatibility and simple deployment matter more than
@@ -120,9 +120,9 @@ adapter.listen(8079, () => {
 Install the core, uWS server adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.125 \
-    nengi-uws-instance-adapter@2.0.0-rc.125 \
-    nengi-buffers@2.0.0-rc.125
+npm install nengi@2.0.0-rc.126 \
+    nengi-uws-instance-adapter@2.0.0-rc.126 \
+    nengi-buffers@2.0.0-rc.126
 ```
 
 Use uWS when the deployment Node version is supported by the native
@@ -171,9 +171,9 @@ version.
 Install the core, Node client adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.125 \
-    nengi-ws-client-adapter@2.0.0-rc.125 \
-    nengi-buffers@2.0.0-rc.125
+npm install nengi@2.0.0-rc.126 \
+    nengi-ws-client-adapter@2.0.0-rc.126 \
+    nengi-buffers@2.0.0-rc.126
 ```
 
 ```ts
@@ -220,6 +220,14 @@ const client = new Client(context, LocalClientAdapter, 20, {
 await client.connect(serverSocket.clientSocket, { role: 'local' })
 ```
 
+When delay is part of the behavior under test, use
+`SimulatedLocalInstanceAdapter` and `SimulatedLocalClientAdapter`. They run the
+same binary protocol over a seeded, manually advanced duplex link. For live
+browser or Node clients, use `SimulatedWebSocketClientAdapter` or
+`SimulatedWsClientAdapter`. See
+[network-condition-simulation.md](./network-condition-simulation.md) for the
+condition model, clock order, and diagnostics.
+
 ## Binary Boundary
 
 For a browser or typed-array transport, use `nengi-dataviews`. For Node
@@ -252,7 +260,18 @@ A client adapter must:
 - send the handshake through nengi after opening
 - implement `flush()` with `client.network.createOutbound(binary)`
 - pass inbound payloads to `client.network.readSnapshot(...)`
+- implement `flushPongs()` by calling
+  `client.network.flushPongs(binary, sendPayload)` while the transport is open;
+  `readSnapshot(...)` invokes this hook after parsing a Ping so heartbeat
+  traffic does not depend on the application loop
 - call the client network disconnect and socket-error hooks appropriately
+
+`flushPongs()` must send only the payload supplied by `network.flushPongs`.
+Do not implement it by calling the adapter's ordinary `flush()`: that would
+advance command frames and flush application commands and requests from inside
+an inbound socket callback. If transport send throws, `network.flushPongs`
+leaves the Pong queued and the adapter should report the error through
+`network.onSocketError`.
 
 Core game code should import only from the package root. Deep imports into
 `nengi/src` or `nengi/build` are not part of the package contract.

@@ -90,12 +90,20 @@ Ping/Pong has two responsibilities:
 
 The server owns the sent time for each recent Ping. A Pong identifies the Ping
 and reports the client's receive and send times. The client captures its send
-time when the response is serialized during `client.flush()`, not when the Ping
-is parsed.
+time when the response is serialized.
 
-Pongs are engine traffic. Game code does not construct them manually. The
-client still needs a deliberate flush boundary because Nengi does not own the
-application loop.
+Pongs are engine traffic. Game code does not construct them manually. Official
+client adapters send a Pong-only packet immediately after a snapshot containing
+a Ping is parsed. This control packet does not advance the command frame and
+does not flush commands, requests, predicted operations, or other application
+traffic. A normal `client.flush()` also carries any Pong that remains queued,
+which preserves liveness for custom adapters that have not implemented the
+immediate control path.
+
+This separation matters in browsers. `requestAnimationFrame` commonly pauses in
+a hidden tab, but receiving and answering network traffic must not depend on the
+render loop. An open client that continues processing socket messages can remain
+connected while rendering is suspended.
 
 The server likewise needs a regular `instance.step()` cadence even when no game
 or service state changed. Snapshots carry Pings, and each step evaluates
@@ -109,14 +117,26 @@ network step rather than stepping only after application mutations.
 ```ts
 const instance = new Instance(context, {
     pingIntervalMs: 2000,
-    pongTimeoutMs: 6000,
+    pongTimeoutMs: 15000,
     handshakeTimeoutMs: 5000
 })
 ```
 
-The Pong timeout allows several missed Ping cycles. A user who is idle in the
-game but continues responding to Pongs is healthy; gameplay AFK policy belongs
-to the application.
+The Pong timeout allows several missed Ping cycles and a short runtime stall. A
+user who is idle in the game but continues responding to Pings is healthy;
+gameplay AFK policy belongs to the application. Increase the timeout when the
+product deliberately preserves sessions through longer process stalls. No
+finite browser timeout can guarantee survival when an operating system fully
+suspends or unloads the page.
+
+Immediate Pongs solve connection liveness, not hidden-page application work.
+Snapshots continue to produce queued `Frame` reports. A game that intends to
+preserve a hidden session should switch to a low-frequency maintenance loop that
+drains and handles frames, processes essential messages, and neutralizes any
+latched input. Do not run simulation or rendering with one large elapsed `dt`
+when the page becomes visible again; resume from authoritative state and reset
+the application's accumulators. A game may instead choose to disconnect hidden
+clients as an explicit product policy.
 
 The handshake timeout covers the complete pre-acceptance lifecycle: waiting for
 the initial Nengi handshake and waiting for `instance.onConnect` to resolve.
@@ -131,6 +151,11 @@ has been emitted, a Pong timeout closes the transport and emits exactly one
 
 Adapters may provide an immediate `terminate` operation so a half-open
 transport does not wait indefinitely for a graceful WebSocket close.
+
+Use [network-condition-simulation.md](./network-condition-simulation.md) to
+exercise these deadlines under seeded asymmetric delay and stalls. Inject one
+manual monotonic clock into the `Instance`, `Client`, and simulated link so the
+test controls every deadline explicitly.
 
 ## Wire compatibility
 

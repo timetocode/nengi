@@ -838,6 +838,9 @@ export class InstanceNetwork {
         this.pendingUsers.delete(user)
         this.responseBacklogUsers.delete(user)
         this.purgeRequestsForUser(user)
+        for (const channel of Array.from(user.subscriptions.values())) {
+            channel.unsubscribe(user)
+        }
         if (this.isUserlandConnected(user)) {
             const eventReason = reason && typeof reason === 'object' && 'reason' in reason
                 ? reason.reason

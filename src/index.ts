@@ -88,6 +88,7 @@ export * from './common/ChannelHeader'
 export * from './common/binary/BinaryExt'
 export * from './common/Endpoint'
 export * from './common/time'
+export * from './common/network/NetworkConditionLink'
 
 // types for integration with adapters
 export * from './server/adapter/IServerNetworkAdapter'

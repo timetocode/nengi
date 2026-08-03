@@ -47,7 +47,18 @@ the server's `pingIntervalMs`, `pongTimeoutMs`, and `handshakeTimeoutMs`.
 Pre-acceptance handshake expiry emits `UserConnectionDenied`; Pong expiry after
 acceptance emits `UserDisconnected`. See
 [timing-and-liveness.md](./timing-and-liveness.md) for the clock domains and
-adapter termination contract.
+adapter termination contract. Official adapters answer Pings independently of
+the application's render and flush cadence, so `pong_timeout` means the client
+stopped processing network traffic or could not return it, not merely that a
+browser paused `requestAnimationFrame`.
+
+For an accepted connection, nengi completes its channel-side cleanup before
+`UserDisconnected` is observable. The disconnected user is removed from every
+subscribed channel, including spatial views and per-user visibility caches.
+Userland must still remove resources it owns, such as player entities, room and
+account indexes, timers, physics bodies, and persistence sessions. Explicitly
+calling `channel.unsubscribe(user)` in a disconnect handler is safe but is not
+required for nengi's channel lifecycle.
 
 ## Request pressure
 

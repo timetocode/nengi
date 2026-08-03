@@ -66,6 +66,7 @@ for (const required of [
     'benchmarking.md',
     'client-state.md',
     'ecs-world.md',
+    'network-condition-simulation.md',
     'operations.md',
     'service-patterns.md',
     'testing-and-correctness.md',

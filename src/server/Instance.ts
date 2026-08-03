@@ -102,7 +102,7 @@ export class Instance {
         this.tick = 1
         this.now = options.now ?? getMonotonicTime
         this.pingIntervalMs = positiveDuration('pingIntervalMs', options.pingIntervalMs, 2000)
-        this.pongTimeoutMs = positiveDuration('pongTimeoutMs', options.pongTimeoutMs, 6000)
+        this.pongTimeoutMs = positiveDuration('pongTimeoutMs', options.pongTimeoutMs, 15000)
         this.handshakeTimeoutMs = positiveDuration('handshakeTimeoutMs', options.handshakeTimeoutMs, 5000)
         this.responseEndPoints = new Map()
         this.onInboundMessageError = () => {}
@@ -180,6 +180,11 @@ export class Instance {
                 })
 
                 const buffer = createSnapshotBuffer(user, this, serverTimeMs)
+                if (pingId !== null) {
+                    // Local transports may deliver the Pong synchronously from
+                    // inside send(), so the Ping must already be registered.
+                    user.recordPingSent(pingId, serverTimeMs, this.now())
+                }
                 let sent = false
                 if (this.network.snapshotPerformanceEnabled) {
                     // Keep adapter send timing separate from snapshot construction:
@@ -194,9 +199,6 @@ export class Instance {
                     sent = this.sendSnapshotToUser(user, buffer)
                 }
                 if (sent) {
-                    if (pingId !== null) {
-                        user.recordPingSent(pingId, serverTimeMs, this.now())
-                    }
                     user.lastSentInstanceTick = this.tick
                 }
             })

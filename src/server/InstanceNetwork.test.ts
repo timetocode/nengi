@@ -11,6 +11,8 @@ import { Predictor } from '../client/prediction/Predictor'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 import { Instance } from './Instance'
 import { User, UserConnectionState } from './User'
+import { Channel } from './channel/Channel'
+import { EcsChannel2D } from './channel/EcsChannel2D'
 
 function createOpenUser(instance: Instance) {
     const user = new User(undefined, {
@@ -382,6 +384,90 @@ describe('InstanceNetwork', () => {
         expect(handler).not.toHaveBeenCalled()
     })
 
+    it('removes a disconnected user from every subscribed channel', () => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        const channel = new Channel(instance.localState)
+        const spatialChannel = new EcsChannel2D(instance.localState, 100)
+        instance.users.set(user.id, user)
+
+        channel.subscribe(user)
+        spatialChannel.subscribe(user, {
+            x: 0,
+            y: 0,
+            halfWidth: 100,
+            halfHeight: 100
+        })
+
+        expect(user.subscriptions.size).toBe(2)
+        expect(channel.users.has(user.id)).toBe(true)
+        expect(spatialChannel.users.has(user.id)).toBe(true)
+        expect((spatialChannel as any).views.has(user.id)).toBe(true)
+        expect((spatialChannel as any).viewVersions.has(user.id)).toBe(true)
+        spatialChannel.prepareVisibilityPlan(1)
+        expect((spatialChannel as any).visibleCellKeyCache.has(user.id)).toBe(true)
+        expect((spatialChannel as any).visibleNetworkedNidsCache.has(user.id)).toBe(true)
+        expect((spatialChannel as any).visibilityStateByUser.has(user.id)).toBe(true)
+        expect((spatialChannel as any).visibilityPlan).not.toBeNull()
+
+        instance.network.onClose(user, 'transport_closed')
+        instance.network.onClose(user, 'duplicate_close')
+
+        expect(user.subscriptions.size).toBe(0)
+        expect(channel.users.has(user.id)).toBe(false)
+        expect(spatialChannel.users.has(user.id)).toBe(false)
+        expect((spatialChannel as any).views.has(user.id)).toBe(false)
+        expect((spatialChannel as any).viewVersions.has(user.id)).toBe(false)
+        expect((spatialChannel as any).visibleCellKeyCache.has(user.id)).toBe(false)
+        expect((spatialChannel as any).visibleNetworkedNidsCache.has(user.id)).toBe(false)
+        expect((spatialChannel as any).visibilityStateByUser.has(user.id)).toBe(false)
+        expect((spatialChannel as any).visibilityPlan).toBeNull()
+        expect(instance.users.has(user.id)).toBe(false)
+        expect(instance.queue.length).toBe(1)
+        expect(instance.queue.next()).toMatchObject({
+            type: NetworkEvent.UserDisconnected,
+            user,
+            reason: 'transport_closed'
+        })
+    })
+
+    it('keeps channel subscription state bounded through repeated disconnect churn', () => {
+        const instance = new Instance(new Context())
+        const channel = new Channel(instance.localState)
+        const spatialChannel = new EcsChannel2D(instance.localState, 100)
+
+        for (let i = 1; i <= 1000; i++) {
+            const user = createOpenUser(instance)
+            user.id = i
+            instance.users.set(user.id, user)
+            channel.subscribe(user)
+            spatialChannel.subscribe(user, {
+                x: i % 100,
+                y: i % 100,
+                halfWidth: 100,
+                halfHeight: 100
+            })
+            spatialChannel.prepareVisibilityPlan(i)
+
+            instance.network.onClose(user, 'churn')
+            expect(instance.queue.next()).toMatchObject({
+                type: NetworkEvent.UserDisconnected,
+                user
+            })
+        }
+
+        expect(instance.users.size).toBe(0)
+        expect(channel.users.size).toBe(0)
+        expect(spatialChannel.users.size).toBe(0)
+        expect((spatialChannel as any).views.size).toBe(0)
+        expect((spatialChannel as any).viewVersions.size).toBe(0)
+        expect((spatialChannel as any).visibleCellKeyCache.size).toBe(0)
+        expect((spatialChannel as any).visibleNetworkedNidsCache.size).toBe(0)
+        expect((spatialChannel as any).visibilityStateByUser.size).toBe(0)
+        expect((spatialChannel as any).visibilityPlan).toBeNull()
+        expect(instance.queue.length).toBe(0)
+    })
+
     it('rejects duplicate response endpoint registration', () => {
         const instance = new Instance(new Context())
 
@@ -501,5 +587,54 @@ describe('InstanceNetwork', () => {
         expect(clientNetwork.getClockSync().samples).toBe(1)
         expect(clientNetwork.getEstimatedServerTimeMs()).not.toBeNull()
         expect(outbound.byteLength).toBeGreaterThan(0)
+    })
+
+    it('flushes Pongs without advancing application command frames and retries failed sends', () => {
+        let nowMs = 1000
+        const context = new Context()
+        const instance = new Instance(context, { now: () => nowMs })
+        const user = createOpenUser(instance)
+        const clientNetwork = createClientNetwork(context)
+        instance.users.set(user.id, user)
+
+        instance.step()
+        const send = user.networkAdapter.send as jest.Mock
+        const snapshot = send.mock.calls[0][1] as Buffer
+        clientNetwork.readSnapshot(testBinaryAdapter.createReader(snapshot))
+        const commandFrameNumber = clientNetwork.commandFrameNumber
+
+        expect(() => clientNetwork.flushPongs(testBinaryAdapter, () => {
+            throw new Error('send failed')
+        })).toThrow('send failed')
+        expect(clientNetwork.commandFrameNumber).toBe(commandFrameNumber)
+
+        nowMs = 1010
+        expect(clientNetwork.flushPongs(testBinaryAdapter, payload => {
+            instance.network.onMessage(user, payload)
+        })).toBe(1)
+        expect(clientNetwork.flushPongs(testBinaryAdapter, () => undefined)).toBe(0)
+        expect(clientNetwork.commandFrameNumber).toBe(commandFrameNumber)
+        expect(user.lastPongReceivedAtMs).toBe(nowMs)
+    })
+
+    it('splits Pong-only traffic into valid one-byte message-count packets', () => {
+        const context = new Context()
+        const clientNetwork = createClientNetwork(context)
+        const payloads: Buffer[] = []
+        ;(clientNetwork as any).pendingPongs = Array.from({ length: 300 }, (_, index) => ({
+            pingId: index + 1,
+            clientReceiveTimeMs: index
+        }))
+
+        expect(clientNetwork.flushPongs(testBinaryAdapter, payload => payloads.push(payload))).toBe(300)
+        expect(payloads).toHaveLength(2)
+
+        const first = testBinaryAdapter.createReader(payloads[0])
+        expect(first.readUInt8()).toBe(BinarySection.EngineMessages)
+        expect(first.readUInt8()).toBe(255)
+        const second = testBinaryAdapter.createReader(payloads[1])
+        expect(second.readUInt8()).toBe(BinarySection.EngineMessages)
+        expect(second.readUInt8()).toBe(45)
+        expect(clientNetwork.flushPongs(testBinaryAdapter, () => undefined)).toBe(0)
     })
 })

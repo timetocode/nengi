@@ -4,9 +4,18 @@ import { User } from '../User'
 import { ClientNetwork } from '../../client/ClientNetwork'
 import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
 import { BinaryAdapter, BinaryPayload } from '../../common/binary/BinaryAdapter'
+import {
+    NetworkConditionLink,
+    NetworkConditionLinkOptions,
+    NetworkConditions
+} from '../../common/network/NetworkConditionLink'
 
 type MockAdapterConfig<InboundPayload extends BinaryPayload = BinaryPayload, OutboundPayload extends BinaryPayload = InboundPayload> = {
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
+}
+
+type SimulatedLocalConnectOptions = NetworkConditionLinkOptions & {
+    conditions: NetworkConditions
 }
 
 /**
@@ -128,12 +137,41 @@ class LocalClientAdapter<
         this.socket.send(this.network.createOutbound(this.binary))
     }
 
+    flushPongs() {
+        if (!this.socket || !this.connected) {
+            return
+        }
+        try {
+            this.network.flushPongs(this.binary, payload => {
+                this.socket!.send(payload)
+            })
+        } catch (error) {
+            this.network.onSocketError(error)
+        }
+    }
+
     disconnect(reason?: any) {
         this.socket?.close(reason)
         this.socket = null
         this.connected = false
     }
 }
+
+class SimulatedLocalInstanceAdapter<
+    InboundPayload extends BinaryPayload = BinaryPayload,
+    OutboundPayload extends BinaryPayload = InboundPayload
+> extends LocalInstanceAdapter<InboundPayload, OutboundPayload> {
+    createSimulatedConnect(options: SimulatedLocalConnectOptions) {
+        const socket = new SimulatedMockServerSocket(this.network, options)
+        this.open(socket)
+        return socket
+    }
+}
+
+class SimulatedLocalClientAdapter<
+    InboundPayload extends BinaryPayload = BinaryPayload,
+    OutboundPayload extends BinaryPayload = InboundPayload
+> extends LocalClientAdapter<InboundPayload, OutboundPayload> {}
 
 
 enum MockSocketReadyState {
@@ -202,14 +240,82 @@ class MockClientSocket {
     }
 }
 
+class SimulatedMockServerSocket extends MockServerSocket {
+    declare clientSocket: SimulatedMockClientSocket
+    readonly conditions: NetworkConditionLink
+
+    constructor(network: InstanceNetwork, options: SimulatedLocalConnectOptions) {
+        super(network)
+        this.conditions = new NetworkConditionLink(options.conditions, options)
+        this.clientSocket = new SimulatedMockClientSocket(this)
+    }
+
+    receive(buffer: BinaryPayload) {
+        this.conditions.sendClientToServer(buffer, payload => {
+            if (this.readyState === MockSocketReadyState.OPEN && this.user) {
+                this.network.onMessage(this.user, payload)
+            }
+        })
+    }
+
+    send(buffer: BinaryPayload) {
+        this.conditions.sendServerToClient(buffer, payload => {
+            if (this.readyState === MockSocketReadyState.OPEN) {
+                this.clientSocket.deliver(payload)
+            }
+        })
+    }
+
+    end(reason?: any) {
+        this.conditions.clear()
+        super.end(reason)
+    }
+
+    advance() {
+        return this.conditions.advance()
+    }
+
+    advanceTo(nowMs: number) {
+        return this.conditions.advanceTo(nowMs)
+    }
+}
+
+class SimulatedMockClientSocket extends MockClientSocket {
+    declare serverSocket: SimulatedMockServerSocket
+
+    constructor(serverSocket: SimulatedMockServerSocket) {
+        super(serverSocket)
+    }
+
+    receive(buffer: BinaryPayload) {
+        this.serverSocket.send(buffer)
+    }
+
+    deliver(buffer: BinaryPayload) {
+        if (this.adapter) {
+            this.adapter.onMessage(buffer)
+        }
+    }
+
+    close(reason?: any) {
+        this.serverSocket.conditions.clear()
+        super.close(reason)
+    }
+}
+
 const MockInstanceAdapter = LocalInstanceAdapter
 const MockClientAdapter = LocalClientAdapter
 
 export {
     LocalInstanceAdapter,
     LocalClientAdapter,
+    SimulatedLocalInstanceAdapter,
+    SimulatedLocalClientAdapter,
     MockInstanceAdapter,
     MockClientAdapter,
     MockClientSocket,
-    MockServerSocket
+    MockServerSocket,
+    SimulatedMockClientSocket,
+    SimulatedMockServerSocket,
+    SimulatedLocalConnectOptions
 }

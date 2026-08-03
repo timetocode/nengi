@@ -8,6 +8,8 @@ interface IClientNetworkAdapter<
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
     connect(target: ConnectTarget, handshake?: any): Promise<any>
     flush(): void
+    /** Sends queued Ping responses without flushing application traffic. */
+    flushPongs?(): void
     disconnect?(reason?: any): void
 }
 

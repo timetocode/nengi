@@ -12,7 +12,7 @@ game rules.
 ## Install
 
 ```sh
-npm install nengi@2.0.0-rc.125
+npm install nengi@2.0.0-rc.126
 ```
 
 This package exposes a root-only public API. The application-facing surface is
@@ -90,6 +90,7 @@ self-contained and do not require another project:
 - [Architecture and tick flow](./docs/ai/architecture-and-ticks.md)
 - [Client state and presentation](./docs/ai/client-state.md)
 - [Timing and connection liveness](./docs/ai/timing-and-liveness.md)
+- [Network-condition simulation](./docs/ai/network-condition-simulation.md)
 - [Service patterns](./docs/ai/service-patterns.md)
 - [Testing and correctness](./docs/ai/testing-and-correctness.md)
 - [Benchmarking and bot workloads](./docs/ai/benchmarking.md)
@@ -99,6 +100,26 @@ self-contained and do not require another project:
 ## Release Candidate Changelog
 
 Changes after `2.0.0-rc.121`:
+
+### 2.0.0-rc.126
+
+- Added deterministic, seeded duplex network-condition simulation with
+  asymmetric latency, uniform jitter, periodic stalls, FIFO WebSocket ordering,
+  manual clock advancement, live timers, runtime diagnostics, and injectable
+  deterministic delay models.
+- Added simulated local, browser WebSocket, and Node `ws` client adapters. The
+  ordinary local and WebSocket adapters remain immediate and lightweight.
+- Added AI guidance for deterministic protocol tests and live condition
+  simulation.
+- Client adapters now answer Pings with Pong-only control packets immediately
+  after parsing snapshots, independently of application `client.flush()` and
+  `requestAnimationFrame` cadence.
+- Increased the default Pong timeout from 6 seconds to 15 seconds. A fully
+  suspended runtime still times out; an active hidden client that continues
+  processing network traffic remains connected.
+- Fixed disconnected-user retention in server channels. Before emitting
+  `UserDisconnected`, nengi now removes the user from every subscribed channel,
+  including spatial views and per-user visibility caches.
 
 ### 2.0.0-rc.125
 
