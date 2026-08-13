@@ -27,6 +27,7 @@
     "verify:docs": "node scripts/verify-ai-docs.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "release:check": "npm run lint && npm run typecheck && npm run test:family && npm run build:family && npm run verify:docs && npm run verify:release",
+    "release:login": "node scripts/npm-login.mjs",
     "release:publish": "node scripts/publish-package-family.mjs",
     "release:publish:dry-run": "node scripts/publish-package-family.mjs --dry-run",
     "prepack": "npm run build",

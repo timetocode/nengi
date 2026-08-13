@@ -26,6 +26,7 @@ for (const arg of args) {
 
 const dryRun = args.has('--dry-run')
 const tag = 'rc'
+const registry = 'https://registry.npmjs.org/'
 
 function run(command, commandArgs, options = {}) {
     const result = spawnSync(command, commandArgs, {
@@ -93,6 +94,32 @@ function registryTags(packageName) {
     return JSON.parse(result.stdout)
 }
 
+function npmWhoami() {
+    return run('npm', ['whoami', '--registry', registry], {
+        capture: true,
+        allowFailure: true
+    })
+}
+
+function ensureNpmAuthentication() {
+    let result = npmWhoami()
+    if (result.status === 0) {
+        console.log(`Authenticated as ${result.stdout.trim()}.`)
+        return
+    }
+
+    console.log('npm credentials are missing or expired. Starting npm web login...')
+    run(process.execPath, ['scripts/npm-login.mjs'])
+
+    result = npmWhoami()
+    if (result.status !== 0) {
+        process.stderr.write(result.stdout ?? '')
+        process.stderr.write(result.stderr ?? '')
+        throw new Error('npm login completed, but registry authentication still failed.')
+    }
+    console.log(`Authenticated as ${result.stdout.trim()}.`)
+}
+
 const packages = packageRoots.map(packageRoot => ({
     root: packageRoot,
     manifest: readManifest(packageRoot)
@@ -134,7 +161,7 @@ for (const entry of packages) {
 }
 
 console.log('\nChecking npm authentication...')
-run('npm', ['whoami'])
+ensureNpmAuthentication()
 
 for (const entry of packages) {
     const { name } = entry.manifest
