@@ -20,7 +20,9 @@ const adapterPackages = [
     '../nengi-websocket-client-adapter/package.json',
     '../nengi-ws-client-adapter/package.json',
     '../nengi-ws-instance-adapter/package.json',
-    '../nengi-uws-instance-adapter/package.json'
+    '../nengi-uws-instance-adapter/package.json',
+    '../nengi-bun-instance-adapter/package.json',
+    '../nengi-deno-instance-adapter/package.json'
 ]
 const errors = []
 

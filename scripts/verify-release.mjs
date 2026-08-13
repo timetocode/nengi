@@ -10,7 +10,9 @@ const packageRoots = [
     path.resolve(coreRoot, '../nengi-websocket-client-adapter'),
     path.resolve(coreRoot, '../nengi-ws-client-adapter'),
     path.resolve(coreRoot, '../nengi-ws-instance-adapter'),
-    path.resolve(coreRoot, '../nengi-uws-instance-adapter')
+    path.resolve(coreRoot, '../nengi-uws-instance-adapter'),
+    path.resolve(coreRoot, '../nengi-bun-instance-adapter'),
+    path.resolve(coreRoot, '../nengi-deno-instance-adapter')
 ]
 const errors = []
 

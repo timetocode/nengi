@@ -24,6 +24,8 @@ nengi-websocket-client-adapter@2.0.0-rc.126
 nengi-ws-client-adapter@2.0.0-rc.126
 nengi-ws-instance-adapter@2.0.0-rc.126
 nengi-uws-instance-adapter@2.0.0-rc.126
+nengi-bun-instance-adapter@2.0.0-rc.126
+nengi-deno-instance-adapter@2.0.0-rc.126
 nengi-dataviews@2.0.0-rc.126
 nengi-buffers@2.0.0-rc.126
 ```
@@ -38,7 +40,8 @@ Verify the installed graph with:
 ```bash
 npm ls nengi nengi-dataviews nengi-buffers \
     nengi-websocket-client-adapter nengi-ws-client-adapter \
-    nengi-ws-instance-adapter nengi-uws-instance-adapter
+    nengi-ws-instance-adapter nengi-uws-instance-adapter \
+    nengi-bun-instance-adapter nengi-deno-instance-adapter
 ```
 
 There should be one core `nengi` identity. Duplicate private-field TypeScript
@@ -55,6 +58,8 @@ deep source/build imports.
 | `nengi-ws-client-adapter` | Node `ws` client for bots and tools |
 | `nengi-ws-instance-adapter` | Node `ws` server |
 | `nengi-uws-instance-adapter` | uWebSockets.js server |
+| `nengi-bun-instance-adapter` | Native Bun server |
+| `nengi-deno-instance-adapter` | Native Deno server |
 | `nengi-dataviews` | Browser/DataView binary backend |
 | `nengi-buffers` | Node Buffer binary backend |
 
@@ -165,6 +170,66 @@ If the native module is unavailable, use a Node version supported by the
 installed uWS release or select a compatible adapter release. Do not change
 the native dependency tag without testing the target operating system and Node
 version.
+
+## Bun Server
+
+Install the core, native Bun server adapter, and DataView binary backend at one
+version:
+
+```bash
+bun add nengi@2.0.0-rc.126 \
+    nengi-bun-instance-adapter@2.0.0-rc.126 \
+    nengi-dataviews@2.0.0-rc.126
+```
+
+```ts
+import { Instance } from 'nengi'
+import { BunInstanceAdapter } from 'nengi-bun-instance-adapter'
+
+const instance = new Instance(context)
+const adapter = new BunInstanceAdapter(instance.network)
+
+adapter.listen({ port: 8079, hostname: '0.0.0.0' })
+```
+
+For an application that already owns `Bun.serve`, install
+`adapter.websocket` as its WebSocket handler and route the Nengi endpoint to
+`adapter.upgrade(request, server)`. The adapter uses Bun's hard
+`ServerWebSocket.terminate()` path for Nengi deadlines and send failures.
+
+## Deno Server
+
+Install the core, native Deno server adapter, and DataView binary backend at
+one version:
+
+```bash
+deno add npm:nengi@2.0.0-rc.126 \
+    npm:nengi-deno-instance-adapter@2.0.0-rc.126 \
+    npm:nengi-dataviews@2.0.0-rc.126
+```
+
+```ts
+import { Instance } from 'npm:nengi@2.0.0-rc.126'
+import { DenoInstanceAdapter } from 'npm:nengi-deno-instance-adapter@2.0.0-rc.126'
+
+const instance = new Instance(context)
+const adapter = new DenoInstanceAdapter(instance.network)
+
+adapter.listen({ port: 8079, hostname: '0.0.0.0' })
+```
+
+For an application that already owns `Deno.serve`, route the Nengi endpoint to
+`adapter.handle(request, info)`. Deno server WebSockets do not expose hard
+transport termination. Nengi still removes a timed-out user and its channel
+subscriptions synchronously, then the adapter requests a WebSocket close; the
+adapter's longer Deno idle timeout remains the transport fallback.
+
+Both native adapters reject text protocol messages and bound queued outbound
+bytes with `maxBufferedBytes`, defaulting to 4 MiB. A send that would exceed the
+limit throws, which invokes Nengi's normal snapshot-send error reporting and
+immediate user cleanup. Tune the limit for measured snapshot sizes; do not use
+it as an ordinary packet-dropping policy because Nengi snapshots are an
+ordered reliable stream.
 
 ## Node Client
 
