@@ -28,18 +28,34 @@ const dryRun = args.has('--dry-run')
 const tag = 'rc'
 const registry = 'https://registry.npmjs.org/'
 
+function commandEnvironment() {
+    if (process.platform === 'win32') {
+        return process.env
+    }
+
+    const env = {
+        ...process.env,
+        TMPDIR: '/tmp',
+        npm_config_cache: process.env.npm_config_cache ?? '/tmp/nengi-npm-cache',
+        NPM_CONFIG_CACHE: process.env.NPM_CONFIG_CACHE ?? '/tmp/nengi-npm-cache'
+    }
+    try {
+        if (/microsoft/i.test(readFileSync('/proc/version', 'utf8')) && !env.BROWSER) {
+            env.BROWSER = path.join(coreRoot, 'scripts', 'open-windows-browser.mjs')
+        }
+    } catch {
+        // Non-WSL Linux does not need the Windows browser bridge.
+    }
+    return env
+}
+
+const environment = commandEnvironment()
+
 function run(command, commandArgs, options = {}) {
     const result = spawnSync(command, commandArgs, {
         cwd: options.cwd ?? coreRoot,
         encoding: 'utf8',
-        env: process.platform === 'win32'
-            ? process.env
-            : {
-                ...process.env,
-                TMPDIR: '/tmp',
-                npm_config_cache: process.env.npm_config_cache ?? '/tmp/nengi-npm-cache',
-                NPM_CONFIG_CACHE: process.env.NPM_CONFIG_CACHE ?? '/tmp/nengi-npm-cache'
-            },
+        env: environment,
         stdio: options.capture ? 'pipe' : 'inherit',
         shell: process.platform === 'win32'
     })
