@@ -58,9 +58,7 @@ class LocalInstanceAdapter<
     }
 
     close(socket: MockServerSocket) {
-        if (socket.user) {
-            this.network.onClose(socket.user)
-        }
+        socket.end()
     }
 
     disconnect(user: User, reason: any): void {
@@ -121,6 +119,11 @@ class LocalClientAdapter<
         }
 
         this.socket.adapter = this
+        if (this.socket.readyState !== MockSocketReadyState.OPEN) {
+            this.socket.adapter = null
+            this.socket = null
+            return Promise.reject(new Error('Connection closed before handshake began.'))
+        }
         return new Promise((resolve, reject) => {
             this.pendingConnect = { resolve, reject }
             this.socket!.send(this.network.createHandshake(handshake, this.binary))
@@ -151,9 +154,20 @@ class LocalClientAdapter<
     }
 
     disconnect(reason?: any) {
-        this.socket?.close(reason)
+        if (this.socket) {
+            this.socket.close(reason)
+        } else if (this.connected || this.pendingConnect) {
+            this.onClose(reason)
+        }
+    }
+
+    onClose(reason?: any) {
+        const pending = this.pendingConnect
+        this.pendingConnect = null
         this.socket = null
         this.connected = false
+        pending?.reject(reason ?? new Error('Disconnected before handshake completed.'))
+        this.network.onDisconnect(reason)
     }
 }
 
@@ -196,16 +210,17 @@ class MockServerSocket {
     }
 
     end(reason?: any) {
-        this.readyState = MockSocketReadyState.CLOSED
         this.clientSocket.close(reason)
     }
 
     receive(buffer: BinaryPayload) {
-        this.network.onMessage(this.user!, buffer)
+        if (this.readyState === MockSocketReadyState.OPEN && this.user) {
+            this.network.onMessage(this.user, buffer)
+        }
     }
 
     send(buffer: BinaryPayload) {
-        if (this.clientSocket) {
+        if (this.readyState === MockSocketReadyState.OPEN) {
             this.clientSocket.receive(buffer)
         }
     }
@@ -223,10 +238,17 @@ class MockClientSocket {
     }
 
     close(reason?: any) {
+        if (this.readyState === MockSocketReadyState.CLOSED) {
+            return
+        }
         this.readyState = MockSocketReadyState.CLOSED
+        this.serverSocket.readyState = MockSocketReadyState.CLOSED
+        const adapter = this.adapter
+        this.adapter = null
         if (this.serverSocket.user) {
             this.serverSocket.network.onClose(this.serverSocket.user, reason)
         }
+        adapter?.onClose(reason)
     }
 
     send(buffer: BinaryPayload) {
@@ -234,7 +256,7 @@ class MockClientSocket {
     }
 
     receive(buffer: BinaryPayload) {
-        if (this.adapter) {
+        if (this.readyState === MockSocketReadyState.OPEN && this.adapter) {
             this.adapter.onMessage(buffer)
         }
     }
@@ -251,6 +273,7 @@ class SimulatedMockServerSocket extends MockServerSocket {
     }
 
     receive(buffer: BinaryPayload) {
+        if (this.readyState !== MockSocketReadyState.OPEN) return
         this.conditions.sendClientToServer(buffer, payload => {
             if (this.readyState === MockSocketReadyState.OPEN && this.user) {
                 this.network.onMessage(this.user, payload)
@@ -259,6 +282,7 @@ class SimulatedMockServerSocket extends MockServerSocket {
     }
 
     send(buffer: BinaryPayload) {
+        if (this.readyState !== MockSocketReadyState.OPEN) return
         this.conditions.sendServerToClient(buffer, payload => {
             if (this.readyState === MockSocketReadyState.OPEN) {
                 this.clientSocket.deliver(payload)
@@ -292,7 +316,7 @@ class SimulatedMockClientSocket extends MockClientSocket {
     }
 
     deliver(buffer: BinaryPayload) {
-        if (this.adapter) {
+        if (this.readyState === MockSocketReadyState.OPEN && this.adapter) {
             this.adapter.onMessage(buffer)
         }
     }

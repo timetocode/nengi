@@ -105,7 +105,8 @@ For a deterministic scenario, make order visible in the test:
 1. Set the shared clock.
 2. Advance due network deliveries.
 3. Drain server events and apply authoritative transitions.
-4. Call `instance.step()` when a server network tick is due.
+4. Explicitly confirm completed command batches and call `instance.step()` when
+   a server network tick is due.
 5. Advance newly due deliveries.
 6. Drain client frames, produce commands or requests, and call `client.flush()`.
 7. Advance newly due deliveries again when the tested timestamp permits it.

@@ -53,7 +53,7 @@ describe('User clock sync timing', () => {
         expect(timing.clockSyncSamples).toBe(0)
     })
 
-    it('resolves command view time from explicit viewed server time or relative view age', () => {
+    it('keeps command view time anchored while input waits for processing, subject to the rewind limit', () => {
         const baseTiming = {
             commandIndex: 0,
             clientTimeMs: 0,
@@ -72,7 +72,9 @@ describe('User clock sync timing', () => {
         }
 
         expect(getCommandViewTimeMs(undefined, { nowMs: 5000, fallbackRewindMs: 100 })).toBe(4900)
-        expect(getCommandViewTimeMs(baseTiming, { nowMs: 5000, fallbackRewindMs: 100 })).toBe(4925)
+        expect(getCommandViewTimeMs(baseTiming, { nowMs: 1000 })).toBe(925)
+        expect(getCommandViewTimeMs(baseTiming, { nowMs: 1033 })).toBe(925)
+        expect(getCommandViewTimeMs(baseTiming, { nowMs: 5000, fallbackRewindMs: 100 })).toBe(925)
         expect(getCommandViewTimeMs({ ...baseTiming, viewServerTimeMs: 4700 }, { nowMs: 5000, fallbackRewindMs: 100 })).toBe(4700)
         expect(getCommandViewTimeMs(baseTiming, { nowMs: 5000, maxRewindMs: 40 })).toBe(4960)
     })

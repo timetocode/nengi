@@ -1,14 +1,6 @@
 import { IEntity } from '../common/IEntity'
 import { Context } from '../common/Context'
-
-type EntityHistoryRecord =
-    | { tick: number, entity: IEntity, deleted: false }
-    | { tick: number, entity: null, deleted: true }
-
-type EntityTimeline = {
-    records: EntityHistoryRecord[]
-    start: number
-}
+import { EntityHistoryRecord, EntityTimeline, findRecordIndex } from './entityTimeline'
 
 export type EntityHistoryStats = {
     timelines: number
@@ -17,6 +9,8 @@ export type EntityHistoryStats = {
 }
 
 const COMPACT_START_THRESHOLD = 64
+
+type ExpirationBucket = { nids: number[], count: number }
 
 /**
  * Client-side entity history is retained for interpolation only.
@@ -28,6 +22,10 @@ const COMPACT_START_THRESHOLD = 64
 export class EntityHistory {
     context: Context
     timelines = new Map<number, EntityTimeline>()
+    private expirationNids = new Map<number, ExpirationBucket>()
+    private spareExpirationBucket: ExpirationBucket | undefined
+    private nextExpirationTick = Number.POSITIVE_INFINITY
+    private prunedBeforeTick = Number.NEGATIVE_INFINITY
 
     constructor(context: Context) {
         this.context = context
@@ -98,24 +96,60 @@ export class EntityHistory {
     }
 
     pruneBefore(tick: number) {
-        this.timelines.forEach((timeline, nid) => {
-            const firstKeptIndex = this.findFirstIndexAtOrAfter(timeline, tick)
-            if (firstKeptIndex === -1) {
-                const last = this.getLastRecord(timeline)
-                if (!last || last.deleted) {
-                    this.timelines.delete(nid)
-                    return
+        if (tick <= this.nextExpirationTick) {
+            return
+        }
+        this.nextExpirationTick = Number.POSITIVE_INFINITY
+        this.prunedBeforeTick = Math.max(this.prunedBeforeTick, tick)
+        // The normal client appends in frame order. Inspect the small tick
+        // index rather than relying on Map insertion order: standalone users
+        // may record separate entities' timelines in a different order.
+        this.expirationNids.forEach((bucket, recordedTick) => {
+            if (recordedTick < tick) {
+                for (let i = 0; i < bucket.count; i++) {
+                    this.pruneTimeline(bucket.nids[i], tick)
                 }
-                timeline.records = [last]
-                timeline.start = 0
-                return
-            }
-
-            if (firstKeptIndex > timeline.start + 1) {
-                timeline.start = firstKeptIndex - 1
-                this.compactTimelineIfNeeded(timeline)
+                this.expirationNids.delete(recordedTick)
+                // Reuse one expired buffer on the next recorded tick. Keeping
+                // a separate count avoids allocating/growing a dense ID array
+                // every frame. Trim any unused suffix from a smaller workload.
+                bucket.nids.length = bucket.count
+                bucket.count = 0
+                this.spareExpirationBucket = bucket
+            } else {
+                this.nextExpirationTick = Math.min(this.nextExpirationTick, recordedTick)
             }
         })
+        if (this.expirationNids.size === 0) {
+            this.spareExpirationBucket = undefined
+        }
+    }
+
+    private pruneTimeline(nid: number, tick: number) {
+        const timeline = this.timelines.get(nid)
+        if (!timeline) {
+            return
+        }
+        const last = this.getLastRecord(timeline)
+        if (!last || (last.deleted && last.tick < tick)) {
+            this.timelines.delete(nid)
+            return
+        }
+        if (last.tick < tick) {
+            // Release the entire expired prefix when a live timeline becomes
+            // stationary. Already compact one-record arrays remain untouched.
+            if (timeline.records.length > 1) {
+                timeline.records = [last]
+                timeline.start = 0
+            }
+            return
+        }
+        // Keep the last record strictly before the cutoff, including a live
+        // entity's final state when it has stopped changing altogether.
+        while (timeline.start + 1 < timeline.records.length && timeline.records[timeline.start + 1].tick < tick) {
+            timeline.start++
+        }
+        this.compactTimelineIfNeeded(timeline)
     }
 
     getStats(): EntityHistoryStats {
@@ -142,10 +176,12 @@ export class EntityHistory {
 
     private append(nid: number, record: EntityHistoryRecord) {
         const timeline = this.timelines.get(nid)
+        let replaced = false
         if (timeline) {
             const last = this.getLastRecord(timeline)
             if (last && last.tick === record.tick) {
                 timeline.records[timeline.records.length - 1] = record
+                replaced = true
             } else {
                 timeline.records.push(record)
             }
@@ -155,49 +191,25 @@ export class EntityHistory {
                 start: 0
             })
         }
+        // One ID per entity per recorded tick, including tombstones. A record
+        // replaced after its tick was already pruned must be indexed again.
+        if (!replaced || record.tick < this.prunedBeforeTick) {
+            let bucket = this.expirationNids.get(record.tick)
+            if (!bucket) {
+                bucket = this.spareExpirationBucket ?? { nids: [], count: 0 }
+                this.spareExpirationBucket = undefined
+                this.expirationNids.set(record.tick, bucket)
+                this.nextExpirationTick = Math.min(this.nextExpirationTick, record.tick)
+            }
+            bucket.nids[bucket.count++] = nid
+        }
     }
 
     private findRecordAtTick(timeline: EntityTimeline, tick: number): EntityHistoryRecord {
-        const index = this.findRecordIndex(timeline, tick)
+        const index = findRecordIndex(timeline, tick)
         return index === -1
             ? { tick: Number.NEGATIVE_INFINITY, entity: null, deleted: true }
             : timeline.records[index]
-    }
-
-    private findRecordIndex(timeline: EntityTimeline, tick: number) {
-        let low = timeline.start
-        let high = timeline.records.length - 1
-        let best = -1
-
-        while (low <= high) {
-            const mid = (low + high) >> 1
-            if (timeline.records[mid].tick <= tick) {
-                best = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-
-        return best
-    }
-
-    private findFirstIndexAtOrAfter(timeline: EntityTimeline, tick: number) {
-        let low = timeline.start
-        let high = timeline.records.length - 1
-        let best = -1
-
-        while (low <= high) {
-            const mid = (low + high) >> 1
-            if (timeline.records[mid].tick >= tick) {
-                best = mid
-                high = mid - 1
-            } else {
-                low = mid + 1
-            }
-        }
-
-        return best
     }
 
     private getLastRecord(timeline: EntityTimeline) {

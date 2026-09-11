@@ -1,11 +1,12 @@
 import { NetworkEvent } from '../common/binary/NetworkEvent'
 import { CommandRouter } from './CommandRouter'
+import { UserConnectionState } from './User'
 
 describe('CommandRouter', () => {
     it('dispatches command sets by ntype in order', () => {
         const router = new CommandRouter()
         const events: string[] = []
-        const user = { id: 7 } as any
+        const user = { id: 7, connectionState: UserConnectionState.Open } as any
 
         router.on<{ ntype: number, value: string }>(1, ({ user, command, commandFrameNumber, commandIndex }) => {
             events.push(`${user.id}:${commandFrameNumber}:${commandIndex}:${command.value}`)
@@ -43,7 +44,7 @@ describe('CommandRouter', () => {
 
         router.process({
             type: NetworkEvent.CommandSet,
-            user: { id: 1 } as any,
+            user: { id: 1, connectionState: UserConnectionState.Open } as any,
             commandFrameNumber: 1,
             commands: [
                 { ntype: 9 }
@@ -79,7 +80,7 @@ describe('CommandRouter', () => {
 
         router.process({
             type: NetworkEvent.CommandSet,
-            user: { id: 1 } as any,
+            user: { id: 1, connectionState: UserConnectionState.Open } as any,
             commandFrameNumber: 1,
             commands: [
                 { ntype: 1 },
@@ -92,5 +93,35 @@ describe('CommandRouter', () => {
         })
 
         expect(received).toEqual([-1, 15])
+    })
+
+    it('skips closed users through batch, legacy, direct and unhandled dispatch', () => {
+        const router = new CommandRouter()
+        const handled = jest.fn()
+        const unhandled = jest.fn()
+        router.on(1, handled).onUnhandled(unhandled)
+        const user = { connectionState: UserConnectionState.Closed } as any
+        const event = { type: NetworkEvent.CommandSet, user, commands: [{ ntype: 1 }, { ntype: 2 }] }
+        expect(router.process(event)).toBe(0)
+        expect(router.process({ ...event, type: NetworkEvent.Command, commands: { ntype: 1 } })).toBe(0)
+        expect(router.processCommand(user, { ntype: 1 }, event)).toBe(false)
+        expect(router.processCommand(user, { ntype: 2 }, event)).toBe(false)
+        expect(handled).not.toHaveBeenCalled()
+        expect(unhandled).not.toHaveBeenCalled()
+    })
+
+    it('stops additional handlers and commands when a handler closes its user', () => {
+        const router = new CommandRouter()
+        const user = { connectionState: UserConnectionState.Open } as any
+        const handled = jest.fn(() => { user.connectionState = UserConnectionState.Closed })
+        const laterHandler = jest.fn()
+        const unhandled = jest.fn()
+        router.on(1, handled).on(1, laterHandler).onUnhandled(unhandled)
+        expect(router.process({
+            type: NetworkEvent.CommandSet, user, commands: [{ ntype: 1 }, { ntype: 1 }, { ntype: 2 }]
+        })).toBe(1)
+        expect(handled).toHaveBeenCalledTimes(1)
+        expect(laterHandler).not.toHaveBeenCalled()
+        expect(unhandled).not.toHaveBeenCalled()
     })
 })

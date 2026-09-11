@@ -217,6 +217,25 @@ describe('EcsWorld', () => {
         expect(world.require(100, Position).x).toBe(5)
     })
 
+    it('replaces an existing component type with a new nid in one frame', () => {
+        const world = new EcsWorld()
+        const pid = world.createEntity(100)
+        const previous = world.add(Position.create({ pid, nid: 10, x: 1, y: 2 }))
+        const velocity = world.add(Velocity.create({ pid, nid: 11, x: 3, y: 4 }))
+        const changes = applyEcsChannelFrame(world, createChannelFrame({
+            ecsCreateComponents: [{ pid, nid: 12, ntype: Position.ntype, x: 5, y: 6 }],
+            updateEntities: [{ nid: 12, prop: 'x', previous: 5, value: 7 }],
+            deleteEntities: [10]
+        }))
+        expect(world.getByNid(10)).toBeUndefined()
+        expect(world.require(pid, Position)).toMatchObject({ nid: 12, x: 7, y: 6 })
+        expect(world.require(pid, Velocity)).toBe(velocity)
+        expect(changes.deletedComponents).toEqual([{ nid: 10, pid, ntype: Position.ntype, component: previous }])
+        expect(changes.createdComponents.map(component => component.nid)).toEqual([12])
+        expect(changes.updatedComponents.map(update => update.nid)).toEqual([12])
+        expect(changes.removedEntities).toEqual([])
+    })
+
     it('applies ECS component deletes before root deletes', () => {
         const world = new EcsWorld()
         const pid = world.createEntity(100)

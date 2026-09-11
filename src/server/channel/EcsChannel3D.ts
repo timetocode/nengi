@@ -99,6 +99,7 @@ export class EcsChannel3D {
     private visibleCellKeyCache: Map<number, { viewVersion: number, membershipVersion: number, keys: string[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private structuralDeltas = false
+    private spatialRootsAdded = false
     private spatialXProp: string
     private spatialYProp: string
     private spatialZProp: string
@@ -265,7 +266,7 @@ export class EcsChannel3D {
     }
 
     private hasLifecycleDeltas() {
-        return this.createdRoots.length > 0 ||
+        return this.spatialRootsAdded || this.createdRoots.length > 0 ||
             this.deletedEntities.length > 0 ||
             this.createdComponents.length > 0 ||
             this.deletedComponents.length > 0
@@ -390,6 +391,20 @@ export class EcsChannel3D {
             return
         }
 
+        // Only a frame with removals needs to discard cleared component IDs.
+        // Compact once per flush, rather than once per removal or on every write.
+        if (this.deletedComponents.length > 0) {
+            let ops = 0
+            for (let i = 0; i < this.pendingOpTypes.length; i++) {
+                const type = this.pendingOpTypes[i]
+                const index = this.pendingOpIndexes[i]
+                const component = type === 0 ? this.pendingPropComponents[index] : this.pendingGroupComponents[index]
+                if (component.nid === 0) continue
+                this.pendingOpTypes[ops] = type
+                this.pendingOpIndexes[ops++] = index
+            }
+            this.pendingOpTypes.length = this.pendingOpIndexes.length = ops
+        }
         const updatedPids = new Set<number>()
         for (let i = 0; i < this.pendingOpTypes.length; i++) {
             const index = this.pendingOpIndexes[i]
@@ -564,6 +579,9 @@ export class EcsChannel3D {
         const component = this.entities.setSpatialComponent(pid, componentOrNid)
         if (!this.grid.objectCells.has(pid)) {
             this.addRootToCell(pid, component)
+            // The cell signature can stay unchanged when this root joins an
+            // occupied cell, even though clients need its entire entity tree.
+            this.spatialRootsAdded = true
             this.membershipVersion++
             this.structuralDeltas = true
             this.invalidateVisibleCellKeyCache()
@@ -794,6 +812,7 @@ export class EcsChannel3D {
         this.skipInterpolationNids.length = 0
         this.dirtyCells.clear()
         this.structuralDeltas = false
+        this.spatialRootsAdded = false
         this.movedRootCells.length = 0
         this.clearVisibilityPlan()
     }
@@ -815,6 +834,7 @@ export class EcsChannel3D {
         this.grid.cells.clear()
         this.grid.objectCells.clear()
         this.structuralDeltas = false
+        this.spatialRootsAdded = false
     }
 
     createComponentWriter(ntype: number, schema: Schema): Ecs3DTypeWriters {

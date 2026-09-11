@@ -1,7 +1,7 @@
 
 import { Frame } from '../Frame'
 import { EntityStore } from '../EntityStore'
-import { PredictionLog, PredictionOperationStatus } from './PredictionLog'
+import { PredictionLog, PredictionOperationStatus, targetsOverlap } from './PredictionLog'
 import type { PredictionOperation, PredictionOperationOptions, PredictionResolution, PredictionTarget } from './PredictionLog'
 
 export type PredictionStateMismatch = {
@@ -26,25 +26,6 @@ export type PredictionReconciliationEvent = {
 }
 
 type PredictionReconciliationHandler = (event: PredictionReconciliationEvent) => void
-
-function targetKey(target: PredictionTarget) {
-    return `${target.nid}:${target.props ? target.props.slice().sort().join(',') : '*'}`
-}
-
-function targetsOverlap(a: PredictionTarget, b: PredictionTarget) {
-    if (a.nid !== b.nid) {
-        return false
-    }
-    if (!a.props || !b.props) {
-        return true
-    }
-    for (let i = 0; i < a.props.length; i++) {
-        if (b.props.indexOf(a.props[i]) > -1) {
-            return true
-        }
-    }
-    return false
-}
 
 class Predictor {
     log: PredictionLog
@@ -103,18 +84,25 @@ class Predictor {
             return
         }
 
-        const byTarget = new Map<string, { target: PredictionTarget, confirmed: PredictionOperation[] }>()
+        // One event per entity: a later expectation supersedes the same property
+        // even when its affected-property group differs from an earlier one.
+        const byTarget = new Map<number, { target: PredictionTarget, confirmed: PredictionOperation[] }>()
         for (let i = 0; i < resolutions.length; i++) {
             const operation = resolutions[i].operation
             for (let j = 0; j < operation.affected.length; j++) {
                 const target = operation.affected[j]
-                const key = targetKey(target)
-                let entry = byTarget.get(key)
+                let entry = byTarget.get(target.nid)
                 if (!entry) {
-                    entry = { target, confirmed: [] }
-                    byTarget.set(key, entry)
+                    entry = { target: { nid: target.nid, props: target.props?.slice() }, confirmed: [] }
+                    byTarget.set(target.nid, entry)
+                } else if (!target.props) {
+                    entry.target.props = undefined
+                } else if (entry.target.props) {
+                    for (const prop of target.props) {
+                        if (!entry.target.props.includes(prop)) entry.target.props.push(prop)
+                    }
                 }
-                entry.confirmed.push(operation)
+                if (entry.confirmed[entry.confirmed.length - 1] !== operation) entry.confirmed.push(operation)
             }
         }
 

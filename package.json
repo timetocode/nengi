@@ -1,6 +1,6 @@
 {
   "name": "nengi",
-  "version": "2.0.0-rc.126",
+  "version": "2.0.0-rc.127",
   "description": "High-performance realtime multiplayer networking for TypeScript games.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -32,6 +32,8 @@
     "release:publish:dry-run": "node scripts/publish-package-family.mjs --dry-run",
     "prepack": "npm run build",
     "profile:snapshot": "node --import tsx src/performance/SnapshotPipeline.performance.ts",
+    "profile:history": "node --expose-gc --import tsx src/performance/ClientHistory.performance.ts",
+    "profile:history:browser": "node scripts/profile-client-history-browser.mjs",
     "lint": "npx eslint . --config .eslintrc.js",
     "lintfix": "npx eslint . --fix --config .eslintrc.js"
   },

@@ -1,5 +1,5 @@
 import { Client } from '../Client'
-import { PredictionOperationKind } from './PredictionLog'
+import { PredictionOperationKind, targetsOverlap } from './PredictionLog'
 import type { PredictionOperation, PredictionOperationOptions } from './PredictionLog'
 import type { PredictionReconciliationEvent } from './Predictor'
 
@@ -18,7 +18,9 @@ export type StateReplayPredictionOptions<TLocal = any, TAuthority = any, TState 
     applyPayload: (state: TLocal | TState, payload: TPayload) => void
     applyReplayState?: (local: TLocal, replayState: TState) => void
     affectedProps?: string[]
-    expectedValues?: (local: TLocal, payload: TPayload) => Record<string, any> | undefined
+    /** Computes the expected result from the pre-step state, on prediction and replay.
+     * Return independent values for mutable properties. */
+    expectedValues?: (state: TLocal | TState, payload: TPayload) => Record<string, any> | undefined
     predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'expected' | 'applyLocal'>
     dropConfirmedOnReconcile?: boolean
 }
@@ -45,7 +47,7 @@ export class StateReplayPrediction<TLocal = any, TAuthority = any, TState = any,
     private applyPayload: (state: TLocal | TState, payload: TPayload) => void
     private applyReplayState: (local: TLocal, replayState: TState) => void
     private affectedProps?: string[]
-    private expectedValues?: (local: TLocal, payload: TPayload) => Record<string, any> | undefined
+    private expectedValues?: (state: TLocal | TState, payload: TPayload) => Record<string, any> | undefined
     private predictionOptions?: Omit<PredictionOperationOptions, 'affected' | 'expected' | 'applyLocal'>
     private dropConfirmedOnReconcile: boolean
 
@@ -74,7 +76,7 @@ export class StateReplayPrediction<TLocal = any, TAuthority = any, TState = any,
         return this.client.predictState(payload, {
             ...this.predictionOptions,
             affected: [{ nid, props: this.affectedProps }],
-            expected: values ? [{ nid, values }] : undefined,
+            expected: values ? [{ nid, values: { ...values } }] : undefined,
             applyLocal: () => {
                 this.applyPayload(local, payload)
             }
@@ -87,18 +89,39 @@ export class StateReplayPrediction<TLocal = any, TAuthority = any, TState = any,
         if (nid === undefined || !local) {
             return null
         }
-        const authoritative = (event?.authority ?? this.getAuthoritative?.() ?? this.getAuthoritativeFromStore(nid)) as TAuthority | undefined
-        if (!authoritative) {
+        if (event && !targetsOverlap(event.target, { nid, props: this.affectedProps })) {
             return null
         }
-        if (event && event.target.nid !== nid) {
+        const authoritative = (event?.authority ?? this.getAuthoritative?.() ?? this.getAuthoritativeFromStore(nid)) as TAuthority | undefined
+        if (!authoritative) {
             return null
         }
 
         const replayState = this.createReplayState(authoritative)
         const pending = this.getPendingStateOperations(event)
         for (let i = 0; i < pending.length; i++) {
-            this.applyPayload(replayState, pending[i].payload as TPayload)
+            const operation = pending[i]
+            const values = this.expectedValues?.(replayState, operation.payload as TPayload)
+            // Capture before the next replay step can mutate a reused result map.
+            const expected = values ? { ...values } : undefined
+            this.applyPayload(replayState, operation.payload as TPayload)
+            if (expected) {
+                operation.options.expected = [{ nid, values: expected }]
+            } else {
+                // Explicit predictions name the properties to recapture. Inputs
+                // remain unchanged; only their derived expected result changes.
+                operation.options.expected = operation.options.expected?.map(entry => {
+                    if (entry.nid !== nid) return entry
+                    const values: Record<string, any> = {}
+                    const authority = this.client.network.store.get(nid)
+                    const schema = authority && this.client.context.getSchema(authority.ntype)
+                    for (const prop of Object.keys(entry.values)) {
+                        const value = (replayState as any)[prop]
+                        values[prop] = schema?.props[prop]?.binary.clone(value) ?? value
+                    }
+                    return { nid, values }
+                })
+            }
         }
         this.applyReplayState(local, replayState)
         if (event && this.dropConfirmedOnReconcile) {
@@ -112,18 +135,19 @@ export class StateReplayPrediction<TLocal = any, TAuthority = any, TState = any,
     }
 
     getPendingStateOperations(event?: PredictionReconciliationEvent) {
-        const operations = event ? event.pending : this.getPendingByNid()
-        return operations
-            .filter(operation => operation.kind === PredictionOperationKind.State)
-            .sort((a, b) => a.commandFrameNumber - b.commandFrameNumber || a.id - b.id)
-    }
-
-    private getPendingByNid() {
         const nid = this.resolveNid()
         if (nid === undefined) {
             return []
         }
-        return this.client.predictor.log.getPendingByNid(nid)
+        const target = { nid, props: this.affectedProps }
+        if (event && !targetsOverlap(event.target, target)) {
+            return []
+        }
+        // An event may cover only part of this helper's state. Rebuilding that
+        // state still needs every pending operation that affects the helper.
+        return this.client.predictor.log.getPendingByTarget(target)
+            .filter(operation => operation.kind === PredictionOperationKind.State)
+            .sort((a, b) => a.commandFrameNumber - b.commandFrameNumber || a.id - b.id)
     }
 
     private resolveNid() {

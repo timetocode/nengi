@@ -62,6 +62,135 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
 }
 
 describe('client prediction', () => {
+    it.each([false, true])('rebuilds pending expectations after a rejected spend (callback=%s)', callback => {
+        const client = createClient()
+        const local = { semiAmmo: 10 }
+        const reused = { semiAmmo: 0 }
+        const ammo = new StateReplayPrediction({
+            client, nid: 1, getLocal: () => local, affectedProps: ['semiAmmo'],
+            createReplayState: authority => ({ semiAmmo: authority.semiAmmo }),
+            applyPayload: (state, payload: { spent: number }) => { state.semiAmmo -= payload.spent },
+            expectedValues: callback ? (state, payload) => {
+                reused.semiAmmo = state.semiAmmo - payload.spent
+                return reused
+            } : undefined
+        })
+        client.network.queueSnapshot(snapshot({
+            createEntities: [{ nid: 1, ntype: 1, x: 0, semiAmmo: 10, autoAmmo: 0 }],
+            confirmedCommandFrameNumber: 0
+        }), 1000)
+        client.network.processNextFrame()
+        const operations = [1, 2, 3].map(() => {
+            const payload = Object.freeze({ spent: 1 })
+            const op = ammo.predict(payload, callback ? undefined : { semiAmmo: local.semiAmmo - 1 })!
+            client.network.incrementCommandFrameNumber()
+            return op
+        })
+        expect(operations.map(op => op.options.expected![0].values.semiAmmo)).toEqual([9, 8, 7])
+        const mismatches: number[] = []
+        client.predictor.onReconcile(event => {
+            mismatches.push(event.mismatches.length)
+            ammo.reconcile(event)
+        })
+        // First spend rejected. Later inputs must be predicted again from 10.
+        client.network.queueSnapshot(snapshot({ confirmedCommandFrameNumber: 1 }), 1050)
+        client.network.processNextFrame()
+        expect(local.semiAmmo).toBe(8)
+        expect(operations.slice(1).map(op => op.options.expected![0].values.semiAmmo)).toEqual([9, 8])
+        for (const [frame, value] of [[2, 9], [3, 8]]) {
+            client.network.queueSnapshot(snapshot({
+                confirmedCommandFrameNumber: frame,
+                updateEntities: [{ nid: 1, prop: 'semiAmmo', value }]
+            }), 1050 + frame * 50)
+            client.network.processNextFrame()
+        }
+        expect(mismatches).toEqual([1, 0, 0])
+        expect(local.semiAmmo).toBe(8)
+        expect(operations.every(op => op.payload.spent === 1)).toBe(true)
+    })
+
+    it.each([false, true])('coalesces overlapping and wildcard expectations across skipped confirmations (wildcard=%s)', wildcard => {
+        const client = createClient()
+        client.predictState({}, {
+            affected: [{ nid: 1, props: ['x'] }],
+            expected: [{ nid: 1, values: { x: 1 } }]
+        })
+        client.network.incrementCommandFrameNumber()
+        client.predictState({}, {
+            affected: [{ nid: 1, props: wildcard ? undefined : ['x', 'semiAmmo'] }],
+            expected: [{ nid: 1, values: { x: 0, semiAmmo: 9 } }]
+        })
+        const handler = jest.fn(event => {
+            expect(event.confirmed).toHaveLength(2)
+            expect(event.mismatches).toEqual([])
+            event.dropConfirmed()
+        })
+        client.predictor.onReconcile(handler)
+        client.network.queueSnapshot(snapshot({
+            confirmedCommandFrameNumber: 7,
+            createEntities: [{ nid: 1, ntype: 1, x: 0, semiAmmo: 9, autoAmmo: 0 }]
+        }), 1000)
+        client.network.processNextFrame()
+        expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps disjoint state payloads out of a helper replay', () => {
+        const client = createClient()
+        const local = { semiAmmo: 6 }
+        const ammo = new StateReplayPrediction({
+            client, nid: 1, getLocal: () => local,
+            getAuthoritative: () => ({ semiAmmo: 6 }),
+            affectedProps: ['semiAmmo'],
+            applyPayload: (state, payload: { spent: number }) => { state.semiAmmo -= payload.spent }
+        })
+        ammo.predict({ spent: 1 })
+        client.predictState({ dx: 10 }, { affected: [{ nid: 1, props: ['x'] }] })
+        expect(ammo.reconcile()?.replayed).toBe(1)
+        expect(local.semiAmmo).toBe(5)
+    })
+
+    it('replays all helper properties when an event confirms only one of them', () => {
+        const client = createClient()
+        const local = { semiAmmo: 6, autoAmmo: 22 }
+        const ammo = new StateReplayPrediction({
+            client, nid: 1, getLocal: () => local,
+            createReplayState: authority => ({ semiAmmo: authority.semiAmmo, autoAmmo: authority.autoAmmo }),
+            affectedProps: ['semiAmmo', 'autoAmmo'],
+            applyPayload: (state, payload: { prop: 'semiAmmo' | 'autoAmmo' }) => { state[payload.prop]-- }
+        })
+        client.network.queueSnapshot(snapshot({
+            createEntities: [{ nid: 1, ntype: 1, x: 0, semiAmmo: 6, autoAmmo: 22 }],
+            confirmedCommandFrameNumber: 0
+        }), 1000)
+        client.network.processNextFrame()
+        client.predictState({ prop: 'semiAmmo' }, { affected: [{ nid: 1, props: ['semiAmmo'] }] })
+        client.network.incrementCommandFrameNumber()
+        client.predictState({ prop: 'autoAmmo' }, { affected: [{ nid: 1, props: ['autoAmmo'] }] })
+        client.predictor.onReconcile(event => { ammo.reconcile(event) })
+        client.network.queueSnapshot(snapshot({ confirmedCommandFrameNumber: 1 }), 1050)
+        client.network.processNextFrame()
+        expect(local).toEqual({ semiAmmo: 6, autoAmmo: 21 })
+    })
+
+    it('ignores reconciliation events for unrelated properties on the same entity', () => {
+        const client = createClient()
+        const local = { semiAmmo: 5 }
+        const ammo = new StateReplayPrediction({
+            client, nid: 1, getLocal: () => local, affectedProps: ['semiAmmo'],
+            createReplayState: authority => ({ semiAmmo: authority.semiAmmo }),
+            applyPayload: () => {}
+        })
+        const op = client.predictState({ dx: 10 }, { affected: [{ nid: 1, props: ['x'] }] })
+        client.predictor.onReconcile(event => { expect(ammo.reconcile(event)).toBeNull() })
+        client.network.queueSnapshot(snapshot({
+            createEntities: [{ nid: 1, ntype: 1, x: 10, semiAmmo: 6, autoAmmo: 22 }],
+            confirmedCommandFrameNumber: 1
+        }), 1000)
+        client.network.processNextFrame()
+        expect(local.semiAmmo).toBe(5)
+        expect(client.predictor.log.operations.has(op.id)).toBe(true)
+    })
+
     it('sends predicted commands and resolves them when their command frame number is confirmed', () => {
         const client = createClient()
         const localPlayer = { x: 0 }

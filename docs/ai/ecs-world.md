@@ -17,15 +17,14 @@ const world = new EcsWorld()
 const pid = world.createEntity()
 world.add(Transform.create({
     pid,
-    nid: 0,
     x: 0,
     y: 0
 }))
 ```
 
 Network components have a positive `nid` after they are added to an
-`EcsChannel`. Local components may omit `nid` and use `ecs.defineLocalComponent`.
-Local components are ordinary ECS state; they are not serialized by nengi.
+`EcsChannel`. Local components may omit `nid` and use `ecs.defineLocalComponent`;
+`EcsWorld` then allocates negative local ids. Local components are ordinary ECS state; they are not serialized by nengi.
 
 ## Resources
 
@@ -73,8 +72,11 @@ changes less often than the component values. Cached query membership refreshes
 lazily when `all()` or `pids()` is read. `flushQueries()` is an optional eager
 boundary when a tick wants all cached memberships refreshed before later work.
 
-Component values are still mutable. A query cache tracks which roots match; it
-does not snapshot or freeze component state.
+Component values are not frozen by the world. A query cache tracks which roots
+match; it does not snapshot component state. Server systems may mutate their
+authoritative components and client systems may mutate local-only components.
+Treat received replicated client components as read-only; use a separate copy
+for prediction or presentation changes. See [client-state.md](./client-state.md).
 
 ## Network binding
 
@@ -110,7 +112,8 @@ TransformNet.mutate.patch(transform, { x: 120, y: 105 })
 TransformNet.mutate.groups.pose(transform, 120, 105, 0.5)
 
 // Append-only mode leaves assignment to the caller.
-TransformNet.writer.props.x(transform, 125)
+transform.x = 125
+TransformNet.writer.props.x(transform, transform.x)
 ```
 
 `mutate` assigns component fields and emits their pending network mutations.
@@ -124,7 +127,10 @@ facts disagree because raw code changed one store, the operation fails instead
 of silently repairing the projection.
 
 `addSpatial` exists only for `EcsChannel2D` and `EcsChannel3D`. A plain
-`EcsChannel` exposes `add` but not spatial construction.
+`EcsChannel` exposes `add` but not spatial construction. A spatial root may
+remain unpositioned before selection or after its selected component is removed.
+Bound component removal still works in that state; bound writers and mutators
+require a selected spatial component. Select one before emitting updates.
 
 Local components remain ordinary world state. A component created with
 `ecs.defineLocalComponent` cannot be registered through the binding, but it can

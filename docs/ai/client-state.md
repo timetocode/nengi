@@ -11,6 +11,12 @@ what changed while one snapshot was applied. The application owns rendering,
 local UI state, prediction state, interpolation choices, sounds, and other
 presentation resources.
 
+Treat received network values as read-only. This includes entities obtained
+from `EntityStore`, values in `Frame`, and replicated components applied to a
+client `EcsWorld`. These surfaces can share nested objects or arrays. Userland
+may mutate its own copy; copy the nested fields it will change as well as the
+outer object. Local-only ECS components remain application-owned mutable state.
+
 Each frame also exposes `serverTimeMs`, the server's monotonic timestamp for the
 snapshot, and `receivedAtMs`, the local client arrival time. These are different
 clock domains. Server time is useful for command timing and lag compensation;
@@ -40,6 +46,11 @@ Always process queued frames in order. Snapshots contain deltas; skipping an
 older queued snapshot can leave the store missing state required by a later
 snapshot.
 
+Within a frame, apply channel closes before opens and entity changes. Close
+facts describe the old channel and its entities; the same frame can create
+their replacements. See the complete handlers in [plain-channels.md](./plain-channels.md)
+and [ecs-channels.md](./ecs-channels.md).
+
 ## Raw state and frame facts
 
 Use the raw store for current authoritative state:
@@ -66,13 +77,41 @@ for (const frame of client.network.drainFrames()) {
 }
 ```
 
-`updateEntities` contains applied changes. Read the current entity from the
-store when the presentation needs the full state. `deletedEntities` carries the
-last known entity when available, which is useful for cleanup and effects.
+`updateEntities` contains applied changes. `drainFrames()` applies the entire
+requested batch to the store before returning its frames. A store lookup while
+iterating those frames therefore sees the latest state in the batch, which may
+include a later update or deletion. Use frame facts for effects tied to a
+specific transition; use store lookups for the latest full state.
+`deletedEntities` carries the last known entity when available, which is useful
+for cleanup and effects.
+
+If a handler needs the store to match each frame as it runs, process one frame
+at a time:
+
+```ts
+let frame: Frame | null
+while ((frame = client.network.processNextFrame()) !== null) {
+    applyNetworkFrame(frame)
+}
+```
 
 Top-level messages describe connection or user context. Channel messages belong
 to a particular visibility scope. Use durable entities or headers for state
 that a new subscriber must reconstruct; use messages for transient events.
+
+## Connection lifetime
+
+Use a fresh `Client` for a replacement connection, and recreate session-bound
+interpolators and prediction helpers around it. Register disconnect/error
+handlers before connecting and start the network loop only after acceptance.
+On disconnect, stop the old loop and release its application-owned presentation,
+input and prediction state.
+
+`client.connect()` opens a transport; it does not reset a previous session.
+Received state, retained frames/history and unsent commands can survive a
+transport close on the old Client. Reusing it can carry old state or input into
+the replacement connection. Keep persistent application state outside the Client
+and explicitly restore only the state intended for the new session.
 
 ## Plain channels
 
@@ -149,6 +188,27 @@ desired visual result. Keep predicted local state and reconciliation anchored to
 raw store state. Do not feed an interpolated render sample back into replay or
 authoritative decisions.
 
+`sample.entities` is a `Map` keyed by entity nid. Its `.forEach` callback receives
+each entity value; for a `for...of` loop, iterate `sample.entities.values()`.
+Iterating the Map directly yields `[nid, entity]` pairs.
+
+History records resolved entity states when they change and preserves the state
+needed at the beginning of the retained frame window. An unchanged entity can
+therefore remain sampleable without a new history record every snapshot.
+Deletion history remains available until it falls outside the retained window.
+
+Use `sample()` when presentation needs every entity visible at the interpolation
+bounds. Use `sampleEntities(nids, interpDelay)` or `getEntities(nids, interpDelay)`
+when a presentation query already identifies the relevant subset. Full sampling
+still constructs an output object for every sampled entity; stationary scenery
+and locally predicted objects often do not need that work every render frame.
+History copy methods such as `getAt()` and interpolation samples return
+independent schema values for built-in types, including numeric arrays. Methods
+whose names end in `Ref` or `Refs` expose retained history and must be treated as
+read-only. Custom mutable binary types must supply an independent `clone` and,
+if they define `interp`, return an independent interpolation result. Without a
+custom `interp`, the binary type uses its clone of the latest value.
+
 ## Prediction
 
 Prediction keeps local state in the application and reconciles it against raw
@@ -159,6 +219,7 @@ const movement = new CommandReplayPrediction({
     client,
     nid: () => controlledPlayerNid,
     getLocal: () => predictedTransform,
+    createReplayState: authority => ({ x: authority.x, y: authority.y }),
     applyCommand(state, command) {
         applyMoveStep(state, command, command.dt)
     },
@@ -169,6 +230,10 @@ const movement = new CommandReplayPrediction({
 Use a deliberate command cadence and the same movement units and time model on
 client and server. Presentation smoothing belongs after reconciliation, not
 inside the replay transition. See [realtime-movement-prediction.md](./realtime-movement-prediction.md).
+
+`affectedProps` selects overlapping pending operations; the replay-state and
+apply callbacks define which local fields this helper owns. Copy nested mutable
+values explicitly in `createReplayState`; the default is a shallow object copy.
 
 ## Application ownership
 

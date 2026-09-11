@@ -57,6 +57,12 @@ export function applyEcsChannelFrame(
         changes.createdEntities.push(pid)
     }
 
+    // An existing component may be replaced with a new nid of the same type
+    // in this frame. Release its world slot before adding the replacement.
+    for (let i = 0; i < channel.deleteEntities.length; i++) {
+        changes.deletedComponents.push(deleteComponentByNid(world, channel.deleteEntities[i]))
+    }
+
     for (let i = 0; i < channel.ecsCreateComponents.length; i++) {
         const component = world.add({ ...channel.ecsCreateComponents[i] } as IdentifiedComponent)
         changes.createdComponents.push(component)
@@ -64,10 +70,6 @@ export function applyEcsChannelFrame(
 
     for (let i = 0; i < channel.updateEntities.length; i++) {
         changes.updatedComponents.push(applyComponentUpdate(world, channel.updateEntities[i]))
-    }
-
-    for (let i = 0; i < channel.deleteEntities.length; i++) {
-        changes.deletedComponents.push(deleteComponentByNid(world, channel.deleteEntities[i]))
     }
 
     for (let i = 0; i < channel.ecsDeleteEntities.length; i++) {

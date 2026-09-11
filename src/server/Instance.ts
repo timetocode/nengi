@@ -10,6 +10,7 @@ import { EngineMessage } from '../common/EngineMessage'
 import { Endpoint, EndpointDefinition, getEndpointDefinition, getEndpointId } from '../common/Endpoint'
 import { BinaryPayload } from '../common/binary/BinaryAdapter'
 import { getMonotonicTime, TimeSource } from '../common/time'
+import { NetworkLimitEvent, NetworkLimits, resolveNetworkLimits } from './NetworkLimits'
 
 export type ResponseSender<Response = any> = (response: Response) => void
 export type ResponseHandlerArgs<Request = any> = { user: User, body: Request }
@@ -38,6 +39,7 @@ export type ResponseEndpoint = {
 }
 
 export type InstanceOptions = {
+    limits?: Partial<NetworkLimits>
     now?: TimeSource
     pingIntervalMs?: number
     pongTimeoutMs?: number
@@ -67,6 +69,9 @@ export class Instance {
     pongTimeoutMs: number
     handshakeTimeoutMs: number
     readonly now: TimeSource
+    readonly limits: NetworkLimits
+    /** Diagnostic only; the offending connection has already been closed. */
+    onNetworkLimit: (event: NetworkLimitEvent) => void = () => {}
     responseEndPoints: Map<number, ResponseEndpoint>
     /**
      * Observes malformed or otherwise unreadable inbound network messages before
@@ -96,7 +101,8 @@ export class Instance {
         this.context = context
         this.localState = new LocalState()
         this.users = new Map()
-        this.queue = new NQueue()
+        this.queue = new NQueue(event => this.network.releaseQueuedInput(event))
+        this.limits = resolveNetworkLimits(options.limits)
         this.incrementalUserId = 0
         this.cache = new EntityCache()
         this.tick = 1
@@ -163,28 +169,20 @@ export class Instance {
 
         try {
             Array.from(this.users.values()).forEach(user => {
-                let pingId: number | null = null
-                if (user.shouldSendPing(serverTimeMs, this.pingIntervalMs)) {
-                    pingId = user.nextPing()
-                    user.queueEngineMessage({
+                const ping = user.shouldSendPing(serverTimeMs, this.pingIntervalMs)
+                    ? {
                         ntype: EngineMessage.Ping,
                         latency: Math.max(0, Math.min(65535, Math.round(user.roundTripMs))),
-                        pingId,
+                        pingId: user.nextPing(),
                         serverTimeMs
-                    })
-                }
+                    } : undefined
 
                 user.queueEngineMessage({
                     ntype: EngineMessage.CommandFrameNumber,
-                    commandFrameNumber: user.lastReceivedCommandFrameNumber
+                    commandFrameNumber: user.lastConfirmedCommandFrameNumber
                 })
 
-                const buffer = createSnapshotBuffer(user, this, serverTimeMs)
-                if (pingId !== null) {
-                    // Local transports may deliver the Pong synchronously from
-                    // inside send(), so the Ping must already be registered.
-                    user.recordPingSent(pingId, serverTimeMs, this.now())
-                }
+                const buffer = createSnapshotBuffer(user, this, serverTimeMs, ping)
                 let sent = false
                 if (this.network.snapshotPerformanceEnabled) {
                     // Keep adapter send timing separate from snapshot construction:
@@ -208,6 +206,11 @@ export class Instance {
                 channel.clearBroadcastMessages?.()
                 channel.clearSnapshotDeltas?.()
             })
+            // A diff baseline belongs to this lifetime of the id. Release it
+            // before the allocator can assign that id to a different schema.
+            for (const nid of this.localState.nidPool.deferredIds) {
+                delete this.cache.cache[nid]
+            }
             this.localState.releaseDeferredIds()
         }
     }

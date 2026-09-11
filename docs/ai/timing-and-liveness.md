@@ -68,18 +68,41 @@ const estimatedServerTimeMs = client.getEstimatedServerTimeMs()
 const sync = client.getClockSync()
 ```
 
-The estimate is `null` until a Ping has supplied a sample. It is useful when a
-command needs to state what server-time view the client was using:
+The estimate is `null` until a Ping has supplied a sample. It estimates server
+**now**, not the state currently displayed by an interpolator. For historical
+shots, retain the actual displayed sample's time instead:
 
 ```ts
+const a = sample.frameA
+const b = sample.frameB
+const displayedTimeMs = a && b
+    ? a.serverTimeMs + (b.serverTimeMs - a.serverTimeMs) * sample.alpha
+    : a?.serverTimeMs ?? b?.serverTimeMs
+
 client.addCommandWithTiming(command, {
     inputTimeMs: clientTimeMs,
-    viewServerTimeMs: client.getEstimatedServerTimeMs() ?? -1
+    viewServerTimeMs: displayedTimeMs
 })
 ```
 
-Treat this as an estimate. Server code must clamp rewind windows and retain
-authority over hit validation, movement, permissions, and state changes.
+This includes playback clamping to the latest available frame. With a custom
+renderer, supply the time of its displayed state. Estimated timing is a fallback
+when the game cannot identify that time; see the
+[historian timing model](./historian-lag-compensation.md#timing-model).
+
+Nengi validates engine-message direction, connection state, timing structure and
+finite arithmetic before exposing command timing to game handlers. Those checks
+prevent invalid control data from corrupting clock state; they do not authenticate
+a client's clock, reported render delay or claimed historical view. A client can
+still submit plausible false values. Enforce a server-chosen rewind ceiling with
+`getCommandViewTimeMs(..., { nowMs, maxRewindMs })`, then validate the action
+against authoritative state. Do not grant movement, damage, rewards or simulation
+steps solely from frame counters, estimated latency or client timestamps.
+
+The engine rejects malformed controls and ignores unusable clock samples without
+refreshing liveness. Native WebSocket Pong frames are not nengi clock replies.
+See [network limits](./network-limits.md) for control rules, fixed packet ceilings
+and the native transport accounting boundary.
 
 ## Ping and Pong
 
@@ -88,9 +111,19 @@ Ping/Pong has two responsibilities:
 1. measure round-trip time and estimate clock offset;
 2. prove that the client runtime is still processing Nengi traffic.
 
-The server owns the sent time for each recent Ping. A Pong identifies the Ping
-and reports the client's receive and send times. The client captures its send
-time when the response is serialized.
+The server writes each Ping's timestamp after snapshot preparation, just before
+passing the packet to the adapter. The snapshot header still timestamps the state
+boundary. A Pong identifies the Ping and reports client receive/send times.
+Receive time is captured at entry to snapshot decoding; send time is captured
+when the Pong is serialized. RTT subtracts this client turnaround, including
+snapshot decoding. Preparation and decoding therefore do not bias the clock
+offset as if they were directional network delay.
+
+These are engine/adapter boundaries, not hardware packet timestamps. Transport
+queues, event-loop scheduling and asymmetric links still affect the estimate.
+`oneWayMs` is half RTT, not a measured direction-specific latency. Estimated
+command view timestamps are anchored at receipt and do not advance while the
+command waits in the server queue.
 
 Pongs are engine traffic. Game code does not construct them manually. Official
 client adapters send a Pong-only packet immediately after a snapshot containing
@@ -137,6 +170,18 @@ latched input. Do not run simulation or rendering with one large elapsed `dt`
 when the page becomes visible again; resume from authoritative state and reset
 the application's accumulators. A game may instead choose to disconnect hidden
 clients as an explicit product policy.
+
+`maxFrameHistory` bounds applied interpolation history, not `pendingFrames`.
+Do not clear or skip queued snapshots to catch up: they contain ordered deltas,
+messages, channel lifecycle changes, and request responses. Handle them in
+order. If the application chooses to abandon a large backlog, end the session
+and connect with a fresh `Client` and fresh presentation state.
+
+After interpolation exhausts its buffer, forward playback slows temporarily
+to rebuild the desired delay. The default maximum rate correction is 10%;
+playback does not reverse. A game may call `interpolator.resetTimeline()` after
+handling a pause backlog to restart at the current desired buffer immediately;
+that explicit reset can change the displayed point in time.
 
 The handshake timeout covers the complete pre-acceptance lifecycle: waiting for
 the initial Nengi handshake and waiting for `instance.onConnect` to resolve.

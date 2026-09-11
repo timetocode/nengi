@@ -15,4 +15,17 @@ describe('NQueue', () => {
         expect(queue.next()).toBe(3)
         expect(queue.isEmpty()).toBe(true)
     })
+
+    it('notifies each removal once and retains FIFO through selective removal and clear', () => {
+        const removed: number[] = []
+        const queue = new NQueue<number>(item => removed.push(item))
+        for (const value of [1, 2, 3, 4, 5]) queue.enqueue(value)
+        expect(queue.removeWhere(value => value % 2 === 0)).toBe(2)
+        expect(queue.next()).toBe(1)
+        expect(queue.dequeue()).toBe(3)
+        expect(queue.peekNext()).toBe(5)
+        queue.clear()
+        expect(queue.dequeue()).toBeUndefined()
+        expect(removed.sort()).toEqual([1, 2, 3, 4, 5])
+    })
 })

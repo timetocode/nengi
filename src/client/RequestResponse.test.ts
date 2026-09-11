@@ -249,25 +249,31 @@ describe('request/response', () => {
         expect(instance.network.requestQueue.length).toBe(0)
     })
 
-    it('rejects requests received before the connection is open', async () => {
-        const context = new Context()
-        const instance = new Instance(context)
-        const user = createUser(instance)
-        const clientNetwork = createClientNetwork(context)
-        const handler = jest.fn(() => ({ ok: true }))
-        user.connectionState = UserConnectionState.OpenAwaitingHandshake
+    it.each([UserConnectionState.OpenPreHandshake, UserConnectionState.OpenAwaitingHandshake])(
+        'disconnects requests received in pre-authentication state %s without queuing responses', state => {
+            const context = new Context()
+            const instance = new Instance(context)
+            const user = createUser(instance)
+            const clientNetwork = createClientNetwork(context)
+            const handler = jest.fn(() => ({ ok: true }))
+            instance.network.onOpen(user)
+            user.connectionState = state
 
-        instance.respond(1, handler)
+            instance.respond(1, handler)
 
-        const response = clientNetwork.request(1, { text: 'early' })
-        deliverRequestAndResponse(instance, user, clientNetwork)
+            clientNetwork.request(1, { text: 'early' }, { timeoutMs: 0 }).catch(() => undefined)
+            const packet = clientNetwork.createOutbound(testBinaryAdapter)
+            for (let i = 0; i < 10; i++) instance.network.onMessage(user, packet)
+            instance.processRequests()
 
-        expect(handler).not.toHaveBeenCalled()
-        expect(instance.network.requestQueue.length).toBe(0)
-        await expect(response).rejects.toMatchObject({
-            code: 'NOT_OPEN'
+            expect(handler).not.toHaveBeenCalled()
+            expect(instance.network.requestQueue.length).toBe(0)
+            expect(user.responseQueue.length).toBe(0)
+            expect(user.connectionState).toBe(UserConnectionState.Closed)
+            expect(instance.network.pendingUsers.has(user)).toBe(false)
+            expect(user.networkAdapter.disconnect).toHaveBeenCalledTimes(1)
+            clientNetwork.rejectPendingRequests(new Error('test cleanup'))
         })
-    })
 
     it('round trips endpoint descriptors with binary request and response schemas', async () => {
         const context = new Context()
@@ -744,7 +750,8 @@ describe('request/response', () => {
 
     it('sends at most 255 queued requests per outbound frame', () => {
         const context = new Context()
-        const instance = new Instance(context)
+        // Exercise the wire batching boundary above the default application budget.
+        const instance = new Instance(context, { limits: { maxQueuedRequestsPerUser: 256 } })
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const onRequestBacklog = jest.fn()

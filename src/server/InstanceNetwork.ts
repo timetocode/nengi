@@ -3,7 +3,7 @@ import { NetworkEvent } from '../common/binary/NetworkEvent'
 import { User, UserConnectionState } from './User'
 import type { CommandTimingEstimate, CommandTimingInput } from './User'
 import { BinarySection } from '../common/binary/BinarySection'
-import { EngineMessage } from '../common/EngineMessage'
+import { EngineMessage, MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET, MAX_CLIENT_PACKET_SECTIONS } from '../common/EngineMessage'
 import readEngineMessage from '../binary/message/readEngineMessage'
 import readMessage from '../binary/message/readMessage'
 import countMessage from '../binary/message/count'
@@ -12,11 +12,14 @@ import { BinaryPayload } from '../common/binary/BinaryAdapter'
 import { binaryGet } from '../common/binary/BinaryExt'
 import { Binary } from '../common/binary/Binary'
 import { ProtocolConfig, WIRE_PROTOCOL_VERSION } from '../common/binary/Protocol'
-import { createEndpointPayload, readSizedEndpointPayload, skipEndpointPayload } from '../binary/endpoint/EndpointPayload'
+import { countEndpointPayload, createEndpointPayload, readSizedEndpointPayload, skipEndpointPayload } from '../binary/endpoint/EndpointPayload'
 import { ResponseStatus } from '../common/Endpoint'
 import type { ResponseEndpoint } from './Instance'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 import { NQueue } from '../NQueue'
+import { NetworkLimitError, NetworkLimits } from './NetworkLimits'
+import type { SnapshotResponse } from '../binary/snapshot/SnapshotPlan'
+import { copyNObject } from '../common/binary/schema/util'
 
 export interface INetworkEvent {
     type: NetworkEvent
@@ -232,7 +235,13 @@ export class InstanceNetwork {
     pendingUsers = new Set<User>()
     private deniedUsers = new WeakSet<User>()
     responseBacklogUsers = new Set<User>()
-    requestQueue = new NQueue<INetworkRequest>()
+    requestQueue = new NQueue<INetworkRequest>(request => this.releaseQueuedInput(request))
+    queuedCommandCount = 0
+    queuedInputBytes = 0
+    queuedResponseCount = 0
+    queuedResponseBytes = 0
+    private inputCharges = new WeakMap<object, { bytes: number, commands: number, requests: number }>()
+    private responseCharges = new WeakMap<SnapshotResponse, number>()
     requireSchemaFingerprint = false
     // Rerun failed snapshot writes with field-level context. Keep off for the
     // normal fast path because it disables shared binary fragments.
@@ -425,7 +434,8 @@ export class InstanceNetwork {
     }
 
     queueResponse(user: User, requestId: number, endpoint: ResponseEndpoint, response: any) {
-        user.responseQueue.push({
+        if (user.connectionState !== UserConnectionState.Open) return
+        this.enqueueResponse(user, {
             requestId,
             status: ResponseStatus.Ok,
             payload: createEndpointPayload(response, endpoint.endpoint?.responseSchema)
@@ -433,11 +443,110 @@ export class InstanceNetwork {
     }
 
     queueErrorResponse(user: User, requestId: number, code: string, message: string) {
-        user.responseQueue.push({
+        if (user.connectionState !== UserConnectionState.Open) return
+        this.enqueueResponse(user, {
             requestId,
             status: ResponseStatus.Error,
             payload: createEndpointPayload(errorPayload(code, message))
         })
+    }
+
+    private enqueueResponse(user: User, response: SnapshotResponse) {
+        if (user.connectionState !== UserConnectionState.Open) return
+        try {
+            this.checkLimit('maxQueuedResponsesPerUser', user.responseQueue.length + 1)
+            this.checkLimit('maxQueuedResponses', this.queuedResponseCount + 1)
+            const bytes = 9 + countEndpointPayload(response.payload)
+            if (!Number.isSafeInteger(bytes) || bytes < 9) throw new Error('Invalid response byte length.')
+            this.checkLimit('maxQueuedResponseBytesPerUser', user.queuedResponseBytes + bytes)
+            this.checkLimit('maxQueuedResponseBytes', this.queuedResponseBytes + bytes)
+            // Stabilize the byte charge and queued value against later game edits.
+            if (response.payload.kind === 'schema') {
+                response.payload.value = copyNObject(response.payload.value, response.payload.schema)
+            }
+            this.responseCharges.set(response, bytes)
+            user.queuedResponseBytes += bytes
+            this.queuedResponseBytes += bytes
+            this.queuedResponseCount++
+            user.responseQueue.push(response)
+        } catch (error) {
+            if (error instanceof NetworkLimitError) this.rejectLimit(user, error)
+            else throw error
+        }
+    }
+
+    releaseQueuedResponse(user: User, response: SnapshotResponse) {
+        const bytes = this.responseCharges.get(response)
+        if (bytes === undefined) return
+        this.responseCharges.delete(response)
+        user.queuedResponseBytes -= bytes
+        this.queuedResponseBytes -= bytes
+        this.queuedResponseCount--
+    }
+
+    releaseQueuedInput(item: INetworkEvent | INetworkRequest) {
+        const charge = this.inputCharges.get(item)
+        if (!charge) return
+        this.inputCharges.delete(item)
+        item.user.queuedInputBytes -= charge.bytes
+        item.user.queuedCommandCount -= charge.commands
+        item.user.queuedRequestCount -= charge.requests
+        this.queuedInputBytes -= charge.bytes
+        this.queuedCommandCount -= charge.commands
+    }
+
+    private chargeInput(item: INetworkEvent | INetworkRequest, bytes: number, commands: number, requests: number) {
+        this.inputCharges.set(item, { bytes, commands, requests })
+        item.user.queuedInputBytes += bytes
+        item.user.queuedCommandCount += commands
+        item.user.queuedRequestCount += requests
+        this.queuedInputBytes += bytes
+        this.queuedCommandCount += commands
+    }
+
+    private checkLimit(limit: keyof NetworkLimits, value: number) {
+        const maximum = this.instance.limits[limit]
+        if (value > maximum) throw new NetworkLimitError(limit, value, maximum)
+    }
+
+    private checkInputBytes(user: User, bytes: number) {
+        this.checkLimit('maxQueuedInputBytesPerUser', user.queuedInputBytes + bytes)
+        this.checkLimit('maxQueuedInputBytes', this.queuedInputBytes + bytes)
+    }
+
+    private eventSlotsUsed() {
+        return this.instance.queue.length + this.instance.users.size + 2 * this.pendingUsers.size
+    }
+
+    private rejectLimit(user: User, error: NetworkLimitError) {
+        this.disconnectUser(user, { reason: 'network_limit', limit: error.limit }, true)
+        try {
+            this.instance.onNetworkLimit({ user, limit: error.limit, value: error.value, maximum: error.maximum })
+        } catch (observerError) {
+            // Diagnostics cannot interfere with cleanup or other connections.
+        }
+    }
+
+    private admitPacket(user: User, bytes: number, nowMs: number) {
+        this.checkLimit('maxPacketBytes', bytes)
+        const limits = this.instance.limits
+        if (user.inboundRateTimeMs === null) {
+            user.inboundRateTimeMs = nowMs
+            user.inboundPacketTokens = limits.packetBurst
+            user.inboundByteTokens = limits.byteBurst
+        }
+        const elapsed = Math.max(0, nowMs - user.inboundRateTimeMs) / 1000
+        user.inboundRateTimeMs = Math.max(nowMs, user.inboundRateTimeMs)
+        user.inboundPacketTokens = Math.min(limits.packetBurst, user.inboundPacketTokens + elapsed * limits.packetsPerSecond)
+        user.inboundByteTokens = Math.min(limits.byteBurst, user.inboundByteTokens + elapsed * limits.bytesPerSecond)
+        if (user.inboundPacketTokens < 1) {
+            throw new NetworkLimitError('packetBurst', limits.packetBurst - user.inboundPacketTokens + 1, limits.packetBurst)
+        }
+        if (user.inboundByteTokens < bytes) {
+            throw new NetworkLimitError('byteBurst', limits.byteBurst - user.inboundByteTokens + bytes, limits.byteBurst)
+        }
+        user.inboundPacketTokens--
+        user.inboundByteTokens -= bytes
     }
 
     reportResponseBacklog(user: User, queued: number, sent: number) {
@@ -511,10 +620,19 @@ export class InstanceNetwork {
     }
 
     onOpen(user: User) {
+        if (user.connectionState === UserConnectionState.Closed || this.pendingUsers.has(user) || this.isUserlandConnected(user)) return
         user.connectionState = UserConnectionState.OpenPreHandshake
         user.network = this
         user.openedAtMs = this.instance.now()
-        this.pendingUsers.add(user)
+        try {
+            this.checkLimit('maxConnections', this.pendingUsers.size + this.instance.users.size + 1)
+            this.checkLimit('maxPendingConnections', this.pendingUsers.size + 1)
+            this.checkLimit('maxQueuedEvents', this.eventSlotsUsed() + 2)
+            this.pendingUsers.add(user)
+        } catch (error) {
+            if (error instanceof NetworkLimitError) this.rejectLimit(user, error)
+            else throw error
+        }
     }
 
     async onHandshake(
@@ -527,6 +645,8 @@ export class InstanceNetwork {
             if (user.connectionState !== UserConnectionState.OpenPreHandshake) {
                 throw new Error('Connection attempt received when the connection is not awaiting its initial handshake.')
             }
+            if (!this.pendingUsers.has(user)) this.onOpen(user)
+            if (isUserClosed(user)) return
             user.connectionState = UserConnectionState.OpenAwaitingHandshake
             this.pendingUsers.add(user)
             if (clientWireProtocolVersion !== WIRE_PROTOCOL_VERSION) {
@@ -556,6 +676,7 @@ export class InstanceNetwork {
             }
 
             this.sendConnectionAccepted(user)
+            if (isUserClosed(user)) return
             user.instance = this.instance
             user.protocol = { ...this.getProtocol() }
             this.onConnectionAccepted(user, connectionAccepted)
@@ -606,13 +727,38 @@ export class InstanceNetwork {
         }
     }
 
-    onMessage(user: User, buffer: BinaryPayload) {
+    /** Admission for native WebSocket Ping/Pong callbacks, not nengi clock Pongs. */
+    onTransportControl(user: User, byteLength: number): boolean {
+        if (user.connectionState === UserConnectionState.Closed) return false
+        try {
+            const now = this.instance.now()
+            if (!Number.isFinite(now) || !Number.isSafeInteger(byteLength) || byteLength < 0) {
+                throw new Error('Invalid transport control metadata.')
+            }
+            this.admitPacket(user, byteLength, now)
+            return true
+        } catch (error) {
+            if (error instanceof NetworkLimitError) this.rejectLimit(user, error)
+            else this.disconnectUser(user, { reason: 'invalid_transport_control' }, true)
+            return false
+        }
+    }
 
+    onMessage(user: User, buffer: BinaryPayload) {
+        if (user.connectionState === UserConnectionState.Closed) return
         try {
             const serverReceivedTimeMs = this.instance.now()
+            if (!Number.isFinite(serverReceivedTimeMs)) throw new Error('instance.now must return a finite time.')
+            this.admitPacket(user, buffer.byteLength, serverReceivedTimeMs)
             const binaryReader = user.networkAdapter.binary.createReader(buffer)
             const commands: any[] = []
-            const commandTimingInputs: CommandTimingInput[] = []
+            const commandTimingInputs: Array<CommandTimingInput | undefined> = []
+            let engineMessageCount = 0
+            let sectionCount = 0
+            let receivedCommandFrameNumber: number | undefined
+            let interpolationDelay: number | undefined
+            let pongs: Array<{ pingId: number, clientReceiveTimeMs: number, clientSendTimeMs: number }> | undefined
+            let connectionAttempt: { handshake: any, schemaFingerprint: string, wireProtocolVersion: number } | undefined
 
             const commandSet = {
                 type: NetworkEvent.CommandSet,
@@ -624,48 +770,71 @@ export class InstanceNetwork {
             }
 
             while (binaryReader.offset < binaryReader.byteLength) {
+                if (++sectionCount > MAX_CLIENT_PACKET_SECTIONS) throw new ProtocolError('Too many client packet sections.')
                 const section = binaryReader.readUInt8()
 
                 switch (section) {
                 case BinarySection.EngineMessages: {
                     const count = binaryReader.readUInt8()
+                    engineMessageCount += count
+                    if (engineMessageCount > MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET) {
+                        throw new ProtocolError('Too many client engine messages in one packet.')
+                    }
                     for (let i = 0; i < count; i++) {
-                        const msg: any = readEngineMessage(binaryReader, this.instance.context)
-
-                        if (msg.ntype === EngineMessage.ConnectionAttempt) {
-                            const handshake = JSON.parse(msg.handshake)
-                            this.onHandshake(
-                                user,
-                                handshake,
-                                msg.schemaFingerprint || '',
-                                msg.wireProtocolVersion
-                            )
+                        // Check direction and state before allocating/decoding the body.
+                        const ntype = binaryReader.readUInt8()
+                        if (ntype === EngineMessage.ConnectionAttempt) {
+                            if (connectionAttempt || user.connectionState !== UserConnectionState.OpenPreHandshake) {
+                                throw new ProtocolError('Connection attempt received when the connection is not awaiting its initial handshake.')
+                            }
+                        } else {
+                            if (ntype !== EngineMessage.CommandFrameNumber && ntype !== EngineMessage.Pong &&
+                                ntype !== EngineMessage.CommandTiming && ntype !== EngineMessage.InterpolationDelay) {
+                                throw new ProtocolError('Engine message is not permitted from a client.')
+                            }
+                            if (user.connectionState !== UserConnectionState.Open) {
+                                throw new ProtocolError('Gameplay engine message received before the connection was open.')
+                            }
                         }
-
-                        if (msg.ntype === EngineMessage.CommandFrameNumber) {
-                            commandSet.commandFrameNumber = user.receiveCommandFrameNumber(msg.commandFrameNumber)
-                        }
-
-                        if (msg.ntype === EngineMessage.Pong) {
-                            user.recordClockSyncPong({
-                                pingId: msg.pingId,
-                                clientReceiveTimeMs: msg.clientReceiveTimeMs,
-                                clientSendTimeMs: msg.clientSendTimeMs
-                            }, serverReceivedTimeMs)
-                        }
-
-                        if (msg.ntype === EngineMessage.CommandTiming) {
-                            commandTimingInputs.push({
-                                commandIndex: msg.commandIndex,
-                                clientTimeMs: msg.clientTimeMs,
-                                renderDelayMs: msg.renderDelayMs,
-                                viewTick: msg.viewTick,
-                                viewServerTimeMs: msg.viewServerTimeMs
-                            })
-                        }
-
-                        if (msg.ntype === EngineMessage.InterpolationDelay) {
-                            user.recordInterpolationDelay(msg.delayMs, serverReceivedTimeMs)
+                        const msg: any = readEngineMessage(binaryReader, this.instance.context, ntype)
+                        switch (ntype) {
+                        case EngineMessage.ConnectionAttempt:
+                            connectionAttempt = {
+                                handshake: JSON.parse(msg.handshake),
+                                schemaFingerprint: msg.schemaFingerprint || '',
+                                wireProtocolVersion: msg.wireProtocolVersion
+                            }
+                            break
+                        case EngineMessage.CommandFrameNumber:
+                            if (receivedCommandFrameNumber !== undefined || msg.commandFrameNumber <= user.lastReceivedCommandFrameNumber) {
+                                throw new ProtocolError('Command frame numbers must advance once per packet.')
+                            }
+                            receivedCommandFrameNumber = msg.commandFrameNumber
+                            break
+                        case EngineMessage.Pong:
+                            if (!Number.isFinite(msg.clientReceiveTimeMs) || !Number.isFinite(msg.clientSendTimeMs) ||
+                                msg.clientSendTimeMs < msg.clientReceiveTimeMs) {
+                                throw new ProtocolError('Invalid Pong timestamps.')
+                            }
+                            if (!pongs) pongs = []
+                            pongs.push(msg)
+                            break
+                        case EngineMessage.CommandTiming:
+                            if (commandTimingInputs[msg.commandIndex]) {
+                                throw new ProtocolError('Duplicate timing for one command.')
+                            }
+                            if (!Number.isFinite(msg.clientTimeMs) || !Number.isFinite(msg.renderDelayMs) ||
+                                !Number.isFinite(msg.viewTick) || !Number.isFinite(msg.viewServerTimeMs) || msg.renderDelayMs < 0) {
+                                throw new ProtocolError('Invalid command timing.')
+                            }
+                            commandTimingInputs[msg.commandIndex] = msg
+                            break
+                        case EngineMessage.InterpolationDelay:
+                            if (interpolationDelay !== undefined || !Number.isFinite(msg.delayMs) || msg.delayMs < 0) {
+                                throw new ProtocolError('Invalid or duplicate interpolation delay.')
+                            }
+                            interpolationDelay = msg.delayMs
+                            break
                         }
                     }
 
@@ -676,6 +845,12 @@ export class InstanceNetwork {
                         throw new ProtocolError('Commands received before the connection was open.')
                     }
                     const count = binaryReader.readUInt8()
+                    if (count > 0) {
+                        this.checkLimit('maxQueuedCommandsPerUser', user.queuedCommandCount + commands.length + count)
+                        this.checkLimit('maxQueuedCommands', this.queuedCommandCount + commands.length + count)
+                        this.checkLimit('maxQueuedEvents', this.eventSlotsUsed() + 1)
+                        this.checkInputBytes(user, buffer.byteLength)
+                    }
                     for (let i = 0; i < count; i++) {
                         const msg = readMessage(binaryReader, this.instance.context, this.instance.context.ntypeType)
                         commands.push(msg)
@@ -683,30 +858,38 @@ export class InstanceNetwork {
                     break
                 }
                 case BinarySection.Requests: {
+                    if (user.connectionState !== UserConnectionState.Open) {
+                        throw new ProtocolError('Requests received before the connection was open.')
+                    }
                     const count = binaryReader.readUInt8()
                     for (let i = 0; i < count; i++) {
                         const requestId = binaryReader.readUInt32()
                         const endpoint = binaryReader.readUInt32()
                         const payloadByteLength = binaryReader.readUInt32()
-                        if (user.connectionState !== UserConnectionState.Open) {
-                            skipEndpointPayload(binaryReader, payloadByteLength)
-                            this.queueErrorResponse(user, requestId, 'NOT_OPEN', 'Request received before the connection was open.')
-                            continue
+                        if (payloadByteLength > binaryReader.byteLength - binaryReader.offset) {
+                            throw new ProtocolError('Request payload exceeds the remaining packet bytes.')
                         }
+                        this.checkLimit('maxQueuedRequestsPerUser', user.queuedRequestCount + 1)
+                        this.checkLimit('maxQueuedRequests', this.requestQueue.length + 1)
+                        const bytes = 12 + payloadByteLength
+                        this.checkInputBytes(user, bytes)
                         const responseEndpoint = this.instance.responseEndPoints.get(endpoint)
+                        let request: INetworkRequest
                         if (!responseEndpoint) {
                             skipEndpointPayload(binaryReader, payloadByteLength)
-                            this.requestQueue.enqueue({ user, requestId, endpointId: endpoint })
+                            request = { user, requestId, endpointId: endpoint }
                         } else {
                             const body = readSizedEndpointPayload(binaryReader, payloadByteLength, responseEndpoint.endpoint?.requestSchema)
-                            this.requestQueue.enqueue({
+                            request = {
                                 user,
                                 requestId,
                                 endpointId: endpoint,
                                 endpoint: responseEndpoint,
                                 body
-                            })
+                            }
                         }
+                        this.chargeInput(request, bytes, 0, 1)
+                        this.requestQueue.enqueue(request)
                     }
                     break
                 }
@@ -716,18 +899,41 @@ export class InstanceNetwork {
                 }
             }
 
+            // Validate the entire packet before applying engine controls. Requests
+            // queued during decoding are purged by disconnect on any failure.
+            if (commands.length > 0) this.checkInputBytes(user, buffer.byteLength)
             for (let i = 0; i < commandTimingInputs.length; i++) {
-                const input = commandTimingInputs[i]
-                if (input.commandIndex >= 0 && input.commandIndex < commands.length) {
-                    commandSet.commandTimings[input.commandIndex] = user.estimateCommandTiming(input, serverReceivedTimeMs)
+                if (commandTimingInputs[i] && i >= commands.length) {
+                    throw new ProtocolError('Timing references a missing command.')
                 }
             }
+            if (pongs) {
+                for (const pong of pongs) user.recordClockSyncPong(pong, serverReceivedTimeMs)
+            }
+            for (let i = 0; i < commandTimingInputs.length; i++) {
+                const input = commandTimingInputs[i]
+                if (input) commandSet.commandTimings[i] = user.estimateCommandTiming(input, serverReceivedTimeMs)
+            }
+            if (receivedCommandFrameNumber !== undefined) {
+                commandSet.commandFrameNumber = user.receiveCommandFrameNumber(receivedCommandFrameNumber)
+            }
+            if (interpolationDelay !== undefined) user.recordInterpolationDelay(interpolationDelay, serverReceivedTimeMs)
+            // Application authentication must not begin for a valid prefix of
+            // a malformed packet. onHandshake owns the asynchronous outcome.
+            if (connectionAttempt) {
+                this.onHandshake(user, connectionAttempt.handshake, connectionAttempt.schemaFingerprint, connectionAttempt.wireProtocolVersion)
+            }
             if (commands.length > 0) {
+                this.checkInputBytes(user, buffer.byteLength)
+                this.chargeInput(commandSet, buffer.byteLength, commands.length, 0)
                 this.instance.queue.enqueue(commandSet)
             }
         } catch (err) {
-            this.notifyInboundMessageError(user, buffer, err)
-            this.disconnectMalformedInboundUser(user)
+            if (err instanceof NetworkLimitError) this.rejectLimit(user, err)
+            else {
+                this.notifyInboundMessageError(user, buffer, err)
+                this.disconnectMalformedInboundUser(user)
+            }
         }
 
     }
@@ -784,12 +990,14 @@ export class InstanceNetwork {
         }
     }
 
-    private disconnectUser(user: User, reason: any, force: boolean) {
+    disconnectUser(user: User, reason: any, force = false) {
         if (user.connectionState === UserConnectionState.Closed) {
             return
         }
 
-        const wasConnected = this.isUserlandConnected(user)
+        // Logical cleanup precedes transport callbacks, including synchronous
+        // callbacks that try to disconnect the same user again.
+        this.onClose(user, reason)
         try {
             if (force && user.networkAdapter.terminate) {
                 user.networkAdapter.terminate(user, reason)
@@ -797,14 +1005,16 @@ export class InstanceNetwork {
                 user.networkAdapter.disconnect(user, reason)
             }
         } catch (err) {
-            // Cleanup below remains authoritative when the transport is already broken.
-        }
-
-        if (wasConnected) {
-            this.onClose(user, reason)
-        } else {
-            this.pendingUsers.delete(user)
-            user.connectionState = UserConnectionState.Closed
+            // A close can fail before touching the socket (for example, an
+            // invalid close reason). The user is no longer tracked for timeouts,
+            // so try hard termination rather than leaving the transport open.
+            if (!force && user.networkAdapter.terminate) {
+                try {
+                    user.networkAdapter.terminate(user, reason)
+                } catch (terminateError) {
+                    // Logical cleanup remains complete if the transport is broken.
+                }
+            }
         }
     }
 
@@ -827,6 +1037,7 @@ export class InstanceNetwork {
             return
         }
         this.deniedUsers.add(user)
+        this.pendingUsers.delete(user)
         this.instance.queue.enqueue({
             type: NetworkEvent.UserConnectionDenied,
             user,
@@ -835,13 +1046,17 @@ export class InstanceNetwork {
     }
 
     onClose(user: User, reason?: any) {
+        user.connectionState = UserConnectionState.Closed
         this.pendingUsers.delete(user)
         this.responseBacklogUsers.delete(user)
-        this.purgeRequestsForUser(user)
+        if (user.queuedRequestCount > 0) this.purgeRequestsForUser(user)
+        for (const response of user.responseQueue) this.releaseQueuedResponse(user, response)
+        user.responseQueue.length = 0
         for (const channel of Array.from(user.subscriptions.values())) {
             channel.unsubscribe(user)
         }
         if (this.isUserlandConnected(user)) {
+            this.instance.users.delete(user.id)
             const eventReason = reason && typeof reason === 'object' && 'reason' in reason
                 ? reason.reason
                 : reason
@@ -850,9 +1065,7 @@ export class InstanceNetwork {
                 user,
                 reason: eventReason
             })
-            this.instance.users.delete(user.id)
         }
-        user.connectionState = UserConnectionState.Closed
     }
 
     private isUserlandConnected(user: User) {
@@ -860,22 +1073,7 @@ export class InstanceNetwork {
     }
 
     purgeRequestsForUser(user: User) {
-        if (this.requestQueue.isEmpty()) {
-            return 0
-        }
-
-        let purged = 0
-        const kept = []
-        for (let i = 0; i < this.requestQueue.arr.length; i++) {
-            const request = this.requestQueue.arr[i]
-            if (request.user === user) {
-                purged++
-            } else {
-                kept.push(request)
-            }
-        }
-        this.requestQueue.arr = kept
-        return purged
+        return this.requestQueue.removeWhere(request => request.user === user)
     }
 }
 

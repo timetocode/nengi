@@ -104,7 +104,10 @@ export const TransformSchema = defineEntitySchema({
     x: Binary.Float32,
     y: Binary.Float32,
     rotation: Binary.Float32,
-    radius: Binary.Float32
+    radius: Binary.Float32,
+    $options: {
+        updateGroups: { pose: ['x', 'y', 'rotation'] }
+    }
 })
 
 export const Transform = ecs.defineComponent<TransformComponent>(
@@ -116,10 +119,8 @@ export function createTransform(
     x: number,
     y: number,
     radius: number
-): Omit<TransformComponent, 'pid'> {
+): Omit<TransformComponent, 'pid' | 'nid' | 'ntype'> {
     return {
-        nid: 0,
-        ntype: NType.Transform,
         x,
         y,
         rotation: 0,
@@ -141,11 +142,14 @@ owns the channel creates the channel-specific projection.
 const replicated = bindEcsChannel(world, worldChannel, { context })
 const TransformNet = replicated.component(Transform)
 
+const pid = replicated.createEntity()
 const transform = TransformNet.addSpatial(pid, createTransform(0, 0, 10))
 TransformNet.mutate.groups.pose(transform, nextX, nextY, rotation)
 ```
 
-The client and server can both import `Transform` for queries. The server alone
+The factory returns gameplay state only. The binding supplies `pid`, `nid`, and
+`ntype`; its `add` and `addSpatial` methods reject state that supplies those
+fields. The client and server can both import `Transform` for queries. The server alone
 creates `TransformNet` or lower-level writers for the channel it authors. Use
 `mutate` when the binding should assign component fields and emit the matching
 network mutation. Use `writer` only when code deliberately manages assignment

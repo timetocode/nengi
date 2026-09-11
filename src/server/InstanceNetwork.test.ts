@@ -26,9 +26,10 @@ function createOpenUser(instance: Instance) {
     return user
 }
 
-function createClientNetwork(context: Context) {
+function createClientNetwork(context: Context, now?: () => number) {
     const client = {
         context,
+        now,
         serverTickRate: 20,
         disconnectHandler: jest.fn(),
         websocketErrorHandler: jest.fn(),
@@ -42,6 +43,123 @@ function createClientNetwork(context: Context) {
 }
 
 describe('InstanceNetwork', () => {
+    it.each([[0, 0], [40, 0], [0, 40], [40, 40]])('excludes snapshot preparation (%i ms) and decode (%i ms) from clock sync', (preparationMs, decodeMs) => {
+        let nowMs = 1000
+        const context = new Context()
+        const instance = new Instance(context, { now: () => nowMs })
+        const user = createOpenUser(instance)
+        const clientNetwork = createClientNetwork(context, () => nowMs - 900)
+        user.roundTripMs = 20 // An established RTT estimate is sent in the Ping.
+        user.networkAdapter.binary = {
+            ...testBinaryAdapter,
+            createWriter: bytes => {
+                nowMs += preparationMs
+                return testBinaryAdapter.createWriter(bytes)
+            }
+        }
+        instance.users.set(user.id, user)
+        ;(user.networkAdapter.send as jest.Mock).mockImplementation((_user, payload) => {
+            const sentAtMs = nowMs
+            expect(user.lastPingSentAtMs).toBe(sentAtMs)
+            nowMs += 10
+            const reader = testBinaryAdapter.createReader(payload)
+            const readFloat64 = reader.readFloat64.bind(reader)
+            reader.readFloat64 = () => {
+                nowMs += decodeMs
+                reader.readFloat64 = readFloat64
+                return readFloat64()
+            }
+            clientNetwork.readSnapshot(reader)
+            // Return the encoded Pong within send(), as a local transport may.
+            clientNetwork.flushPongs(testBinaryAdapter, pong => {
+                nowMs += 10
+                instance.network.onMessage(user, pong)
+            })
+        })
+        instance.step()
+        expect(clientNetwork.processNextFrame()!.serverTimeMs).toBe(1000)
+        expect(user.roundTripMs).toBe(20)
+        expect(user.clockOffsetMs).toBe(900)
+        expect(user.clockSyncSamples).toBe(1)
+        expect(user.pendingPings.size).toBe(0)
+        expect(clientNetwork.getEstimatedServerTimeMs()).toBe(nowMs)
+    })
+
+    it.each([false, true])('falls back to termination after close throws (termination throws=%s)', terminationThrows => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        instance.network.onConnectionAccepted(user, {})
+        instance.queue.next()
+        const channel = new Channel(instance.localState)
+        channel.subscribe(user)
+        const close = user.networkAdapter.disconnect as jest.Mock
+        close.mockImplementation(() => { throw new Error('close payload cannot be encoded') })
+        const terminate = jest.fn(() => {
+            expect(instance.users.size).toBe(0)
+            expect(user.subscriptions.size).toBe(0)
+            instance.network.onClose(user)
+            if (terminationThrows) throw new Error('transport already broken')
+        })
+        user.networkAdapter.terminate = terminate
+        expect(() => user.disconnect('kick')).not.toThrow()
+        expect(terminate).toHaveBeenCalledTimes(1)
+        user.disconnect('repeat')
+        expect(terminate).toHaveBeenCalledTimes(1)
+        expect(instance.queue.next()).toMatchObject({ type: NetworkEvent.UserDisconnected, user, reason: 'kick' })
+        expect(instance.queue.isEmpty()).toBe(true)
+    })
+
+    it('does not retry a failed forced termination', () => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        instance.network.onConnectionAccepted(user, {})
+        const terminate = jest.fn(() => { throw new Error('transport already broken') })
+        user.networkAdapter.terminate = terminate
+        expect(() => instance.network.disconnectUser(user, 'failure', true)).not.toThrow()
+        expect(terminate).toHaveBeenCalledTimes(1)
+        expect(user.networkAdapter.disconnect).not.toHaveBeenCalled()
+    })
+
+    it.each(['delayed', 'throwing', 'reentrant'])('cleans up a public disconnect before a %s transport close', mode => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        instance.network.onConnectionAccepted(user, {})
+        instance.queue.next()
+        const channel = new Channel(instance.localState)
+        channel.subscribe(user)
+        const requestClient = createClientNetwork(instance.context)
+        requestClient.request(1, {}, { timeoutMs: 0 }).catch(() => undefined)
+        instance.network.onMessage(user, requestClient.createOutbound(testBinaryAdapter))
+        requestClient.rejectPendingRequests(new Error('test cleanup'))
+        const close = user.networkAdapter.disconnect as jest.Mock
+        let stateDuringClose: unknown
+        close.mockImplementation(() => {
+            stateDuringClose = {
+                connectionState: user.connectionState,
+                registered: instance.users.has(user.id),
+                subscriptions: user.subscriptions.size,
+                requests: instance.network.requestQueue.length
+            }
+            if (mode === 'throwing') throw new Error('broken socket')
+            if (mode === 'reentrant') {
+                user.disconnect('recursive close')
+                instance.network.onClose(user, 'transport reason')
+            }
+        })
+
+        expect(() => user.disconnect('kick')).not.toThrow()
+        expect(stateDuringClose).toEqual({
+            connectionState: UserConnectionState.Closed, registered: false, subscriptions: 0, requests: 0
+        })
+        expect(close).toHaveBeenCalledTimes(1)
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        instance.network.onClose(user, 'late callback')
+        user.disconnect('repeated kick')
+        expect(close).toHaveBeenCalledTimes(1)
+        expect(instance.queue.next()).toMatchObject({ type: NetworkEvent.UserDisconnected, user, reason: 'kick' })
+        expect(instance.queue.isEmpty()).toBe(true)
+    })
+
     it('disconnects open users after the Pong deadline', () => {
         let nowMs = 0
         const instance = new Instance(new Context(), {
@@ -199,6 +317,93 @@ describe('InstanceNetwork', () => {
         expect(onInboundMessageError.mock.calls[0][0]).not.toHaveProperty('payload')
         expect(onInboundMessageError.mock.calls[0][0]).not.toHaveProperty('buffer')
         expect(user.networkAdapter.disconnect).toHaveBeenCalledWith(user, {})
+    })
+
+    it.each(['unknown section', 'truncated command', 'duplicate handshake', 'early request'])('validates a whole handshake packet before onConnect: %s', async suffix => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        instance.network.onOpen(user)
+        const client = createClientNetwork(instance.context)
+        const handshake = client.createHandshake({ account: 'test' }, testBinaryAdapter) as Buffer
+        let tail = suffix === 'duplicate handshake' ? handshake : suffix === 'unknown section'
+            ? Buffer.from([255]) : Buffer.from([BinarySection.Commands])
+        if (suffix === 'early request') {
+            client.request(1, {}, { timeoutMs: 0 }).catch(() => undefined)
+            tail = client.createOutbound(testBinaryAdapter) as Buffer
+            client.rejectPendingRequests(new Error('test cleanup'))
+        }
+        instance.onConnect = jest.fn(async () => true)
+        const error = jest.fn()
+        instance.onInboundMessageError = error
+        instance.network.onMessage(user, Buffer.from([...handshake, ...tail]))
+        await Promise.resolve()
+        expect(instance.onConnect).not.toHaveBeenCalled()
+        expect(error).toHaveBeenCalledTimes(1)
+        expect(user.connectionState).toBe(UserConnectionState.Closed)
+        expect(instance.users.size).toBe(0)
+        expect(instance.network.pendingUsers.size).toBe(0)
+        expect(user.networkAdapter.send).not.toHaveBeenCalled()
+    })
+
+    it('contains malformed command/request suffixes without discarding another user\'s work', () => {
+        const context = new Context()
+        context.register(1, defineMessageSchema({ value: Binary.UInt8 }))
+        const instance = new Instance(context)
+        const bad = createOpenUser(instance)
+        const healthy = createOpenUser(instance)
+        instance.network.onConnectionAccepted(bad, {})
+        instance.network.onConnectionAccepted(healthy, {})
+        const channel = new Channel(instance.localState)
+        channel.subscribe(bad)
+        channel.subscribe(healthy)
+        const handler = jest.fn((request: any) => ({ ok: request.body.value === 7 }))
+        instance.respond(1, handler)
+        for (const [user, value] of [[healthy, 7], [bad, 8]] as const) {
+            const client = createClientNetwork(context)
+            client.addCommand({ ntype: 1, value })
+            client.request(1, { value }, { timeoutMs: 0 }).catch(() => undefined)
+            const packet = client.createOutbound(testBinaryAdapter) as Buffer
+            instance.network.onMessage(user, user === bad ? Buffer.from([...packet, 255]) : packet)
+        }
+        expect(bad.connectionState).toBe(UserConnectionState.Closed)
+        expect(bad.subscriptions.size).toBe(0)
+        expect(instance.users.has(bad.id)).toBe(false)
+        expect(healthy.connectionState).toBe(UserConnectionState.Open)
+        expect(healthy.subscriptions.get(channel.nid)).toBe(channel)
+        const commands = instance.queue.arr.filter(event => event.type === NetworkEvent.CommandSet)
+        expect(commands).toHaveLength(1)
+        expect(commands[0]).toMatchObject({ user: healthy, commands: [{ ntype: 1, value: 7 }] })
+        expect(instance.network.requestQueue.length).toBe(1)
+        expect(instance.processRequests()).toBe(1)
+        expect(handler).toHaveBeenCalledTimes(1)
+        expect(handler.mock.calls[0][0]).toMatchObject({ user: healthy, body: { value: 7 } })
+        expect(() => instance.step()).not.toThrow()
+        expect(healthy.networkAdapter.send).toHaveBeenCalledTimes(1)
+        expect(bad.networkAdapter.send).not.toHaveBeenCalled()
+    })
+
+    it('ignores packets arriving after logical disconnect without accumulating responses', () => {
+        const instance = new Instance(new Context())
+        const user = createOpenUser(instance)
+        instance.network.onConnectionAccepted(user, {})
+        instance.network.disconnectUser(user, 'closed')
+        const client = createClientNetwork(instance.context)
+        client.request(1, {}, { timeoutMs: 0 }).catch(() => undefined)
+        const packet = client.createOutbound(testBinaryAdapter)
+        const error = jest.fn()
+        instance.onInboundMessageError = error
+        const read = jest.spyOn(user.networkAdapter.binary, 'createReader')
+        try {
+            for (let i = 0; i < 3; i++) instance.network.onMessage(user, packet)
+            instance.network.onMessage(user, Buffer.from([255]))
+            expect(read).not.toHaveBeenCalled()
+            expect(error).not.toHaveBeenCalled()
+            expect(user.responseQueue).toEqual([])
+            expect(instance.network.requestQueue.length).toBe(0)
+            expect(user.networkAdapter.disconnect).toHaveBeenCalledTimes(1)
+        } finally {
+            read.mockRestore()
+        }
     })
 
     it('does not let inbound error observers crash the server edge', () => {

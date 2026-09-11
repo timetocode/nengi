@@ -34,15 +34,25 @@ function defaultApplyReplayState(local: any, replayState: any) {
 }
 
 function defaultMeasureError(local: any, replayState: any) {
-    if (
+    const hasXY = (
         typeof local?.x === 'number' &&
         typeof local?.y === 'number' &&
         typeof replayState?.x === 'number' &&
         typeof replayState?.y === 'number'
-    ) {
-        return Math.hypot(replayState.x - local.x, replayState.y - local.y)
+    )
+    // Preserve the XY distance tolerance, but do not hide corrections to the
+    // rest of the replay state (velocity, grounding, depth, etc.). Local-only
+    // presentation fields are outside the replay state and do not affect it.
+    for (const prop of Object.keys(replayState)) {
+        if (hasXY && (prop === 'x' || prop === 'y')) {
+            continue
+        }
+        if (!Object.is(local[prop], replayState[prop]) &&
+            JSON.stringify(local[prop]) !== JSON.stringify(replayState[prop])) {
+            return Number.POSITIVE_INFINITY
+        }
     }
-    return JSON.stringify(local) === JSON.stringify(replayState) ? 0 : Number.POSITIVE_INFINITY
+    return hasXY ? Math.hypot(replayState.x - local.x, replayState.y - local.y) : 0
 }
 
 function defaultShouldCorrect(error: number) {
@@ -52,7 +62,8 @@ function defaultShouldCorrect(error: number) {
 /**
  * Small movement-style helper over PredictionLog. It predicts commands
  * immediately, then rebuilds local state from latest authority plus still
- * unconfirmed commands when the server confirms a command frame number.
+ * unconfirmed commands. Call reconcile after each authoritative frame, including
+ * frames whose confirmation did not advance.
  */
 export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = any, TCommand = any> {
     private client: Client
@@ -143,7 +154,7 @@ export class CommandReplayPrediction<TLocal = any, TAuthority = any, TState = an
         if (nid === undefined) {
             return []
         }
-        return this.client.predictor.log.getPendingByNid(nid)
+        return this.client.predictor.log.getPendingByTarget({ nid, props: this.affectedProps })
             .filter(operation => operation.kind === PredictionOperationKind.Command)
             .sort((a, b) => a.commandFrameNumber - b.commandFrameNumber || a.id - b.id)
     }

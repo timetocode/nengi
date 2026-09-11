@@ -1,6 +1,8 @@
 export type { IEntity } from './common/IEntity'
 // server
 export * from './server/Instance'
+export { DEFAULT_NETWORK_LIMITS } from './server/NetworkLimits'
+export type { NetworkLimits, NetworkLimitEvent } from './server/NetworkLimits'
 export * from './server/InstanceNetwork'
 export * from './server/CommandRouter'
 export * from './server/channel/Point2D'
@@ -39,10 +41,9 @@ export type {
     ResourceKey as EcsResourceKey
 } from './ecs/EcsWorld'
 export * from './server/User'
-export * from './server/Historian'
 export * from './server/Historian2D'
 export * from './server/Historian3D'
-export * from './server/PublicPositionSmoother2D'
+export * from './server/PublicPathSmoother2D'
 export * from './server/adapter/MockAdapter'
 
 // client

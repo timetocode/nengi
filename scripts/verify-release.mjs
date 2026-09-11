@@ -66,6 +66,29 @@ for (const packageRoot of packageRoots) {
             if (dependency.startsWith('nengi') && version !== corePackage.version) {
                 errors.push(`${name} ${dependencyGroup}.${dependency} must equal ${corePackage.version}`)
             }
+            if (dependency.startsWith('nengi') && lockRoot?.[dependencyGroup]?.[dependency] !== version) {
+                errors.push(`${name} package-lock root ${dependencyGroup}.${dependency} does not match its manifest`)
+            }
+        }
+    }
+
+    // Root declarations alone can hide an older package in the resolved tree.
+    for (const [location, entry] of Object.entries(packageLock.packages || {})) {
+        const dependency = location.split('/').at(-1)
+        if (!location || !dependency.startsWith('nengi')) continue
+        if (entry.version !== corePackage.version) {
+            errors.push(`${name} locks ${dependency}@${entry.version}, expected ${corePackage.version}`)
+        }
+        const expectedUrl = `https://registry.npmjs.org/${dependency}/-/${dependency}-${corePackage.version}.tgz`
+        if (entry.resolved !== expectedUrl || !entry.integrity?.startsWith('sha512-')) {
+            errors.push(`${name} ${location} needs the release registry URL and artifact integrity`)
+        }
+        for (const group of ['dependencies', 'peerDependencies']) {
+            for (const [child, version] of Object.entries(entry[group] || {})) {
+                if (child.startsWith('nengi') && version !== corePackage.version) {
+                    errors.push(`${name} ${location}.${group}.${child} must equal ${corePackage.version}`)
+                }
+            }
         }
     }
 

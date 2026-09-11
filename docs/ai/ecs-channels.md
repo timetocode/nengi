@@ -89,6 +89,13 @@ Transform.groups.position(transform, nextX, nextY)
 
 Spatial ECS channels place roots in the grid using a selected spatial component. The root itself does not have position.
 
+A root without a selected spatial component is absent from spatial replication.
+Selecting an existing component with `setSpatialComponent(pid, component)` makes
+the root and its components eligible for the next snapshot's cell visibility.
+Removing the selected component removes the root from the spatial grid; select
+another component to make it spatial again. With `bindEcsChannel`, use the bound
+component's removal API so the game world and network channel stay aligned.
+
 ```ts
 const channel = new EcsChannel2D(instance.localState, 100)
 const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
@@ -117,7 +124,10 @@ The server owns gameplay state in an `EcsWorld`, binds selected roots to an
 `EcsChannel2D`, and uses bound mutators at explicit mutation points.
 
 Assume `NType`, schemas, and factory functions such as `createPlayer`,
-`createTransform`, and `createContext` are defined by the game.
+`createTransform`, and `createContext` are defined by the game. Configure the
+[transport adapter](./adapters.md) and
+[connection handler](./networking-primitives.md#connection-handshake) before
+starting the loop; an `Instance` without an `onConnect` handler denies connections.
 
 ```ts
 import {
@@ -183,7 +193,8 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
 
     const transform = world.require(pid, Transform)
     applyMoveStep(transform, command)
-    TransformNet.mutate.patch(transform, { x: transform.x, y: transform.y })
+    TransformNet.writer.props.x(transform, transform.x)
+    TransformNet.writer.props.y(transform, transform.y)
     worldChannel.updateView(user, viewFor(transform))
 })
 
@@ -200,6 +211,9 @@ function tick() {
     }
 
     instance.processRequests()
+    for (const user of instance.users.values()) {
+        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
+    }
     instance.step()
 }
 ```
@@ -223,8 +237,10 @@ channel a header or name that the client can classify.
 
 ## Canonical small client
 
-On the client, classify opened channels, apply ECS channel frames to an
-`EcsWorld`, and keep presentation code outside the network applier.
+On the client, apply channel closes before classifying opens and applying ECS
+channel frames to an `EcsWorld`. This releases old roots and local resources
+before a replacement can reuse their ids. Keep presentation code outside the
+network applier.
 
 ```ts
 import {
@@ -239,13 +255,40 @@ import type { Frame } from 'nengi'
 const client = new Client(context, WebSocketClientAdapter, serverTickRate)
 const world = new EcsWorld()
 const channelByName = new Map<string, number>()
+const networkRoots = new Set<number>()
+let connected = false
 
 const Player = ecs.defineComponent<PlayerComponent>(NType.Player, 'Player')
 const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
 
-await client.connect('ws://localhost:8079')
+function clearNetworkSession() {
+    connected = false
+    for (const pid of networkRoots) {
+        destroyPresentation(pid)
+        world.removeEntity(pid)
+    }
+    networkRoots.clear()
+    channelByName.clear()
+}
+
+client.setDisconnectHandler(clearNetworkSession)
+client.setWebsocketErrorHandler(error => console.error('Network error', error))
+const connection = await client.connect('ws://localhost:8079')
+connected = connection.accepted
 
 function applyNetworkFrame(frame: Frame) {
+    frame.closedChannels.forEach(channel => {
+        if (channel.channelId === channelByName.get('world')) {
+            applyEcsChannelClose(world, channel, {
+                beforeRemoveEntity(pid) {
+                    destroyPresentation(pid)
+                    networkRoots.delete(pid)
+                }
+            })
+            channelByName.delete('world')
+        }
+    })
+
     frame.openedChannels.forEach(channel => {
         if (channel.header.name === 'world') {
             channelByName.set('world', channel.channelId)
@@ -262,6 +305,13 @@ function applyNetworkFrame(frame: Frame) {
         const changes = applyEcsChannelFrame(world, channel, {
             beforeRemoveEntity(pid) {
                 destroyPresentation(pid)
+                networkRoots.delete(pid)
+            }
+        })
+        changes.createdEntities.forEach(pid => networkRoots.add(pid))
+        changes.deletedComponents.forEach(component => {
+            if (component.ntype === NType.Player && component.pid !== undefined && world.hasEntity(component.pid)) {
+                destroyPresentation(component.pid)
             }
         })
         changes.createdComponents.forEach(component => {
@@ -273,20 +323,12 @@ function applyNetworkFrame(frame: Frame) {
             markPresentationDirty(update.component.pid, update.prop)
         })
     })
-
-    frame.closedChannels.forEach(channel => {
-        if (channel.channelId === channelByName.get('world')) {
-            applyEcsChannelClose(world, channel, {
-                beforeRemoveEntity(pid) {
-                    destroyPresentation(pid)
-                }
-            })
-            channelByName.delete('world')
-        }
-    })
 }
 
 function frame() {
+    if (!connected) {
+        return
+    }
     for (const frame of client.network.drainFrames()) {
         applyNetworkFrame(frame)
     }
@@ -298,7 +340,22 @@ function frame() {
     client.flush()
     requestAnimationFrame(frame)
 }
+
+if (connected) requestAnimationFrame(frame)
 ```
+
+`networkRoots` tracks roots applied to this client world, including roots with
+no Player component. On transport disconnect, clean them up immediately; there
+will be no final channel-close frame. `destroyPresentation` should tolerate a
+root without presentation resources. Local entities outside this set survive.
+The network loop starts only after acceptance and stops on disconnect. Follow
+the [connection lifetime guidance](./client-state.md#connection-lifetime) when
+rebuilding a session.
+
+Component removal can leave its root alive. The handler releases Player
+presentation for that case before creating any replacement presentation. Root
+removal uses `beforeRemoveEntity`; the `world.hasEntity` check avoids repeating
+that cleanup after the whole root was removed.
 
 For multiple ECS channels, do not infer meaning from component type alone. Route
 by channel identity first, then apply the frame or close event to the appropriate
@@ -351,6 +408,18 @@ Do not confuse these two. Parent/child is useful for scenegraph-like or object-w
 ## Mutation responsibility
 
 ECS channels are manual. If a component changes and game code does not call the component writer, nengi will not send the update.
+
+For the fast spatial ECS paths, create the root before adding its components.
+Arrange structural changes so that each newly created root or component survives
+its first server snapshot; remove it in a subsequent tick. Decide whether a
+temporary object is needed before allocating network identity. These lifetime
+rules let the engine retain simpler bookkeeping and share snapshot work.
+
+An existing component can be removed during a later tick even if it has already
+been written that tick. Other live components' writes must still arrive correctly.
+If game logic can decide removals before producing manual writes, do so to avoid
+generating updates that will be discarded. Do not depend on same-tick creation
+and cancellation as part of the fast-channel contract.
 
 Do not call component writers with draft components that have not been added to
 the channel. A component with `nid: 0` is not networked. After a successful

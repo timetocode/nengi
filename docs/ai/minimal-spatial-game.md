@@ -69,6 +69,9 @@ while (!instance.queue.isEmpty()) {
 }
 
 instance.processRequests()
+for (const user of instance.users.values()) {
+    user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
+}
 instance.step()
 ```
 
@@ -161,7 +164,8 @@ function frame(dtMs: number) {
 ```
 
 `maxFrames` chunks catch-up work but does not skip frames. If pending frames
-grow too high, reconnect rather than skipping delta snapshots.
+grow too high, rebuild the session with a fresh Client rather than skipping
+delta snapshots; see [connection lifetime](./client-state.md#connection-lifetime).
 
 Keep command cadence explicit. A fixed server step per command is fine if the
 client sends commands at a fixed command rate. If the client sends commands from

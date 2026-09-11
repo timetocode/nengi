@@ -43,12 +43,14 @@ function hasPlanContent(plan: SnapshotPlan) {
         plan.interpolatedMessages.length > 0
 }
 
-function addVisibilityPlan(plan: SnapshotPlan, instance: Instance, channel: Channel, visibility: ChannelSnapshotVisibility) {
+function addVisibilityPlan(plan: SnapshotPlan, instance: Instance, visibility: ChannelSnapshotVisibility, includeUpdates: boolean) {
     for (let i = 0; i < visibility.toCreate.length; i++) {
         addRegularCreate(plan, instance, visibility.toCreate[i])
     }
-    for (let i = 0; i < visibility.toUpdate.length; i++) {
-        addRegularUpdate(plan, instance, visibility.toUpdate[i])
+    if (includeUpdates) {
+        for (let i = 0; i < visibility.toUpdate.length; i++) {
+            addRegularUpdate(plan, instance, visibility.toUpdate[i])
+        }
     }
     plan.deleteEntities = visibility.toDelete
 }
@@ -72,6 +74,7 @@ export function createChannelOutput(
         ? channel.collectChannelSharedDeltaVisibility(user) ?? channel.collectChannelSnapshotVisibility(user)
         : channel.collectChannelSnapshotVisibility(user)
     const useDeltaFragments = useSharedFragments && canUseSharedDelta(channel, visibility)
+    const useSharedUpdates = useSharedFragments && visibility.hasPrevious
     const deltaFragments = useDeltaFragments
         ? {
             creates: getSharedCreateFragment(user, instance, channel),
@@ -81,12 +84,12 @@ export function createChannelOutput(
     const excludedUpdateNids = deltaFragments.creates?.nids
 
     if (!useDeltaFragments) {
-        addVisibilityPlan(plan, instance, channel, visibility)
+        addVisibilityPlan(plan, instance, visibility, !useSharedUpdates)
     }
 
-    const messageFragments = useSharedMessageFragments ? getSharedMessageFragments(user, instance) : []
+    const messageFragments = useSharedMessageFragments ? getSharedMessageFragments(user, instance, channel) : []
     addChannelMessages(plan, user, channel, !useSharedMessageFragments)
-    const updateFragment = useSharedFragments && visibility.hasPrevious
+    const updateFragment = useSharedUpdates
         ? getSharedUpdateFragment(user, instance, channel, excludedUpdateNids)
         : null
 

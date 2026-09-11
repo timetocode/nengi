@@ -95,6 +95,20 @@ An entity has:
 
 Entities are created, updated, and deleted through snapshots. A newly subscribed user receives creates for visible entities.
 
+Validate actions before allocating networked entities or components when possible.
+Registration, queued writes, and removal all cost server work. In the fast spatial
+ECS channels, new roots and components must survive their first snapshot; remove
+them in a subsequent tick. Follow the
+[spatial ECS lifetime rules](./ecs-channels.md#mutation-responsibility) instead of
+relying on same-tick creation and cancellation. Use a message for an event that
+must be observed even if it lasts less than a tick.
+
+Network ids are reusable transport identities, not permanent gameplay identities.
+Removed ids become reusable after the snapshot boundary. Until then they still
+occupy allocator slots, so a large burst of temporary objects can widen ids from
+8 to 16 or 32 bits. The width does not shrink during that instance's lifetime.
+This is another reason to keep temporary calculations outside networked state.
+
 For discontinuous movement, call `channel.skipInterpolation(entity)` after
 moving the entity on the server. This marks the next snapshot so the client
 snaps to the new value instead of interpolating from the old position. Use it
@@ -117,6 +131,24 @@ Messages are not persistent. A user who was not subscribed or connected when the
 Messages have the same scope as the server API that sent them. Messages queued
 directly to a user are top-level frame messages. Messages added to a channel are
 channel-scoped and must be read from that channel's `ChannelFrame`.
+
+For a subscribed channel, `user.queueChannelMessage(channelId, message)` keeps
+issue order within that channel. `queueChannelInterpolatedMessage` preserves
+order in its separate interpolated-message queue. Broadcasts, per-user messages,
+different channels and ordinary/interpolated messages occupy separate queues;
+their calls do not establish one combined delivery order.
+
+Subscribe before queueing per-user channel messages. Calls for an unsubscribed
+channel are ignored. Unsubscribe discards that subscription's unsent ordinary
+and interpolated messages, including during channel destruction or disconnect.
+Resubscribing starts with a fresh queue for that channel, even within one server
+tick. Messages already sent in an earlier snapshot are not recalled.
+
+For asynchronous work tied to a particular channel object, check
+`user.subscriptions.get(channel.nid) === channel` after awaiting and before
+queueing its result. The numeric-ID queue APIs cannot identify a stale operation
+if a different channel now owns that ID. If work belongs to a particular visit
+to the same channel, game code also owns that visit's cancellation or identity.
 
 On the client, top-level messages may be handled immediately from processed
 frames or on the interpolation timeline:
@@ -204,8 +236,46 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command, commandFrameNumber
 })
 ```
 
-The server confirms processed command frames back to the client. Each applied
-frame exposes that numeric confirmation as `frame.confirmedCommandFrameNumber`.
+Each applied frame exposes `frame.confirmedCommandFrameNumber`: the server game
+has completed authoritative handling of every received command batch through
+that number. A command deliberately rejected by game validation is still
+confirmed; confirmation does not mean its requested action succeeded.
+
+Game code must call `user.confirmCommandsThrough(commandFrameNumber)` after the
+relevant simulation work and before `instance.step()`. Receiving packets,
+dequeueing events, returning from `CommandRouter` handlers and producing snapshots
+do not advance confirmation. The initial confirmed number is 0. The method
+returns the confirmed number, ignores older/duplicate completions, and throws
+`RangeError` for a non-UInt32 number or a number beyond received input.
+`user.lastReceivedCommandFrameNumber` and `user.lastConfirmedCommandFrameNumber`
+expose the separate receipt and completion boundaries.
+
+For a synchronous tick that fully handles all received commands, including any
+game-owned movement queue, confirm each user after simulation:
+
+```ts
+// All received input has been applied or deliberately rejected in this tick.
+for (const user of instance.users.values()) {
+    user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
+}
+instance.step()
+```
+
+For deferred work, retain the batch's `event.commandFrameNumber` and explicitly
+confirm through the last fully completed batch after integration. Do not sample
+the latest received number after an `await`: newer input may still be pending.
+Do not confirm a batch from its first command handler, or confirm a later batch
+while an earlier one is unfinished. Nengi validates the numeric boundary; game
+code owns the assertion that all work through it is complete. Keep the snapshot's
+predicted fields aligned with that boundary. Explicit confirmation alone does not
+define physics tick assignment or make a replay model deterministic.
+
+Games **without prediction** also confirm their command input: confirmation
+releases the client's retained command history. Omitting the call leaves that
+history growing. Snapshots, requests, responses and connection liveness continue
+independently; request-only applications have no command history to confirm.
+Use a request result when an individual asynchronous operation needs a response.
+See the [server cycle](./architecture-and-ticks.md#server-cycle).
 
 ```ts
 for (const frame of client.network.drainFrames()) {
@@ -249,8 +319,23 @@ commands.on<GatherCommand>(NType.GatherCommand, ({ user, command }) => {
 commands.process(event)
 ```
 
-`CommandRouter` does not change command semantics. It only dispatches received
-commands by `ntype` in their original order.
+`CommandRouter` dispatches commands by `ntype` in their original order while the
+user is `UserConnectionState.Open`. If a handler disconnects the user, remaining
+handlers and commands for that user are skipped, including later queued batches.
+`process(event)` returns the number of commands whose dispatch began; skipped
+commands are excluded. A command with no registered handler still counts.
+
+Hand-written command loops must check the same condition before each command,
+including batches collected earlier in the tick:
+
+```ts
+import { UserConnectionState } from 'nengi'
+
+for (const command of event.commands) {
+    if (event.user.connectionState !== UserConnectionState.Open) break
+    processCommand(event.user, command)
+}
+```
 
 ## Request/response
 
@@ -273,6 +358,18 @@ Pattern:
 5. Normal snapshots deliver resulting entities/messages.
 
 For expected game failures, prefer normal responses like `{ accepted: false, reason: 'too_far' }` rather than throwing.
+
+A missing response to an immediate game action (such as an inventory swap) is a
+request-flow fault to investigate, not a normal gameplay denial. A timeout does
+not prove rejection or cancel server work. API-style endpoints waiting on external
+work may have normal deadline failures. Keep these distinct from domain outcomes.
+
+Movement, automatic fire and reload share an ordered simulation timeline; use
+commands for those coupled actions. Requests and commands are ordered within
+their categories, not interleaved by send-call order. Optimistic requests should
+derive local display from current authority and remaining intent; blindly restoring
+a captured old value on rejection can overwrite a later valid change. See the
+[action model](./realtime-movement-prediction.md#fire-reload-requests-and-physics).
 
 Requests do not have to own the resulting state. In many game features, a
 request is only the validated transaction boundary. The durable result then
@@ -328,6 +425,9 @@ function tick() {
 
     instance.processRequests(100)
     stepAuthoritativeSimulation()
+    for (const user of instance.users.values()) {
+        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
+    }
     instance.step()
 }
 ```
@@ -339,10 +439,69 @@ authoritative mutation after `await` is outside the synchronous tick order and
 should be deliberately re-entered through the game's own queue if deterministic
 ordering matters.
 
+Requests reach handlers in issue order, including across calls to
+`processRequests(max)`. Synchronous responses preserve that order; deferred
+responses may complete out of order and are matched to their originating
+requests. Commands and requests have separate queues: alternating
+`addCommand()`, `request()`, and `addCommand()` does not interleave their server
+handlers. The game chooses when to drain each category. Request deduplication
+or replacement policies can intentionally suppress superseded requests.
+
 Passing a numeric endpoint id is the schema-less form. Prefer the shared endpoint
 definition object for typed request/response payloads. The current API is
 client-request/server-response, not bidirectional RPC: server-initiated actions
 should use a command-like client message, a normal message, or replicated state.
+
+### Complete an action before leaving
+
+`client.disconnect()` asks the adapter to close; it does not flush queued nengi
+work or wait for a server result. If a final action matters, use a game endpoint
+that responds after that action has completed, then disconnect from the client.
+For a shared `FinalAction` endpoint whose response includes `accepted`:
+
+```ts
+async function finishAndLeave(payload) {
+    const pending = client.request(FinalAction, payload, { timeoutMs: 5000 })
+    client.flush()
+    const response = await pending
+    if (response.accepted) client.disconnect('finished')
+    return response
+}
+```
+
+Keep the normal client frame-processing loop running while this function waits:
+request responses resolve when their snapshot is applied. The server must keep
+processing requests and sending snapshots too. Handle rejection or timeout in
+the calling UI; a missing response does not prove the action failed, and a
+timeout does not cancel server work. Decide whether to retry or leave based on
+the game action. The server handler should not close the connection before its
+response can reach the client.
+
+### Disconnect during an asynchronous request
+
+Disconnect removes queued requests that have not started. A running handler's
+promise continues, and nengi suppresses its eventual response after the user
+closes. The application owns any effects of that operation. If applying its
+result requires the original session to be connected, check immediately before
+the mutation:
+
+```ts
+import { UserConnectionState } from 'nengi'
+
+instance.respond(LoadSelection, async ({ user, body }) => {
+    const selection = await loadSelection(body.selectionId)
+    if (user.connectionState !== UserConnectionState.Open) return
+    applySelectionToPlayer(user, selection)
+    return { accepted: true }
+})
+```
+
+These endpoint and game functions are application-defined. Check again after
+any further `await`, or inside the game's tick queue when applying a deferred
+result there. Use the original `user` object; a replacement connection is a
+different session. The connection check does not undo work already performed,
+such as a database write. Persistence that should finish after departure can
+deliberately continue. A request timeout likewise does not cancel the handler.
 
 ## Channel
 
@@ -409,6 +568,12 @@ Plain nengi entities can have parent/child relationships through
 entity model: when the parent is visible, its children become visible too.
 Creates are parent-first and deletes are child-first. This is useful for
 scenegraph-like objects or objects with replicated parts.
+
+Pass the actual registered objects to `attachChild` and `detachChild`, including
+the parent. A copied object with the same `nid` is not a lifecycle handle.
+Keep the references returned by channel creation/attachment; let nengi assign
+and clear their network ids. Invalid copies are rejected before tree or id-pool
+bookkeeping changes.
 
 Parent/child entities are not the ECS channel model. In nengi ECS channels, a
 root is only an id and replicated state lives on component entities with `pid`.

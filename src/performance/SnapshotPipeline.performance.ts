@@ -2,7 +2,6 @@ import { Binary } from '../common/binary/Binary'
 import { BinaryAdapter, BinaryPayload } from '../common/binary/BinaryAdapter'
 import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
-import { ChannelHeader, ChannelType, createChannelHeader } from '../common/ChannelHeader'
 import { IEntity } from '../common/IEntity'
 import { AABB2D } from '../server/channel/AABB2D'
 import { AABB3D } from '../server/channel/AABB3D'
@@ -15,6 +14,7 @@ import { ManualChannel2D } from '../server/channel/ManualChannel2D'
 import { ManualChannel3D } from '../server/channel/ManualChannel3D'
 import { EcsChannel } from '../server/channel/EcsChannel'
 import { EcsChannel2D } from '../server/channel/EcsChannel2D'
+import { EcsChannel3D } from '../server/channel/EcsChannel3D'
 import { IChannel } from '../server/channel/IChannel'
 import { Instance } from '../server/Instance'
 import { User } from '../server/User'
@@ -46,6 +46,7 @@ type ScenarioName =
     | 'ecs-channel'
     | 'ecs-channel-churn'
     | 'ecs-channel-2d'
+    | 'ecs-channel-3d'
     | 'ecs-channel-clump'
     | 'wide-manual-channel-2d'
     | 'ecs-manual-channel-2d'
@@ -71,6 +72,7 @@ const SCENARIOS = new Set<ScenarioName>([
     'ecs-channel',
     'ecs-channel-churn',
     'ecs-channel-2d',
+    'ecs-channel-3d',
     'ecs-channel-clump',
     'wide-manual-channel-2d',
     'ecs-manual-channel-2d',
@@ -108,6 +110,7 @@ const CUSTOM_MUTATION_SCENARIOS = new Set<ScenarioName>([
     'ecs-channel-churn',
     'ecs-manual-channel-2d',
     'ecs-channel-2d',
+    'ecs-channel-3d',
     'ecs-channel-clump',
     'parent-child-manual-channel',
     'parent-child-manual-channel-2d'
@@ -163,7 +166,10 @@ type EcsBundle = {
     loadout: LoadoutComponent
 }
 
-type Ecs2DBenchmarkChannel = {
+type EcsSpatialBenchmarkChannel = {
+    removeEntity(pid: number): void
+    removeComponent(component: any): void
+    getVisibleEntities(userId: number): any
     createEntity(): number
     addSpatialComponent<T extends { nid: number, ntype: number }>(pid: number, component: T): T & { pid: number }
     addComponent<T extends { nid: number, ntype: number }>(pid: number, component: T): T & { pid: number }
@@ -184,6 +190,9 @@ type ScenarioConfig = {
     cellSize: number
     viewHalf: number
     churn: number
+    ecsChurn: 'none' | 'roots' | 'components'
+    ecsChurnOrder: 'before-writes' | 'after-writes'
+    ecsMaterialize: boolean
     children: number
     spatialDistribution: string
     spatialPlane: SpatialPlane
@@ -225,61 +234,6 @@ class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
     }
 }
 
-class FixedVisibleChannel implements IChannel {
-    nid: number
-    channelType = ChannelType.Channel
-    header: ChannelHeader
-    headerVersion = 0
-    entities: any
-    users = new Map<number, User>()
-    private visibleByUser = new Map<number, number[]>()
-
-    constructor(nid: number) {
-        this.nid = nid
-        this.header = createChannelHeader(nid, this.channelType)
-        this.entities = { array: [], size: 0 }
-    }
-
-    addMessage(): void {
-    }
-
-    addEntity(entity: IEntity): IEntity {
-        this.entities.array.push(entity)
-        this.entities.size = this.entities.array.length
-        return entity
-    }
-
-    removeEntity(): void {
-    }
-
-    removeAllEntities(): void {
-    }
-
-    subscribe(user: User): void {
-        this.users.set(user.id, user)
-        user.subscribe(this)
-    }
-
-    unsubscribe(user: User): void {
-        this.users.delete(user.id)
-        user.unsubscribe(this)
-    }
-
-    unsubscribeAll(): void {
-    }
-
-    destroy(): void {
-    }
-
-    setVisible(userId: number, nids: number[]) {
-        this.visibleByUser.set(userId, nids)
-    }
-
-    getVisibleEntities(userId: number): number[] {
-        return this.visibleByUser.get(userId) || []
-    }
-}
-
 function envNumber(name: string, fallback: number) {
     const value = Number(process.env[name])
     return Number.isFinite(value) ? value : fallback
@@ -293,7 +247,7 @@ function envBool(name: string, fallback: boolean) {
     return value === '1' || value === 'true'
 }
 
-function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
+export function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
     const scenarioValue = scenarioOverride || process.env.PROFILE_SCENARIO || 'shared-npcs'
     if (!SCENARIOS.has(scenarioValue as ScenarioName)) {
         throw new Error(`Unknown PROFILE_SCENARIO "${scenarioValue}". Use one of: ${Array.from(SCENARIOS).join(', ')}`)
@@ -313,13 +267,35 @@ function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
     if (spatialViewShape !== 'aabb' && spatialViewShape !== 'circle' && spatialViewShape !== 'sphere') {
         throw new Error('PROFILE_VIEW_SHAPE must be "aabb", "circle", or "sphere".')
     }
+    const ecsChurn = process.env.PROFILE_ECS_CHURN || 'none'
+    const ecsChurnOrder = process.env.PROFILE_ECS_CHURN_ORDER || 'after-writes'
+    const ecsMaterialize = envBool('PROFILE_ECS_MATERIALIZE', false)
+    if (ecsChurn !== 'none' && ecsChurn !== 'roots' && ecsChurn !== 'components') {
+        throw new Error('PROFILE_ECS_CHURN must be "none", "roots", or "components".')
+    }
+    if (ecsChurnOrder !== 'before-writes' && ecsChurnOrder !== 'after-writes') {
+        throw new Error('PROFILE_ECS_CHURN_ORDER must be "before-writes" or "after-writes".')
+    }
+    if ((ecsChurn !== 'none' || ecsMaterialize) &&
+        scenario !== 'ecs-channel-2d' && scenario !== 'ecs-channel-3d' && scenario !== 'ecs-channel-clump') {
+        throw new Error('ECS structural workload options require a spatial ECS scenario.')
+    }
+    if (ecsMaterialize && ecsChurnOrder === 'before-writes') {
+        throw new Error('Materialized removal requires after-writes order.')
+    }
     const ecsChannelClump = scenario === 'ecs-channel-clump'
+    const users = Math.max(1, Math.floor(envNumber('PROFILE_USERS', ecsChannelClump ? 350 : scenario === 'players-300' ? 300 : 20)))
+    const entities = Math.max(1, Math.floor(envNumber('PROFILE_ENTITIES', scenario === 'sparse-visible' ? 50000 : ecsChannelClump ? 350 : scenario === 'players-300' ? 302 : 1000)))
+    const visible = Math.max(1, Math.floor(envNumber('PROFILE_VISIBLE', scenario === 'non-overlap' ? Math.floor(entities / users) : scenario === 'sparse-visible' ? 200 : ecsChannelClump ? 350 : scenario === 'players-300' ? 302 : 1000)))
+    if (scenario === 'non-overlap' && users * visible > entities) {
+        throw new Error('non-overlap requires PROFILE_ENTITIES >= PROFILE_USERS * PROFILE_VISIBLE; increase entities or reduce users/visible.')
+    }
 
     return {
         scenario,
-        users: Math.max(1, Math.floor(envNumber('PROFILE_USERS', ecsChannelClump ? 350 : scenario === 'players-300' ? 300 : 20))),
-        entities: Math.max(1, Math.floor(envNumber('PROFILE_ENTITIES', scenario === 'sparse-visible' ? 50000 : ecsChannelClump ? 350 : scenario === 'players-300' ? 302 : 1000))),
-        visible: Math.max(1, Math.floor(envNumber('PROFILE_VISIBLE', scenario === 'sparse-visible' ? 200 : ecsChannelClump ? 350 : scenario === 'players-300' ? 302 : 1000))),
+        users,
+        entities,
+        visible,
         ticks: Math.max(1, Math.floor(envNumber('PROFILE_TICKS', 300))),
         warmup: Math.max(0, Math.floor(envNumber('PROFILE_WARMUP', 60))),
         sharedUpdates: envBool('PROFILE_SHARED_UPDATES', ecsChannelClump),
@@ -328,6 +304,9 @@ function readConfig(scenarioOverride?: ScenarioName): ScenarioConfig {
         cellSize: Math.max(1, envNumber('PROFILE_CELL_SIZE', ecsChannelClump ? 512 : 50)),
         viewHalf: Math.max(1, envNumber('PROFILE_VIEW_HALF', ecsChannelClump ? 512 : Math.sqrt(Math.max(1, envNumber('PROFILE_VISIBLE', scenario === 'sparse-visible' ? 200 : scenario === 'players-300' ? 302 : 1000))) * 1.5)),
         churn: Math.max(0, Math.floor(envNumber('PROFILE_CHURN', scenario === 'channel-churn' || scenario === 'ecs-channel-churn' ? 100 : 0))),
+        ecsChurn,
+        ecsChurnOrder,
+        ecsMaterialize,
         children: Math.max(0, Math.floor(envNumber('PROFILE_CHILDREN', scenario === 'channel-churn' ? 1 : 0))),
         spatialDistribution: process.env.PROFILE_SPATIAL_DISTRIBUTION || (ecsChannelClump ? 'single-cell' : 'default'),
         spatialPlane: process.env.PROFILE_SPATIAL_PLANE === 'xz' ? 'xz' : 'xy',
@@ -580,6 +559,7 @@ function spreadEntitiesClustered(entities: TestEntity[], config: ScenarioConfig)
 
 function applySpatialDistribution(entities: TestEntity[], config: ScenarioConfig) {
     if (
+        (config.scenario === 'ecs-channel-3d' && config.spatialDistribution !== 'single-cell') ||
         config.scenario === 'channel-3d' ||
         config.scenario === 'manual-channel-3d'
     ) {
@@ -1145,12 +1125,12 @@ function setupEcsManualChannel2D(instance: Instance, users: User[], bundles: Ecs
     }
 }
 
-function setupEcsChannel2D(
+function setupEcsSpatialChannel(
     instance: Instance,
     users: User[],
     bundles: EcsBundle[],
     config: ScenarioConfig,
-    createChannel: (name: string) => Ecs2DBenchmarkChannel = name => new EcsChannel2D(instance.localState, config.cellSize, {
+    createChannel: (name: string) => EcsSpatialBenchmarkChannel = name => new EcsChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
@@ -1173,9 +1153,32 @@ function setupEcsChannel2D(
         channel.addComponent(pid, bundle.loadout)
     }
     for (let i = 0; i < users.length; i++) {
-        channel.subscribe(users[i], createSpatialView(i, roots as any, config))
+        channel.subscribe(users[i], config.scenario === 'ecs-channel-3d'
+            ? createSpatialView3D(i, roots as any, config) : createSpatialView(i, roots as any, config))
+    }
+    let cursor = 0
+    const churn = () => {
+        // The initial population must survive its first snapshot. Subsequent
+        // replacements visit each slot at most once per tick.
+        if (instance.tick === 0 || config.ecsChurn === 'none') return
+        const count = Math.min(config.churn, bundles.length)
+        for (let i = 0; i < count; i++) {
+            const bundle = bundles[cursor++ % bundles.length]
+            if (config.ecsChurn === 'roots') {
+                channel.removeEntity(bundle.root.nid)
+                const pid = channel.createEntity()
+                bundle.root.nid = pid
+                bundle.transform = channel.addSpatialComponent(pid, { ...bundle.transform, nid: 0 })
+                bundle.vitals = channel.addComponent(pid, { ...bundle.vitals, nid: 0 })
+                bundle.loadout = channel.addComponent(pid, { ...bundle.loadout, nid: 0 })
+            } else {
+                channel.removeComponent(bundle.vitals)
+                bundle.vitals = channel.addComponent(bundle.root.nid, { ...bundle.vitals, nid: 0 })
+            }
+        }
     }
     return () => {
+        if (config.ecsChurnOrder === 'before-writes') churn()
         const moving = Math.floor(bundles.length * config.moveFraction)
         for (let i = 0; i < moving; i++) {
             const bundle = bundles[i]
@@ -1209,6 +1212,8 @@ function setupEcsChannel2D(
             Vitals.vitals(bundle.vitals, values.hp, values.maxHp, values.shield)
             Loadout.loadout(bundle.loadout, values.weapon, values.ammo, values.reload)
         }
+        if (config.ecsMaterialize) channel.getVisibleEntities(users[0].id)
+        if (config.ecsChurnOrder === 'after-writes') churn()
     }
 }
 
@@ -1310,28 +1315,26 @@ function setupParentChildManualChannel2D(instance: Instance, users: User[], enti
 }
 
 function setupFixedVisible(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
-    const channel = new FixedVisibleChannel(instance.localState.nextNetworkId())
-    for (let i = 0; i < entities.length; i++) {
-        const entity = entities[i]
-        instance.localState.registerEntity(entity, channel.nid)
-        channel.addEntity(entity)
-    }
-
-    for (let i = 0; i < users.length; i++) {
-        const user = users[i]
-        channel.subscribe(user)
-        const nids: number[] = []
-        if (config.scenario === 'non-overlap') {
-            const start = (i * config.visible) % entities.length
+    // Fixed room membership uses the same public channel lifecycle as a game.
+    // Unobserved entities still mutate, but no subscriber causes them to be diffed.
+    let assigned = 0
+    if (config.scenario === 'non-overlap') {
+        for (let i = 0; i < users.length; i++) {
+            const room = new Channel(instance.localState, { name: `room:${i}` })
             for (let j = 0; j < config.visible; j++) {
-                nids.push(entities[(start + j) % entities.length].nid)
+                room.addEntity(entities[assigned++])
             }
-        } else {
-            for (let j = 0; j < Math.min(config.visible, entities.length); j++) {
-                nids.push(entities[j].nid)
-            }
+            room.subscribe(users[i])
         }
-        channel.setVisible(user.id, nids)
+    } else {
+        const room = new Channel(instance.localState, { name: 'visible' })
+        const count = Math.min(config.visible, entities.length)
+        while (assigned < count) room.addEntity(entities[assigned++])
+        for (const user of users) room.subscribe(user)
+    }
+    if (assigned < entities.length) {
+        const hidden = new Channel(instance.localState, { name: 'unobserved' })
+        while (assigned < entities.length) hidden.addEntity(entities[assigned++])
     }
 }
 
@@ -1477,7 +1480,7 @@ function setupChannelChurn(instance: Instance, users: User[], entities: TestEnti
     }
 }
 
-function buildScenario(config: ScenarioConfig) {
+export function buildScenario(config: ScenarioConfig) {
     const context = createContext(config.groups)
     const instance = new Instance(context)
     instance.network.snapshotPerformanceEnabled = true
@@ -1510,6 +1513,7 @@ function buildScenario(config: ScenarioConfig) {
         config.scenario === 'wide-manual-channel-2d' ||
         config.scenario === 'ecs-manual-channel-2d' ||
         config.scenario === 'ecs-channel-2d' ||
+        config.scenario === 'ecs-channel-3d' ||
         config.scenario === 'ecs-channel-clump' ||
         config.scenario === 'parent-child-channel-2d' ||
         config.scenario === 'parent-child-manual-channel-2d') {
@@ -1556,8 +1560,11 @@ function buildScenario(config: ScenarioConfig) {
         beforeStep = setupEcsChannelChurn(instance, users, ecsBundles, config)
     } else if (config.scenario === 'ecs-manual-channel-2d') {
         beforeStep = setupEcsManualChannel2D(instance, users, ecsBundles, config)
-    } else if (config.scenario === 'ecs-channel-2d' || config.scenario === 'ecs-channel-clump') {
-        beforeStep = setupEcsChannel2D(instance, users, ecsBundles, config, name => new EcsChannel2D(instance.localState, config.cellSize, {
+    } else if (config.scenario === 'ecs-channel-2d' || config.scenario === 'ecs-channel-3d' || config.scenario === 'ecs-channel-clump') {
+        beforeStep = setupEcsSpatialChannel(instance, users, ecsBundles, config, name => config.scenario === 'ecs-channel-3d' ? new EcsChannel3D(instance.localState, config.cellSize, {
+            queryPadding: config.queryPadding, fragmentCellLimit: config.fragmentCellLimit,
+            stableFragmentCellLimit: config.stableFragmentCellLimit, name: `ecs-${name}`
+        }) : new EcsChannel2D(instance.localState, config.cellSize, {
             queryPadding: config.queryPadding,
             fragmentCellLimit: config.fragmentCellLimit,
             stableFragmentCellLimit: config.stableFragmentCellLimit,
@@ -1593,10 +1600,10 @@ function summarize(values: number[]) {
     const sorted = [...values].sort((a, b) => a - b)
     const total = values.reduce((sum, value) => sum + value, 0)
     return {
-        avg: values.length > 0 ? total / values.length : 0,
-        p50: percentile(sorted, 0.50),
-        p95: percentile(sorted, 0.95),
-        max: sorted[sorted.length - 1] || 0
+        avg: fmt(values.length > 0 ? total / values.length : 0),
+        p50: fmt(percentile(sorted, 0.50)),
+        p95: fmt(percentile(sorted, 0.95)),
+        max: fmt(sorted[sorted.length - 1] || 0)
     }
 }
 
@@ -1604,7 +1611,18 @@ function fmt(value: number) {
     return Number(value.toFixed(3))
 }
 
-function runScenario(config: ScenarioConfig) {
+export function summarizeSnapshotTimings(stepTimes: number[], preStepTimes: number[], indexTimes: number[]) {
+    return {
+        stepMs: summarize(stepTimes),
+        preStepMs: summarize(preStepTimes),
+        indexMs: summarize(indexTimes),
+        preStepPlusStepMs: summarize(stepTimes.map((step, i) => preStepTimes[i] + step)),
+        stepPlusIndexMs: summarize(stepTimes.map((step, i) => step + indexTimes[i])),
+        totalMs: summarize(stepTimes.map((step, i) => preStepTimes[i] + step + indexTimes[i]))
+    }
+}
+
+export function runScenario(config: ScenarioConfig) {
     const { instance, adapter, entities, updateChannel2DIndex, beforeStep } = buildScenario(config)
     const stepTimes: number[] = []
     const preStepTimes: number[] = []
@@ -1628,29 +1646,30 @@ function runScenario(config: ScenarioConfig) {
     adapter.bytes = 0
 
     for (let i = 0; i < config.ticks; i++) {
+        let preStepMs = 0
+        let indexMs = 0
         if (!CUSTOM_MUTATION_SCENARIOS.has(config.scenario)) {
             const preStepStart = performance.now()
             mutateEntities(entities, i + config.warmup, config.moveFraction)
-            preStepTimes.push(performance.now() - preStepStart)
+            preStepMs += performance.now() - preStepStart
         }
         if (beforeStep) {
             const preStepStart = performance.now()
             beforeStep()
-            preStepTimes.push(performance.now() - preStepStart)
+            preStepMs += performance.now() - preStepStart
         }
         if (updateChannel2DIndex) {
             const indexStart = performance.now()
             updateChannel2DIndex()
-            indexTimes.push(performance.now() - indexStart)
+            indexMs = performance.now() - indexStart
         }
         const start = performance.now()
         instance.step()
         stepTimes.push(performance.now() - start)
+        preStepTimes.push(preStepMs)
+        indexTimes.push(indexMs)
     }
 
-    const summary = summarize(stepTimes)
-    const preStepSummary = summarize(preStepTimes)
-    const indexSummary = summarize(indexTimes)
     const perf = instance.network.snapshotPerformance
     const snapshots = perf.snapshots || 1
     const sharedBuilds = perf.sharedFragmentBuilds || 1
@@ -1670,6 +1689,9 @@ function runScenario(config: ScenarioConfig) {
         cellSize: config.cellSize,
         viewHalf: fmt(config.viewHalf),
         churn: config.churn,
+        ecsChurn: config.ecsChurn,
+        ecsChurnOrder: config.ecsChurnOrder,
+        ecsMaterialize: config.ecsMaterialize,
         children: config.children,
         spatialDistribution: config.spatialDistribution,
         spatialPlane: config.spatialPlane,
@@ -1681,42 +1703,7 @@ function runScenario(config: ScenarioConfig) {
         fragmentCellLimit: config.fragmentCellLimit,
         stableFragmentCellLimit: config.stableFragmentCellLimit,
         manualEmitMode: config.manualEmitMode,
-        stepMs: {
-            avg: fmt(summary.avg),
-            p50: fmt(summary.p50),
-            p95: fmt(summary.p95),
-            max: fmt(summary.max)
-        },
-        preStepMs: {
-            avg: fmt(preStepSummary.avg),
-            p50: fmt(preStepSummary.p50),
-            p95: fmt(preStepSummary.p95),
-            max: fmt(preStepSummary.max)
-        },
-        preStepPlusStepMs: {
-            avg: fmt(preStepSummary.avg + summary.avg),
-            p50: fmt(preStepSummary.p50 + summary.p50),
-            p95: fmt(preStepSummary.p95 + summary.p95),
-            max: fmt(preStepSummary.max + summary.max)
-        },
-        indexMs: {
-            avg: fmt(indexSummary.avg),
-            p50: fmt(indexSummary.p50),
-            p95: fmt(indexSummary.p95),
-            max: fmt(indexSummary.max)
-        },
-        stepPlusIndexMs: {
-            avg: fmt(summary.avg + indexSummary.avg),
-            p50: fmt(summary.p50 + indexSummary.p50),
-            p95: fmt(summary.p95 + indexSummary.p95),
-            max: fmt(summary.max + indexSummary.max)
-        },
-        totalMs: {
-            avg: fmt(preStepSummary.avg + summary.avg + indexSummary.avg),
-            p50: fmt(preStepSummary.p50 + summary.p50 + indexSummary.p50),
-            p95: fmt(preStepSummary.p95 + summary.p95 + indexSummary.p95),
-            max: fmt(preStepSummary.max + summary.max + indexSummary.max)
-        },
+        ...summarizeSnapshotTimings(stepTimes, preStepTimes, indexTimes),
         snapshots: perf.snapshots,
         sharedSnapshots: perf.sharedSnapshots,
         sends: adapter.sends,
@@ -1791,6 +1778,10 @@ function summarizeProfileOutput(result: ProfileOutput) {
         sharedUpdates: result.sharedUpdates,
         manualEmitMode: result.manualEmitMode,
         spatialDistribution: result.spatialDistribution,
+        churn: result.churn,
+        ecsChurn: result.ecsChurn,
+        ecsChurnOrder: result.ecsChurnOrder,
+        ecsMaterialize: result.ecsMaterialize,
         stepMs: result.stepMs,
         preStepMs: result.preStepMs,
         totalMs: result.totalMs,
@@ -1810,4 +1801,4 @@ function summarizeProfileOutput(result: ProfileOutput) {
     }
 }
 
-run()
+if (require.main === module) run()

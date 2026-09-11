@@ -108,7 +108,6 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
     readonly context: Context
     private readonly ownedPids = new Set<number>()
     private readonly componentRecords = new WeakMap<object, ComponentRecord>()
-    private readonly componentsByPid = new Map<number, Set<object>>()
     private readonly definitions = new Map<number, { definition: ComponentDefinition<any>, binding: any }>()
 
     constructor(world: EcsWorld, channel: Channel, options: EcsChannelBindingOptions) {
@@ -140,15 +139,12 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
         // The world must remove network components before the channel resets
         // their nids during unregisterEntity(). Local-only components are also
         // removed here, even though the channel never sees them.
-        const components = this.world.componentsForEntity(pid)
-        this.world.removeEntity(pid)
+        const components = this.world.removeEntity(pid)
         this.channelApi().removeEntity(pid)
 
         this.ownedPids.delete(pid)
         for (const component of components) {
-            if (this.componentRecords.has(component)) {
-                this.unregisterComponent(component, pid)
-            }
+            this.componentRecords.delete(component)
         }
     }
 
@@ -276,7 +272,7 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
         try {
             const networked = spatial ? api.addSpatialComponent(pid, component) : api.addComponent(pid, component)
             const stored = this.world.add(networked as ComponentTypeForWorld<Definition>) as BoundComponent<Channel, Definition>
-            this.registerComponent(stored, definition, pid)
+            this.componentRecords.set(stored, { definition, pid })
             return stored
         } catch (error) {
             if (component.nid !== 0 && api.getComponent(component.nid) === component) {
@@ -297,11 +293,11 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
             throw new Error(`Entity ${typeof componentOrPid === 'number' ? componentOrPid : componentOrPid.pid} is missing component ${definition.ntype}.`)
         }
 
-        this.assertWritableComponent(definition, component)
+        this.assertActiveComponent(definition, component)
         const pid = component.pid
         this.world.removeComponent(pid, definition)
         this.channelApi().removeComponent(component.nid)
-        this.unregisterComponent(component, pid)
+        this.componentRecords.delete(component)
     }
 
     private mutatePatch<Definition extends ComponentDefinition<any>>(
@@ -387,7 +383,7 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
         }
     }
 
-    private assertWritableComponent<Definition extends ComponentDefinition<any>>(
+    private assertActiveComponent<Definition extends ComponentDefinition<any>>(
         definition: Definition,
         component: BoundComponent<Channel, Definition>
     ) {
@@ -405,30 +401,15 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
         if (component.nid === 0 || this.channelApi().getComponent(component.nid) !== component) {
             throw new Error(`ECS component type ${definition.ntype} is not active in the channel.`)
         }
+    }
+
+    private assertWritableComponent<Definition extends ComponentDefinition<any>>(
+        definition: Definition,
+        component: BoundComponent<Channel, Definition>
+    ) {
+        this.assertActiveComponent(definition, component)
         if (this.isSpatialChannel() && !this.channelApi().hasSpatialComponent?.(component.pid)) {
             throw new Error(`ECS root ${component.pid} has no spatial component.`)
-        }
-    }
-
-    private registerComponent(component: object, definition: ComponentDefinition<any>, pid: number) {
-        this.componentRecords.set(component, { definition, pid })
-        let components = this.componentsByPid.get(pid)
-        if (!components) {
-            components = new Set()
-            this.componentsByPid.set(pid, components)
-        }
-        components.add(component)
-    }
-
-    private unregisterComponent(component: object, pid: number) {
-        this.componentRecords.delete(component)
-        const components = this.componentsByPid.get(pid)
-        if (!components) {
-            return
-        }
-        components.delete(component)
-        if (components.size === 0) {
-            this.componentsByPid.delete(pid)
         }
     }
 

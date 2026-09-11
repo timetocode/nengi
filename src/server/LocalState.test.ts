@@ -2,6 +2,48 @@ import { LocalState } from './LocalState'
 import { Binary } from '../common/binary/Binary'
 
 describe('LocalState', () => {
+    it.each(['register', 'unregister', 'attach-parent', 'attach-child', 'detach-parent', 'detach-child'])(
+        'rejects copied entity handles before mutating state (%s)', operation => {
+            const state = new LocalState()
+            const parent = { nid: 0, ntype: 1 }
+            const child = { nid: 0, ntype: 2 }
+            const grandchild = { nid: 0, ntype: 3 }
+            state.registerEntity(parent, 123)
+            state.addChild(parent, child)
+            state.addChild(child, grandchild)
+            const p = parent.nid, c = child.nid, g = grandchild.nid
+            const version = state.entityTreeVersion
+            const tree = state.getEntityTree(p).slice()
+            const operationToRun = () => {
+                if (operation === 'register') state.registerEntity({ ...parent }, 123)
+                if (operation === 'unregister') state.unregisterEntity({ ...parent }, 123)
+                if (operation === 'attach-parent') state.addChild({ ...parent }, { nid: 0, ntype: 2 })
+                if (operation === 'attach-child') state.addChild(parent, { ...child })
+                if (operation === 'detach-parent') state.removeChild({ ...parent }, child)
+                if (operation === 'detach-child') state.removeChild(parent, { ...child })
+            }
+            expect(operationToRun).toThrow()
+            expect([parent.nid, child.nid, grandchild.nid]).toEqual([p, c, g])
+            expect(state.entityTreeVersion).toBe(version)
+            expect(state.getEntityTree(p)).toEqual(tree)
+            expect(state.getByNid(p)).toBe(parent)
+            expect(state.getByNid(c)).toBe(child)
+            expect(state.getByNid(g)).toBe(grandchild)
+            expect(state.ownerByNid.get(p)).toBe(123)
+            expect(state.ownerByNid.get(c)).toBe(p)
+            expect(state.ownerByNid.get(g)).toBe(c)
+            expect(state.nidPool.ids).toEqual(new Set([p, c, g]))
+            expect(state.nidPool.deferredIds.size).toBe(0)
+            // Real handles still remove the complete tree and allow subsequent reuse.
+            state.unregisterEntity(parent, 123)
+            expect(state._entities.size).toBe(0)
+            state.releaseDeferredIds()
+            state.nidPool.current = 0
+            const next = { nid: 0, ntype: 4 }
+            expect(state.registerEntity(next, 123)).toBe(p)
+        }
+    )
+
     it('assigns a nid of 1 to the first freshly added entity', () => {
         const localState = new LocalState()
         const entity = { nid: 0, ntype: 1 }

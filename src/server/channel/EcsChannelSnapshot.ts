@@ -4,6 +4,7 @@ import { ProtocolConfig } from '../../common/binary/Protocol'
 import { Instance } from '../Instance'
 import { User } from '../User'
 import { ChannelHeaderUpdate } from '../../binary/snapshot/SnapshotPlan'
+import { collectScopedChannelMessages } from '../../binary/snapshot/channelMessages'
 import {
     SnapshotChunk
 } from '../../binary/snapshot/SnapshotChunk'
@@ -135,25 +136,6 @@ export function getSingleEcsChannel2D(user: User) {
     }
     const channel = user.subscriptions.values().next().value
     return isEcsChannel2D(channel) ? channel : null
-}
-
-function collectScopedChannelMessages(user: User, channelId: number, messages: any[], interpolatedMessages: any[]) {
-    for (let i = user.scopedMessageQueue.length - 1; i >= 0; i--) {
-        const queued = user.scopedMessageQueue[i]
-        if (queued.channelId !== channelId) {
-            continue
-        }
-        messages.push(queued.message)
-        user.scopedMessageQueue.splice(i, 1)
-    }
-    for (let i = user.scopedInterpolatedMessageQueue.length - 1; i >= 0; i--) {
-        const queued = user.scopedInterpolatedMessageQueue[i]
-        if (queued.channelId !== channelId) {
-            continue
-        }
-        interpolatedMessages.push(queued.message)
-        user.scopedInterpolatedMessageQueue.splice(i, 1)
-    }
 }
 
 function collectEcsChannelChannelSections(

@@ -28,24 +28,28 @@ export function addChannelMessages(
             plan.interpolatedMessages.push(...interpolatedBroadcastMessages)
         }
     }
-    addScopedQueuedMessages(plan, user, channel.nid)
+    collectScopedChannelMessages(user, channel.nid, plan.messages, plan.interpolatedMessages)
 }
 
-function addScopedQueuedMessages(plan: SnapshotPlan, user: User, channelId: number) {
-    for (let i = user.scopedMessageQueue.length - 1; i >= 0; i--) {
+export function collectScopedChannelMessages(user: User, channelId: number, messages: any[], interpolatedMessages: any[]) {
+    let retained = 0
+    for (let i = 0; i < user.scopedMessageQueue.length; i++) {
         const queued = user.scopedMessageQueue[i]
-        if (queued.channelId !== channelId) {
-            continue
+        if (queued.channelId === channelId) {
+            messages.push(queued.message)
+        } else {
+            user.scopedMessageQueue[retained++] = queued
         }
-        plan.messages.push(queued.message)
-        user.scopedMessageQueue.splice(i, 1)
     }
-    for (let i = user.scopedInterpolatedMessageQueue.length - 1; i >= 0; i--) {
+    user.scopedMessageQueue.length = retained
+    retained = 0
+    for (let i = 0; i < user.scopedInterpolatedMessageQueue.length; i++) {
         const queued = user.scopedInterpolatedMessageQueue[i]
-        if (queued.channelId !== channelId) {
-            continue
+        if (queued.channelId === channelId) {
+            interpolatedMessages.push(queued.message)
+        } else {
+            user.scopedInterpolatedMessageQueue[retained++] = queued
         }
-        plan.interpolatedMessages.push(queued.message)
-        user.scopedInterpolatedMessageQueue.splice(i, 1)
     }
+    user.scopedInterpolatedMessageQueue.length = retained
 }

@@ -52,6 +52,11 @@ export class PlaybackCursor {
         if (errorTicks > this.options.correctionDeadbandTicks) {
             const correction = Math.min(this.options.maxCorrectionRate, errorTicks * this.options.correctionGain)
             playbackRate += correction
+        } else if (errorTicks < -this.options.correctionDeadbandTicks) {
+            // A stall can exhaust the buffer. Slightly slower forward playback
+            // lets it refill; running at 1x forever would stay at the frontier.
+            const correction = Math.min(this.options.maxCorrectionRate, -errorTicks * this.options.correctionGain)
+            playbackRate = Math.max(0, playbackRate - correction)
         }
 
         this.playbackTick = Math.min(availableLastTick, this.playbackTick + (elapsedTicks * playbackRate))

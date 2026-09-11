@@ -1,5 +1,5 @@
 import { IEntity } from '../common/IEntity'
-import { ChannelType, createChannelHeader, mergeChannelHeaderData } from '../common/ChannelHeader'
+import { ChannelType, createChannelHeader, hasSchemaBackedChannelHeader, mergeChannelHeaderData } from '../common/ChannelHeader'
 import { SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 import { NQueue } from '../NQueue'
 import { Client } from './Client'
@@ -18,7 +18,7 @@ import {
     assertNetworkIdType,
     readNetworkId
 } from '../common/binary/Protocol'
-import { EngineMessage } from '../common/EngineMessage'
+import { EngineMessage, MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET } from '../common/EngineMessage'
 import { BinarySection } from '../common/binary/BinarySection'
 import count from '../binary/message/count'
 import readEngineMessage from '../binary/message/readEngineMessage'
@@ -171,6 +171,7 @@ export class ClientNetwork {
     sendSchemaFingerprint = false
     private pendingOutboundRollback: OutboundRollback | null = null
     private pendingPongs: PendingPong[] = []
+    private pendingTypeDeletes = new Set<number>()
 
     onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
         this.pendingPongs = []
@@ -246,6 +247,12 @@ export class ClientNetwork {
 
         this.lastReportedInterpolationDelayMs = roundedDelayMs
         this.lastInterpolationDelayReportAt = now
+        // A delayed flush needs only the latest reported delay.
+        const queued = this.outbound.outboundEngineCommands.get(this.outbound.tick)
+        if (queued) {
+            const previous = queued.find(command => command.ntype === EngineMessage.InterpolationDelay)
+            if (previous) { previous.delayMs = roundedDelayMs; return true }
+        }
         this.addEngineCommand({
             ntype: EngineMessage.InterpolationDelay,
             delayMs: roundedDelayMs
@@ -437,13 +444,25 @@ export class ClientNetwork {
 
         const frame = this.store.applySnapshot(pending.snapshot, this.frameTick, pending.receivedAtMs)
         frame.channels.forEach(channel => {
-            channel.deleteEntities.forEach(nid => this.entityNTypes.delete(nid))
-            channel.ecsDeleteEntities.forEach(pid => this.entityNTypes.delete(pid))
+            channel.deleteEntities.forEach(nid => this.pendingTypeDeletes.add(nid))
+            channel.ecsDeleteEntities.forEach(pid => this.pendingTypeDeletes.add(pid))
         })
         frame.closedChannels.forEach(closed => {
-            this.entityNTypes.delete(closed.channelId)
-            closed.entityNids.forEach(nid => this.entityNTypes.delete(nid))
+            this.pendingTypeDeletes.add(closed.channelId)
+            closed.entityNids.forEach(nid => this.pendingTypeDeletes.add(nid))
         })
+        // The decoder may already know types from newer queued snapshots. Only
+        // remove closed/deleted IDs once the store catches up, and keep any ID
+        // now owned by a replacement entity or schema-backed channel header.
+        if (this.pendingFrames.length === 0 && this.pendingTypeDeletes.size > 0) {
+            this.pendingTypeDeletes.forEach(nid => {
+                const header = this.store.channelHeaders.get(nid)
+                if (!this.store.entities.has(nid) && (!header || !hasSchemaBackedChannelHeader(header))) {
+                    this.entityNTypes.delete(nid)
+                }
+            })
+            this.pendingTypeDeletes.clear()
+        }
         this.frameTick++
         this.frames.push(frame)
         while (this.frames.length > this.maxFrameHistory) {
@@ -635,10 +654,16 @@ export class ClientNetwork {
         const queuedRequests = this.requestQueue.length
         const requests = this.getRequestsForNextFrame()
 
+        if (outboundEngineCommands.length > MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET) {
+            throw new Error('Too many client engine messages in one packet; flush more frequently.')
+        }
+        if (outboundCommands.length > 255) {
+            throw new Error('A client packet supports at most 255 commands; flush more frequently.')
+        }
+
         // count ENGINE COMMANDS
         if (outboundEngineCommands.length > 0) {
-            bytes += 1 // commands!
-            bytes += 1 // number of commands
+            bytes += 2 * Math.ceil(outboundEngineCommands.length / MAX_ENGINE_MESSAGES_PER_SECTION)
             outboundEngineCommands.forEach((command: any) => {
                 bytes += count(this.client.context.getEngineSchema(command.ntype)!, command)
             })
@@ -664,14 +689,15 @@ export class ClientNetwork {
 
         const dw = binary.createWriter(bytes)
 
-        // write ENGINE COMMANDs
-        if (outboundEngineCommands.length > 0) {
+        // Each section has a UInt8 count; timing metadata can require more than one.
+        for (let offset = 0; offset < outboundEngineCommands.length; offset += MAX_ENGINE_MESSAGES_PER_SECTION) {
+            const end = Math.min(offset + MAX_ENGINE_MESSAGES_PER_SECTION, outboundEngineCommands.length)
             dw.writeUInt8(BinarySection.EngineMessages)
-            dw.writeUInt8(outboundEngineCommands.length)
-
-            outboundEngineCommands.forEach((command: any) => {
+            dw.writeUInt8(end - offset)
+            for (let i = offset; i < end; i++) {
+                const command = outboundEngineCommands[i]
                 writeMessage(command, this.client.context.getEngineSchema(command.ntype)!, dw)
-            })
+            }
         }
 
         if (isDebug) {
@@ -901,7 +927,10 @@ export class ClientNetwork {
                     }
 
                     if (engineMessage.ntype === EngineMessage.Ping) {
-                        const clientReceiveTimeMs = this.nowMs()
+                        // Timestamp entry to the receive callback, not the point
+                        // at which decoding reaches this engine section. Parsing
+                        // belongs to client turnaround in the Pong exchange.
+                        const clientReceiveTimeMs = receivedAtMs
                         this.pendingPongs.push({
                             pingId: engineMessage.pingId,
                             clientReceiveTimeMs

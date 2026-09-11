@@ -28,5 +28,9 @@ export function commitSnapshotPlan(user: User, plan: SnapshotPlan) {
     }
 
     const sentResponses = new Set(plan.responses)
-    user.responseQueue = user.responseQueue.filter(response => !sentResponses.has(response))
+    user.responseQueue = user.responseQueue.filter(response => {
+        if (!sentResponses.has(response)) return true
+        user.instance?.network.releaseQueuedResponse(user, response)
+        return false
+    })
 }

@@ -44,19 +44,22 @@ export type CommandViewTimeOptions = {
 
 export function getCommandViewTimeMs(timing: CommandTimingEstimate | undefined, options: CommandViewTimeOptions) {
     const nowMs = options.nowMs
-    const fallbackRewindMs = Math.max(0, options.fallbackRewindMs ?? 0)
+    if (!Number.isFinite(nowMs)) throw new Error('nowMs must be finite.')
+    const fallbackRewindMs = Number.isFinite(options.fallbackRewindMs) ? Math.max(0, options.fallbackRewindMs!) : 0
     let viewTimeMs = nowMs - fallbackRewindMs
 
     if (timing) {
-        if (timing.viewServerTimeMs >= 0) {
+        if (Number.isFinite(timing.viewServerTimeMs) && timing.viewServerTimeMs >= 0) {
             viewTimeMs = timing.viewServerTimeMs
-        } else if (Number.isFinite(timing.estimatedViewAgeMs)) {
-            viewTimeMs = nowMs - Math.max(0, timing.estimatedViewAgeMs)
+        } else if (Number.isFinite(timing.estimatedViewTimeMs)) {
+            // The estimate is anchored at receipt. Queueing must not move the
+            // world the client saw forward to the command's processing time.
+            viewTimeMs = timing.estimatedViewTimeMs
         }
     }
 
-    if (options.maxRewindMs !== undefined && options.maxRewindMs > 0) {
-        viewTimeMs = Math.max(nowMs - options.maxRewindMs, viewTimeMs)
+    if (Number.isFinite(options.maxRewindMs) && options.maxRewindMs! > 0) {
+        viewTimeMs = Math.max(nowMs - options.maxRewindMs!, viewTimeMs)
     }
     return Math.min(nowMs, viewTimeMs)
 }
@@ -77,6 +80,14 @@ export class User {
     scopedMessageQueue: { channelId: number, message: any }[] = []
     scopedInterpolatedMessageQueue: { channelId: number, message: any }[] = []
     responseQueue: SnapshotResponse[] = []
+    /** Engine accounting; consume server queues through next/dequeue/removeWhere/clear. */
+    queuedCommandCount = 0
+    queuedRequestCount = 0
+    queuedInputBytes = 0
+    queuedResponseBytes = 0
+    inboundRateTimeMs: number | null = null
+    inboundPacketTokens = 0
+    inboundByteTokens = 0
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
     knownChannelIds: Set<number> = new Set()
     knownChannelHeaderVersions: Map<number, number> = new Map()
@@ -84,6 +95,7 @@ export class User {
     private pendingChannelCloses: Set<number> = new Set()
     lastSentInstanceTick = 0
     lastReceivedCommandFrameNumber = 0
+    private confirmedCommandFrameNumber = 0
     nextPingId = 1
     lastSentPingId = 0
     latency = 0
@@ -147,7 +159,7 @@ export class User {
     }
 
     receiveCommandFrameNumber(commandFrameNumber: number) {
-        if (commandFrameNumber <= 0) {
+        if (!Number.isSafeInteger(commandFrameNumber) || commandFrameNumber <= 0 || commandFrameNumber > 0xffffffff) {
             return this.lastReceivedCommandFrameNumber
         }
 
@@ -155,6 +167,30 @@ export class User {
             this.lastReceivedCommandFrameNumber = commandFrameNumber
         }
         return this.lastReceivedCommandFrameNumber
+    }
+
+    /** The complete input prefix explicitly confirmed by game code. */
+    get lastConfirmedCommandFrameNumber() {
+        return this.confirmedCommandFrameNumber
+    }
+
+    /**
+     * Confirm that authoritative state reflects the handling of every received
+     * command batch through this number, including deliberately rejected input.
+     * Call after the relevant simulation work and before instance.step(). Merely
+     * receiving or routing a batch does not confirm it. An older completion is
+     * harmless, but must not be used to skip unfinished earlier input.
+     *
+     * Games without prediction also confirm commands to release client history.
+     * Request responses have their own completion mechanism.
+     */
+    confirmCommandsThrough(commandFrameNumber: number) {
+        if (!Number.isSafeInteger(commandFrameNumber) || commandFrameNumber < 0 ||
+            commandFrameNumber > 0xffffffff || commandFrameNumber > this.lastReceivedCommandFrameNumber) {
+            throw new RangeError('Command confirmation must be a received UInt32 command frame number.')
+        }
+        this.confirmedCommandFrameNumber = Math.max(this.confirmedCommandFrameNumber, commandFrameNumber)
+        return this.confirmedCommandFrameNumber
     }
 
     recordClockSyncPong(
@@ -169,21 +205,30 @@ export class User {
             !Number.isFinite(serverReceiveTimeMs) ||
             !Number.isFinite(pong.clientReceiveTimeMs) ||
             !Number.isFinite(pong.clientSendTimeMs) ||
+            Math.abs(pong.clientReceiveTimeMs) > Number.MAX_SAFE_INTEGER ||
+            Math.abs(pong.clientSendTimeMs) > Number.MAX_SAFE_INTEGER ||
             pong.clientSendTimeMs < pong.clientReceiveTimeMs
         ) {
             return false
         }
 
-        this.pendingPings.delete(pong.pingId)
-        this.lastPongReceivedAtMs = serverReceiveTimeMs
-
         const serverSendTimeMs = pendingPing.serverTimeMs
         const clientReceiveTimeMs = pong.clientReceiveTimeMs
         const clientSendTimeMs = pong.clientSendTimeMs
         const clientTurnaroundMs = Math.max(0, clientSendTimeMs - clientReceiveTimeMs)
-        const roundTripMs = Math.max(0, (serverReceiveTimeMs - pendingPing.sentAtMs) - clientTurnaroundMs)
+        const elapsedMs = serverReceiveTimeMs - pendingPing.sentAtMs
+        // Client processing cannot exceed the observed trip. Allow 1 ms for
+        // clock rounding; an implausible sample must not renew liveness.
+        if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || clientTurnaroundMs > elapsedMs + 1) return false
+        const roundTripMs = Math.max(0, elapsedMs - clientTurnaroundMs)
         const offsetMs = ((serverSendTimeMs - clientReceiveTimeMs) + (serverReceiveTimeMs - clientSendTimeMs)) * 0.5
 
+        const clockOffsetMs = this.clockSyncSamples === 0
+            ? offsetMs : (this.clockOffsetMs * 0.85) + (offsetMs * 0.15)
+        if (!Number.isFinite(roundTripMs) || !Number.isFinite(clockOffsetMs)) return false
+
+        this.pendingPings.delete(pong.pingId)
+        this.lastPongReceivedAtMs = serverReceiveTimeMs
         this.recentLatencies.push(roundTripMs)
         while (this.recentLatencies.length > this.latencySamples) {
             this.recentLatencies.shift()
@@ -197,21 +242,32 @@ export class User {
         this.oneWayMs = this.roundTripMs * 0.5
         this.latency = this.roundTripMs
         this.minRoundTripMs = Math.min(this.minRoundTripMs, roundTripMs)
-        if (this.clockSyncSamples === 0) {
-            this.clockOffsetMs = offsetMs
-        } else {
-            this.clockOffsetMs = (this.clockOffsetMs * 0.85) + (offsetMs * 0.15)
-        }
+        this.clockOffsetMs = clockOffsetMs
         this.clockSyncSamples++
         return true
     }
 
     estimateCommandTiming(input: CommandTimingInput, serverReceivedTimeMs: number): CommandTimingEstimate {
+        // Fractional clocks are valid; values outside safe millisecond magnitude
+        // cannot represent useful client timing. Check before deriving estimates.
+        if (!Number.isFinite(input.clientTimeMs) || Math.abs(input.clientTimeMs) > Number.MAX_SAFE_INTEGER ||
+            !Number.isFinite(input.renderDelayMs) || input.renderDelayMs > Number.MAX_SAFE_INTEGER || input.renderDelayMs < 0 ||
+            !Number.isFinite(input.viewTick) || Math.abs(input.viewTick) > Number.MAX_SAFE_INTEGER ||
+            !Number.isFinite(input.viewServerTimeMs) || Math.abs(input.viewServerTimeMs) > Number.MAX_SAFE_INTEGER ||
+            !Number.isFinite(serverReceivedTimeMs)) {
+            throw new Error('Invalid command timing.')
+        }
         const estimatedInputTimeMs = this.clockSyncSamples > 0
             ? input.clientTimeMs + this.clockOffsetMs
             : serverReceivedTimeMs - this.oneWayMs
         const renderDelayMs = Number.isFinite(input.renderDelayMs) ? Math.max(0, input.renderDelayMs) : 0
         const estimatedViewTimeMs = estimatedInputTimeMs - renderDelayMs
+        const estimatedInputAgeMs = Math.max(0, serverReceivedTimeMs - estimatedInputTimeMs)
+        const estimatedViewAgeMs = Math.max(0, serverReceivedTimeMs - estimatedViewTimeMs)
+        if (!Number.isFinite(estimatedInputTimeMs) || !Number.isFinite(estimatedViewTimeMs) ||
+            !Number.isFinite(estimatedInputAgeMs) || !Number.isFinite(estimatedViewAgeMs)) {
+            throw new Error('Invalid derived command timing.')
+        }
         return {
             commandIndex: input.commandIndex,
             clientTimeMs: input.clientTimeMs,
@@ -221,8 +277,8 @@ export class User {
             serverReceivedTimeMs,
             estimatedInputTimeMs,
             estimatedViewTimeMs,
-            estimatedInputAgeMs: Math.max(0, serverReceivedTimeMs - estimatedInputTimeMs),
-            estimatedViewAgeMs: Math.max(0, serverReceivedTimeMs - estimatedViewTimeMs),
+            estimatedInputAgeMs,
+            estimatedViewAgeMs,
             roundTripMs: this.roundTripMs,
             oneWayMs: this.oneWayMs,
             clockOffsetMs: this.clockOffsetMs,
@@ -255,10 +311,12 @@ export class User {
     }
 
     unsubscribe(channel: IChannel) {
-        if (!this.subscriptions.has(channel.nid)) {
+        if (this.subscriptions.get(channel.nid) !== channel) {
             return
         }
         this.subscriptions.delete(channel.nid)
+        this.scopedMessageQueue = this.scopedMessageQueue.filter(queued => queued.channelId !== channel.nid)
+        this.scopedInterpolatedMessageQueue = this.scopedInterpolatedMessageQueue.filter(queued => queued.channelId !== channel.nid)
         const pendingOpen = this.pendingChannelOpens.delete(channel.nid)
         if (!pendingOpen && this.knownChannelIds.has(channel.nid)) {
             this.pendingChannelCloses.add(channel.nid)
@@ -274,7 +332,9 @@ export class User {
         this.messageQueue.push(message)
     }
 
+    /** Queues for the current subscription; unsubscribe cancels unsent scoped messages. */
     queueChannelMessage(channelId: number, message: any) {
+        if (!this.subscriptions.has(channelId)) return
         this.scopedMessageQueue.push({ channelId, message })
     }
 
@@ -282,7 +342,9 @@ export class User {
         this.interpolatedMessageQueue.push(message)
     }
 
+    /** Queues for the current subscription; unsubscribe cancels unsent scoped messages. */
     queueChannelInterpolatedMessage(channelId: number, message: any) {
+        if (!this.subscriptions.has(channelId)) return
         this.scopedInterpolatedMessageQueue.push({ channelId, message })
     }
 
@@ -311,7 +373,11 @@ export class User {
     }
 
     disconnect(reason: StringOrJSONStringifiable) {
-        this.networkAdapter.disconnect(this, reason)
+        if (this.network) {
+            this.network.disconnectUser(this, reason)
+        } else {
+            this.networkAdapter.disconnect(this, reason)
+        }
     }
 
 }

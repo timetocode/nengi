@@ -26,6 +26,39 @@ function addMovingEntityFrames(harness: InterpolationTestHarness) {
 }
 
 describe('FixedStepInterpolator', () => {
+    it('rebuilds its interpolation buffer after a stall without moving playback backward', () => {
+        const harness = new InterpolationTestHarness({ delay: { mode: 'static' } })
+        harness.receiveMovingFrames(1000)
+        harness.sample(100, 1150)
+        let sample = harness.sample(100, 2000)
+        expect(sample.latestBufferTicks).toBe(0)
+        for (let i = 1; i <= 100; i++) {
+            const previous = sample.targetTick
+            harness.receive({
+                serverTimeMs: 1150 + i * 50,
+                updateEntities: [{ nid: 1, prop: 'x', value: 30 + i * 10 }]
+            }, 2000 + i * 50)
+            sample = harness.sample(100, 2000 + i * 50)
+            expect(sample.targetTick).toBeGreaterThanOrEqual(previous)
+            expect(sample.targetTick).toBeLessThanOrEqual(sample.availableLastTick!)
+        }
+        expect(sample.latestBufferTicks!).toBeGreaterThanOrEqual(1.89)
+        expect(sample.latestBufferTicks!).toBeLessThanOrEqual(2.1)
+    })
+
+    it('honors an increased delay on an existing timeline without reversing playback', () => {
+        const harness = new InterpolationTestHarness({ delay: { mode: 'static' } })
+        harness.receiveMovingFrames(1000)
+        let sample = harness.sample(50, 1150)
+        for (let i = 1; i <= 100; i++) {
+            const previous = sample.targetTick
+            harness.receive({ serverTimeMs: 1150 + i * 50 }, 1150 + i * 50)
+            sample = harness.sample(150, 1150 + i * 50)
+            expect(sample.targetTick).toBeGreaterThanOrEqual(previous)
+        }
+        expect(sample.latestBufferTicks!).toBeGreaterThanOrEqual(2.89)
+    })
+
     it('starts playback at the desired tick buffer behind the latest frame', () => {
         const harness = new InterpolationTestHarness()
         addMovingEntityFrames(harness)

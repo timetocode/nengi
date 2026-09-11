@@ -2,6 +2,7 @@ import { NetworkEvent } from '../common/binary/NetworkEvent'
 import type { INetworkEvent } from './InstanceNetwork'
 import type { CommandTimingEstimate } from './User'
 import type { User } from './User'
+import { UserConnectionState } from './User'
 
 export type CommandRouterHandler<Command = any> = (args: {
     user: User
@@ -37,13 +38,18 @@ export class CommandRouter {
         return this
     }
 
+    /** Routes input only; game code explicitly confirms completed simulation on User. */
     process(event: INetworkEvent) {
+        if (event.user.connectionState !== UserConnectionState.Open) {
+            return 0
+        }
         if (event.type === NetworkEvent.CommandSet) {
             const commands = Array.isArray(event.commands) ? event.commands : []
-            for (let i = 0; i < commands.length; i++) {
+            let i = 0
+            for (; i < commands.length && event.user.connectionState === UserConnectionState.Open; i++) {
                 this.processCommand(event.user, commands[i], event, event.commandFrameNumber ?? -1, i, event.commandTimings?.[i])
             }
-            return commands.length
+            return i
         }
 
         if (event.type === NetworkEvent.Command && event.commands) {
@@ -55,6 +61,9 @@ export class CommandRouter {
     }
 
     processCommand(user: User, command: any, event: INetworkEvent, commandFrameNumber = -1, commandIndex = 0, timing?: CommandTimingEstimate) {
+        if (user.connectionState !== UserConnectionState.Open) {
+            return false
+        }
         const ntype = command?.ntype
         const handlers = typeof ntype === 'number' ? this.handlers.get(ntype) : undefined
         if (!handlers || handlers.length === 0) {
@@ -62,7 +71,7 @@ export class CommandRouter {
             return false
         }
 
-        for (let i = 0; i < handlers.length; i++) {
+        for (let i = 0; i < handlers.length && user.connectionState === UserConnectionState.Open; i++) {
             handlers[i]({ user, command, event, commandFrameNumber, commandIndex, timing })
         }
         return true

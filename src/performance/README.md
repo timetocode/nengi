@@ -4,6 +4,49 @@ These scripts are local profiling tools for nengi hot paths. They are not
 product tests and their numbers are machine-dependent. Use them to compare
 variants on the same machine in the same session.
 
+## Client History
+
+`ClientHistoryWorkload.ts` exercises real client frame application and retained
+history without a transport or renderer. Run one scenario and phase at a time:
+
+```bash
+PROFILE_SCENARIO=sparse PROFILE_PHASE=prune npm run profile:history
+PROFILE_SCENARIO=sparse PROFILE_PHASE=sample npm run profile:history
+PROFILE_CHROMIUM_PATH=/absolute/path/to/chrome PROFILE_SCENARIO=sparse PROFILE_PHASE=sample npm run profile:history:browser
+```
+
+Scenarios are `stationary`, `sparse` (one percent changing), `dense` (all
+changing), `churn` (delete/create with reused IDs and periodic channel close/open),
+`ecs` (three components per root, one percent changing), and `selective` (sample
+at most 500 IDs from a larger sparse population). Defaults are 50,000 entities,
+or 10,000 for `dense` and `ecs`, 240 history frames, 60 warmup iterations, and
+120 measured iterations. Override with `PROFILE_ENTITIES`,
+`PROFILE_HISTORY_FRAMES`, `PROFILE_WARMUP`, and `PROFILE_ITERATIONS`.
+
+The prune phase reports both the whole frame-processing duration and its nested
+pruning duration, so the cost of recording the expiration index is included in
+the whole-frame measurement. Synthetic snapshot construction is outside that
+measurement. The sample phase uses fixed retained history and three playback
+positions per frame interval (20 Hz receive / 60 Hz render), isolating sampling
+from receive cost. It includes sample diagnostics but does not model live
+arrival jitter, a renderer, or wall-clock playback scheduling.
+
+Output includes p50/p95/p99/max, timeline and record counts, expiration-index
+counts, and heap readings before/after explicit GC. Heap readings measure
+retained memory and transient heap occupancy, **not total allocated bytes or GC
+pause duration**. Browser timings below the clock's resolution can report zero.
+The Node command exposes GC; the browser runner uses a fresh headless Chromium
+process and profile, and requires a local Chromium executable. Chromium runs
+without its sandbox for compatibility with local container environments.
+
+For a before/after comparison, copy these two workload files into a clean
+baseline checkout's `src/performance` directory and run the same configurations
+sequentially on the same machine. The browser runner accepts
+`PROFILE_SOURCE_ROOT=/absolute/path/to/baseline`; the Node entry can be run from
+that checkout using the current checkout's tsx loader. Do not benchmark both
+versions concurrently. Dense workloads retain millions of records and require
+substantial heap space. Keep full JSON results outside the published package.
+
 ## Snapshot Pipeline
 
 `SnapshotPipeline.performance.ts` measures server-side snapshot production
@@ -11,6 +54,50 @@ without WebSocket or client processing cost. It uses real `Instance`, `User`,
 channels, entity schemas, entity cache, diffing, byte counting, and binary
 writing. The only mocked part is the network adapter: it counts sends and bytes
 and then discards the buffer.
+
+Each measured tick contributes one pre-step, index and snapshot duration;
+inactive stages contribute zero. Combined statistics summarize the sums of
+matching ticks. They exclude harness bookkeeping outside the measured stages.
+Separate decode/apply tests establish output correctness for the fixed-membership
+workloads; timing and byte counts alone do not establish correctness.
+
+Spatial ECS lifecycle workloads also have decode/apply checks in
+`SnapshotPipeline.test.ts`. They cover 2D/3D, shared/direct output, root or
+component replacement, and writes before/after removal. Removed objects must
+have survived an earlier snapshot; no benchmark relies on creating and removing
+the same object in one tick.
+
+To measure structural work in the existing pipeline, use `ecs-channel-2d`,
+`ecs-channel-3d`, or `ecs-channel-clump` with these additional options:
+
+```bash
+PROFILE_SCENARIO=ecs-channel-2d PROFILE_USERS=20 PROFILE_ENTITIES=1000 \
+PROFILE_SPATIAL_DISTRIBUTION=single-cell PROFILE_CELL_SIZE=512 PROFILE_VIEW_HALF=1024 \
+PROFILE_SHARED_UPDATES=1 PROFILE_CHURN=100 PROFILE_ECS_CHURN=components \
+PROFILE_ECS_CHURN_ORDER=after-writes PROFILE_ECS_MATERIALIZE=0 \
+PROFILE_WARMUP=200 PROFILE_TICKS=600 npm run profile:snapshot
+```
+
+`PROFILE_ECS_CHURN` is `none` (default), `roots`, or `components`. Root replacement
+replaces the root and its three components; component replacement replaces only
+vitals on a surviving root. Replacement copies current gameplay values so it
+preserves the intended movement workload. `PROFILE_CHURN` is the number replaced
+per tick, capped at the population; it remains zero by default in spatial ECS
+scenarios. Every root still has three live components after replacement.
+
+`PROFILE_ECS_CHURN_ORDER` is `before-writes` or `after-writes` (default).
+`PROFILE_ECS_MATERIALIZE=1` calls a public visibility query after writes and before
+removal; it requires `after-writes`. This exercises already-built cell logs as
+well as ordinary pending writes. These options default off and do not change
+the existing fixed-membership workloads. Full and summary output report the
+chosen structural settings alongside mutation, snapshot, and total timings.
+
+For comparisons, hold this harness and its binary backend identical across
+source revisions, use fresh sequential processes, rotate variant order, and
+report both p50 and p95 with individual repeats. An untouched old release measures
+all intervening changes; a control changing only the suspected code is needed to
+attribute a difference. Output counts and bytes help characterize a workload,
+but fewer updates are not automatically a correctness or performance improvement.
 
 Run from the `nengi` package:
 
@@ -54,11 +141,17 @@ Scenarios:
   grouped transform update testing.
 - `players-300`: default shape matches the all-visible player stress profile:
   300 users, 302 visible entities.
-- `sparse-visible`: many entities mutate, but users see only a small fixed set.
-  This is useful for avoiding global-diff designs that would scan the whole
-  world.
-- `non-overlap`: users each see a different fixed slice. This tests whether an
-  optimization only helps shared visibility.
+- `sparse-visible`: all users subscribe to one ordinary `Channel` containing
+  the first `min(PROFILE_VISIBLE, PROFILE_ENTITIES)` entities. Remaining entities
+  belong to an unsubscribed channel. The entire population mutates, but only the
+  subscribed set should be diffed. This models fixed room membership, not spatial
+  visibility-query cost.
+- `non-overlap`: each user subscribes to a separate ordinary `Channel` with a
+  disjoint slice of `PROFILE_VISIBLE` entities. Unassigned entities belong to an
+  unsubscribed channel. Requires `PROFILE_ENTITIES >= PROFILE_USERS * PROFILE_VISIBLE`;
+  invalid configurations throw rather than silently reusing entities across views.
+  Without an explicit visible count, it uses `floor(entities / users)`. Compare
+  this against shared membership to assess fragment reuse with different audiences.
 - `channel-2d`: whole-cell spatial visibility workload through `Channel2D`,
   using per-cell create/update/delete fragments.
   `PROFILE_STABLE_FRAGMENT_CELL_LIMIT` allows stable views to use more copied
@@ -184,6 +277,10 @@ Interpretation notes:
   WebSocket backpressure, bot CPU saturation, or client decode/apply cost.
 - Compare variants by running them back-to-back. Absolute numbers are less
   useful than ratios.
+- Fixed-membership scenarios now use supported channels instead of the old
+  synthetic visibility fixture. Their results are not directly comparable to
+  historical measurements of that fixture. Earlier combined p50/p95/max fields
+  added stage statistics; regenerate those figures with the corrected harness.
 - Keep experimental variants short-lived until they beat the current per-user
   snapshot path across both shared and non-overlapping visibility shapes.
 - Unknown `PROFILE_SCENARIO` values throw immediately. A typo can otherwise

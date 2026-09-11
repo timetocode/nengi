@@ -112,8 +112,8 @@ function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecificati
         pre: (pre) ? pre : (value: any) => { return value },
         // use the post function or create a function that returns the value unchanged
         post: (post) ? post : (value: any) => { return value },
-        // use the interp function or create a function that returns the most recent value uninterpolated
-        interp: (interp) ? interp : (a: any, b: any) => { return b },
+        // Without interpolation, return the latest value using the type's copy contract.
+        interp: interp ?? (clone ? (_a: any, b: any) => clone(b) : (_a: any, b: any) => b),
         clone: (clone) ? clone : (value: any) => { return value }
     })
 }
@@ -217,56 +217,64 @@ declareBinaryType<Uint8Array>(Binary.UInt8Array, {
     write: (value: Uint8Array, bw: IBinaryWriter) => { bw.writeUInt8Array(value) },
     read: (br: IBinaryReader) => { return br.readUInt8Array() },
     byteSize: countByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Uint8Array) => new Uint8Array(value)
 })
 
 declareBinaryType<Int8Array>(Binary.Int8Array, {
     write: (value: Int8Array, bw: IBinaryWriter) => { bw.writeInt8Array(value) },
     read: (br: IBinaryReader) => { return br.readInt8Array() },
     byteSize: countByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Int8Array) => new Int8Array(value)
 })
 
 declareBinaryType<Uint16Array>(Binary.UInt16Array, {
     write: (value: Uint16Array, bw: IBinaryWriter) => { bw.writeUInt16Array(value) },
     read: (br: IBinaryReader) => { return br.readUInt16Array() },
     byteSize: count2ByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Uint16Array) => new Uint16Array(value)
 })
 
 declareBinaryType<Int16Array>(Binary.Int16Array, {
     write: (value: Int16Array, bw: IBinaryWriter) => { bw.writeInt16Array(value) },
     read: (br: IBinaryReader) => { return br.readInt16Array() },
     byteSize: count2ByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Int16Array) => new Int16Array(value)
 })
 
 declareBinaryType<Uint32Array>(Binary.UInt32Array, {
     write: (value: Uint32Array, bw: IBinaryWriter) => { bw.writeUInt32Array(value) },
     read: (br: IBinaryReader) => { return br.readUInt32Array() },
     byteSize: count4ByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Uint32Array) => new Uint32Array(value)
 })
 
 declareBinaryType<Int32Array>(Binary.Int32Array, {
     write: (value: Int32Array, bw: IBinaryWriter) => { bw.writeInt32Array(value) },
     read: (br: IBinaryReader) => { return br.readInt32Array() },
     byteSize: count4ByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Int32Array) => new Int32Array(value)
 })
 
 declareBinaryType<Float32Array>(Binary.Float32Array, {
     write: (value: Float32Array, bw: IBinaryWriter) => { bw.writeFloat32Array(value) },
     read: (br: IBinaryReader) => { return br.readFloat32Array() },
     byteSize: count4ByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Float32Array) => new Float32Array(value)
 })
 
 declareBinaryType<Float64Array>(Binary.Float64Array, {
     write: (value: Float64Array, bw: IBinaryWriter) => { bw.writeFloat64Array(value) },
     read: (br: IBinaryReader) => { return br.readFloat64Array() },
     byteSize: count8ByteArray,
-    compare: compareTypedArray
+    compare: compareTypedArray,
+    clone: (value: Float64Array) => new Float64Array(value)
 })
 
 declareBinaryType<boolean>(Binary.Boolean, {

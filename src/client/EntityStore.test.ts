@@ -42,6 +42,45 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
 }
 
 describe('EntityStore raw client surface', () => {
+    it('preserves read-only frame values and independent history across mutable-value updates', () => {
+        const context = new Context()
+        context.register(1, defineEntitySchema({ bytes: Binary.UInt8Array, position: Binary.Vector2 }))
+        const store = new EntityStore(context)
+        const channel = (changes: any) => ({
+            channelId: 50, ecsCreateEntities: [], ecsCreateComponents: [], ecsDeleteEntities: [],
+            createEntities: [], updateEntities: [], updateEntityGroups: [], deleteEntities: [],
+            messages: [], interpolatedMessages: [], ...changes
+        })
+        const created = store.applySnapshot(snapshot({
+            channelOpens: [{ channelId: 50, header: createChannelHeader(50, ChannelType.Channel) }],
+            channels: [channel({ createEntities: [{
+                nid: 10, ntype: 1, bytes: new Uint8Array([7]), position: { x: 1, y: 2 }
+            }] })]
+        }), 1)
+        const changed = store.applySnapshot(snapshot({ channels: [channel({ updateEntities: [
+            { nid: 10, prop: 'bytes', value: new Uint8Array([9]) },
+            { nid: 10, prop: 'position', value: { x: 3, y: 4 } }
+        ] })] }), 2)
+        store.applySnapshot(snapshot({ channels: [channel({ updateEntities: [
+            { nid: 10, prop: 'bytes', value: new Uint8Array([11]) },
+            { nid: 10, prop: 'position', value: { x: 5, y: 6 } }
+        ] })] }), 3)
+
+        expect(created.requireChannel(50).createEntities[0].bytes[0]).toBe(7)
+        const updates = changed.requireChannel(50).updateEntities
+        expect(updates[0].previous[0]).toBe(7)
+        expect(updates[0].value[0]).toBe(9)
+        expect(updates[1]).toMatchObject({ previous: { x: 1, y: 2 }, value: { x: 3, y: 4 } })
+        const copy = store.history.getAt(10, 2)!
+        copy.bytes[0] = 99
+        copy.position.x = 99
+        expect(updates[0].value[0]).toBe(9)
+        expect(updates[1].value.x).toBe(3)
+        expect(store.get(10)!.bytes[0]).toBe(11)
+        expect(store.history.getAt(10, 2)!.bytes[0]).toBe(9)
+        expect(store.history.getAt(10, 2)!.position.x).toBe(3)
+    })
+
     it('applies regular channel creates, updates, deletes, and exposes channel facts', () => {
         const store = createStore()
         const frame1 = store.applySnapshot(snapshot({

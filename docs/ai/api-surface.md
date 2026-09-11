@@ -26,6 +26,8 @@ Use these for ordinary game or service code:
 
 - `Context`, schemas, `defineEndpoint`, and protocol payload types
 - `Instance`, `InstanceOptions`, `User`, channels, `CommandRouter`, and `NetworkEvent`
+- `user.confirmCommandsThrough(K)`, `user.lastReceivedCommandFrameNumber`, and
+  `user.lastConfirmedCommandFrameNumber` for explicit command completion
 - `Client`, `ClientOptions`, `ClientConnectResult`, `RequestOptions`, `Frame`, `EntityStore`, and interpolation/prediction helpers
 - `TimeSource`, `client.getEstimatedServerTimeMs()`, and `client.getClockSync()`
 - `EcsWorld`, `ecs`, `bindEcsChannel`, and ECS channel frame appliers
@@ -51,7 +53,7 @@ Use these deliberately and test them against the game's workload:
 
 - `ManualChannel*` and generated component/entity writers
 - `Historian2D` / `Historian3D`
-- `PublicPositionSmoother2D`
+- `PublicPathSmoother2D`
 - `ClientNetwork`, `InstanceNetwork`, `EntityHistory`, and playback details
 - schema fingerprint descriptions and binary diagnostics
 

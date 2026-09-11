@@ -16,18 +16,18 @@ The core package and every official Nengi adapter or binary package used by an
 application must have the exact same version. Do not use `^`, `~`, `latest`, or
 an unpinned range for release-candidate work.
 
-For this release candidate, the package version is `2.0.0-rc.126`:
+For this release candidate, the package version is `2.0.0-rc.127`:
 
 ```text
-nengi@2.0.0-rc.126
-nengi-websocket-client-adapter@2.0.0-rc.126
-nengi-ws-client-adapter@2.0.0-rc.126
-nengi-ws-instance-adapter@2.0.0-rc.126
-nengi-uws-instance-adapter@2.0.0-rc.126
-nengi-bun-instance-adapter@2.0.0-rc.126
-nengi-deno-instance-adapter@2.0.0-rc.126
-nengi-dataviews@2.0.0-rc.126
-nengi-buffers@2.0.0-rc.126
+nengi@2.0.0-rc.127
+nengi-websocket-client-adapter@2.0.0-rc.127
+nengi-ws-client-adapter@2.0.0-rc.127
+nengi-ws-instance-adapter@2.0.0-rc.127
+nengi-uws-instance-adapter@2.0.0-rc.127
+nengi-bun-instance-adapter@2.0.0-rc.127
+nengi-deno-instance-adapter@2.0.0-rc.127
+nengi-dataviews@2.0.0-rc.127
+nengi-buffers@2.0.0-rc.127
 ```
 
 When the core version changes, change every installed official package to that
@@ -72,9 +72,9 @@ Install the core, browser WebSocket adapter, and browser binary backend at the
 same version:
 
 ```bash
-npm install nengi@2.0.0-rc.126 \
-    nengi-websocket-client-adapter@2.0.0-rc.126 \
-    nengi-dataviews@2.0.0-rc.126
+npm install nengi@2.0.0-rc.127 \
+    nengi-websocket-client-adapter@2.0.0-rc.127 \
+    nengi-dataviews@2.0.0-rc.127
 ```
 
 Use the package root for core imports and the adapter package root for the
@@ -97,9 +97,9 @@ setup payload. Use it for authentication or session selection data that
 Install the core, `ws` server adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.126 \
-    nengi-ws-instance-adapter@2.0.0-rc.126 \
-    nengi-buffers@2.0.0-rc.126
+npm install nengi@2.0.0-rc.127 \
+    nengi-ws-instance-adapter@2.0.0-rc.127 \
+    nengi-buffers@2.0.0-rc.127
 ```
 
 Use this adapter when compatibility and simple deployment matter more than
@@ -125,9 +125,9 @@ adapter.listen(8079, () => {
 Install the core, uWS server adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.126 \
-    nengi-uws-instance-adapter@2.0.0-rc.126 \
-    nengi-buffers@2.0.0-rc.126
+npm install nengi@2.0.0-rc.127 \
+    nengi-uws-instance-adapter@2.0.0-rc.127 \
+    nengi-buffers@2.0.0-rc.127
 ```
 
 Use uWS when the deployment Node version is supported by the native
@@ -177,9 +177,9 @@ Install the core, native Bun server adapter, and DataView binary backend at one
 version:
 
 ```bash
-bun add nengi@2.0.0-rc.126 \
-    nengi-bun-instance-adapter@2.0.0-rc.126 \
-    nengi-dataviews@2.0.0-rc.126
+bun add nengi@2.0.0-rc.127 \
+    nengi-bun-instance-adapter@2.0.0-rc.127 \
+    nengi-dataviews@2.0.0-rc.127
 ```
 
 ```ts
@@ -196,6 +196,13 @@ For an application that already owns `Bun.serve`, install
 `adapter.websocket` as its WebSocket handler and route the Nengi endpoint to
 `adapter.upgrade(request, server)`. The adapter uses Bun's hard
 `ServerWebSocket.terminate()` path for Nengi deadlines and send failures.
+Admission is checked before upgrade; a full instance returns HTTP 503.
+
+On tested Bun 1.3.14, a server-initiated WebSocket close could leave
+`server.stop(true)` unresolved even after the socket close event. This also
+reproduced without nengi. Core user cleanup remains immediate; verify native
+shutdown on the Bun version you deploy. Pre-upgrade admission refusals avoid
+creating the refused socket.
 
 ## Deno Server
 
@@ -203,14 +210,14 @@ Install the core, native Deno server adapter, and DataView binary backend at
 one version:
 
 ```bash
-deno add npm:nengi@2.0.0-rc.126 \
-    npm:nengi-deno-instance-adapter@2.0.0-rc.126 \
-    npm:nengi-dataviews@2.0.0-rc.126
+deno add npm:nengi@2.0.0-rc.127 \
+    npm:nengi-deno-instance-adapter@2.0.0-rc.127 \
+    npm:nengi-dataviews@2.0.0-rc.127
 ```
 
 ```ts
-import { Instance } from 'npm:nengi@2.0.0-rc.126'
-import { DenoInstanceAdapter } from 'npm:nengi-deno-instance-adapter@2.0.0-rc.126'
+import { Instance } from 'npm:nengi@2.0.0-rc.127'
+import { DenoInstanceAdapter } from 'npm:nengi-deno-instance-adapter@2.0.0-rc.127'
 
 const instance = new Instance(context)
 const adapter = new DenoInstanceAdapter(instance.network)
@@ -219,10 +226,16 @@ adapter.listen({ port: 8079, hostname: '0.0.0.0' })
 ```
 
 For an application that already owns `Deno.serve`, route the Nengi endpoint to
-`adapter.handle(request, info)`. Deno server WebSockets do not expose hard
+`adapter.handle(request, info)`. Admission is checked before upgrade; a full
+instance returns HTTP 503. Deno server WebSockets do not expose hard
 transport termination. Nengi still removes a timed-out user and its channel
 subscriptions synchronously, then the adapter requests a WebSocket close; the
 adapter's longer Deno idle timeout remains the transport fallback.
+
+On tested Deno 2.9.5, immediate server-side WebSocket refusal with the native
+idle timeout enabled could keep the process alive after close events and server
+shutdown. This also reproduced without nengi. Pre-upgrade refusals avoid that
+socket; verify later server-initiated close/shutdown on the runtime you deploy.
 
 Both native adapters reject text protocol messages and bound queued outbound
 bytes with `maxBufferedBytes`, defaulting to 4 MiB. A send that would exceed the
@@ -236,9 +249,9 @@ ordered reliable stream.
 Install the core, Node client adapter, and Node binary backend at one version:
 
 ```bash
-npm install nengi@2.0.0-rc.126 \
-    nengi-ws-client-adapter@2.0.0-rc.126 \
-    nengi-buffers@2.0.0-rc.126
+npm install nengi@2.0.0-rc.127 \
+    nengi-ws-client-adapter@2.0.0-rc.127 \
+    nengi-buffers@2.0.0-rc.127
 ```
 
 ```ts
@@ -315,8 +328,11 @@ A server adapter must:
 - call `instance.network.onClose(user)` on close
 - implement `send(user, payload)` and `disconnect(user, reason)`
 - implement `terminate(user, reason)` when the transport supports immediate
-  destruction of an unresponsive socket; Nengi uses it for heartbeat and
-  handshake deadline cleanup and falls back to `disconnect` when it is absent
+  destruction of an unresponsive socket; nengi uses it for forced cleanup
+  (including heartbeat and handshake deadlines) and falls back to `disconnect`
+  when it is absent. If an ordinary `disconnect` throws, nengi attempts
+  `terminate` once when available. Logical user cleanup occurs before either
+  transport call, and repeated close callbacks are safe
 
 A client adapter must:
 

@@ -5,7 +5,7 @@ import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { createEmptySnapshotPlan } from './SnapshotPlan'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { writeChannelScope, writeSnapshot } from './writeSnapshot'
-import { isSharedMessageChannel, SharedMessageChannel } from './channelModes'
+import { SharedMessageChannel } from './channelModes'
 import { writePayload } from './snapshotPayload'
 import { byteSizeOfNetworkType, ProtocolConfig } from '../../common/binary/Protocol'
 
@@ -60,18 +60,12 @@ function getSharedMessageFragment(user: User, instance: Instance, channel: Share
     return fragment
 }
 
-export function getSharedMessageFragments(user: User, instance: Instance) {
-    if (instance.network.diagnosticBinaryWrites) {
+export function getSharedMessageFragments(user: User, instance: Instance, channel: SharedMessageChannel): MessageFragment[] {
+    if (instance.network.diagnosticBinaryWrites || channel.broadcastMessages.length === 0) {
         return []
     }
 
-    const fragments: MessageFragment[] = []
-    user.subscriptions.forEach((channel: any) => {
-        if (isSharedMessageChannel(channel) && channel.broadcastMessages.length > 0) {
-            fragments.push(getSharedMessageFragment(user, instance, channel))
-        }
-    })
-    return fragments
+    return [getSharedMessageFragment(user, instance, channel)]
 }
 
 export function sumSharedMessageFragmentBytes(fragments: MessageFragment[], protocol: ProtocolConfig) {

@@ -41,8 +41,14 @@ export class LocalState {
     }
 
     private assertRegisteredParent(parent: IEntity) {
-        if (parent.nid === 0 || !this.ownerByNid.has(parent.nid)) {
+        if (parent.nid === 0 || !this.ownerByNid.has(parent.nid) || this._entities.get(parent.nid) !== parent) {
             throw new Error('Cannot attach a child to an entity that is not networked.')
+        }
+    }
+
+    private assertRegisteredEntity(entity: IEntity) {
+        if (this._entities.get(entity.nid) !== entity) {
+            throw new Error(`Entity nid ${entity.nid} does not refer to the registered object.`)
         }
     }
 
@@ -74,6 +80,7 @@ export class LocalState {
 
         const existingChildren = this.children.get(parent.nid)
         if (child.nid !== 0 && existingChildren?.has(child.nid)) {
+            this.assertRegisteredEntity(child)
             return child
         }
 
@@ -98,6 +105,7 @@ export class LocalState {
         if (!children || !children.has(cnid)) {
             return
         }
+        this.assertRegisteredEntity(child)
         this.invalidateEntityTreeCache(cnid)
         children.delete(cnid)
         this.unregisterEntity(child, parent.nid)
@@ -108,6 +116,7 @@ export class LocalState {
         if (nid !== 0) {
             const ownerNid = this.ownerByNid.get(nid)
             if (ownerNid === ownerId) {
+                this.assertRegisteredEntity(entity)
                 return nid
             }
             if (ownerNid !== undefined) {
@@ -134,6 +143,7 @@ export class LocalState {
             throw new Error(`Entity nid ${nid} is owned by ${ownerNid}, not ${ownerId}.`)
         }
 
+        this.assertRegisteredEntity(entity)
         this.invalidateEntityTreeCache(nid)
         this.unregisterChildren(nid)
         this.ownerByNid.delete(nid)

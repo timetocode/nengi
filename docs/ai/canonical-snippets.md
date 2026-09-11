@@ -139,68 +139,16 @@ function tick() {
     }
 
     instance.processRequests()
+    for (const user of instance.users.values()) {
+        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
+    }
     instance.step()
 }
 ```
 
-```ts
-// client/main.ts
-import { AdaptiveInterpolator, Client } from 'nengi'
-import type { Frame } from 'nengi'
-
-const client = new Client(context, WebSocketClientAdapter, 20)
-const interpolator = new AdaptiveInterpolator(client)
-const channelByName = new Map<string, number>()
-const sprites = new Map<number, Sprite>()
-let controlledNid = 0
-
-function applyFrame(frame: Frame) {
-    frame.openedChannels.forEach(channel => {
-        if (channel.header.name === 'world') {
-            channelByName.set('world', channel.channelId)
-        }
-    })
-
-    frame.messages.forEach(message => {
-        if (message.ntype === NType.YouArePlayer) {
-            controlledNid = message.nid
-        }
-    })
-
-    const worldId = channelByName.get('world')
-    const worldFrame = worldId === undefined ? undefined : frame.getChannel(worldId)
-    if (worldFrame) {
-        worldFrame.createEntities.forEach(entity => {
-            if (entity.ntype === NType.Player) {
-                sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))
-            }
-        })
-
-        worldFrame.deletedEntities.forEach(deleted => {
-            sprites.get(deleted.nid)?.destroy()
-            sprites.delete(deleted.nid)
-        })
-    }
-
-    frame.closedChannels.forEach(channel => {
-        if (channel.channelId === worldId) {
-            channel.entityNids.forEach(nid => {
-                sprites.get(nid)?.destroy()
-                sprites.delete(nid)
-            })
-            channelByName.delete('world')
-        }
-    })
-}
-
-function renderRemotePlayers() {
-    const remoteNids = Array.from(sprites.keys()).filter(nid => nid !== controlledNid)
-    const sample = interpolator.sampleEntities(remoteNids, 100)
-    sample.entities.forEach(entity => {
-        placeSprite(sprites.get(entity.nid), entity)
-    })
-}
-```
+Use the [plain client handler and render loop](./plain-channels.md#canonical-small-client)
+for channel routing, lifecycle cleanup, and interpolation. That is the maintained
+client implementation for this flow.
 
 ## ECS spatial server and client
 
@@ -231,60 +179,20 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
 
     const transform = world.require(pid, Transform)
     applyMoveStep(transform, command)
-    TransformNet.mutate.patch(transform, { x: transform.x, y: transform.y })
+    TransformNet.writer.props.x(transform, transform.x)
+    TransformNet.writer.props.y(transform, transform.y)
     worldChannel.updateView(user, viewFor(transform))
 })
 ```
 
-```ts
-// client/main.ts
-import { Client, EcsWorld, applyEcsChannelClose, applyEcsChannelFrame, ecs } from 'nengi'
-import type { Frame } from 'nengi'
-
-const client = new Client(context, WebSocketClientAdapter, 20)
-const world = new EcsWorld()
-const channelByName = new Map<string, number>()
-
-const Transform = ecs.defineComponent<TransformComponent>(NType.Transform, 'Transform')
-
-function applyFrame(frame: Frame) {
-    frame.openedChannels.forEach(channel => {
-        if (channel.header.name === 'world') {
-            channelByName.set('world', channel.channelId)
-        }
-    })
-
-    const worldId = channelByName.get('world')
-    frame.channels.forEach(channelFrame => {
-        if (channelFrame.channelId === worldId) {
-            applyEcsChannelFrame(world, channelFrame, {
-                beforeRemoveEntity(pid) {
-                    destroySpriteForPid(pid)
-                }
-            })
-        }
-    })
-
-    frame.closedChannels.forEach(channel => {
-        if (channel.channelId === worldId) {
-            applyEcsChannelClose(world, channel, {
-                beforeRemoveEntity(pid) {
-                    destroySpriteForPid(pid)
-                }
-            })
-            channelByName.delete('world')
-        }
-    })
-}
-
-function render() {
-    world.query(Transform).all((pid, transform) => {
-        placeSpriteForPid(transform.pid, transform)
-    })
-}
-```
+Use the [ECS client handler](./ecs-channels.md#canonical-small-client) for
+channel routing, ECS application, and resource cleanup.
 
 ## Predicted movement loop
+
+The client code below uses `client`, `controlledNid`, `applyNetworkFrame`, and
+`render` from the plain client above, plus game-owned prediction state and input.
+Replace its basic animation loop with the prediction loop shown here.
 
 For fast local movement, the server and client must share the deterministic part
 of player-authored movement. If the server resolves wall collision while
@@ -292,11 +200,10 @@ processing a command, the client prediction replay should use the same resolver.
 
 ```ts
 // shared/movement.ts
-export const COMMAND_RATE = 30
-export const COMMAND_DT = 1 / COMMAND_RATE
+// MoveCommand carries dtMs from the originating client render frame.
 
 export function applyPredictedMove(state: MoveState, command: MoveCommand) {
-    applyMoveStep(state, command)
+    applyMoveStep(state, command) // Uses command.dtMs on both sides.
     resolvePlayerWallCollision(state)
 }
 ```
@@ -309,6 +216,7 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
         return
     }
 
+    if (!validateInput(command) || !consumeInputTime(player, command.dtMs)) return
     applyPredictedMove(player, command)
     checkPickupsAndTriggers(user, player)
     world.moveEntity(player)
@@ -335,24 +243,30 @@ const movementPrediction = new CommandReplayPrediction({
     affectedProps: ['x', 'y', 'vx', 'vy']
 })
 
-function renderFrame(dt: number) {
-    for (const frame of client.network.drainFrames()) {
-        applyFrame(frame)
+function renderFrame(dtMs: number) {
+    let frame
+    while ((frame = client.network.processNextFrame())) {
+        applyNetworkFrame(frame)
+        movementPrediction.reconcile()
     }
 
-    movementPrediction.reconcile()
-
-    commandAccumulator += Math.min(dt, 0.12)
-    while (commandAccumulator >= COMMAND_DT) {
-        commandAccumulator -= COMMAND_DT
-        movementPrediction.predict(readMoveCommand())
+    if (document.hidden || dtMs > 100) {
+        clearHeldInput()
+    } else if (dtMs > 0) {
+        movementPrediction.predict({ ...readMoveCommand(), dtMs })
     }
 
     renderLocalPlayer(predictedPlayer)
-    renderRemotePlayers()
+    render()
     client.flush()
 }
 ```
 
 Do not put a custom sequence number in the command payload. Nengi records command
 ordering with `commandFrameNumber` and confirms it through snapshots.
+
+Here `dtMs` is milliseconds and `clearHeldInput()` clears application-owned input.
+The 100 ms cutoff discards input time after a stall. Clear input and reset the
+render clock on visibility changes too; keep essential frame handling separate
+from rendering while hidden. See the
+[client loop and pause policy](./realtime-movement-prediction.md#client-loop).

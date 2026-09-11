@@ -3,6 +3,7 @@ import { Context } from '../../common/Context'
 import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { Component, EcsWorld, ecs } from '../../ecs/EcsWorld'
 import { LocalState } from '../LocalState'
+import { Instance } from '../Instance'
 import { EcsChannel } from './EcsChannel'
 import { EcsChannel2D } from './EcsChannel2D'
 import { EcsChannel3D } from './EcsChannel3D'
@@ -185,6 +186,38 @@ describe('ECS channel binding', () => {
         expect(() => replicated.removeEntity(pid)).toThrow(
             `ECS channel binding invariant failed for root ${pid}: owned=true, world=true, channel=false.`
         )
+    })
+
+    describe.each([EcsChannel2D, EcsChannel3D])('%p unpositioned roots', Channel => {
+        it.each([false, true])('removes components without a spatial component (previously spatial=%s)', previouslySpatial => {
+            const context = createContext()
+            const instance = new Instance(context)
+            const world = new EcsWorld()
+            const channel = new Channel(instance.localState, 100)
+            const binding = bindEcsChannel(world, channel, { context })
+            const TransformNet = binding.component(Transform)
+            const ActorNet = binding.component(Actor)
+            const pid = binding.createEntity()
+            const actor = ActorNet.add(pid, actorState())
+            const actorNid = actor.nid
+            const transform = previouslySpatial ? TransformNet.addSpatial(pid, transformState()) : undefined
+            instance.step() // Created components survive their first snapshot boundary.
+            if (transform) TransformNet.remove(transform)
+
+            expect(channel.hasSpatialComponent(pid)).toBe(false)
+            expect(() => ActorNet.mutate.props.hp(actor, 50)).toThrow('has no spatial component')
+            expect(actor.hp).toBe(100)
+            expect(() => ActorNet.remove({ ...actor })).toThrow('not owned by this channel binding')
+            expect(() => ActorNet.remove(actor)).not.toThrow()
+            expect(world.get(pid, Actor)).toBeUndefined()
+            expect(world.getByNid(actorNid)).toBeUndefined()
+            expect(channel.getComponent(actorNid)).toBeUndefined()
+            expect(world.hasEntity(pid)).toBe(true)
+            expect(channel.hasRoot(pid)).toBe(true)
+            binding.removeEntity(pid)
+            expect(world.hasEntity(pid)).toBe(false)
+            expect(channel.hasRoot(pid)).toBe(false)
+        })
     })
 
     it('exposes spatial construction only for spatial channels', () => {

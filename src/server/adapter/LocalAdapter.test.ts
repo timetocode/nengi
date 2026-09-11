@@ -12,7 +12,8 @@ import {
     LocalClientAdapter,
     LocalInstanceAdapter,
     SimulatedLocalClientAdapter,
-    SimulatedLocalInstanceAdapter
+    SimulatedLocalInstanceAdapter,
+    SimulatedMockServerSocket
 } from './MockAdapter'
 import { testBinaryAdapter } from '../../testSupport/BufferBinary'
 
@@ -36,6 +37,82 @@ function createContext() {
 }
 
 describe('LocalAdapter', () => {
+    it.each([
+        ['local', 'client'], ['local', 'server'],
+        ['simulated', 'client'], ['simulated', 'server']
+    ])('notifies both sides once on %s %s close and rejects pending requests', async (transport, initiator) => {
+        const instance = new Instance(createContext())
+        instance.onConnect = async () => true
+        const adapter = new SimulatedLocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const socket = transport === 'local'
+            ? adapter.createMockConnect()
+            : adapter.createSimulatedConnect({ now: () => 0, conditions: { seed: 1 } })
+        const client = new Client(instance.context, SimulatedLocalClientAdapter, 20, { binary: testBinaryAdapter })
+        const closed = jest.fn(() => { client.disconnect('reentrant') })
+        client.setDisconnectHandler(closed)
+        const connecting = client.connect(socket.clientSocket)
+        if (socket instanceof SimulatedMockServerSocket) {
+            socket.advance()
+            await Promise.resolve()
+            socket.advance()
+        }
+        await connecting
+        const user = Array.from(instance.users.values())[0]
+        instance.queue.next()
+        const response = client.request(1, {}, { timeoutMs: 0 })
+        const rejection = expect(response).rejects.toMatchObject({ code: 'DISCONNECTED' })
+        client.flush()
+        instance.step()
+        if (initiator === 'client') client.disconnect('done')
+        else user.disconnect('done')
+        await rejection
+        expect(closed).toHaveBeenCalledTimes(1)
+        expect(closed).toHaveBeenCalledWith('done', undefined)
+        expect(client.adapter.connected).toBe(false)
+        expect(client.adapter.socket).toBeNull()
+        expect(socket.readyState).toBe(3)
+        expect(socket.clientSocket.readyState).toBe(3)
+        expect(instance.users.size).toBe(0)
+        expect(instance.queue.next()).toMatchObject({ type: NetworkEvent.UserDisconnected, reason: 'done' })
+        if (socket instanceof SimulatedMockServerSocket) {
+            expect(socket.conditions.status().clientToServer.queued).toBe(0)
+            expect(socket.conditions.status().serverToClient.queued).toBe(0)
+        }
+        socket.end('duplicate')
+        socket.clientSocket.close('duplicate')
+        adapter.close(socket)
+        client.disconnect('duplicate')
+        expect(closed).toHaveBeenCalledTimes(1)
+        expect(instance.queue.isEmpty()).toBe(true)
+        socket.send(Buffer.from([0]))
+        socket.clientSocket.send(Buffer.from([0]))
+        if (socket instanceof SimulatedMockServerSocket) expect(socket.advance()).toBe(0)
+        expect(instance.network.requestQueue.length).toBe(0)
+    })
+
+    it('rejects a connect closed while its asynchronous handshake is pending', async () => {
+        const instance = new Instance(createContext())
+        let accept!: (value: boolean) => void
+        const authorization = new Promise<boolean>(resolve => { accept = resolve })
+        instance.onConnect = () => authorization
+        const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const socket = adapter.createMockConnect()
+        const client = new Client(instance.context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
+        const closed = jest.fn()
+        client.setDisconnectHandler(closed)
+        const connecting = client.connect(socket.clientSocket)
+        const rejected = expect(connecting).rejects.toBe('cancelled')
+        client.disconnect('cancelled')
+        await rejected
+        accept(true)
+        await authorization
+        expect(instance.users.size).toBe(0)
+        expect(instance.network.pendingUsers.size).toBe(0)
+        expect(client.adapter.connected).toBe(false)
+        expect(client.adapter.pendingConnect).toBeNull()
+        expect(closed).toHaveBeenCalledTimes(1)
+    })
+
     it('uses the normal handshake and snapshot pipeline without a socket library', async () => {
         const context = createContext()
         const instance = new Instance(context)

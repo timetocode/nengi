@@ -435,6 +435,8 @@ describe('server snapshot pipeline', () => {
         secondClient.processNextFrame()
 
         entity.x = 11
+        entity.label = 'open door'
+        entity.y = 12
         child.x = 21
         instance.step()
         firstClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(firstUser)))
@@ -447,6 +449,11 @@ describe('server snapshot pipeline', () => {
         expect(firstClient.store.get(childNid)?.x).toBe(21)
         expect(secondClient.store.get(nid)?.x).toBe(11)
         expect(secondClient.store.get(childNid)?.x).toBe(21)
+        for (const client of [firstClient, secondClient]) {
+            const updates = client.latestFrame!.requireChannel(channel.nid).updateEntities
+            expect(updates.filter(update => update.nid === nid).map(update => update.prop).sort()).toEqual(['label', 'x', 'y'])
+            expect(updates.filter(update => update.nid === childNid).map(update => update.prop)).toEqual(['x'])
+        }
     })
 
     it('writes manual grouped mutations directly', () => {
@@ -2500,6 +2507,84 @@ describe('server snapshot pipeline', () => {
         expect(clientNetwork.latestFrame!.hasChannel(channel.nid)).toBe(false)
     })
 
+    it.each([
+        ['Channel', (instance: Instance) => new Channel(instance.localState)],
+        ['ManualChannel', (instance: Instance) => new ManualChannel(instance.localState)],
+        ['EcsChannel', (instance: Instance) => new EcsChannel(instance.localState)],
+        ['Channel2D', (instance: Instance) => new Channel2D(instance.localState, 50)],
+        ['Channel3D', (instance: Instance) => new Channel3D(instance.localState, 50)],
+        ['ManualChannel2D', (instance: Instance) => new ManualChannel2D(instance.localState, 50)],
+        ['ManualChannel3D', (instance: Instance) => new ManualChannel3D(instance.localState, 50)],
+        ['EcsChannel2D', (instance: Instance) => new EcsChannel2D(instance.localState, 50)],
+        ['EcsChannel3D', (instance: Instance) => new EcsChannel3D(instance.localState, 50)]
+    ] as const)('preserves scoped message issue order through %s', (_name, createChannel) => {
+        const context = createContext()
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        const client = createClientNetwork(context)
+        const channel = createChannel(instance)
+        const other = new Channel(instance.localState)
+        instance.users.set(user.id, user)
+        channel.subscribe(user, new AABB3D(0, 0, 0, 100, 100, 100))
+        other.subscribe(user)
+
+        for (let tick = 0; tick < 2; tick++) {
+            for (let sequence = 1; sequence <= 3; sequence++) {
+                user.queueChannelMessage(channel.nid, { ntype: NType.Message, text: `channel:${sequence}` })
+                user.queueChannelMessage(other.nid, { ntype: NType.Message, text: `other:${sequence}` })
+                user.queueChannelInterpolatedMessage(channel.nid, { ntype: NType.Message, text: `fx:${sequence}` })
+                user.queueChannelInterpolatedMessage(other.nid, { ntype: NType.Message, text: `other-fx:${sequence}` })
+            }
+            const frame = stepClient(instance, user, client)
+            expect(frame.requireChannel(channel.nid).messages.map(message => message.text)).toEqual(['channel:1', 'channel:2', 'channel:3'])
+            expect(frame.requireChannel(other.nid).messages.map(message => message.text)).toEqual(['other:1', 'other:2', 'other:3'])
+            expect(frame.requireChannel(channel.nid).interpolatedMessages.map(message => message.text)).toEqual(['fx:1', 'fx:2', 'fx:3'])
+            expect(frame.requireChannel(other.nid).interpolatedMessages.map(message => message.text)).toEqual(['other-fx:1', 'other-fx:2', 'other-fx:3'])
+            expect(user.scopedMessageQueue).toEqual([])
+            expect(user.scopedInterpolatedMessageQueue).toEqual([])
+        }
+        const empty = stepClient(instance, user, client)
+        expect(empty.channels.every(frame => frame.messages.length === 0 && frame.interpolatedMessages.length === 0)).toBe(true)
+    })
+
+    it.each([Channel, ManualChannel, EcsChannel])('emits each subscribed channel broadcast once with %p', SecondChannel => {
+        for (const diagnostic of [false, true]) {
+            const context = createContext()
+            const instance = new Instance(context)
+            instance.network.diagnosticBinaryWrites = diagnostic
+            const firstUser = createUser(instance)
+            const secondUser = createUser(instance)
+            secondUser.id = 2
+            const firstClient = createClientNetwork(context)
+            const secondClient = createClientNetwork(context)
+            const first = new Channel(instance.localState)
+            const second = new SecondChannel(instance.localState)
+            instance.users.set(firstUser.id, firstUser)
+            instance.users.set(secondUser.id, secondUser)
+            first.subscribe(firstUser)
+            second.subscribe(firstUser)
+            second.subscribe(secondUser)
+            // Repeat after the initial opens to cover stable subscribed channels too.
+            for (let tick = 0; tick < 2; tick++) {
+                first.addMessage({ ntype: NType.Message, text: 'first:1' })
+                first.addMessage({ ntype: NType.Message, text: 'first:2' })
+                second.addMessage({ ntype: NType.Message, text: 'second:1' })
+                second.addInterpolatedMessage({ ntype: NType.Message, text: 'second:fx' })
+                instance.step()
+                for (const [user, client] of [[firstUser, firstClient], [secondUser, secondClient]] as const) {
+                    client.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+                    client.processNextFrame()
+                }
+                expect(firstClient.latestFrame!.requireChannel(first.nid).messages.map(message => message.text)).toEqual(['first:1', 'first:2'])
+                for (const client of [firstClient, secondClient]) {
+                    expect(client.latestFrame!.requireChannel(second.nid).messages.map(message => message.text)).toEqual(['second:1'])
+                    expect(client.latestFrame!.requireChannel(second.nid).interpolatedMessages.map(message => message.text)).toEqual(['second:fx'])
+                }
+                expect(secondClient.latestFrame!.hasChannel(first.nid)).toBe(false)
+            }
+        }
+    })
+
     it('can use shared message fragments for channel broadcasts', () => {
         const context = createContext()
         const instance = new Instance(context)
@@ -3368,6 +3453,61 @@ describe('server snapshot pipeline', () => {
 
         expect(user.responseQueue).toHaveLength(0)
         expect(onResponseBacklog).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([false, true])('keeps existing and new subscribers correct across width growth with shared updates=%p', shared => {
+        const context = createGroupedContext()
+        const instance = new Instance(context)
+        instance.network.sharedUpdateFragmentsEnabled = shared
+        const users = [createUser(instance), createUser(instance), createUser(instance)]
+        const clients = users.map(() => createClientNetwork(context))
+        users.forEach((user, index) => { user.id = index + 1 })
+        const world = new Channel(instance.localState)
+        const original = world.addEntity({ nid: 0, ntype: NType.Entity, x: 1, y: 2, label: 'original' })
+        const removed = world.addEntity({ nid: 0, ntype: NType.Entity, x: 3, y: 4, label: 'removed' })
+        const removedNid = removed.nid
+        for (const user of users.slice(0, 2)) {
+            instance.users.set(user.id, user)
+            world.subscribe(user)
+        }
+        instance.step()
+        for (let i = 0; i < 2; i++) {
+            clients[i].readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(users[i])))
+            clients[i].processNextFrame()
+        }
+
+        // Existing subscribers need deltas; a joining subscriber needs a full
+        // baseline. Both id widths grow in the same snapshot as a channel open.
+        context.register(256, defineEntitySchema({ x: Binary.Float64 }))
+        const header = { nid: 0, ntype: NType.Entity, x: 10, y: 20, label: 'inventory' }
+        const inventory = new Channel(instance.localState, { header })
+        instance.users.set(users[2].id, users[2])
+        world.subscribe(users[2])
+        users.forEach(user => inventory.subscribe(user))
+        world.removeEntity(removed)
+        original.x = 9
+        const added = Array.from({ length: 256 }, (_, x) => world.addEntity({ nid: 0, ntype: 256, x }))
+        world.addMessage({ ntype: NType.Message, text: 'world' })
+        inventory.addMessage({ ntype: NType.Message, text: 'inventory' })
+        expect(instance.localState.nidType).toBe(Binary.UInt16)
+        expect(context.ntypeType).toBe(Binary.UInt16)
+        instance.step()
+        for (let i = 0; i < users.length; i++) {
+            const client = clients[i]
+            client.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(users[i])))
+            client.processNextFrame()
+            expect(client.protocol).toEqual({ nidType: Binary.UInt16, ntypeType: Binary.UInt16 })
+            expect(client.store.get(original.nid)?.x).toBe(9)
+            expect(client.store.get(removedNid)).toBeUndefined()
+            for (const entity of added) expect(client.store.get(entity.nid)?.x).toBe(entity.x)
+            const worldFrame = client.latestFrame!.requireChannel(world.nid)
+            expect(worldFrame.createEntities).toHaveLength(i === 2 ? 257 : 256)
+            expect(worldFrame.updateEntities.filter(update => update.nid === original.nid)).toHaveLength(i === 2 ? 0 : 1)
+            expect(worldFrame.messages.map(message => message.text)).toEqual(['world'])
+            const inventoryFrame = client.latestFrame!.requireChannel(inventory.nid)
+            expect(inventoryFrame.messages.map(message => message.text)).toEqual(['inventory'])
+            expect(client.store.getChannelHeader(inventory.nid)?.label).toBe('inventory')
+        }
     })
 
     it('sends a protocol update before entity sections when nid width grows', () => {

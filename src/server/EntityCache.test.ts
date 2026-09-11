@@ -3,6 +3,22 @@ import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { EntityCache } from './EntityCache'
 
 describe('EntityCache', () => {
+    it('detects in-place typed-array edits and keeps the emitted diff stable until the next tick', () => {
+        const schema = defineEntitySchema({ bytes: Binary.UInt8Array })
+        const entity = { nid: 1, ntype: 1, bytes: new Uint8Array([7]) }
+        const cache = new EntityCache()
+        cache.cacheify(1, entity, schema)
+        entity.bytes[0] = 9
+        cache.createCachesForTick(2)
+        const changes = cache.getAndDiffGrouped(2, entity, schema).changes
+        expect(changes).toHaveLength(1)
+        expect(changes[0].value[0]).toBe(9)
+        entity.bytes[0] = 11
+        expect(changes[0].value[0]).toBe(9)
+        cache.createCachesForTick(3)
+        expect(cache.getAndDiffGrouped(3, entity, schema).changes[0].value[0]).toBe(11)
+    })
+
     it('clones cached objects and keeps same-tick diffs stable', () => {
         const schema = defineEntitySchema({
             position: { type: Binary.Vector2, interp: true }

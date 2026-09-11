@@ -68,7 +68,7 @@ export type PredictionOperation<Response = any> = {
     options: PredictionOperationOptions<Response>
 }
 
-function targetsOverlap(a: PredictionTarget, b: PredictionTarget) {
+export function targetsOverlap(a: PredictionTarget, b: PredictionTarget) {
     if (a.nid !== b.nid) {
         return false
     }

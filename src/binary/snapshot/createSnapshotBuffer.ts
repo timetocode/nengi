@@ -21,6 +21,8 @@ import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelSnapshotOutput } from '../../server/channel/ChannelSnapshotOutput'
 import { SNAPSHOT_HEADER_BYTES, writeSnapshotHeader } from './snapshotHeader'
 
+type SnapshotPing = { ntype: number, pingId: number, latency: number, serverTimeMs: number }
+
 type SnapshotOutputChannel = {
     nid: number
     channelType?: number
@@ -86,7 +88,7 @@ function protocolWillChange(user: User, instance: Instance) {
     return user.protocol.nidType !== protocol.nidType || user.protocol.ntypeType !== protocol.ntypeType
 }
 
-function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, channels: SnapshotOutputChannel[], serverTimeMs: number) {
+function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, channels: SnapshotOutputChannel[], serverTimeMs: number, ping?: SnapshotPing) {
     const measure = instance.network.snapshotPerformanceEnabled
     let collectStart = 0
     let collectMs = 0
@@ -120,11 +122,19 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
         envelopeChunks.push(createProtocolPreludeChunk(instance, protocol))
     }
     envelopeChunks.push(createSnapshotPlanChunk('Envelope', envelope, instance.context, protocol))
+    // Reserve a final engine section so its timestamp can be written after
+    // snapshot preparation without seeking or patching adapter-owned buffers.
+    let pingChunk: SnapshotChunk | undefined
+    if (ping) {
+        const pingPlan = createEmptySnapshotPlan()
+        pingPlan.engineMessages = [ping]
+        pingChunk = createSnapshotPlanChunk('Ping', pingPlan, instance.context, protocol)
+    }
     let channelBytes = 0
     for (let i = 0; i < channelOutputs.length; i++) {
         channelBytes += channelOutputs[i].bytes
     }
-    const bytes = SNAPSHOT_HEADER_BYTES + sumSnapshotChunkBytes(envelopeChunks) + channelBytes
+    const bytes = SNAPSHOT_HEADER_BYTES + sumSnapshotChunkBytes(envelopeChunks) + channelBytes + (pingChunk?.bytes ?? 0)
     const writer = user.networkAdapter.binary.createWriter(bytes)
 
     if (measure) {
@@ -190,20 +200,28 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
             groupedUpdateProps: stats.groupedUpdateProps,
             deletes: stats.deletes,
             messages: countPlanMessages(envelope) + stats.messages,
-            engineMessages: envelope.engineMessages.length,
+            engineMessages: envelope.engineMessages.length + (ping ? 1 : 0),
             responses: envelope.responses.length
         })
     }
 
+    if (ping && pingChunk) {
+        const sentAtMs = instance.now()
+        if (!Number.isFinite(sentAtMs)) throw new Error('instance.now must return a finite monotonic server time.')
+        ping.serverTimeMs = sentAtMs
+        writeSnapshotChunks([pingChunk], writer, writeOptions)
+        // Local transports can return a Pong synchronously from inside send().
+        user.recordPingSent(ping.pingId, sentAtMs, sentAtMs)
+    }
     return writer.payload
 }
 
-const createSnapshotBuffer = (user: User, instance: Instance, serverTimeMs = instance.now()) => {
+const createSnapshotBuffer = (user: User, instance: Instance, serverTimeMs = instance.now(), ping?: SnapshotPing) => {
     const outputChannels = getSubscribedOutputChannels(user)
     if (!outputChannels) {
         throw new Error('All subscribed channels must implement createSnapshotOutput().')
     }
-    return createChannelOutputsSnapshotBuffer(user, instance, outputChannels, serverTimeMs)
+    return createChannelOutputsSnapshotBuffer(user, instance, outputChannels, serverTimeMs, ping)
 }
 
 export default createSnapshotBuffer

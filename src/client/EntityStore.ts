@@ -235,12 +235,14 @@ export class EntityStore {
         }
         const nschema = this.context.getSchema(entity.ntype)
         const propData = nschema.props[update.prop]
-        const previous = propData.binary.clone(entity[update.prop])
-        const value = propData.binary.clone(update.value)
+        // Received values are read-only. Frames and the store can share them;
+        // history takes its own schema copy after the snapshot is applied.
+        const previous = entity[update.prop]
+        const value = update.value
         if (propData.binary.compare(previous, value)) {
             return
         }
-        entity[update.prop] = propData.binary.clone(update.value)
+        entity[update.prop] = value
         const applied = {
             nid: update.nid,
             prop: update.prop,

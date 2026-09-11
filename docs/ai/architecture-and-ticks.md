@@ -105,14 +105,30 @@ canonical cycle is:
 5. Run authoritative simulation systems with an explicit `dt`.
 6. Apply channel view and spatial membership changes.
 7. Emit manual or ECS mutations that correspond to state changes.
-8. Call `instance.step()` to create the snapshot boundary and timestamp it in
+8. Explicitly confirm each user's completed input with `user.confirmCommandsThrough(K)`.
+9. Call `instance.step()` to create the snapshot boundary and timestamp it in
    the server's monotonic time domain.
-9. Let the adapter flush the resulting bytes.
+10. Let the adapter flush the resulting bytes.
 
 The exact stage order can differ when the game requires it. The order must be
 deliberate and stable. In particular, do not let adapter callbacks, promise
 continuations, or arbitrary module registration decide when gameplay state
 changes.
+
+Confirmation is always application-controlled. In the synchronous model, fully
+drain input, complete simulation and confirm through each user's
+`lastReceivedCommandFrameNumber` before producing the snapshot. This includes
+deliberately rejected input and empty flushes. A handler that only moves input
+to another queue has not finished that input.
+
+For deferred simulation, retain the command batch numbers and confirm only the
+complete prefix actually integrated. Receipt and routing do not confirm input;
+snapshots can continue while a batch is pending. Do not use the latest received
+number as a completion boundary after yielding or while earlier work is queued.
+The game must keep authoritative predicted state aligned with its confirmation
+boundary. The [command contract](./networking-primitives.md#command-payloads-and-sequencing)
+also applies to games without prediction, because confirmation releases retained
+client commands. Requests have a separate response mechanism.
 
 `instance.processRequests(limit)` is an application stage, not a replacement
 for the game loop. Keep its location and limit visible. A request handler can
@@ -141,15 +157,17 @@ root.
 
 ## Time and determinism
 
-Make the source and unit of `dt` explicit at every simulation boundary. A common
-server model is a fixed simulation step with commands assigned to that step. A
-client may render at a variable rate, but its predicted movement step should use
-the same movement units and command timing model that the server replays.
+Make the source and unit of `dt` explicit at every simulation boundary. For
+simple predicted action movement, use immediate render-duration input: include
+that duration in the command and apply it unchanged during server command
+processing. This handles variable client frame rates without waiting for a server
+tick to determine movement distance.
 
-Do not use render `dt` as a substitute for a command step. Do not let a timer
-inside a system silently become the authoritative clock. Pass time into the
-transition that consumes it, and keep presentation interpolation outside the
-authoritative transition.
+A shared physics model may instead assign input to fixed simulation steps and
+integrate it there. That is a different replay contract: input completion and
+simulation-step identity are separate facts. Do not mix the two clocks or silently
+replace recorded input durations. Pass time into transitions; keep presentation
+interpolation outside authoritative simulation.
 
 When a transition depends on time or randomness, inject the value or source at
 the shell boundary. This makes a server outcome reproducible from state, input,
@@ -161,6 +179,14 @@ when Nengi supplies snapshot timestamps. Nengi's default interpolation cursor is
 client-local presentation state; it is not an authoritative server-time clock.
 
 ## Mutation ledger
+
+For generated templates, use readable modules, four-space
+indentation and one statement per line. Keep the tick/render shell visible as an
+ordered sequence of systems. Simulation functions operate on supplied state and
+inputs; clocks, network sends and rendering belong at explicit boundaries.
+Follow the chosen renderer's scene/object model instead of hiding gameplay in
+drawing callbacks. Prefer tests of network contracts and gameplay outcomes over
+tests that merely restate a helper's implementation.
 
 For every replicated field, identify the mutation path that makes it visible to
 nengi:

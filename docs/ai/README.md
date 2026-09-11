@@ -9,12 +9,14 @@ Read this file first. Then open only the topic files that match the feature you
 are building.
 
 If you are creating a new project, start with the pinned npm installation in
-[adapters.md](./adapters.md).
+[adapters.md](./adapters.md). When updating an existing game, read the
+[upgrade checklist](./migration.md) before adapting its network and client loops.
 
 If you need to see the canonical server/client flow without relying on another
 project, use [canonical-snippets.md](./canonical-snippets.md). It contains compact
-plain-channel, ECS-channel, and predicted movement snippets. These snippets are
-orientation material, not complete game templates.
+plain-channel and ECS-channel server snippets, links to their maintained client
+handlers, and a predicted movement loop. These snippets are orientation
+material, not complete game templates.
 
 ## Documentation policy
 
@@ -156,8 +158,12 @@ sync layer tiny: CRUD in, ECS mutation plus facts out.
 - Do not use spatial channels for permission-only visibility unless position is
   also part of the visibility rule.
 - Do not use requests for high-frequency movement input. Use commands.
-- Do not mix render-`dt` movement prediction with a server command-step movement
-  model. Pick one timing model and apply it consistently.
+- Explicitly call `user.confirmCommandsThrough(K)` after completing command
+  simulation and before the snapshot, including in games without prediction.
+  Receipt and routing do not confirm input. See the
+  [command contract](./networking-primitives.md#command-payloads-and-sequencing).
+- Use the same recorded command duration for render-`dt` prediction and server
+  command processing. Pick one timing model and apply it consistently.
 - Do not use messages for persistent state that new subscribers must reconstruct.
 - Do not choose manual channels unless game code can reliably call mutation
   writers everywhere networked state changes.
@@ -195,6 +201,7 @@ Use this map instead of reading every file every time.
 - If visibility depends on position, read [spatial-channels.md](./spatial-channels.md).
 - If the game uses ECS-style roots and components, read [ecs-channels.md](./ecs-channels.md), which includes a small canonical server/client ECS shape.
 - If the game uses ECS resources, cached queries, or client/server ECS service boundaries, read [ecs-world.md](./ecs-world.md).
+- If configuring connection/traffic budgets or diagnosing a limit disconnect, read [network-limits.md](./network-limits.md).
 - If hardening a deployment or diagnosing network failures, read [operations.md](./operations.md).
 - If deciding whether an optimization helped, read [benchmarking.md](./benchmarking.md).
 - If the design feels suspicious or you are auditing for common bugs, read [anti-patterns.md](./anti-patterns.md).
@@ -212,7 +219,7 @@ Use this map instead of reading every file every time.
 - EntityStore: client-side authoritative raw state, indexed by nid and channel.
 - Frame: per-snapshot change report returned after nengi applies a snapshot.
 - `StaticInterpolator` / `AdaptiveInterpolator`: sample retained entity history for smooth rendering.
-- `PublicPositionSmoother2D`: server-side helper for smoothing replicated public positions when predicted movement makes raw authority advance in client-command bursts.
+- `PublicPathSmoother2D`: optional game-owned path follower for public positions; enqueue every raw step and handle backlog limits explicitly.
 - Schema: binary definition of properties nengi can write over the network.
 
 ## Default recommendation

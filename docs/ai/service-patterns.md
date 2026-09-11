@@ -27,17 +27,29 @@ cycle is:
 
 1. Accept adapter input and put it into an application queue.
 2. Authenticate the connection and validate the payload.
-3. Process a bounded batch of commands and requests.
+3. Process or deliberately reject all received command input; process a bounded
+   batch of requests.
 4. Read durable state and external resources through explicit dependencies.
 5. Apply the accepted state transition.
 6. Emit entity, channel, message, and response changes.
-7. Call `instance.step()` at the snapshot boundary.
+7. Confirm completed command input with `user.confirmCommandsThrough(K)`.
+8. Call `instance.step()` at the snapshot boundary.
+9. Flush transport output and metrics.
 
 Keep that network step on a regular cadence even when the service has no state
 changes to publish. Nengi evaluates connection deadlines and emits Pings at the
 step boundary; an event-driven service that steps only after mutations cannot
 provide heartbeat liveness.
-8. Flush transport output and metrics.
+
+Command confirmation is explicit even when the service has no prediction.
+After a synchronous full drain and simulation, confirm through each user's
+`lastReceivedCommandFrameNumber`. For deferred commands, retain their batch
+numbers and confirm only the prefix whose authoritative work is finished.
+Unconfirmed commands remain in client history. Request-only services do not
+need command confirmation for their responses, state updates or liveness.
+Use requests for work that must wait on external resources, and complete it
+through a response or a later application event. See the
+[command confirmation contract](./networking-primitives.md#command-payloads-and-sequencing).
 
 The service may run this cycle after each event or on a short scheduled cadence.
 Choose one policy and document it. The important property is that no adapter

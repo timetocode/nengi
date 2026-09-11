@@ -81,10 +81,6 @@ export type CellFragmentChannel = {
     hasStructuralDeltas(): boolean
 }
 
-export function isSharedMessageChannel(channel: any): channel is SharedMessageChannel {
-    return channel?.cellFragmentMode !== true && Array.isArray(channel.broadcastMessages)
-}
-
 export function isCellFragmentChannel(channel: any): channel is CellFragmentChannel {
     return channel?.cellFragmentMode === true &&
         typeof channel.membershipVersion === 'number' &&

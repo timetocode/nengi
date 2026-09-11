@@ -1,6 +1,7 @@
 import { IEntity } from '../common/IEntity'
 import { Client } from './Client'
 import { Frame } from './Frame'
+import { sampleEntityTimelines } from './entityTimeline'
 import {
     AdaptiveDelayPolicy,
     InterpolationDelayPolicy,
@@ -275,22 +276,16 @@ export class FixedStepInterpolator {
             }
         }
 
-        const entitiesA = this.getEntityRefsAtFrame(diagnostics.frameA)
-        if (diagnostics.frameA === diagnostics.frameB) {
-            return {
-                ...diagnostics,
-                entities: this.cloneEntities(entitiesA)
-            }
-        }
-
-        const entitiesB = this.getEntityRefsAtFrame(diagnostics.frameB)
-        const entities = new Map<number, IEntity>()
+        const frameA = diagnostics.frameA
         const frameB = diagnostics.frameB
-
-        entitiesA.forEach((entityA, nid) => {
-            const entityB = entitiesB.get(nid)
-            entities.set(nid, this.interpolateEntityForFrame(nid, entityA, entityB || null, frameB, diagnostics.alpha))
-        })
+        const entities = sampleEntityTimelines(
+            this.client.network.store.history.timelines,
+            frameA.tick,
+            frameB.tick,
+            frameA === frameB
+                ? (_nid, entityA) => this.cloneEntity(entityA)
+                : (nid, entityA, entityB) => this.interpolateEntityForFrame(nid, entityA, entityB, frameB, diagnostics.alpha)
+        )
 
         return {
             ...diagnostics,
@@ -389,18 +384,6 @@ export class FixedStepInterpolator {
 
     private getEntityRefAtFrame(nid: number, targetFrame: Frame): IEntity | null {
         return this.client.network.store.history.getEntityAtTickRef(nid, targetFrame.tick)
-    }
-
-    private getEntityRefsAtFrame(targetFrame: Frame): Map<number, IEntity> {
-        return this.client.network.store.history.getVisibleEntitiesAtTickRefs(targetFrame.tick)
-    }
-
-    private cloneEntities(entities: Map<number, IEntity>) {
-        const clones = new Map<number, IEntity>()
-        entities.forEach((entity, nid) => {
-            clones.set(nid, this.cloneEntity(entity))
-        })
-        return clones
     }
 
     private interpolateEntity(entityA: IEntity, entityB: IEntity | null, alpha: number): IEntity {

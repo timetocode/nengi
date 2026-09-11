@@ -12,7 +12,8 @@ They are not second game simulations and they do not decide what is fair. Game
 code decides which objects are worth tracking, which time to query, and what a
 historical result means.
 
-The historian stores copied facts, not live game objects. A spatial query returns
+Recording copies facts from the selected sources. Treat nearest-query samples as
+read-only: they can be retained history objects. A spatial query returns
 historical samples containing ids and sampled geometry. After a query, userland
 may discover that the current object for a returned `nid` has already been
 destroyed. That is normal. The game must decide whether to ignore the hit, apply
@@ -33,7 +34,7 @@ third.
 Track only the state that a historical gameplay decision needs. For a ray shot,
 that might be target hitboxes. For falling hazards, that might be hazard circles.
 For a shield or invulnerability window, that might be a small boolean or state
-flag in a separate future historian. Do not put every static tree, rock, item,
+flag in the same historian or a separate one. Do not put every static tree, rock, item,
 or decorative entity into history unless the game actually needs to rewind it.
 
 It is reasonable to use more than one historian. Separate historians keep
@@ -41,7 +42,7 @@ unrelated policies and query shapes apart:
 
 - ray shots: historical target hitboxes
 - bullet-hell hazards: historical hazard positions
-- future combat state: historical shields, teams, damage modifiers, or statuses
+- combat state: historical shields, teams, damage modifiers, or statuses
 
 For small histories, brute-force spatial queries are often fine. For larger
 histories, `Historian2D` and `Historian3D` can keep a per-frame grid index:
@@ -90,8 +91,9 @@ viewing roughly this point in server time when it authored the command."
 
 Use `getCommandViewTimeMs(...)` on the server to choose the historian query
 time. It uses explicit viewed server time when the command has it. Otherwise it
-falls back to relative time using the command's estimated view age, or a supplied
-fallback rewind.
+uses the estimated viewed server timestamp anchored at receipt. Queue delay
+does not move that estimate forward. With no timing, it uses the supplied
+fallback rewind from now.
 
 ```ts
 const queryTimeMs = getCommandViewTimeMs(timing, {
@@ -101,6 +103,10 @@ const queryTimeMs = getCommandViewTimeMs(timing, {
 })
 ```
 
+Client timing fields are untrusted claims even after nengi validates their
+format and arithmetic. The server chooses `maxRewindMs`; a reported view time
+is not evidence that an action happened then.
+
 This helper is deliberately about time only. It does not decide whether the
 result should count as a hit, dodge, trade, or blocked action.
 
@@ -109,9 +115,61 @@ less direct than explicit viewed server time. Clamp rewind windows for
 competitive games. A PvE game may allow a generous rewind; a PvP game may choose
 a much smaller maximum such as a few hundred milliseconds.
 
-Stay in server-time units when possible. The client does not need to tell the
-server "I shot at snapshot N" for the basic model; it can report enough timing
-information for the server to infer the historical server view.
+When using `AdaptiveInterpolator` or `FixedStepInterpolator`, report the actual
+sample that was displayed, including endpoint clamping:
+
+```ts
+const a = sample.frameA
+const b = sample.frameB
+const viewServerTimeMs = a && b
+    ? a.serverTimeMs + (b.serverTimeMs - a.serverTimeMs) * sample.alpha
+    : a?.serverTimeMs ?? b?.serverTimeMs
+
+client.addCommandWithTiming(shot, { viewServerTimeMs })
+```
+
+Retain this time alongside the displayed remote scene, then attach it to input
+authored against that scene. `client.getEstimatedServerTimeMs()` estimates now;
+it is not the viewed time. A desired playback cursor can be ahead of available
+history too. Custom render models should provide their own displayed server time.
+`Frame.tick` is a local applied-snapshot counter, not an authoritative physics tick.
+
+Ping/Pong timing separates snapshot state time from the Ping's send-boundary
+clock sample. RTT subtracts client turnaround; estimated one-way delay is half
+RTT, not a measurement of directional latency. Asymmetric links and runtime
+scheduling still create uncertainty. A viewed timestamp reduces reliance on that
+estimate but remains a client claim subject to server policy.
+
+## Values without geometry and migration
+
+The legacy `Historian` export has been removed. Replace whole-schema recording
+with deliberately selected facts in `Historian2D` or `Historian3D`. Use the game's
+monotonic server milliseconds for records and queries; old APIs took an age
+relative to the latest record. Call `record(tick, timeMs)` at the snapshot state
+boundary, after updating the facts that will be published.
+
+Boolean, number and string history needs no coordinates or spatial key:
+
+```ts
+const history = new Historian2D({ retentionMs: 1000 })
+history.setValue(playerId, 'team', 'blue', nowMs)
+history.setFlag(playerId, 'shield', true, nowMs)
+history.record(serverTick, nowMs) // Also advances retention for values-only use.
+const teamThen = history.getValue(playerId, 'team', shotTimeMs)
+const shieldThen = history.wasFlagActive(playerId, 'shield', shotTimeMs)
+```
+
+Set values when they change. Closed intervals are pruned by `record`; unchanged
+open values remain current. `getValue` returns undefined for missing history;
+`wasFlagActive` returns false. Geometry is selected with `trackSpatial`,
+`trackSpatialTarget` or `recordSpatialSample`. Track the public hitbox for targets
+that observers see smoothed, and use the shooter's raw command-applied origin.
+Separate historians can retain raw and public geometry for the same id.
+
+Start with `getSpatialNearest` / `queryRayNearest`. Interpolation is optional;
+measure its benefit and cost in the game before adopting it. Nearest queries can
+clamp to the oldest/newest retained frame, so enforce rewind policy and retention
+coverage explicitly. There is no generic whole-entity replacement API.
 
 ## Pattern: ray shots
 
@@ -141,7 +199,7 @@ const queryTimeMs = getCommandViewTimeMs(timing, {
     maxRewindMs
 })
 
-const hit = history.queryRayInterpolated(
+const hit = history.queryRayNearest(
     queryTimeMs,
     shooter.rawX,
     shooter.rawY,
@@ -154,9 +212,8 @@ if (hit) {
 }
 ```
 
-Use nearest-frame queries when you want simpler and cheaper behavior. Use
-interpolated queries when the visuals are close enough that players can notice
-edge cases around fast movers and direction changes.
+Nearest-frame queries are the baseline. Consider interpolated queries only when
+measured gameplay cases justify their extra work.
 
 ## Pattern: player-dodged hazards
 
@@ -226,7 +283,7 @@ For games that do not care about trades or post-death interactions, the rule can
 be simple:
 
 ```ts
-const hit = history.queryRayInterpolated(...)
+const hit = history.queryRayNearest(...)
 const target = hit ? entitiesByNid.get(hit.sample.nid) : undefined
 if (!target || target.state !== 'alive') {
     return

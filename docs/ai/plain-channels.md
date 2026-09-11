@@ -17,7 +17,9 @@ plain channels, the replicated object is the network entity: it has `nid`,
 ## Canonical small server
 
 Assume `NType`, schemas, and factory functions such as `createPlayer` and
-`createContext` are defined by the game.
+`createContext` are defined by the game. Configure the [transport adapter](./adapters.md)
+and [connection handler](./networking-primitives.md#connection-handshake) before
+starting the loop; an `Instance` without an `onConnect` handler denies connections.
 
 ```ts
 import {
@@ -89,6 +91,9 @@ function tick() {
     }
 
     instance.processRequests()
+    for (const user of instance.users.values()) {
+        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
+    }
     instance.step()
 }
 ```
@@ -106,6 +111,9 @@ The non-ECS client uses `client.network.store` for current authoritative network
 state. Use `Frame` for what changed in each snapshot, then derive the game's
 presentation records from those facts and store lookups.
 
+Within each frame, clean up closed channels before recording opens and applying
+entity changes. A replacement can reuse the old channel or entity ids.
+
 ```ts
 import {
     AdaptiveInterpolator,
@@ -119,10 +127,31 @@ const channelByName = new Map<string, number>()
 const sprites = new Map<number, Sprite>()
 
 let controlledNid = 0
+let connected = false
 
-await client.connect('ws://localhost:8079')
+client.setDisconnectHandler(() => {
+    connected = false
+    sprites.forEach(sprite => sprite.destroy())
+    sprites.clear()
+    channelByName.clear()
+    controlledNid = 0
+})
+client.setWebsocketErrorHandler(error => console.error('Network error', error))
+
+const connection = await client.connect('ws://localhost:8079')
+connected = connection.accepted
 
 function applyNetworkFrame(frame: Frame) {
+    frame.closedChannels.forEach(channel => {
+        if (channel.channelId === channelByName.get('world')) {
+            channel.entityNids.forEach(nid => {
+                sprites.get(nid)?.destroy()
+                sprites.delete(nid)
+            })
+            channelByName.delete('world')
+        }
+    })
+
     frame.openedChannels.forEach(channel => {
         if (channel.header.name === 'world') {
             channelByName.set('world', channel.channelId)
@@ -162,16 +191,6 @@ function applyNetworkFrame(frame: Frame) {
             sprites.delete(deleted.nid)
         })
     }
-
-    frame.closedChannels.forEach(channel => {
-        if (channel.channelId === worldId) {
-            channel.entityNids.forEach(nid => {
-                sprites.get(nid)?.destroy()
-                sprites.delete(nid)
-            })
-            channelByName.delete('world')
-        }
-    })
 }
 
 function render() {
@@ -188,6 +207,10 @@ function render() {
 }
 
 function frame() {
+    if (!connected) {
+        requestAnimationFrame(frame)
+        return
+    }
     for (const frame of client.network.drainFrames()) {
         applyNetworkFrame(frame)
     }
@@ -202,6 +225,14 @@ function frame() {
 The client meaning comes from channel identity first, then entity type. A
 `Player` created in the world channel and a `Player` created in a separate
 spectator, replay, or party channel may require different presentation.
+
+Transport disconnect is a separate cleanup boundary: do not wait for a channel
+close frame after the socket closes. Register the disconnect handler before
+connecting, release application-owned presentation and input/prediction state,
+and stop consuming frames or producing commands for that session. The snippet
+above stops its network loop while disconnected. Follow the
+[connection lifetime guidance](./client-state.md#connection-lifetime) when
+rebuilding a session.
 
 ## Boundaries
 
