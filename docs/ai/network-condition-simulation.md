@@ -65,7 +65,8 @@ import { dataViewBinary } from 'nengi-dataviews'
 let nowMs = 0
 const now = () => nowMs
 const instance = new Instance(context, { now })
-const instanceAdapter = new SimulatedLocalInstanceAdapter(instance.network, {
+instance.onConnect = async () => true
+const instanceAdapter = new SimulatedLocalInstanceAdapter(instance.adapterHost, {
     binary: dataViewBinary
 })
 const socket = instanceAdapter.createSimulatedConnect({
@@ -86,7 +87,7 @@ nowMs += 100
 socket.advance()
 await Promise.resolve()
 
-nowMs += 100
+nowMs += 150
 socket.advance()
 await connecting
 ```
@@ -98,15 +99,19 @@ function, the game simulation, `instance.step()`, or `client.flush()`.
 
 An asynchronous `instance.onConnect` may need a microtask turn after the
 client-to-server handshake is delivered before the handshake response is
-queued. Advance the response direction only after that work has settled.
+queued. Advance the response direction only after that work has settled. The
+increments above cover the stated profile's handshake delays; a profile with
+longer latency or a stall needs later advances. The test accepts connections
+explicitly because an instance's default handler denies them.
 
 For a deterministic scenario, make order visible in the test:
 
 1. Set the shared clock.
 2. Advance due network deliveries.
 3. Drain server events and apply authoritative transitions.
-4. Explicitly confirm completed command batches and call `instance.step()` when
-   a server network tick is due.
+4. If using prediction, confirm the commands whose effects are now integrated.
+   Call `instance.step()` when a server network tick is due. Ordinary commands
+   without prediction need no confirmation bookkeeping.
 5. Advance newly due deliveries.
 6. Drain client frames, produce commands or requests, and call `client.flush()`.
 7. Advance newly due deliveries again when the tested timestamp permits it.
@@ -213,6 +218,16 @@ byte length, and a seeded random function. It must return a finite,
 non-negative `delayMs`; the link still enforces FIFO ordering and payload
 copying.
 
+Queued payloads own a copy of their bytes, including the exact window of a
+typed-array view. Later changes to the source do not affect delivery. A copy
+failure throws without accepting a message or changing its direction's queue
+counters and release schedule. A custom delay model may already have been
+sampled; its side effects are not rolled back.
+
 Keep custom models deterministic and computationally small. The delay model
 decides when a payload may be delivered; it must not decode, mutate, drop,
 duplicate, or deliver the payload itself.
+
+When using a link directly, keep delivery callbacks bounded. `advance()` also
+delivers newly queued traffic due at that time; callbacks that endlessly send
+zero-delay replies to each other prevent the call from returning.

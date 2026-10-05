@@ -1,3 +1,4 @@
+import { assertBinaryWriteSize } from '../assertBinaryWriteSize'
 import { BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { IBinaryWriter } from '../../common/binary/IBinaryWriter'
 import { Instance } from '../../server/Instance'
@@ -91,6 +92,7 @@ export function getSharedCreateFragment(user: User, instance: Instance, channel:
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Shared entity creates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -136,6 +138,7 @@ export function getSharedDeleteFragment(user: User, instance: Instance, channel:
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Shared entity deletes')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -183,6 +186,7 @@ export function getSharedUpdateFragment(user: User, instance: Instance, channel:
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Shared entity updates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -191,7 +195,7 @@ export function getSharedUpdateFragment(user: User, instance: Instance, channel:
         bytes,
         updateProps: plan.updateEntities.length,
         updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
+        groupedUpdateProps: measure ? plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0) : 0
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })

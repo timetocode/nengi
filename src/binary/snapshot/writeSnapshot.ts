@@ -7,7 +7,7 @@ import { writeEntity } from '../entity/writeEntity'
 import writeDiff from '../entity/writeDiff'
 import writeUpdateGroup from '../entity/writeUpdateGroup'
 import { writeMessage } from '../message/writeMessage'
-import { SnapshotPlan } from './SnapshotPlan'
+import { ReadonlySnapshotPlan } from './SnapshotPlan'
 import { createBinaryDiagnosticError, BinaryDiagnosticFields } from '../BinaryDiagnosticError'
 import { Schema } from '../../common/binary/schema/Schema'
 import { IEntity } from '../../common/IEntity'
@@ -18,7 +18,7 @@ export function writeChannelScope(channelId: number, writer: IBinaryWriter, prot
     writeNetworkId(channelId, protocol.nidType, writer)
 }
 
-function writeEngineMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter) {
+function writeEngineMessages(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter) {
     if (plan.engineMessages.length === 0) {
         return
     }
@@ -34,7 +34,7 @@ function writeEngineMessages(plan: SnapshotPlan, context: Context, writer: IBina
 
 export function writeMessageSection(
     section: BinarySection.Messages | BinarySection.InterpolatedMessages,
-    messages: any[],
+    messages: readonly any[],
     context: Context,
     writer: IBinaryWriter,
     protocol: ProtocolConfig
@@ -52,15 +52,15 @@ export function writeMessageSection(
     }
 }
 
-function writeMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeMessages(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeMessageSection(BinarySection.Messages, plan.messages, context, writer, protocol)
 }
 
-function writeInterpolatedMessages(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeInterpolatedMessages(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeMessageSection(BinarySection.InterpolatedMessages, plan.interpolatedMessages, context, writer, protocol)
 }
 
-function writeResponses(plan: SnapshotPlan, writer: IBinaryWriter) {
+function writeResponses(plan: ReadonlySnapshotPlan, writer: IBinaryWriter) {
     if (plan.responses.length === 0) {
         return
     }
@@ -75,7 +75,7 @@ function writeResponses(plan: SnapshotPlan, writer: IBinaryWriter) {
     }
 }
 
-function writeChannelOpens(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeChannelOpens(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.channelOpens.length === 0) {
         return
     }
@@ -97,7 +97,7 @@ function writeChannelOpens(plan: SnapshotPlan, context: Context, writer: IBinary
 }
 
 export function writeChannelHeaderUpdateSection(
-    updates: SnapshotPlan['channelHeaderUpdates'],
+    updates: ReadonlySnapshotPlan['channelHeaderUpdates'],
     writer: IBinaryWriter,
     protocol: ProtocolConfig
 ) {
@@ -122,11 +122,11 @@ export function writeChannelHeaderUpdateSection(
     }
 }
 
-function writeChannelHeaderUpdates(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeChannelHeaderUpdates(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeChannelHeaderUpdateSection(plan.channelHeaderUpdates, writer, protocol)
 }
 
-function writeChannelCloses(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeChannelCloses(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.channelCloses.length === 0) {
         return
     }
@@ -138,7 +138,7 @@ function writeChannelCloses(plan: SnapshotPlan, writer: IBinaryWriter, protocol:
     }
 }
 
-function writeSkipInterpolation(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeSkipInterpolation(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.skipInterpolationNids.length === 0) {
         return
     }
@@ -150,7 +150,7 @@ function writeSkipInterpolation(plan: SnapshotPlan, writer: IBinaryWriter, proto
     }
 }
 
-function writeCreateEntities(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeCreateEntities(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.createEntities.length === 0) {
         return
     }
@@ -166,7 +166,7 @@ function writeCreateEntities(plan: SnapshotPlan, context: Context, writer: IBina
 
 export function writeNetworkIdSection(
     section: BinarySection.EcsCreateEntities | BinarySection.EcsDeleteEntities | BinarySection.DeleteEntities,
-    ids: number[],
+    ids: readonly number[],
     writer: IBinaryWriter,
     protocol: ProtocolConfig
 ) {
@@ -181,12 +181,12 @@ export function writeNetworkIdSection(
     }
 }
 
-function writeEcsCreateEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsCreateEntities(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeNetworkIdSection(BinarySection.EcsCreateEntities, plan.ecsCreateEntities, writer, protocol)
 }
 
 export function writeEcsCreateComponentSection(
-    components: IEntity[],
+    components: readonly IEntity[],
     context: Context,
     writer: IBinaryWriter,
     protocol: ProtocolConfig
@@ -205,15 +205,15 @@ export function writeEcsCreateComponentSection(
     }
 }
 
-function writeEcsCreateComponents(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsCreateComponents(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeEcsCreateComponentSection(plan.ecsCreateComponents, context, writer, protocol)
 }
 
-function writeEcsDeleteEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsDeleteEntities(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeNetworkIdSection(BinarySection.EcsDeleteEntities, plan.ecsDeleteEntities, writer, protocol)
 }
 
-function writeUpdateEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeUpdateEntities(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.updateEntities.length === 0) {
         return
     }
@@ -226,7 +226,7 @@ function writeUpdateEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol
     }
 }
 
-function writeUpdateEntityGroups(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeUpdateEntityGroups(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.updateEntityGroups.length === 0) {
         return
     }
@@ -238,11 +238,11 @@ function writeUpdateEntityGroups(plan: SnapshotPlan, writer: IBinaryWriter, prot
     }
 }
 
-function writeDeleteEntities(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeDeleteEntities(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     writeNetworkIdSection(BinarySection.DeleteEntities, plan.deleteEntities, writer, protocol)
 }
 
-export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
+export function writeSnapshot(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
     writeEngineMessages(plan, context, writer)
     writeMessages(plan, context, writer, protocol)
     writeInterpolatedMessages(plan, context, writer, protocol)
@@ -260,7 +260,7 @@ export function writeSnapshot(plan: SnapshotPlan, context: Context, writer: IBin
     writeDeleteEntities(plan, writer, protocol)
 }
 
-export function writeSnapshotDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
+export function writeSnapshotDiagnostic(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
     writeEngineMessagesDiagnostic(plan, context, writer)
     writeMessagesDiagnostic(plan, context, writer, protocol)
     writeInterpolatedMessagesDiagnostic(plan, context, writer, protocol)
@@ -349,7 +349,7 @@ function writeUpdateGroupDiagnostic(update: any, writer: IBinaryWriter, index: n
     })
 }
 
-function writeEngineMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter) {
+function writeEngineMessagesDiagnostic(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter) {
     if (plan.engineMessages.length === 0) {
         return
     }
@@ -361,7 +361,7 @@ function writeEngineMessagesDiagnostic(plan: SnapshotPlan, context: Context, wri
     }
 }
 
-function writeMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeMessagesDiagnostic(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.messages.length === 0) {
         return
     }
@@ -373,7 +373,7 @@ function writeMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: I
     }
 }
 
-function writeInterpolatedMessagesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeInterpolatedMessagesDiagnostic(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.interpolatedMessages.length === 0) {
         return
     }
@@ -385,7 +385,7 @@ function writeInterpolatedMessagesDiagnostic(plan: SnapshotPlan, context: Contex
     }
 }
 
-function writeResponsesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter) {
+function writeResponsesDiagnostic(plan: ReadonlySnapshotPlan, writer: IBinaryWriter) {
     if (plan.responses.length === 0) {
         return
     }
@@ -401,7 +401,7 @@ function writeResponsesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter) {
     }
 }
 
-function writeCreateEntitiesDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeCreateEntitiesDiagnostic(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.createEntities.length === 0) {
         return
     }
@@ -413,7 +413,7 @@ function writeCreateEntitiesDiagnostic(plan: SnapshotPlan, context: Context, wri
     }
 }
 
-function writeEcsCreateEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsCreateEntitiesDiagnostic(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.ecsCreateEntities.length === 0) {
         return
     }
@@ -426,7 +426,7 @@ function writeEcsCreateEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWri
     }
 }
 
-function writeEcsCreateComponentsDiagnostic(plan: SnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsCreateComponentsDiagnostic(plan: ReadonlySnapshotPlan, context: Context, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.ecsCreateComponents.length === 0) {
         return
     }
@@ -441,7 +441,7 @@ function writeEcsCreateComponentsDiagnostic(plan: SnapshotPlan, context: Context
     }
 }
 
-function writeUpdateEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeUpdateEntitiesDiagnostic(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.updateEntities.length === 0) {
         return
     }
@@ -452,7 +452,7 @@ function writeUpdateEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter
     }
 }
 
-function writeUpdateEntityGroupsDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeUpdateEntityGroupsDiagnostic(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.updateEntityGroups.length === 0) {
         return
     }
@@ -463,7 +463,7 @@ function writeUpdateEntityGroupsDiagnostic(plan: SnapshotPlan, writer: IBinaryWr
     }
 }
 
-function writeDeleteEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeDeleteEntitiesDiagnostic(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.deleteEntities.length === 0) {
         return
     }
@@ -476,7 +476,7 @@ function writeDeleteEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter
     }
 }
 
-function writeEcsDeleteEntitiesDiagnostic(plan: SnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
+function writeEcsDeleteEntitiesDiagnostic(plan: ReadonlySnapshotPlan, writer: IBinaryWriter, protocol: ProtocolConfig) {
     if (plan.ecsDeleteEntities.length === 0) {
         return
     }

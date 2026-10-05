@@ -203,25 +203,25 @@ export class NetworkConditionLink {
             directionState.startedAtMs
         )
         validateDelayDecision(decision)
+        const ownedPayload = cloneBinaryPayload(payload)
 
         const releaseAtMs = Math.max(
             nowMs + decision.delayMs,
             directionState.lastReleaseAtMs
         )
+        const queued: QueuedDelivery = {
+            direction,
+            sequence,
+            releaseAtMs,
+            payload: ownedPayload,
+            deliver
+        }
+        insertDelivery(this.deliveries, queued)
         directionState.lastReleaseAtMs = releaseAtMs
         directionState.sampledDelayMs = decision.delayMs
         directionState.effectiveDelayMs = releaseAtMs - nowMs
         directionState.state = decision.state ?? 'normal'
         directionState.enqueued++
-
-        const queued: QueuedDelivery = {
-            direction,
-            sequence,
-            releaseAtMs,
-            payload: cloneBinaryPayload(payload),
-            deliver
-        }
-        insertDelivery(this.deliveries, queued)
         this.scheduleTimer()
         return releaseAtMs
     }
@@ -451,20 +451,22 @@ function cloneBinaryPayload<T extends BinaryPayload>(payload: T): T {
         return payload.slice(0) as T
     }
 
-    const bytes = Uint8Array.from(
-        new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
-    )
-    if (payload instanceof DataView) {
-        return new DataView(bytes.buffer) as unknown as T
-    }
-
     const constructor = payload.constructor as {
         new (buffer: ArrayBuffer, byteOffset?: number, length?: number): T
         from?: (value: Uint8Array) => T
     }
-    if (typeof constructor.from === 'function') {
-        return constructor.from(bytes)
+    // Buffer.from also owns its bytes, without importing Buffer into browser builds.
+    if (payload instanceof Uint8Array && typeof constructor.from === 'function') {
+        return constructor.from(payload)
     }
+
+    const bytes = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength).slice()
+    if (payload instanceof DataView) {
+        return new DataView(bytes.buffer) as unknown as T
+    }
+
+    // Rebuild the view over copied bytes; TypedArray.from would convert each byte
+    // into an element, corrupting wider integer, float and BigInt payloads.
     const length = 'length' in payload ? Number(payload.length) : undefined
     return new constructor(bytes.buffer, 0, length)
 }

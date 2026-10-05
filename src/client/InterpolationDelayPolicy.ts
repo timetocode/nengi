@@ -35,7 +35,7 @@ export type ResolvedInterpolationDelayPolicyOptions = {
 }
 
 export interface InterpolationDelayPolicy {
-    getDelayMs(requestedDelayMs: number, frames: Frame[], now: number): number
+    getDelayMs(requestedDelayMs: number, frames: readonly Frame[], now: number): number
     reset(): void
 }
 
@@ -80,7 +80,7 @@ export class AdaptiveDelayPolicy implements InterpolationDelayPolicy {
         this.tickMs = tickMs
     }
 
-    getDelayMs(_requestedDelayMs: number, frames: Frame[], now: number) {
+    getDelayMs(_requestedDelayMs: number, frames: readonly Frame[], now: number) {
         const maxGapMs = this.getMaxUsableFrameGapMs(frames)
         const excessGapMs = Math.max(0, maxGapMs - this.tickMs)
         const measuredDelayMs = maxGapMs > 0
@@ -125,7 +125,7 @@ export class AdaptiveDelayPolicy implements InterpolationDelayPolicy {
         this.stableDelaySince = null
     }
 
-    private getMaxUsableFrameGapMs(frames: Frame[]) {
+    private getMaxUsableFrameGapMs(frames: readonly Frame[]) {
         const windowSize = Math.max(2, this.options.windowFrames)
         const start = Math.max(1, frames.length - windowSize)
         let maxGapMs = 0

@@ -4,7 +4,9 @@ import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { SnapshotPlan } from './SnapshotPlan'
 
-export function addPendingChannelHeader(plan: SnapshotPlan, user: User, instance: Instance, channel: IChannel) {
+type HeaderPlan = Pick<SnapshotPlan, 'channelHeaderUpdates' | 'channelHeaderVersions'>
+
+export function addPendingChannelHeader(plan: HeaderPlan, user: User, instance: Instance, channel: IChannel) {
     const header = channel.header
     const headerVersion = channel.headerVersion || 0
     if (!hasSchemaBackedChannelHeader(header) || headerVersion <= 0) {
@@ -40,7 +42,7 @@ export function addPendingChannelHeader(plan: SnapshotPlan, user: User, instance
     plan.channelHeaderVersions.push({ channelId: channel.nid, version: headerVersion })
 }
 
-export function addPendingChannelHeaders(plan: SnapshotPlan, user: User, instance: Instance) {
+export function addPendingChannelHeaders(plan: HeaderPlan, user: User, instance: Instance) {
     for (const channel of user.subscriptions.values()) {
         addPendingChannelHeader(plan, user, instance, channel)
     }

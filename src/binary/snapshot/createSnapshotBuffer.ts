@@ -5,7 +5,7 @@ import { collectSkipInterpolationNids, MAX_RESPONSES_PER_FRAME } from './snapsho
 import { commitSnapshotPlan } from './commitSnapshotPlan'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { writeSnapshot } from './writeSnapshot'
-import { createEmptySnapshotPlan, SnapshotPlan } from './SnapshotPlan'
+import { EMPTY_SNAPSHOT_ARRAY, EMPTY_SNAPSHOT_PLAN, ReadonlySnapshotPlan, SnapshotPlan } from './SnapshotPlan'
 import {
     createSnapshotPlanChunk,
     SnapshotChunk,
@@ -20,8 +20,12 @@ import { addPendingChannelHeaders } from './channelHeaders'
 import { ProtocolConfig } from '../../common/binary/Protocol'
 import { ChannelSnapshotOutput } from '../../server/channel/ChannelSnapshotOutput'
 import { SNAPSHOT_HEADER_BYTES, writeSnapshotHeader } from './snapshotHeader'
+import { assertBinaryWriteSize } from '../assertBinaryWriteSize'
 
 type SnapshotPing = { ntype: number, pingId: number, latency: number, serverTimeMs: number }
+
+type EnvelopePlan = ReadonlySnapshotPlan & Pick<SnapshotPlan,
+    'channelOpens' | 'channelCloses' | 'channelHeaderUpdates' | 'channelHeaderVersions'>
 
 type SnapshotOutputChannel = {
     nid: number
@@ -46,14 +50,20 @@ function getSubscribedOutputChannels(user: User): SnapshotOutputChannel[] | null
 }
 
 function collectEnvelopePlan(user: User, instance: Instance) {
-    const plan = createEmptySnapshotPlan()
+    const plan: EnvelopePlan = {
+        ...EMPTY_SNAPSHOT_PLAN,
+        channelOpens: [],
+        channelCloses: [],
+        channelHeaderUpdates: [],
+        channelHeaderVersions: []
+    }
     const queuedResponses = user.responseQueue.length
     addEnvelopeQueues(plan, user, instance)
     return { plan, queuedResponses }
 }
 
-function addEnvelopeQueues(plan: SnapshotPlan, user: User, instance?: Instance) {
-    const channelOpens = user.consumePendingChannelOpens()
+function addEnvelopeQueues(plan: EnvelopePlan, user: User, instance?: Instance) {
+    const channelOpens = user.hasPendingChannelOpens() ? user.consumePendingChannelOpens() : EMPTY_SNAPSHOT_ARRAY
     for (let i = 0; i < channelOpens.length; i++) {
         const channel = user.subscriptions.get(channelOpens[i])
         if (channel) {
@@ -66,25 +76,34 @@ function addEnvelopeQueues(plan: SnapshotPlan, user: User, instance?: Instance) 
             plan.channelOpens.push({ channelId: channel.nid, header: channel.header })
         }
     }
-    const channelCloses = user.consumePendingChannelCloses()
+    const channelCloses = user.hasPendingChannelCloses() ? user.consumePendingChannelCloses() : EMPTY_SNAPSHOT_ARRAY
     for (let i = 0; i < channelCloses.length; i++) {
         plan.channelCloses.push({ channelId: channelCloses[i] })
     }
-    plan.engineMessages = user.engineMessageQueue
-    user.engineMessageQueue = []
+    // Detach nonempty queues; leave empty user queues available for later sends.
+    // The plan's immutable empty sections cannot see messages queued by a writer.
+    if (user.engineMessageQueue.length > 0) {
+        plan.engineMessages = user.engineMessageQueue
+        user.engineMessageQueue = []
+    }
     plan.skipInterpolationNids = collectSkipInterpolationNids(user)
     if (instance) {
         addPendingChannelHeaders(plan, user, instance)
     }
-    plan.messages = user.messageQueue
-    user.messageQueue = []
-    plan.interpolatedMessages = user.interpolatedMessageQueue
-    user.interpolatedMessageQueue = []
-    plan.responses = user.responseQueue.slice(0, MAX_RESPONSES_PER_FRAME)
+    if (user.messageQueue.length > 0) {
+        plan.messages = user.messageQueue
+        user.messageQueue = []
+    }
+    if (user.interpolatedMessageQueue.length > 0) {
+        plan.interpolatedMessages = user.interpolatedMessageQueue
+        user.interpolatedMessageQueue = []
+    }
+    if (user.responseQueue.length > 0) {
+        plan.responses = user.responseQueue.slice(0, MAX_RESPONSES_PER_FRAME)
+    }
 }
 
-function protocolWillChange(user: User, instance: Instance) {
-    const protocol = instance.network.getProtocol()
+function protocolWillChange(user: User, protocol: ProtocolConfig) {
     return user.protocol.nidType !== protocol.nidType || user.protocol.ntypeType !== protocol.ntypeType
 }
 
@@ -103,9 +122,9 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
         collectStart = performance.now()
     }
 
-    const needsProtocolPrelude = protocolWillChange(user, instance)
-    instance.network.queueProtocolIfChanged(user)
     const protocol = instance.network.getProtocol()
+    const needsProtocolPrelude = protocolWillChange(user, protocol)
+    instance.network.queueProtocolIfChanged(user, protocol)
     const { plan: envelope, queuedResponses } = collectEnvelopePlan(user, instance)
     const channelOutputs: ChannelSnapshotOutput[] = []
     for (let i = 0; i < channels.length; i++) {
@@ -126,8 +145,7 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
     // snapshot preparation without seeking or patching adapter-owned buffers.
     let pingChunk: SnapshotChunk | undefined
     if (ping) {
-        const pingPlan = createEmptySnapshotPlan()
-        pingPlan.engineMessages = [ping]
+        const pingPlan = { ...EMPTY_SNAPSHOT_PLAN, engineMessages: [ping] }
         pingChunk = createSnapshotPlanChunk('Ping', pingPlan, instance.context, protocol)
     }
     let channelBytes = 0
@@ -176,6 +194,7 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
         }
         for (let i = 0; i < channelOutputs.length; i++) {
             const outputStats = channelOutputs[i].stats
+            if (!outputStats) continue
             stats.creates += outputStats.creates
             stats.updateProps += outputStats.updateProps
             stats.updateGroups += outputStats.updateGroups
@@ -213,6 +232,7 @@ function createChannelOutputsSnapshotBuffer(user: User, instance: Instance, chan
         // Local transports can return a Pong synchronously from inside send().
         user.recordPingSent(ping.pingId, sentAtMs, sentAtMs)
     }
+    assertBinaryWriteSize(writer, bytes, 'Snapshot')
     return writer.payload
 }
 

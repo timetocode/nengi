@@ -7,6 +7,7 @@ import { NDictionary } from '../NDictionary'
 import { User } from '../User'
 import { createChannelOutput } from './ChannelOutput'
 import { IObjectChannel } from './IChannel'
+import { ChannelVisibilityCache, ChannelVisibilitySnapshot, RememberedVisibility } from './ChannelVisibilityCache'
 
 export type ChannelOptions = {
     header?: ChannelHeaderInput
@@ -14,19 +15,13 @@ export type ChannelOptions = {
     channelType?: ChannelType
 }
 
-export type ChannelSnapshotVisibility = {
-    toCreate: number[]
-    toUpdate: number[]
-    toDelete: number[]
-    visibleRef: number[]
-    visibleSet?: Set<number>
+export type ChannelSnapshotVisibility = Omit<ChannelVisibilitySnapshot, 'visibleSet'> & {
+    readonly visibleSet?: ReadonlySet<number>
     hasPrevious: boolean
     previousMembershipVersion: number
 }
 
-type RememberedChannelVisibility = {
-    visibleRef: number[]
-    visibleSet?: Set<number>
+type RememberedChannelVisibility = RememberedVisibility & {
     membershipVersion: number
 }
 
@@ -47,6 +42,7 @@ export class Channel implements IObjectChannel {
     headerVersion = 0
     channelType: ChannelType
     private visibleNetworkedNidsCache: { membershipVersion: number, entityTreeVersion: number, nids: number[] } | null = null
+    protected snapshotVisibilityCache = new ChannelVisibilityCache()
     private channelSnapshotVisibilityByUser: Map<number, RememberedChannelVisibility> = new Map()
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
@@ -140,48 +136,10 @@ export class Channel implements IObjectChannel {
 
     collectChannelSnapshotVisibility(userOrId: User | number): ChannelSnapshotVisibility {
         const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
-        const visibleRef = this.getVisibleNetworkedNids(userId)
         const previous = this.channelSnapshotVisibilityByUser.get(userId)
-        if (previous && previous.visibleRef === visibleRef) {
-            return {
-                toCreate: [],
-                toUpdate: visibleRef.slice(),
-                toDelete: [],
-                visibleRef,
-                visibleSet: previous.visibleSet,
-                hasPrevious: true,
-                previousMembershipVersion: previous.membershipVersion
-            }
-        }
-
-        const visibleSet = new Set(visibleRef)
-        const toCreate: number[] = []
-        const toUpdate: number[] = []
-        const toDelete: number[] = []
-        if (!previous) {
-            toCreate.push(...visibleRef)
-        } else {
-            const previousVisibleSet = previous.visibleSet ?? new Set(previous.visibleRef)
-            for (let i = 0; i < visibleRef.length; i++) {
-                const nid = visibleRef[i]
-                if (previousVisibleSet.has(nid)) {
-                    toUpdate.push(nid)
-                } else {
-                    toCreate.push(nid)
-                }
-            }
-            previousVisibleSet.forEach(nid => {
-                if (!visibleSet.has(nid)) {
-                    toDelete.push(nid)
-                }
-            })
-        }
+        const visibility = this.snapshotVisibilityCache.collect(this.getVisibleNetworkedNids(userId), previous)
         return {
-            toCreate,
-            toUpdate,
-            toDelete,
-            visibleRef,
-            visibleSet,
+            ...visibility,
             hasPrevious: !!previous,
             previousMembershipVersion: previous?.membershipVersion || 0
         }
@@ -282,5 +240,7 @@ export class Channel implements IObjectChannel {
         this.localState.nidPool.returnId(this.nid)
         this.localState.channels.delete(this)
         this.channelSnapshotVisibilityByUser.clear()
+        this.snapshotVisibilityCache.clear()
+        this.visibleNetworkedNidsCache = null
     }
 }

@@ -56,6 +56,76 @@ space.subscribe(user, { x: ship.x, y: ship.y, z: ship.z, radius: 5000 })
 
 Use a sphere view when the game thinks in sensor radius or engagement range.
 
+## Application tick per publication
+
+When the game can run zero or several simulation steps per `instance.step()`,
+carry its simulation tick in a schema-backed channel header. Register the same
+schema on the server and client:
+
+```ts
+type WorldHeader = {
+    nid: number
+    ntype: number
+    physicsTick: number
+    publication: number
+}
+
+context.register(NType.WorldHeader, defineEntitySchema({
+    physicsTick: Binary.UInt32,
+    publication: Binary.UInt32
+}))
+```
+
+On the server, subscribe the user to the channel and update its header after
+simulation and entity writes, before publishing:
+
+```ts
+const header: WorldHeader = {
+    nid: 0,
+    ntype: NType.WorldHeader,
+    physicsTick: 0,
+    publication: 0
+}
+const world = new ManualChannel(instance.localState, { name: 'world', header })
+world.subscribe(user)
+
+function publishWorld(physicsTick: number) {
+    header.physicsTick = physicsTick
+    header.publication++
+    world.syncHeader()
+    instance.step()
+}
+```
+
+Header changes and entity changes arrive in the same snapshot. Header-only
+updates work when no entities changed. An unchanged header does not need an
+update; the optional publication counter distinguishes snapshots sharing the
+same physics tick. This is replicated channel state, not a separate event.
+
+On the client, discover `worldChannelId` from the channel open and process one
+frame at a time so the raw store and header describe the same publication:
+
+```ts
+let frame
+while ((frame = client.network.processNextFrame())) {
+    applyNetworkFrame(frame) // Includes channel opens/closes and identity setup.
+    const header = client.network.store.getChannelHeaderById(worldChannelId) as WorldHeader | undefined
+    if (!header) continue
+
+    saveCheckpoint({
+        physicsTick: header.physicsTick,
+        publication: header.publication,
+        bodies: copyAuthoritativeBodies(client.network.store)
+    })
+}
+```
+
+`copyAuthoritativeBodies` and `saveCheckpoint` are game-owned operations. Copy
+the values you retain: the raw store and its header advance on the next applied
+frame. Do not use `drainFrames()` followed by store lookups to reconstruct each
+earlier frame in that batch. Games owning their interpolation/history can
+[disable nengi entity history](./client-state.md#games-that-own-their-history).
+
 ## Private inventory or open chest
 
 Use a private message for simple owner-only counters. Use `Channel` with a
@@ -100,7 +170,15 @@ server, and call `channel.syncHeader()`.
 On the client, process the inventory channel's frame bucket:
 
 ```ts
-for (const frame of client.network.drainFrames()) {
+let frame
+while ((frame = client.network.processNextFrame())) {
+    frame.closedChannels.forEach(closed => {
+        if (closed.channelId === inventoryChannelId) {
+            closeInventory(closed.header)
+            closed.entityNids.forEach(removeInventoryItem)
+        }
+    })
+
     const inventory = frame.getChannel(inventoryChannelId)
     if (!inventory) {
         continue
@@ -117,13 +195,6 @@ for (const frame of client.network.drainFrames()) {
         }
     })
     inventory.deletedEntities.forEach(deleted => removeInventoryItem(deleted.nid))
-
-    frame.closedChannels.forEach(closed => {
-        if (closed.channelId === inventoryChannelId) {
-            closeInventory(header)
-            closed.entityNids.forEach(removeInventoryItem)
-        }
-    })
 }
 ```
 

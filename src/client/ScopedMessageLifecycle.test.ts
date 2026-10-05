@@ -30,13 +30,12 @@ describe('scoped message subscription lifetime', () => {
         context.register(1, defineMessageSchema({ text: Binary.String }))
         const instance = new Instance(context)
         instance.onConnect = async () => true
-        const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const adapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         const socket = adapter.createMockConnect()
         const client = new Client(context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
         clients.push(client)
         const errors: unknown[] = []
-        client.setWebsocketErrorHandler(error => errors.push(error))
-        client.setDisconnectHandler(() => {})
+        client.setDisconnectHandler(info => errors.push(info))
         await client.connect(socket.clientSocket)
         const user = [...instance.users.values()][0]
         const queue = (channelId: number, text: string) => {

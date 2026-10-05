@@ -189,7 +189,7 @@ function createEcs2DTest(
     const channel = createChannel(instance)
     const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-    instance.users.set(user.id, user)
+    instance.connectedUsers.set(user.id, user)
     channel.subscribe(user, view)
 
     return { context, instance, user, clientNetwork, channel, Transform, view }
@@ -214,7 +214,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const first = channel.addEntity({
             nid: 0,
@@ -256,7 +256,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const entity = channel.addEntity({
             nid: 0,
@@ -375,8 +375,8 @@ describe('server snapshot pipeline', () => {
         const nschema = context.getSchema(NType.Entity)!
         const firstPlan = createEmptySnapshotPlan()
         const secondPlan = createEmptySnapshotPlan()
-        firstPlan.updateEntityGroups = instance.cache.getAndDiffGrouped(instance.tick, first, nschema).groups
-        secondPlan.updateEntityGroups = instance.cache.getAndDiffGrouped(instance.tick, second, nschema).groups
+        firstPlan.updateEntityGroups.push(...instance.cache.getAndDiffGrouped(instance.tick, first, nschema).groups)
+        secondPlan.updateEntityGroups.push(...instance.cache.getAndDiffGrouped(instance.tick, second, nschema).groups)
 
         const byteLength = CHANNEL_SCOPE_BYTES +
             countSnapshotBytes(firstPlan, context) +
@@ -407,8 +407,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser)
         channel.subscribe(secondUser)
         const entity = channel.addEntity({
@@ -466,7 +466,7 @@ describe('server snapshot pipeline', () => {
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const entity = channel.addEntity({
             nid: 0,
@@ -502,7 +502,7 @@ describe('server snapshot pipeline', () => {
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const label = Entity.label
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const entity = channel.addEntity({
             nid: 0,
@@ -534,7 +534,7 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel(instance.localState)
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const entity = channel.addEntity({
             nid: 0,
@@ -569,7 +569,7 @@ describe('server snapshot pipeline', () => {
         const regularChannel = new Channel(instance.localState)
         const ManualEntity = manualChannel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         manualChannel.subscribe(user)
         regularChannel.subscribe(user)
         const manualEntity = manualChannel.addEntity({
@@ -619,7 +619,7 @@ describe('server snapshot pipeline', () => {
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(50, 50, 60, 60))
         const entity = channel.addEntity({
             nid: 0,
@@ -633,6 +633,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
+        instance.network.snapshotPerformanceEnabled = true
         entity.x = 11
         entity.y = 12
         position(entity, 11, 12)
@@ -642,7 +643,7 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.store.get(entity.nid)?.x).toBe(11)
         expect(clientNetwork.store.get(entity.nid)?.y).toBe(12)
-        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(1)
     })
 
     it('coalesces repeated ManualChannel2D writes to final prop values', () => {
@@ -653,7 +654,7 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel2D(instance.localState, 100)
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(50, 50, 60, 60))
         const entity = channel.addEntity({
             nid: 0,
@@ -685,7 +686,7 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel2D(instance.localState, 100)
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(50, 50, 60, 60))
         const entity = channel.addEntity({
             nid: 0,
@@ -724,7 +725,7 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel3D(instance.localState, 100)
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(50, 50, 50, 60, 60, 60))
         const entity = channel.addEntity({
             nid: 0,
@@ -770,7 +771,7 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel3D(instance.localState, 100)
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(50, 50, 50, 60, 60, 60))
         const entity = channel.addEntity({
             nid: 0,
@@ -806,7 +807,7 @@ describe('server snapshot pipeline', () => {
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(50, 50, 60, 60))
         const parent = channel.addEntity({
             nid: 0,
@@ -827,6 +828,7 @@ describe('server snapshot pipeline', () => {
         clientNetwork.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
         clientNetwork.processNextFrame()
 
+        instance.network.snapshotPerformanceEnabled = true
         child.x = 21
         child.y = 22
         position(child, 21, 22)
@@ -836,7 +838,7 @@ describe('server snapshot pipeline', () => {
 
         expect(clientNetwork.store.get(child.nid)?.x).toBe(21)
         expect(clientNetwork.store.get(child.nid)?.y).toBe(22)
-        expect(instance.network.sharedUpdateFragments.size).toBe(1)
+        expect(instance.network.snapshotPerformance.sharedFragmentBuilds).toBe(1)
     })
 
     it('replicates ECS roots as ids and components as pid-owned state', () => {
@@ -847,7 +849,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel(instance.localState)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const pid = channel.createEntity()
         const transform = channel.addComponent(pid, {
@@ -904,7 +906,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel(instance.localState)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const pid = channel.createEntity()
         const transform = channel.addComponent(pid, {
@@ -946,7 +948,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel(instance.localState)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         const pid = channel.createEntity()
         const transform = channel.addComponent(pid, {
@@ -981,7 +983,7 @@ describe('server snapshot pipeline', () => {
         const regularChannel = new Channel(instance.localState)
         const Transform = ecsChannel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         ecsChannel.subscribe(user)
         regularChannel.subscribe(user)
 
@@ -1060,7 +1062,7 @@ describe('server snapshot pipeline', () => {
         const worldChannel = new Channel(instance.localState)
         const inventoryChannel = new Channel(instance.localState)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         worldChannel.subscribe(user)
         inventoryChannel.subscribe(user)
 
@@ -1109,7 +1111,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const firstChannel = new EcsChannel(instance.localState, { name: 'first' })
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         firstChannel.subscribe(user)
 
         const firstPid = firstChannel.createEntity()
@@ -1182,7 +1184,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel2D(instance.localState, 10)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(5, 5, 10, 10))
 
         const pid = channel.createEntity()
@@ -1235,7 +1237,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel2D(instance.localState, 10)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(5, 5, 10, 10))
         const pid = channel.createEntity()
         const transform = channel.addSpatialComponent(pid, {
@@ -1462,8 +1464,8 @@ describe('server snapshot pipeline', () => {
             const channel = new EcsChannel2D(instance.localState, 10)
             const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-            instance.users.set(firstUser.id, firstUser)
-            instance.users.set(secondUser.id, secondUser)
+            instance.connectedUsers.set(firstUser.id, firstUser)
+            instance.connectedUsers.set(secondUser.id, secondUser)
             channel.subscribe(firstUser, new AABB2D(5, 5, 4, 4))
             channel.subscribe(secondUser, new AABB2D(5, 5, 4, 4))
 
@@ -1615,8 +1617,8 @@ describe('server snapshot pipeline', () => {
             const channel = new EcsChannel2D(instance.localState, 10)
             const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-            instance.users.set(firstUser.id, firstUser)
-            instance.users.set(secondUser.id, secondUser)
+            instance.connectedUsers.set(firstUser.id, firstUser)
+            instance.connectedUsers.set(secondUser.id, secondUser)
             channel.subscribe(firstUser, new AABB2D(10, 10, 10, 10))
             channel.subscribe(secondUser, new AABB2D(11, 11, 10, 10))
             const roots = [
@@ -1869,7 +1871,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel2D(instance.localState, 10)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(5, 5, 10, 10))
         const pid = channel.createEntity()
         const transform = channel.addSpatialComponent(pid, {
@@ -1911,7 +1913,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel3D(instance.localState, 10)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(5, 5, 5, 10, 10, 10))
 
         const pid = channel.createEntity()
@@ -1964,7 +1966,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel3D(instance.localState, 10)
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(5, 5, 5, 10, 10, 10))
 
         const pid = channel.createEntity()
@@ -2010,7 +2012,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new EcsChannel2D(instance.localState, 10)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         const pid = channel.createEntity()
         const transform = channel.addSpatialComponent(pid, {
             nid: 0,
@@ -2039,7 +2041,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new EcsChannel2D(instance.localState, 10)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         const pid = channel.createEntity()
         const transform = channel.addSpatialComponent(pid, {
             nid: 0,
@@ -2098,7 +2100,7 @@ describe('server snapshot pipeline', () => {
         }
         instance.step()
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(70, 5, 100, 10))
         instance.step()
 
@@ -2121,7 +2123,7 @@ describe('server snapshot pipeline', () => {
         const channel = new EcsChannel2D(instance.localState, 10, { plane: 'xz' })
         const Transform = channel.createComponentWriter(NType.Transform, context.getSchema(NType.Transform)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, { x: 5, z: 5, halfX: 10, halfZ: 10 })
 
         const pid = channel.createEntity()
@@ -2166,7 +2168,7 @@ describe('server snapshot pipeline', () => {
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(100, 50, 110, 60))
         const entity = channel.addEntity({
             nid: 0,
@@ -2200,7 +2202,7 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel2D(instance.localState, 100, { plane: 'xz' })
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, { x: 50, z: 50, halfX: 60, halfZ: 60 })
         const entity = channel.addEntity({
             nid: 0,
@@ -2242,8 +2244,8 @@ describe('server snapshot pipeline', () => {
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
         const position = Entity.position
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB2D(50, 50, 40, 40))
         channel.subscribe(secondUser, new AABB2D(150, 50, 40, 40))
         const mover = channel.addEntity({
@@ -2295,8 +2297,8 @@ describe('server snapshot pipeline', () => {
         const channel = new ManualChannel2D(instance.localState, 10)
         const Entity = channel.createEntityWriter(NType.Entity, context.getSchema(NType.Entity)!)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB2D(10, 10, 10, 10))
         channel.subscribe(secondUser, new AABB2D(11, 11, 10, 10))
         const entities = [
@@ -2358,8 +2360,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser)
         channel.subscribe(secondUser)
         channel.addEntity({
@@ -2432,7 +2434,7 @@ describe('server snapshot pipeline', () => {
         const newClient = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(existingUser.id, existingUser)
+        instance.connectedUsers.set(existingUser.id, existingUser)
         channel.subscribe(existingUser)
         const initial = channel.addEntity({
             nid: 0,
@@ -2446,7 +2448,7 @@ describe('server snapshot pipeline', () => {
         existingClient.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(existingUser)))
         existingClient.processNextFrame()
 
-        instance.users.set(newUser.id, newUser)
+        instance.connectedUsers.set(newUser.id, newUser)
         channel.subscribe(newUser)
         const added = channel.addEntity({
             nid: 0,
@@ -2475,7 +2477,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user)
         channel.addEntity({
             nid: 0,
@@ -2524,7 +2526,7 @@ describe('server snapshot pipeline', () => {
         const client = createClientNetwork(context)
         const channel = createChannel(instance)
         const other = new Channel(instance.localState)
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(0, 0, 0, 100, 100, 100))
         other.subscribe(user)
 
@@ -2559,8 +2561,8 @@ describe('server snapshot pipeline', () => {
             const secondClient = createClientNetwork(context)
             const first = new Channel(instance.localState)
             const second = new SecondChannel(instance.localState)
-            instance.users.set(firstUser.id, firstUser)
-            instance.users.set(secondUser.id, secondUser)
+            instance.connectedUsers.set(firstUser.id, firstUser)
+            instance.connectedUsers.set(secondUser.id, secondUser)
             first.subscribe(firstUser)
             second.subscribe(firstUser)
             second.subscribe(secondUser)
@@ -2596,8 +2598,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel(instance.localState)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser)
         channel.subscribe(secondUser)
         channel.addEntity({
@@ -2648,8 +2650,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB2D(10, 10, 5, 5))
         channel.subscribe(secondUser, new AABB2D(10, 10, 5, 5))
         const entity = channel.addEntity({
@@ -2685,7 +2687,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50, { plane: 'xz' })
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, { x: 10, z: 10, halfX: 20, halfZ: 20 })
         const entity = channel.addEntity({
             nid: 0,
@@ -2719,7 +2721,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel3D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(10, 10, 10, 20, 20, 20))
         const visible = channel.addEntity({
             nid: 0,
@@ -2753,7 +2755,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, { x: 0, y: 0, radius: 25 })
         const entity = channel.addEntity({
             nid: 0,
@@ -2787,7 +2789,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel3D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, { x: 0, y: 0, z: 0, radius: 25 })
         const entity = channel.addEntity({
             nid: 0,
@@ -2823,7 +2825,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel3D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB3D(10, 10, 10, 20, 20, 20))
         const entity = channel.addEntity({
             nid: 0,
@@ -2861,8 +2863,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel3D(instance.localState, 50)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB3D(10, 10, 10, 20, 20, 20))
         channel.subscribe(secondUser, new AABB3D(10, 200, 10, 20, 20, 20))
         channel.addMessage({ ntype: NType.Message, text: 'near-3d', x: 10, y: 10, z: 10 })
@@ -2886,7 +2888,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         const entity = channel.addEntity({
             nid: 0,
@@ -2920,8 +2922,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB2D(200, 200, 5, 5))
         channel.subscribe(secondUser, new AABB2D(200, 200, 5, 5))
         const entity = channel.addEntity({
@@ -3032,8 +3034,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB2D(10, 10, 5, 5))
         channel.subscribe(secondUser, new AABB2D(200, 200, 5, 5))
         channel.addMessage({ ntype: NType.Message, text: 'near', x: 10, y: 10 })
@@ -3057,7 +3059,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         channel.addEntity({
             nid: 0,
@@ -3094,7 +3096,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         const parent = channel.addEntity({
             nid: 0,
@@ -3132,7 +3134,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         const first = channel.addEntity({
             nid: 0,
@@ -3175,8 +3177,8 @@ describe('server snapshot pipeline', () => {
         const secondClient = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(firstUser.id, firstUser)
-        instance.users.set(secondUser.id, secondUser)
+        instance.connectedUsers.set(firstUser.id, firstUser)
+        instance.connectedUsers.set(secondUser.id, secondUser)
         channel.subscribe(firstUser, new AABB2D(10, 10, 5, 5))
         channel.subscribe(secondUser, new AABB2D(60, 10, 5, 5))
         const entity = channel.addEntity({
@@ -3216,7 +3218,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         const entity = channel.addEntity({
             nid: 0,
@@ -3252,7 +3254,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         const entity = channel.addEntity({
             nid: 0,
@@ -3297,7 +3299,7 @@ describe('server snapshot pipeline', () => {
         const clientNetwork = createClientNetwork(context)
         const channel = new Channel2D(instance.localState, 50)
 
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         channel.subscribe(user, new AABB2D(10, 10, 5, 5))
         const parent = channel.addEntity({
             nid: 0,
@@ -3467,7 +3469,7 @@ describe('server snapshot pipeline', () => {
         const removed = world.addEntity({ nid: 0, ntype: NType.Entity, x: 3, y: 4, label: 'removed' })
         const removedNid = removed.nid
         for (const user of users.slice(0, 2)) {
-            instance.users.set(user.id, user)
+            instance.connectedUsers.set(user.id, user)
             world.subscribe(user)
         }
         instance.step()
@@ -3481,7 +3483,7 @@ describe('server snapshot pipeline', () => {
         context.register(256, defineEntitySchema({ x: Binary.Float64 }))
         const header = { nid: 0, ntype: NType.Entity, x: 10, y: 20, label: 'inventory' }
         const inventory = new Channel(instance.localState, { header })
-        instance.users.set(users[2].id, users[2])
+        instance.connectedUsers.set(users[2].id, users[2])
         world.subscribe(users[2])
         users.forEach(user => inventory.subscribe(user))
         world.removeEntity(removed)
@@ -3806,5 +3808,91 @@ describe('server snapshot pipeline', () => {
         ])
         expect(clientNetwork.drainFrames()).toEqual([])
         expect(clientNetwork.store.get(entity.nid)?.x).toBe(3)
+    })
+})
+
+describe.each(['automatic', 'manual', 'ecs'] as const)('%s shared membership snapshots', kind => {
+    it.each([false, true])('keeps joins, removals and resubscriptions independent (fragments: %s)', sharedUpdates => {
+        const context = createContext()
+        const instance = new Instance(context, { now: () => 1000 })
+        instance.network.sharedUpdateFragmentsEnabled = sharedUpdates
+        const channel = kind === 'ecs' ? new EcsChannel(instance.localState)
+            : kind === 'manual' ? new ManualChannel(instance.localState)
+                : new Channel(instance.localState)
+        const users = [createUser(instance), createUser(instance)]
+        users[1].id = 2
+        const clients = users.map(() => createClientNetwork(context))
+        for (const user of users) instance.connectedUsers.set(user.id, user)
+        const schema = context.getSchema(NType.Entity)!
+        const writers = channel instanceof EcsChannel ? channel.createComponentWriter(NType.Entity, schema)
+            : channel instanceof ManualChannel ? channel.createEntityWriter(NType.Entity, schema) : undefined
+        const add = (x: number) => {
+            const component = { nid: 0, pid: 0, ntype: NType.Entity, x, y: 0, label: `entity-${x}` }
+            if (channel instanceof EcsChannel) {
+                const pid = channel.createEntity()
+                return { pid, component: channel.addComponent(pid, component) }
+            }
+            channel.addEntity(component)
+            return { pid: component.nid, component }
+        }
+        const write = (entry: ReturnType<typeof add>, x: number) => {
+            entry.component.x = x
+            writers?.props.x(entry.component, x)
+        }
+        const remove = (entry: ReturnType<typeof add>) => {
+            if (channel instanceof EcsChannel) channel.removeEntity(entry.pid)
+            else channel.removeEntity(entry.component)
+        }
+        const step = () => {
+            instance.step()
+            users.forEach((user, index) => {
+                clients[index].readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+                clients[index].processNextFrame()
+            })
+        }
+        const first = add(1)
+        channel.subscribe(users[0])
+        step()
+        expect(clients[0].store.get(first.component.nid)?.x).toBe(1)
+        expect(clients[1].store.get(first.component.nid)).toBeUndefined()
+
+        const second = add(2)
+        write(first, 10)
+        write(second, 20)
+        channel.subscribe(users[1])
+        // Collecting an output that is abandoned before writing/commit must not
+        // mark this new subscriber's entities as already sent.
+        channel.createSnapshotOutput(users[1], instance, instance.network.getProtocol())
+        step()
+        for (const client of clients) {
+            expect(client.store.get(first.component.nid)?.x).toBe(10)
+            expect(client.store.get(second.component.nid)?.x).toBe(20)
+        }
+
+        const secondNid = second.component.nid
+        write(second, 21)
+        remove(second)
+        const third = add(3)
+        step()
+        for (const client of clients) {
+            expect(client.store.get(secondNid)).toBeUndefined()
+            expect(client.store.get(third.component.nid)?.x).toBe(3)
+        }
+
+        channel.unsubscribe(users[0])
+        step()
+        expect(clients[0].store.get(first.component.nid)).toBeUndefined()
+        channel.subscribe(users[0])
+        const thirdNid = third.component.nid
+        write(third, 31)
+        remove(third)
+        write(first, 40)
+        step()
+        for (const client of clients) {
+            expect(client.store.get(first.component.nid)?.x).toBe(40)
+            expect(client.store.get(thirdNid)).toBeUndefined()
+            const frame = client.latestFrame!.requireChannel(channel.nid)
+            expect(frame.updateEntities.some(update => update.nid === thirdNid)).toBe(false)
+        }
     })
 })

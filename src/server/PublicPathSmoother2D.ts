@@ -11,6 +11,8 @@ export type PublicPathSmoother2DOptions = {
     maxDistance?: number
 }
 
+export type PublicPathWaypoint2D = { readonly x: number, readonly y: number }
+
 type Waypoint = { x: number, y: number }
 
 function finitePosition(x: number, y: number) {
@@ -78,6 +80,49 @@ export class PublicPathSmoother2D {
             this.points[index] = { x, y }
         }
         this.count++
+        this.distance = distance
+        return true
+    }
+
+    /** Copies a complete route, or returns false without queuing any part of it. */
+    enqueueRoute(route: readonly PublicPathWaypoint2D[]): boolean {
+        const tail = this.count > 0 ? this.points[(this.head + this.count - 1) % this.maxWaypoints] : undefined
+        const startX = tail?.x ?? this.x
+        const startY = tail?.y ?? this.y
+        let x = startX
+        let y = startY
+        let count = this.count
+        let distance = this.distance
+
+        // Preflight before touching the ring: one input may turn several times
+        // during collision resolution, and accepting only its prefix is wrong.
+        for (const point of route) {
+            finitePosition(point.x, point.y)
+            const length = Math.hypot(point.x - x, point.y - y)
+            if (length === 0) continue
+            count++
+            distance += length
+            if (count > this.maxWaypoints || !Number.isFinite(distance) || distance > this.maxDistance) return false
+            x = point.x
+            y = point.y
+        }
+
+        x = startX
+        y = startY
+        for (const point of route) {
+            if (point.x === x && point.y === y) continue
+            const index = (this.head + this.count) % this.maxWaypoints
+            const stored = this.points[index]
+            if (stored) {
+                stored.x = point.x
+                stored.y = point.y
+            } else {
+                this.points[index] = { x: point.x, y: point.y }
+            }
+            this.count++
+            x = point.x
+            y = point.y
+        }
         this.distance = distance
         return true
     }

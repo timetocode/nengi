@@ -43,7 +43,7 @@ describe('LocalAdapter', () => {
     ])('notifies both sides once on %s %s close and rejects pending requests', async (transport, initiator) => {
         const instance = new Instance(createContext())
         instance.onConnect = async () => true
-        const adapter = new SimulatedLocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const adapter = new SimulatedLocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         const socket = transport === 'local'
             ? adapter.createMockConnect()
             : adapter.createSimulatedConnect({ now: () => 0, conditions: { seed: 1 } })
@@ -67,13 +67,13 @@ describe('LocalAdapter', () => {
         else user.disconnect('done')
         await rejection
         expect(closed).toHaveBeenCalledTimes(1)
-        expect(closed).toHaveBeenCalledWith('done', undefined)
-        expect(client.adapter.connected).toBe(false)
+        expect(closed).toHaveBeenCalledWith(expect.objectContaining({ code: initiator === 'client' ? 'LOCAL_DISCONNECT' : 'REMOTE_CLOSE', detail: 'done' }))
+        expect(client.connectionState).not.toBe('connected')
         expect(client.adapter.socket).toBeNull()
         expect(socket.readyState).toBe(3)
         expect(socket.clientSocket.readyState).toBe(3)
         expect(instance.users.size).toBe(0)
-        expect(instance.queue.next()).toMatchObject({ type: NetworkEvent.UserDisconnected, reason: 'done' })
+        expect(instance.queue.next()).toMatchObject({ type: NetworkEvent.UserDisconnected, reason: initiator === 'client' ? 'LOCAL_DISCONNECT' : 'done' })
         if (socket instanceof SimulatedMockServerSocket) {
             expect(socket.conditions.status().clientToServer.queued).toBe(0)
             expect(socket.conditions.status().serverToClient.queued).toBe(0)
@@ -95,22 +95,22 @@ describe('LocalAdapter', () => {
         let accept!: (value: boolean) => void
         const authorization = new Promise<boolean>(resolve => { accept = resolve })
         instance.onConnect = () => authorization
-        const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const adapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         const socket = adapter.createMockConnect()
         const client = new Client(instance.context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
         const closed = jest.fn()
         client.setDisconnectHandler(closed)
         const connecting = client.connect(socket.clientSocket)
-        const rejected = expect(connecting).rejects.toBe('cancelled')
+        const rejected = expect(connecting).rejects.toMatchObject({ code: 'CANCELLED', detail: 'cancelled' })
         client.disconnect('cancelled')
         await rejected
         accept(true)
         await authorization
         expect(instance.users.size).toBe(0)
         expect(instance.network.pendingUsers.size).toBe(0)
-        expect(client.adapter.connected).toBe(false)
-        expect(client.adapter.pendingConnect).toBeNull()
-        expect(closed).toHaveBeenCalledTimes(1)
+        expect(client.connectionState).not.toBe('connected')
+        expect(client.connectionState).toBe('idle')
+        expect(closed).not.toHaveBeenCalled()
     })
 
     it('uses the normal handshake and snapshot pipeline without a socket library', async () => {
@@ -118,7 +118,7 @@ describe('LocalAdapter', () => {
         const instance = new Instance(context)
         instance.onConnect = async handshake => handshake.role === 'local'
 
-        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverAdapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         serverAdapter.listen()
         const serverSocket = serverAdapter.createMockConnect()
 
@@ -130,7 +130,7 @@ describe('LocalAdapter', () => {
         )
 
         const result = await client.connect(serverSocket.clientSocket, { role: 'local' })
-        expect(result.accepted).toBe(true)
+        expect(result).toBeUndefined()
         expect(instance.users.size).toBe(1)
 
         const channel = new Channel(instance.localState)
@@ -156,7 +156,7 @@ describe('LocalAdapter', () => {
         const instance = new Instance(context)
         instance.onConnect = async handshake => Object.keys(handshake).length === 0
 
-        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverAdapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         const serverSocket = serverAdapter.createMockConnect()
         const client = new Client<LocalClientAdapter<Buffer, Buffer>>(
             context,
@@ -167,7 +167,7 @@ describe('LocalAdapter', () => {
 
         const result = await client.connect(serverSocket.clientSocket)
 
-        expect(result.accepted).toBe(true)
+        expect(result).toBeUndefined()
         expect(instance.users.size).toBe(1)
     })
 
@@ -176,7 +176,7 @@ describe('LocalAdapter', () => {
         const instance = new Instance(context)
         instance.onConnect = async () => false
 
-        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverAdapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         const serverSocket = serverAdapter.createMockConnect()
         const client = new Client<LocalClientAdapter<Buffer, Buffer>>(
             context,
@@ -186,10 +186,10 @@ describe('LocalAdapter', () => {
         )
 
         await expect(client.connect(serverSocket.clientSocket, { role: 'local' })).rejects.toMatchObject({
-            message: 'Connection denied.'
+            code: 'CONNECTION_DENIED'
         })
 
-        expect(client.adapter.connected).toBe(false)
+        expect(client.connectionState).not.toBe('connected')
         expect(serverSocket.readyState).toBe(3)
         expect(serverSocket.clientSocket.readyState).toBe(3)
         expect(instance.users.size).toBe(0)
@@ -204,7 +204,7 @@ describe('LocalAdapter', () => {
             pongTimeoutMs: 3000
         })
         instance.onConnect = async () => true
-        const serverAdapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const serverAdapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         const serverSocket = serverAdapter.createMockConnect()
         const client = new Client<LocalClientAdapter<Buffer, Buffer>>(
             context,
@@ -251,7 +251,7 @@ describe('LocalAdapter', () => {
         const context = createContext()
         const instance = new Instance(context, { now: () => nowMs })
         instance.onConnect = async handshake => handshake.role === 'simulated'
-        const serverAdapter = new SimulatedLocalInstanceAdapter(instance.network, {
+        const serverAdapter = new SimulatedLocalInstanceAdapter(instance.adapterHost, {
             binary: testBinaryAdapter
         })
         const socket = serverAdapter.createSimulatedConnect({
@@ -285,7 +285,7 @@ describe('LocalAdapter', () => {
         expect(socket.advance()).toBe(0)
         nowMs = 150
         expect(socket.advance()).toBe(1)
-        await expect(connecting).resolves.toMatchObject({ accepted: true })
+        await expect(connecting).resolves.toBeUndefined()
 
         client.addCommand({ ntype: 99, value: 7 })
         client.flush()
@@ -323,7 +323,7 @@ describe('LocalAdapter', () => {
             pongTimeoutMs: 3000
         })
         instance.onConnect = async () => true
-        const serverAdapter = new SimulatedLocalInstanceAdapter(instance.network, {
+        const serverAdapter = new SimulatedLocalInstanceAdapter(instance.adapterHost, {
             binary: testBinaryAdapter
         })
         const socket = serverAdapter.createSimulatedConnect({
@@ -375,7 +375,7 @@ describe('LocalAdapter', () => {
             pongTimeoutMs: 3000
         })
         instance.onConnect = async () => true
-        const serverAdapter = new SimulatedLocalInstanceAdapter(instance.network, {
+        const serverAdapter = new SimulatedLocalInstanceAdapter(instance.adapterHost, {
             binary: testBinaryAdapter
         })
         const socket = serverAdapter.createSimulatedConnect({

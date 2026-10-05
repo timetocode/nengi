@@ -7,6 +7,7 @@ import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
 import { createManualChannelOutput } from './ManualChannelOutput'
+import { ChannelVisibilitySnapshot, RememberedVisibility } from './ChannelVisibilityCache'
 import { appendManualGroup, appendManualGroup1, appendManualGroup2, appendManualGroup3, appendManualGroup4, appendManualProp } from './EcsSpatialManualLog'
 
 export type ManualPropWriter = (entity: IEntity, value: any) => void
@@ -20,18 +21,7 @@ export type ManualTypeWriters = {
     readonly groups: { [name: string]: ManualGroupWriter }
 }
 
-export type ManualChannelSnapshotVisibility = {
-    toCreate: number[]
-    toUpdate: number[]
-    toDelete: number[]
-    visibleRef: number[]
-    visibleSet: Set<number>
-}
-
-type RememberedManualChannelVisibility = {
-    visibleRef: number[]
-    visibleSet: Set<number>
-}
+export type ManualChannelSnapshotVisibility = ChannelVisibilitySnapshot
 
 export class ManualChannel extends Channel {
     // Snapshot writers key off this marker to use the manual mutation log
@@ -47,7 +37,7 @@ export class ManualChannel extends Channel {
     manualOpTypes: number[] = []
     manualOpIndexes: number[] = []
     manualNeedsCoalesce = false
-    private snapshotVisibilityByUser: Map<number, RememberedManualChannelVisibility> = new Map()
+    private snapshotVisibilityByUser: Map<number, RememberedVisibility> = new Map()
 
     constructor(localState: LocalState, options: ChannelOptions = {}) {
         super(localState, { ...options, channelType: ChannelType.ManualChannel })
@@ -59,40 +49,10 @@ export class ManualChannel extends Channel {
 
     collectSnapshotVisibility(userOrId: User | number): ManualChannelSnapshotVisibility {
         const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
-        const visibleRef = this.getVisibleNetworkedNids(userId)
-        const previous = this.snapshotVisibilityByUser.get(userId)
-        if (previous && previous.visibleRef === visibleRef) {
-            return {
-                toCreate: [],
-                toUpdate: visibleRef.slice(),
-                toDelete: [],
-                visibleRef,
-                visibleSet: previous.visibleSet
-            }
-        }
-
-        const visibleSet = new Set(visibleRef)
-        const toCreate: number[] = []
-        const toUpdate: number[] = []
-        const toDelete: number[] = []
-        if (!previous) {
-            toCreate.push(...visibleRef)
-        } else {
-            for (let i = 0; i < visibleRef.length; i++) {
-                const nid = visibleRef[i]
-                if (previous.visibleSet.has(nid)) {
-                    toUpdate.push(nid)
-                } else {
-                    toCreate.push(nid)
-                }
-            }
-            previous.visibleSet.forEach(nid => {
-                if (!visibleSet.has(nid)) {
-                    toDelete.push(nid)
-                }
-            })
-        }
-        return { toCreate, toUpdate, toDelete, visibleRef, visibleSet }
+        return this.snapshotVisibilityCache.collect(
+            this.getVisibleNetworkedNids(userId),
+            this.snapshotVisibilityByUser.get(userId)
+        )
     }
 
     rememberSnapshotVisibility(userId: number, visibility: ManualChannelSnapshotVisibility) {

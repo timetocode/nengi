@@ -81,7 +81,7 @@ function createUser(instance: Instance, id: number) {
     } as any)
     user.id = id
     user.instance = instance
-    instance.users.set(user.id, user)
+    instance.connectedUsers.set(user.id, user)
     return user
 }
 

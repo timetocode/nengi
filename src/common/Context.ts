@@ -13,6 +13,7 @@ import { interpolationDelaySchema } from './schemas/interpolationDelaySchema'
 import { Binary } from './binary/Binary'
 import { NetworkIdType, networkTypeForMaxValue } from './binary/Protocol'
 import { EndpointDefinition, getEndpointId } from './Endpoint'
+import { invalidateSchemaFingerprint } from './binary/schema/schemaFingerprint'
 
 const MAX_SCHEMA_ID = 0xffffffff
 
@@ -23,22 +24,22 @@ function assertValidSchemaId(ntype: number) {
 }
 
 export class Context {
-    /**
-	 * user-defined network schemas
-	 */
-    schemas: Map<number, Schema>
+    private readonly registeredSchemas = new Map<number, Schema>()
+    private readonly registeredEndpoints = new Map<number, EndpointDefinition>()
+
+    /** Inspect registrations; use register() to add immutable protocol definitions. */
+    readonly schemas: ReadonlyMap<number, Schema> = this.registeredSchemas
 
     /**
 	 * schemas internal to nengi
 	 */
     engineSchemas: Map<number, Schema>
-    endpointDefinitions: Map<number, EndpointDefinition>
+    /** Inspect registrations; use registerEndpoint() to add protocol definitions. */
+    readonly endpointDefinitions: ReadonlyMap<number, EndpointDefinition> = this.registeredEndpoints
     ntypeType: NetworkIdType
 
     constructor() {
-        this.schemas = new Map()
         this.engineSchemas = new Map()
-        this.endpointDefinitions = new Map()
         this.ntypeType = Binary.UInt8
 
         // setup the engine schemas
@@ -54,22 +55,28 @@ export class Context {
         this.engineSchemas.set(EngineMessage.InterpolationDelay, interpolationDelaySchema)
     }
 
+    /** Register setup data before connecting; do not mutate its protocol metadata. */
     register(ntype: number, schema: Schema) {
         assertValidSchemaId(ntype)
         if (this.schemas.has(ntype)) {
             throw new Error(`Schema id ${ntype} is already registered.`)
         }
-        this.schemas.set(ntype, schema)
+        this.registeredSchemas.set(ntype, schema)
         this.ntypeType = networkTypeForMaxValue(Math.max(...this.schemas.keys()))
+        invalidateSchemaFingerprint(this)
     }
 
+    /** Register setup data before connecting; do not mutate its payload schemas. */
     registerEndpoint(endpoint: EndpointDefinition) {
         const id = getEndpointId(endpoint)
         const existing = this.endpointDefinitions.get(id)
         if (existing && existing !== endpoint) {
             throw new Error(`Endpoint id ${id} is already registered.`)
         }
-        this.endpointDefinitions.set(id, endpoint)
+        if (!existing) {
+            this.registeredEndpoints.set(id, endpoint)
+            invalidateSchemaFingerprint(this)
+        }
         return endpoint
     }
 

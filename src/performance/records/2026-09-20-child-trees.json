@@ -1,0 +1,5827 @@
+{
+  "date": "2026-09-20",
+  "environment": {
+    "date": "2026-09-20T21:45:05.601Z",
+    "node": "v22.17.1",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "platform": "linux",
+    "release": "6.6.87.2-microsoft-standard-WSL2",
+    "load": [
+      1.74,
+      1.56,
+      1.28
+    ],
+    "cases": [
+      {
+        "warmup": 30,
+        "ticks": 120,
+        "name": "wide-child-churn",
+        "scenario": "channel-churn",
+        "entities": 4,
+        "children": 512,
+        "churn": 1,
+        "users": 20,
+        "moveFraction": 0,
+        "sharedUpdates": true
+      },
+      {
+        "warmup": 30,
+        "ticks": 120,
+        "name": "small-child-churn",
+        "scenario": "channel-churn",
+        "entities": 1000,
+        "children": 2,
+        "churn": 10,
+        "users": 20,
+        "moveFraction": 0.01,
+        "sharedUpdates": true
+      },
+      {
+        "warmup": 30,
+        "ticks": 120,
+        "name": "spatial-steady",
+        "scenario": "parent-child-channel-2d",
+        "entities": 512,
+        "children": 4,
+        "churn": 0,
+        "users": 20,
+        "moveFraction": 0.01,
+        "sharedUpdates": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "worldSize": 128,
+        "spatialDistribution": "single-cell"
+      },
+      {
+        "warmup": 30,
+        "ticks": 120,
+        "name": "manual-steady",
+        "scenario": "parent-child-manual-channel",
+        "entities": 64,
+        "children": 64,
+        "churn": 0,
+        "users": 20,
+        "moveFraction": 0.01,
+        "sharedUpdates": true
+      }
+    ],
+    "notes": "Fresh sequential processes, three repeats, alternating source order. Other development services may be active; no CPU affinity. Tree measurements exclude setup; snapshot measurements use the official nengi-buffers backend and controlled clock."
+  },
+  "sources": {
+    "coreHead": "d78047ca62bf801af58e48f4b0ebb15065612d88",
+    "note": "Core baseline includes prior uncommitted performance and other work. The production-source difference in this comparison is LocalState.addChild invalidation starting at the newly attached child instead of its parent.",
+    "coreBeforeLocalState": "953eb4b4273fc3be22d32593f8433dc0f93ca059471ed5ab34cb60725d99af40",
+    "coreAfterLocalState": "07f16fd73b84fbb97e85fcf63c7ddb64f6f32e1b6053e6f3f6938dbc13fc5ebb",
+    "treeHarness": "5c7b15a03e34cbb4c17829a27110a0b20273a698ef473581633ccc035428a0ab",
+    "snapshotHarness": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031",
+    "loamHead": "c482dd24a1232666b85776c570c532459769e5f8",
+    "loamBeforeReader": "3afb3d1b6098bf41aa7917b706429a8b562a5ba31f34870a7433db4677aab98d",
+    "loamAfterReader": "54bf70c7fab6513662972b6cea630aa3ccc531408e651c965f44bdab3b2db595",
+    "loamHarness": "f2c5acb5248b73a479cb893c4454b525820ac31e8b5edfc80c7b9f0ba5ff76b8",
+    "loamInstalledCore": "2.0.0-rc.127",
+    "loamPinnedTarballSha256": "9c8970ccd9fe4261930bd4c51b00599f3a37a1f11572236fef9152af47072429",
+    "loamNote": "The pinned package and server publisher are unchanged for reader before/after comparisons. The core attachment fix is measured separately; it is not installed in Loam."
+  },
+  "coreRuns": [
+    {
+      "file": "manual-steady-after-0.json",
+      "config": {
+        "scenario": "parent-child-manual-channel",
+        "users": 20,
+        "entities": 64,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "manual-steady"
+      },
+      "result": {
+        "scenario": "parent-child-manual-channel",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 64,
+        "rootEntities": 64,
+        "networkedEntities": 4160,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.225,
+          "p50": 0.186,
+          "p95": 0.427,
+          "max": 0.541
+        },
+        "preStepMs": {
+          "avg": 0.013,
+          "p50": 0.009,
+          "p95": 0.035,
+          "max": 0.248
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.238,
+          "p50": 0.197,
+          "p95": 0.456,
+          "max": 0.573
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.225,
+          "p50": 0.186,
+          "p95": 0.427,
+          "max": 0.541
+        },
+        "totalMs": {
+          "avg": 0.238,
+          "p50": 0.197,
+          "p95": 0.456,
+          "max": 0.573
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 16080,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12554520,
+        "retainedHeapAfterWarmup": 16029832,
+        "retainedHeapDelta": 3475312
+      },
+      "gc": {
+        "count": 1,
+        "durationMs": 0.3182780146598816,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3182780146598816
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 28.905547999999953
+      }
+    },
+    {
+      "file": "manual-steady-after-1.json",
+      "config": {
+        "scenario": "parent-child-manual-channel",
+        "users": 20,
+        "entities": 64,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "manual-steady"
+      },
+      "result": {
+        "scenario": "parent-child-manual-channel",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 64,
+        "rootEntities": 64,
+        "networkedEntities": 4160,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.214,
+          "p50": 0.18,
+          "p95": 0.442,
+          "max": 0.73
+        },
+        "preStepMs": {
+          "avg": 0.013,
+          "p50": 0.009,
+          "p95": 0.021,
+          "max": 0.272
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.227,
+          "p50": 0.191,
+          "p95": 0.448,
+          "max": 0.75
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.214,
+          "p50": 0.18,
+          "p95": 0.442,
+          "max": 0.73
+        },
+        "totalMs": {
+          "avg": 0.227,
+          "p50": 0.191,
+          "p95": 0.448,
+          "max": 0.75
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 16080,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12553376,
+        "retainedHeapAfterWarmup": 16030672,
+        "retainedHeapDelta": 3477296
+      },
+      "gc": {
+        "count": 1,
+        "durationMs": 0.2847369909286499,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.2847369909286499
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 27.51889
+      }
+    },
+    {
+      "file": "manual-steady-after-2.json",
+      "config": {
+        "scenario": "parent-child-manual-channel",
+        "users": 20,
+        "entities": 64,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "manual-steady"
+      },
+      "result": {
+        "scenario": "parent-child-manual-channel",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 64,
+        "rootEntities": 64,
+        "networkedEntities": 4160,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.226,
+          "p50": 0.173,
+          "p95": 0.501,
+          "max": 0.806
+        },
+        "preStepMs": {
+          "avg": 0.012,
+          "p50": 0.009,
+          "p95": 0.022,
+          "max": 0.222
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.238,
+          "p50": 0.188,
+          "p95": 0.534,
+          "max": 0.81
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.226,
+          "p50": 0.173,
+          "p95": 0.501,
+          "max": 0.806
+        },
+        "totalMs": {
+          "avg": 0.238,
+          "p50": 0.188,
+          "p95": 0.534,
+          "max": 0.81
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 16080,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12554008,
+        "retainedHeapAfterWarmup": 16030176,
+        "retainedHeapDelta": 3476168
+      },
+      "gc": {
+        "count": 1,
+        "durationMs": 0.3548080325126648,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3548080325126648
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 28.880019000000004
+      }
+    },
+    {
+      "file": "manual-steady-before-0.json",
+      "config": {
+        "scenario": "parent-child-manual-channel",
+        "users": 20,
+        "entities": 64,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "manual-steady"
+      },
+      "result": {
+        "scenario": "parent-child-manual-channel",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 64,
+        "rootEntities": 64,
+        "networkedEntities": 4160,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.21,
+          "p50": 0.172,
+          "p95": 0.384,
+          "max": 0.797
+        },
+        "preStepMs": {
+          "avg": 0.012,
+          "p50": 0.009,
+          "p95": 0.02,
+          "max": 0.178
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.221,
+          "p50": 0.185,
+          "p95": 0.424,
+          "max": 0.804
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.21,
+          "p50": 0.172,
+          "p95": 0.384,
+          "max": 0.797
+        },
+        "totalMs": {
+          "avg": 0.221,
+          "p50": 0.185,
+          "p95": 0.424,
+          "max": 0.804
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 16080,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12649624,
+        "retainedHeapAfterWarmup": 16129000,
+        "retainedHeapDelta": 3479376
+      },
+      "gc": {
+        "count": 1,
+        "durationMs": 0.25998395681381226,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.25998395681381226
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 26.877161
+      }
+    },
+    {
+      "file": "manual-steady-before-1.json",
+      "config": {
+        "scenario": "parent-child-manual-channel",
+        "users": 20,
+        "entities": 64,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "manual-steady"
+      },
+      "result": {
+        "scenario": "parent-child-manual-channel",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 64,
+        "rootEntities": 64,
+        "networkedEntities": 4160,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.266,
+          "p50": 0.221,
+          "p95": 0.524,
+          "max": 0.865
+        },
+        "preStepMs": {
+          "avg": 0.015,
+          "p50": 0.009,
+          "p95": 0.034,
+          "max": 0.224
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.281,
+          "p50": 0.245,
+          "p95": 0.554,
+          "max": 0.871
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.266,
+          "p50": 0.221,
+          "p95": 0.524,
+          "max": 0.865
+        },
+        "totalMs": {
+          "avg": 0.281,
+          "p50": 0.245,
+          "p95": 0.554,
+          "max": 0.871
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 16080,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12649272,
+        "retainedHeapAfterWarmup": 16132728,
+        "retainedHeapDelta": 3483456
+      },
+      "gc": {
+        "count": 1,
+        "durationMs": 0.3158600330352783,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3158600330352783
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 33.98354499999999
+      }
+    },
+    {
+      "file": "manual-steady-before-2.json",
+      "config": {
+        "scenario": "parent-child-manual-channel",
+        "users": 20,
+        "entities": 64,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "manual-steady"
+      },
+      "result": {
+        "scenario": "parent-child-manual-channel",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 64,
+        "rootEntities": 64,
+        "networkedEntities": 4160,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 64,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.22,
+          "p50": 0.177,
+          "p95": 0.44,
+          "max": 0.661
+        },
+        "preStepMs": {
+          "avg": 0.012,
+          "p50": 0.009,
+          "p95": 0.025,
+          "max": 0.161
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.232,
+          "p50": 0.19,
+          "p95": 0.447,
+          "max": 0.682
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.22,
+          "p50": 0.177,
+          "p95": 0.44,
+          "max": 0.661
+        },
+        "totalMs": {
+          "avg": 0.232,
+          "p50": 0.19,
+          "p95": 0.447,
+          "max": 0.682
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 16080,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12650560,
+        "retainedHeapAfterWarmup": 16130392,
+        "retainedHeapDelta": 3479832
+      },
+      "gc": {
+        "count": 1,
+        "durationMs": 0.34194302558898926,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.34194302558898926
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 28.21466300000003
+      }
+    },
+    {
+      "file": "small-child-churn-after-0.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 1000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "small-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 1000,
+        "rootEntities": 1000,
+        "networkedEntities": 3000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.008,
+          "p50": 0.937,
+          "p95": 1.439,
+          "max": 1.772
+        },
+        "preStepMs": {
+          "avg": 0.067,
+          "p50": 0.054,
+          "p95": 0.102,
+          "max": 0.765
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.076,
+          "p50": 0.993,
+          "p95": 1.567,
+          "max": 1.891
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.008,
+          "p50": 0.937,
+          "p95": 1.439,
+          "max": 1.772
+        },
+        "totalMs": {
+          "avg": 1.076,
+          "p50": 0.993,
+          "p95": 1.567,
+          "max": 1.891
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 20460,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12545912,
+        "retainedHeapAfterWarmup": 15240736,
+        "retainedHeapDelta": 2694824
+      },
+      "gc": {
+        "count": 6,
+        "durationMs": 2.454501986503601,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3417220115661621
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4677429795265198
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4152350425720215
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.35566699504852295
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3851589560508728
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.48897600173950195
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 129.469264
+      }
+    },
+    {
+      "file": "small-child-churn-after-1.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 1000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "small-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 1000,
+        "rootEntities": 1000,
+        "networkedEntities": 3000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.154,
+          "p50": 1.031,
+          "p95": 1.728,
+          "max": 2.343
+        },
+        "preStepMs": {
+          "avg": 0.076,
+          "p50": 0.056,
+          "p95": 0.113,
+          "max": 1.317
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.23,
+          "p50": 1.096,
+          "p95": 1.796,
+          "max": 2.561
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.154,
+          "p50": 1.031,
+          "p95": 1.728,
+          "max": 2.343
+        },
+        "totalMs": {
+          "avg": 1.23,
+          "p50": 1.096,
+          "p95": 1.796,
+          "max": 2.561
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 20460,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12554256,
+        "retainedHeapAfterWarmup": 15238120,
+        "retainedHeapDelta": 2683864
+      },
+      "gc": {
+        "count": 6,
+        "durationMs": 2.631464958190918,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.4397349953651428
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.35655999183654785
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.40052998065948486
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.5202429890632629
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.45266300439834595
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.46173399686813354
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 148.06826
+      }
+    },
+    {
+      "file": "small-child-churn-after-2.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 1000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "small-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 1000,
+        "rootEntities": 1000,
+        "networkedEntities": 3000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.108,
+          "p50": 0.999,
+          "p95": 1.728,
+          "max": 2.183
+        },
+        "preStepMs": {
+          "avg": 0.07,
+          "p50": 0.055,
+          "p95": 0.1,
+          "max": 0.99
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.178,
+          "p50": 1.079,
+          "p95": 1.784,
+          "max": 2.253
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.108,
+          "p50": 0.999,
+          "p95": 1.728,
+          "max": 2.183
+        },
+        "totalMs": {
+          "avg": 1.178,
+          "p50": 1.079,
+          "p95": 1.784,
+          "max": 2.253
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 20460,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12553968,
+        "retainedHeapAfterWarmup": 15244640,
+        "retainedHeapDelta": 2690672
+      },
+      "gc": {
+        "count": 6,
+        "durationMs": 2.4907419681549072,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3491320013999939
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.38372695446014404
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.33730703592300415
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3857659697532654
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.5430560111999512
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4917539954185486
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 141.694296
+      }
+    },
+    {
+      "file": "small-child-churn-before-0.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 1000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "small-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 1000,
+        "rootEntities": 1000,
+        "networkedEntities": 3000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.077,
+          "p50": 0.971,
+          "p95": 1.511,
+          "max": 1.914
+        },
+        "preStepMs": {
+          "avg": 0.075,
+          "p50": 0.057,
+          "p95": 0.119,
+          "max": 1.191
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.152,
+          "p50": 1.038,
+          "p95": 1.559,
+          "max": 3.071
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.077,
+          "p50": 0.971,
+          "p95": 1.511,
+          "max": 1.914
+        },
+        "totalMs": {
+          "avg": 1.152,
+          "p50": 1.038,
+          "p95": 1.559,
+          "max": 3.071
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 20460,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12650504,
+        "retainedHeapAfterWarmup": 15347112,
+        "retainedHeapDelta": 2696608
+      },
+      "gc": {
+        "count": 5,
+        "durationMs": 1.8792459964752197,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3555690050125122
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.40119099617004395
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.34007197618484497
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.41131705045700073
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.37109696865081787
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 138.68213100000003
+      }
+    },
+    {
+      "file": "small-child-churn-before-1.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 1000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "small-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 1000,
+        "rootEntities": 1000,
+        "networkedEntities": 3000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.029,
+          "p50": 0.961,
+          "p95": 1.466,
+          "max": 1.85
+        },
+        "preStepMs": {
+          "avg": 0.068,
+          "p50": 0.056,
+          "p95": 0.106,
+          "max": 0.768
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.097,
+          "p50": 1.023,
+          "p95": 1.563,
+          "max": 1.891
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.029,
+          "p50": 0.961,
+          "p95": 1.466,
+          "max": 1.85
+        },
+        "totalMs": {
+          "avg": 1.097,
+          "p50": 1.023,
+          "p95": 1.563,
+          "max": 1.891
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 20460,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12650432,
+        "retainedHeapAfterWarmup": 15348224,
+        "retainedHeapDelta": 2697792
+      },
+      "gc": {
+        "count": 6,
+        "durationMs": 2.630155920982361,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.2865440249443054
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4118189811706543
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.44207197427749634
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4273579716682434
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4690839648246765
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.5932790040969849
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 132.084921
+      }
+    },
+    {
+      "file": "small-child-churn-before-2.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 1000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "small-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 1000,
+        "rootEntities": 1000,
+        "networkedEntities": 3000,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 10,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.015,
+          "p50": 0.929,
+          "p95": 1.491,
+          "max": 1.65
+        },
+        "preStepMs": {
+          "avg": 0.065,
+          "p50": 0.054,
+          "p95": 0.111,
+          "max": 0.773
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.08,
+          "p50": 0.988,
+          "p95": 1.574,
+          "max": 1.766
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.015,
+          "p50": 0.929,
+          "p95": 1.491,
+          "max": 1.65
+        },
+        "totalMs": {
+          "avg": 1.08,
+          "p50": 0.988,
+          "p95": 1.574,
+          "max": 1.766
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 20460,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12650112,
+        "retainedHeapAfterWarmup": 15354136,
+        "retainedHeapDelta": 2704024
+      },
+      "gc": {
+        "count": 6,
+        "durationMs": 2.4753849506378174,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.39363497495651245
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3783490061759949
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.49600404500961304
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.36824196577072144
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4329899549484253
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4061650037765503
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 129.994058
+      }
+    },
+    {
+      "file": "spatial-steady-after-0.json",
+      "config": {
+        "scenario": "parent-child-channel-2d",
+        "users": 20,
+        "entities": 512,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "spatial-steady"
+      },
+      "result": {
+        "scenario": "parent-child-channel-2d",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 512,
+        "rootEntities": 512,
+        "networkedEntities": 2560,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.809,
+          "p50": 0.761,
+          "p95": 1.112,
+          "max": 1.626
+        },
+        "preStepMs": {
+          "avg": 0.005,
+          "p50": 0.005,
+          "p95": 0.006,
+          "max": 0.01
+        },
+        "indexMs": {
+          "avg": 0.003,
+          "p50": 0.003,
+          "p95": 0.003,
+          "max": 0.005
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.814,
+          "p50": 0.766,
+          "p95": 1.116,
+          "max": 1.632
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.812,
+          "p50": 0.764,
+          "p95": 1.114,
+          "max": 1.629
+        },
+        "totalMs": {
+          "avg": 0.817,
+          "p50": 0.769,
+          "p95": 1.119,
+          "max": 1.636
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 10060,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12554664,
+        "retainedHeapAfterWarmup": 15748032,
+        "retainedHeapDelta": 3193368
+      },
+      "gc": {
+        "count": 8,
+        "durationMs": 2.3762369751930237,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.31661301851272583
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3214699625968933
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.24611997604370117
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.28375500440597534
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2437499761581421
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4178910255432129
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.26818305253982544
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2784549593925476
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 98.29977300000002
+      }
+    },
+    {
+      "file": "spatial-steady-after-1.json",
+      "config": {
+        "scenario": "parent-child-channel-2d",
+        "users": 20,
+        "entities": 512,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "spatial-steady"
+      },
+      "result": {
+        "scenario": "parent-child-channel-2d",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 512,
+        "rootEntities": 512,
+        "networkedEntities": 2560,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.851,
+          "p50": 0.778,
+          "p95": 1.285,
+          "max": 1.501
+        },
+        "preStepMs": {
+          "avg": 0.009,
+          "p50": 0.005,
+          "p95": 0.01,
+          "max": 0.333
+        },
+        "indexMs": {
+          "avg": 0.003,
+          "p50": 0.003,
+          "p95": 0.004,
+          "max": 0.03
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.859,
+          "p50": 0.784,
+          "p95": 1.29,
+          "max": 1.505
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.854,
+          "p50": 0.781,
+          "p95": 1.289,
+          "max": 1.504
+        },
+        "totalMs": {
+          "avg": 0.862,
+          "p50": 0.786,
+          "p95": 1.294,
+          "max": 1.508
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 10060,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12554856,
+        "retainedHeapAfterWarmup": 15746416,
+        "retainedHeapDelta": 3191560
+      },
+      "gc": {
+        "count": 8,
+        "durationMs": 2.709271013736725,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.2795019745826721
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3208850026130676
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.38739705085754395
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.24728697538375854
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.34476804733276367
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2935059666633606
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.5394520163536072
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.29647397994995117
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 103.88442700000002
+      }
+    },
+    {
+      "file": "spatial-steady-after-2.json",
+      "config": {
+        "scenario": "parent-child-channel-2d",
+        "users": 20,
+        "entities": 512,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "spatial-steady"
+      },
+      "result": {
+        "scenario": "parent-child-channel-2d",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 512,
+        "rootEntities": 512,
+        "networkedEntities": 2560,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.868,
+          "p50": 0.797,
+          "p95": 1.268,
+          "max": 1.927
+        },
+        "preStepMs": {
+          "avg": 0.008,
+          "p50": 0.005,
+          "p95": 0.009,
+          "max": 0.37
+        },
+        "indexMs": {
+          "avg": 0.003,
+          "p50": 0.003,
+          "p95": 0.004,
+          "max": 0.008
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.876,
+          "p50": 0.803,
+          "p95": 1.273,
+          "max": 1.938
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.871,
+          "p50": 0.8,
+          "p95": 1.271,
+          "max": 1.932
+        },
+        "totalMs": {
+          "avg": 0.879,
+          "p50": 0.806,
+          "p95": 1.276,
+          "max": 1.944
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 10060,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12555272,
+        "retainedHeapAfterWarmup": 15733384,
+        "retainedHeapDelta": 3178112
+      },
+      "gc": {
+        "count": 8,
+        "durationMs": 2.208076059818268,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.3122560381889343
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.355987012386322
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2593339681625366
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.28422999382019043
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2918670177459717
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.22500300407409668
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2932230234146118
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.18617600202560425
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 105.90451199999995
+      }
+    },
+    {
+      "file": "spatial-steady-before-0.json",
+      "config": {
+        "scenario": "parent-child-channel-2d",
+        "users": 20,
+        "entities": 512,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "spatial-steady"
+      },
+      "result": {
+        "scenario": "parent-child-channel-2d",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 512,
+        "rootEntities": 512,
+        "networkedEntities": 2560,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.869,
+          "p50": 0.772,
+          "p95": 1.375,
+          "max": 1.996
+        },
+        "preStepMs": {
+          "avg": 0.009,
+          "p50": 0.005,
+          "p95": 0.009,
+          "max": 0.283
+        },
+        "indexMs": {
+          "avg": 0.003,
+          "p50": 0.003,
+          "p95": 0.004,
+          "max": 0.006
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.877,
+          "p50": 0.777,
+          "p95": 1.384,
+          "max": 2.002
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.872,
+          "p50": 0.775,
+          "p95": 1.378,
+          "max": 1.999
+        },
+        "totalMs": {
+          "avg": 0.88,
+          "p50": 0.78,
+          "p95": 1.387,
+          "max": 2.005
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 10060,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12649976,
+        "retainedHeapAfterWarmup": 15829376,
+        "retainedHeapDelta": 3179400
+      },
+      "gc": {
+        "count": 8,
+        "durationMs": 2.3813329935073853,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.26482200622558594
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3563230037689209
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.385358989238739
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3650670051574707
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.36936795711517334
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.23663002252578735
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.23421800136566162
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.1695460081100464
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 106.19489299999998
+      }
+    },
+    {
+      "file": "spatial-steady-before-1.json",
+      "config": {
+        "scenario": "parent-child-channel-2d",
+        "users": 20,
+        "entities": 512,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "spatial-steady"
+      },
+      "result": {
+        "scenario": "parent-child-channel-2d",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 512,
+        "rootEntities": 512,
+        "networkedEntities": 2560,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.939,
+          "p50": 0.833,
+          "p95": 1.415,
+          "max": 2.428
+        },
+        "preStepMs": {
+          "avg": 0.006,
+          "p50": 0.005,
+          "p95": 0.008,
+          "max": 0.028
+        },
+        "indexMs": {
+          "avg": 0.003,
+          "p50": 0.003,
+          "p95": 0.004,
+          "max": 0.024
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.944,
+          "p50": 0.838,
+          "p95": 1.443,
+          "max": 2.433
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.942,
+          "p50": 0.835,
+          "p95": 1.419,
+          "max": 2.431
+        },
+        "totalMs": {
+          "avg": 0.947,
+          "p50": 0.84,
+          "p95": 1.447,
+          "max": 2.436
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 10060,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12651320,
+        "retainedHeapAfterWarmup": 15845928,
+        "retainedHeapDelta": 3194608
+      },
+      "gc": {
+        "count": 8,
+        "durationMs": 2.633569061756134,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.26211100816726685
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4131750464439392
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.23454701900482178
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.38204604387283325
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2939719557762146
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2709389925003052
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3462839722633362
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.430495023727417
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 114.020871
+      }
+    },
+    {
+      "file": "spatial-steady-before-2.json",
+      "config": {
+        "scenario": "parent-child-channel-2d",
+        "users": 20,
+        "entities": 512,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "spatial-steady"
+      },
+      "result": {
+        "scenario": "parent-child-channel-2d",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 512,
+        "rootEntities": 512,
+        "networkedEntities": 2560,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 4,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.01,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 0.882,
+          "p50": 0.781,
+          "p95": 1.379,
+          "max": 2.05
+        },
+        "preStepMs": {
+          "avg": 0.006,
+          "p50": 0.005,
+          "p95": 0.008,
+          "max": 0.053
+        },
+        "indexMs": {
+          "avg": 0.003,
+          "p50": 0.003,
+          "p95": 0.004,
+          "max": 0.015
+        },
+        "preStepPlusStepMs": {
+          "avg": 0.887,
+          "p50": 0.787,
+          "p95": 1.389,
+          "max": 2.056
+        },
+        "stepPlusIndexMs": {
+          "avg": 0.884,
+          "p50": 0.784,
+          "p95": 1.382,
+          "max": 2.053
+        },
+        "totalMs": {
+          "avg": 0.89,
+          "p50": 0.79,
+          "p95": 1.393,
+          "max": 2.059
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 10060,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12651040,
+        "retainedHeapAfterWarmup": 15829016,
+        "retainedHeapDelta": 3177976
+      },
+      "gc": {
+        "count": 8,
+        "durationMs": 2.753876030445099,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.32524996995925903
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.3888630270957947
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.4443640112876892
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.33703500032424927
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.37815600633621216
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2921540141105652
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.2697259783744812
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.31832802295684814
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 107.166067
+      }
+    },
+    {
+      "file": "tree-after-0.json",
+      "date": "2026-09-20T21:45:11.306Z",
+      "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+      "node": "v22.17.1",
+      "trials": 7,
+      "warmup": 2,
+      "scope": "Preallocated child attachment or root removal only. Setup, cache population and verification excluded. No snapshots, sockets, physics or GC claims. Traversal counts use separate untimed diagnostic instances.",
+      "results": [
+        {
+          "name": "attach-64",
+          "count": 64,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.07862299999999323,
+            0.07716899999999782,
+            0.07500800000002528,
+            0.084541999999999,
+            0.07321199999998385,
+            0.0767280000000028,
+            0.07737800000001016
+          ],
+          "medianMs": 0.07716899999999782,
+          "invalidationVisits": 64
+        },
+        {
+          "name": "attach-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.4385120000000029,
+            0.39718399999998155,
+            0.9040799999999933,
+            0.7310290000000066,
+            0.6995860000000107,
+            0.4757730000000038,
+            0.40760899999997946
+          ],
+          "medianMs": 0.4757730000000038,
+          "invalidationVisits": 512
+        },
+        {
+          "name": "attach-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            1.6090889999999831,
+            2.7927980000000048,
+            1.629667000000012,
+            1.5472950000000196,
+            3.102921000000009,
+            1.6381069999999909,
+            2.8751509999999882
+          ],
+          "medianMs": 1.6381069999999909,
+          "invalidationVisits": 4096
+        },
+        {
+          "name": "cached-4096-add-64",
+          "count": 64,
+          "existing": 4096,
+          "depth": 0,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            0.41641500000000065,
+            0.3407449999999983,
+            0.36406500000001074,
+            0.3423429999999712,
+            0.4483539999999948,
+            0.3227260000000456,
+            0.39872600000001057
+          ],
+          "medianMs": 0.36406500000001074,
+          "invalidationVisits": 64
+        },
+        {
+          "name": "nested-16-add-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 16,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            0.2570519999999874,
+            0.27004599999997936,
+            0.26522900000003347,
+            0.2629379999999628,
+            0.2788630000000012,
+            0.27165500000000975,
+            0.26787500000000364
+          ],
+          "medianMs": 0.26787500000000364,
+          "invalidationVisits": 512
+        },
+        {
+          "name": "remove-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": true,
+          "remove": true,
+          "samplesMs": [
+            2.0843450000000416,
+            1.0557059999999865,
+            1.1167179999999917,
+            2.3882790000000114,
+            1.2428300000000263,
+            1.1090030000000297,
+            1.1592809999999645
+          ],
+          "medianMs": 1.1592809999999645,
+          "invalidationVisits": 8193
+        }
+      ]
+    },
+    {
+      "file": "tree-after-1.json",
+      "date": "2026-09-20T21:45:16.322Z",
+      "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+      "node": "v22.17.1",
+      "trials": 7,
+      "warmup": 2,
+      "scope": "Preallocated child attachment or root removal only. Setup, cache population and verification excluded. No snapshots, sockets, physics or GC claims. Traversal counts use separate untimed diagnostic instances.",
+      "results": [
+        {
+          "name": "attach-64",
+          "count": 64,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.07780800000000454,
+            0.1087869999999782,
+            0.08750599999999054,
+            0.07340999999999553,
+            0.07250700000000165,
+            0.10605400000000031,
+            0.0962120000000084
+          ],
+          "medianMs": 0.08750599999999054,
+          "invalidationVisits": 64
+        },
+        {
+          "name": "attach-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            1.2875689999999906,
+            0.4305880000000002,
+            0.5001190000000122,
+            0.3607810000000029,
+            0.5652970000000153,
+            0.5117020000000139,
+            0.4972319999999968
+          ],
+          "medianMs": 0.5001190000000122,
+          "invalidationVisits": 512
+        },
+        {
+          "name": "attach-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            1.6338200000000143,
+            2.881455999999986,
+            1.9669930000000022,
+            2.5993640000000084,
+            2.6064719999999966,
+            1.6029570000000035,
+            2.087187
+          ],
+          "medianMs": 2.087187,
+          "invalidationVisits": 4096
+        },
+        {
+          "name": "cached-4096-add-64",
+          "count": 64,
+          "existing": 4096,
+          "depth": 0,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            0.36351499999997827,
+            0.3155619999999999,
+            0.31429399999998964,
+            0.36823100000000863,
+            0.3932929999999999,
+            0.3261420000000044,
+            0.34656400000000076
+          ],
+          "medianMs": 0.34656400000000076,
+          "invalidationVisits": 64
+        },
+        {
+          "name": "nested-16-add-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 16,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            1.1883650000000046,
+            0.24783899999999903,
+            0.2495580000000075,
+            0.24870999999998844,
+            0.25407700000002365,
+            0.2432100000000048,
+            0.24538100000000895
+          ],
+          "medianMs": 0.24870999999998844,
+          "invalidationVisits": 512
+        },
+        {
+          "name": "remove-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": true,
+          "remove": true,
+          "samplesMs": [
+            1.7929289999999867,
+            3.207841000000002,
+            1.3704409999999996,
+            1.098212999999987,
+            1.3093409999999892,
+            1.7761560000000145,
+            2.1035870000000045
+          ],
+          "medianMs": 1.7761560000000145,
+          "invalidationVisits": 8193
+        }
+      ]
+    },
+    {
+      "file": "tree-after-2.json",
+      "date": "2026-09-20T21:45:28.235Z",
+      "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+      "node": "v22.17.1",
+      "trials": 7,
+      "warmup": 2,
+      "scope": "Preallocated child attachment or root removal only. Setup, cache population and verification excluded. No snapshots, sockets, physics or GC claims. Traversal counts use separate untimed diagnostic instances.",
+      "results": [
+        {
+          "name": "attach-64",
+          "count": 64,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.07338800000002266,
+            0.07321300000000974,
+            0.08234799999999609,
+            0.06806600000001595,
+            0.06775700000000029,
+            0.06733800000000656,
+            0.06676500000000374
+          ],
+          "medianMs": 0.06806600000001595,
+          "invalidationVisits": 64
+        },
+        {
+          "name": "attach-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            1.2654449999999997,
+            0.35155699999998546,
+            0.4454769999999826,
+            0.3403160000000014,
+            0.49756200000001627,
+            0.46395899999998846,
+            0.4081380000000081
+          ],
+          "medianMs": 0.4454769999999826,
+          "invalidationVisits": 512
+        },
+        {
+          "name": "attach-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            1.6501090000000147,
+            2.1544159999999977,
+            1.5462140000000204,
+            1.5389839999999992,
+            2.987345000000005,
+            1.6681839999999966,
+            2.6203590000000077
+          ],
+          "medianMs": 1.6681839999999966,
+          "invalidationVisits": 4096
+        },
+        {
+          "name": "cached-4096-add-64",
+          "count": 64,
+          "existing": 4096,
+          "depth": 0,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            0.34348900000000526,
+            0.3844760000000065,
+            0.32541499999999246,
+            0.35120400000002405,
+            0.3645729999999787,
+            0.6802779999999871,
+            0.48712500000002024
+          ],
+          "medianMs": 0.3645729999999787,
+          "invalidationVisits": 64
+        },
+        {
+          "name": "nested-16-add-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 16,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            0.2588259999999991,
+            0.24544699999998443,
+            0.24089599999999223,
+            0.24367300000000114,
+            0.2588269999999966,
+            0.2426810000000046,
+            0.23258599999999774
+          ],
+          "medianMs": 0.24367300000000114,
+          "invalidationVisits": 512
+        },
+        {
+          "name": "remove-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": true,
+          "remove": true,
+          "samplesMs": [
+            1.7626649999999984,
+            1.8582719999999995,
+            1.2504789999999844,
+            2.6370649999999785,
+            1.128124000000014,
+            1.1314530000000218,
+            1.1278489999999692
+          ],
+          "medianMs": 1.2504789999999844,
+          "invalidationVisits": 8193
+        }
+      ]
+    },
+    {
+      "file": "tree-before-0.json",
+      "date": "2026-09-20T21:45:10.958Z",
+      "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+      "node": "v22.17.1",
+      "trials": 7,
+      "warmup": 2,
+      "scope": "Preallocated child attachment or root removal only. Setup, cache population and verification excluded. No snapshots, sockets, physics or GC claims. Traversal counts use separate untimed diagnostic instances.",
+      "results": [
+        {
+          "name": "attach-64",
+          "count": 64,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.42969499999998106,
+            0.2714339999999993,
+            0.30243600000000015,
+            0.2809129999999982,
+            0.11914699999999812,
+            0.10903000000001839,
+            0.11193900000000667
+          ],
+          "medianMs": 0.2714339999999993,
+          "invalidationVisits": 2144
+        },
+        {
+          "name": "attach-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            2.590094999999991,
+            2.7845640000000174,
+            4.253975999999994,
+            2.8124090000000024,
+            2.459750999999983,
+            2.3822509999999966,
+            2.5116149999999493
+          ],
+          "medianMs": 2.590094999999991,
+          "invalidationVisits": 131840
+        },
+        {
+          "name": "attach-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            160.75344099999995,
+            156.48710000000005,
+            161.41513899999995,
+            167.698087,
+            162.71439800000007,
+            162.18050199999993,
+            151.34706299999993
+          ],
+          "medianMs": 161.41513899999995,
+          "invalidationVisits": 8394752
+        },
+        {
+          "name": "cached-4096-add-64",
+          "count": 64,
+          "existing": 4096,
+          "depth": 0,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            5.672797000000173,
+            6.260693000000174,
+            5.79185200000029,
+            6.721575999999914,
+            4.754296999999951,
+            6.716551999999865,
+            4.8589170000000195
+          ],
+          "medianMs": 5.79185200000029,
+          "invalidationVisits": 264288
+        },
+        {
+          "name": "nested-16-add-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 16,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            3.129590999999891,
+            2.7601049999998395,
+            2.684664999999768,
+            4.612083999999868,
+            2.698297999999795,
+            4.403920000000198,
+            2.649431999999706
+          ],
+          "medianMs": 2.7601049999998395,
+          "invalidationVisits": 131840
+        },
+        {
+          "name": "remove-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": true,
+          "remove": true,
+          "samplesMs": [
+            1.2225629999993544,
+            1.189886000000115,
+            1.262655999999879,
+            1.240538000000015,
+            1.1842759999999544,
+            1.8052180000004228,
+            2.9175270000005185
+          ],
+          "medianMs": 1.240538000000015,
+          "invalidationVisits": 8193
+        }
+      ]
+    },
+    {
+      "file": "tree-before-1.json",
+      "date": "2026-09-20T21:45:18.601Z",
+      "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+      "node": "v22.17.1",
+      "trials": 7,
+      "warmup": 2,
+      "scope": "Preallocated child attachment or root removal only. Setup, cache population and verification excluded. No snapshots, sockets, physics or GC claims. Traversal counts use separate untimed diagnostic instances.",
+      "results": [
+        {
+          "name": "attach-64",
+          "count": 64,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.33697599999999284,
+            0.2862130000000036,
+            0.31561700000000315,
+            0.3275819999999783,
+            0.29419300000000703,
+            0.10353000000000634,
+            0.09895700000001284
+          ],
+          "medianMs": 0.29419300000000703,
+          "invalidationVisits": 2144
+        },
+        {
+          "name": "attach-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            2.533602000000002,
+            2.892850999999979,
+            3.253715999999997,
+            2.5911100000000147,
+            2.388721000000004,
+            2.5752760000000023,
+            2.546738999999974
+          ],
+          "medianMs": 2.5752760000000023,
+          "invalidationVisits": 131840
+        },
+        {
+          "name": "attach-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            146.64497100000006,
+            142.7644009999999,
+            153.39155700000003,
+            156.41582300000016,
+            167.19265399999995,
+            140.0716769999999,
+            146.99340199999983
+          ],
+          "medianMs": 146.99340199999983,
+          "invalidationVisits": 8394752
+        },
+        {
+          "name": "cached-4096-add-64",
+          "count": 64,
+          "existing": 4096,
+          "depth": 0,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            5.350316000000021,
+            6.365260000000035,
+            6.2492309999997815,
+            4.815453000000161,
+            5.221904999999879,
+            4.8544050000000425,
+            4.687378000000081
+          ],
+          "medianMs": 5.221904999999879,
+          "invalidationVisits": 264288
+        },
+        {
+          "name": "nested-16-add-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 16,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            2.3926760000003924,
+            2.3594490000000405,
+            2.4956130000000485,
+            2.459573999999975,
+            2.5684759999999187,
+            2.98408100000006,
+            2.487546000000293
+          ],
+          "medianMs": 2.487546000000293,
+          "invalidationVisits": 131840
+        },
+        {
+          "name": "remove-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": true,
+          "remove": true,
+          "samplesMs": [
+            1.1642620000002353,
+            1.1729909999999109,
+            1.684371999999712,
+            2.7309830000003785,
+            1.2173280000006343,
+            1.2008630000000267,
+            1.164770000000317
+          ],
+          "medianMs": 1.2008630000000267,
+          "invalidationVisits": 8193
+        }
+      ]
+    },
+    {
+      "file": "tree-before-2.json",
+      "date": "2026-09-20T21:45:27.933Z",
+      "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+      "node": "v22.17.1",
+      "trials": 7,
+      "warmup": 2,
+      "scope": "Preallocated child attachment or root removal only. Setup, cache population and verification excluded. No snapshots, sockets, physics or GC claims. Traversal counts use separate untimed diagnostic instances.",
+      "results": [
+        {
+          "name": "attach-64",
+          "count": 64,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            0.30476200000001086,
+            0.2863129999999785,
+            0.32261600000001067,
+            0.21490800000000831,
+            0.12569399999998154,
+            0.12164900000001921,
+            0.10054399999998509
+          ],
+          "medianMs": 0.21490800000000831,
+          "invalidationVisits": 2144
+        },
+        {
+          "name": "attach-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            2.591363000000001,
+            2.8108660000000043,
+            3.078583000000009,
+            2.8976010000000088,
+            2.550331,
+            2.5194829999999797,
+            3.263733000000002
+          ],
+          "medianMs": 2.8108660000000043,
+          "invalidationVisits": 131840
+        },
+        {
+          "name": "attach-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": false,
+          "remove": false,
+          "samplesMs": [
+            160.95432900000003,
+            149.61264000000006,
+            154.45337199999994,
+            155.35588600000005,
+            156.98227099999986,
+            169.75313400000005,
+            149.339514
+          ],
+          "medianMs": 155.35588600000005,
+          "invalidationVisits": 8394752
+        },
+        {
+          "name": "cached-4096-add-64",
+          "count": 64,
+          "existing": 4096,
+          "depth": 0,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            4.927270999999564,
+            4.9806900000003225,
+            4.985615999999936,
+            5.152262000000064,
+            4.600456000000122,
+            4.965668000000278,
+            5.986569999999574
+          ],
+          "medianMs": 4.9806900000003225,
+          "invalidationVisits": 264288
+        },
+        {
+          "name": "nested-16-add-512",
+          "count": 512,
+          "existing": 0,
+          "depth": 16,
+          "cached": true,
+          "remove": false,
+          "samplesMs": [
+            2.579558000000361,
+            2.4853299999999763,
+            2.531926999999996,
+            3.686721999999918,
+            2.874663000000055,
+            2.4531980000001568,
+            2.5797680000000582
+          ],
+          "medianMs": 2.579558000000361,
+          "invalidationVisits": 131840
+        },
+        {
+          "name": "remove-4096",
+          "count": 4096,
+          "existing": 0,
+          "depth": 0,
+          "cached": true,
+          "remove": true,
+          "samplesMs": [
+            1.2188160000000607,
+            1.2511180000001332,
+            1.2785270000003948,
+            1.3215269999991506,
+            1.570107999999891,
+            1.3115569999999934,
+            2.920259999999871
+          ],
+          "medianMs": 1.3115569999999934,
+          "invalidationVisits": 8193
+        }
+      ]
+    },
+    {
+      "file": "wide-child-churn-after-0.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 4,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 4,
+        "rootEntities": 4,
+        "networkedEntities": 2052,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.367,
+          "p50": 1.196,
+          "p95": 2.229,
+          "max": 3.287
+        },
+        "preStepMs": {
+          "avg": 0.456,
+          "p50": 0.366,
+          "p95": 0.918,
+          "max": 1.592
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.823,
+          "p50": 1.721,
+          "p95": 2.844,
+          "max": 4.109
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.367,
+          "p50": 1.196,
+          "p95": 2.229,
+          "max": 3.287
+        },
+        "totalMs": {
+          "avg": 1.823,
+          "p50": 1.721,
+          "p95": 2.844,
+          "max": 4.109
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 339240,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12746080,
+        "retainedHeapAfterWarmup": 14990480,
+        "retainedHeapDelta": 2244400
+      },
+      "gc": {
+        "count": 7,
+        "durationMs": 8.028169095516205,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.4632590413093567
+          },
+          {
+            "kind": 1,
+            "durationMs": 2.0297250151634216
+          },
+          {
+            "kind": 8,
+            "durationMs": 0.3636680245399475
+          },
+          {
+            "kind": 4,
+            "durationMs": 1.407173991203308
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.8927170038223267
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.423233985900879
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.4483920335769653
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 219.18198199999995
+      }
+    },
+    {
+      "file": "wide-child-churn-after-1.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 4,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 4,
+        "rootEntities": 4,
+        "networkedEntities": 2052,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.279,
+          "p50": 1.118,
+          "p95": 2.25,
+          "max": 2.998
+        },
+        "preStepMs": {
+          "avg": 0.468,
+          "p50": 0.347,
+          "p95": 0.892,
+          "max": 3.166
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.747,
+          "p50": 1.568,
+          "p95": 2.8,
+          "max": 4.462
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.279,
+          "p50": 1.118,
+          "p95": 2.25,
+          "max": 2.998
+        },
+        "totalMs": {
+          "avg": 1.747,
+          "p50": 1.568,
+          "p95": 2.8,
+          "max": 4.462
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 339240,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12555264,
+        "retainedHeapAfterWarmup": 14800504,
+        "retainedHeapDelta": 2245240
+      },
+      "gc": {
+        "count": 7,
+        "durationMs": 8.432866036891937,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.453449010848999
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.8052330017089844
+          },
+          {
+            "kind": 1,
+            "durationMs": 2.8356289863586426
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.8661350011825562
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.758180022239685
+          },
+          {
+            "kind": 8,
+            "durationMs": 0.36110103130340576
+          },
+          {
+            "kind": 4,
+            "durationMs": 1.3531389832496643
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 210.082654
+      }
+    },
+    {
+      "file": "wide-child-churn-after-2.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 4,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 4,
+        "rootEntities": 4,
+        "networkedEntities": 2052,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.26,
+          "p50": 1.157,
+          "p95": 1.862,
+          "max": 3.235
+        },
+        "preStepMs": {
+          "avg": 0.38,
+          "p50": 0.303,
+          "p95": 0.776,
+          "max": 1.19
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 1.64,
+          "p50": 1.532,
+          "p95": 2.469,
+          "max": 3.489
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.26,
+          "p50": 1.157,
+          "p95": 1.862,
+          "max": 3.235
+        },
+        "totalMs": {
+          "avg": 1.64,
+          "p50": 1.532,
+          "p95": 2.469,
+          "max": 3.489
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 339240,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12549960,
+        "retainedHeapAfterWarmup": 14803264,
+        "retainedHeapDelta": 2253304
+      },
+      "gc": {
+        "count": 7,
+        "durationMs": 6.57769387960434,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.47023695707321167
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.823466956615448
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.9557520151138306
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.9390719532966614
+          },
+          {
+            "kind": 8,
+            "durationMs": 0.3243499994277954
+          },
+          {
+            "kind": 4,
+            "durationMs": 1.33925199508667
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.7255640029907227
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 197.20213800000005
+      }
+    },
+    {
+      "file": "wide-child-churn-before-0.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 4,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 4,
+        "rootEntities": 4,
+        "networkedEntities": 2052,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.325,
+          "p50": 1.144,
+          "p95": 1.938,
+          "max": 2.654
+        },
+        "preStepMs": {
+          "avg": 2.735,
+          "p50": 2.517,
+          "p95": 3.433,
+          "max": 7.859
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 4.059,
+          "p50": 3.928,
+          "p95": 5.272,
+          "max": 9.133
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.325,
+          "p50": 1.144,
+          "p95": 1.938,
+          "max": 2.654
+        },
+        "totalMs": {
+          "avg": 4.059,
+          "p50": 3.928,
+          "p95": 5.272,
+          "max": 9.133
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 339240,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 13023904,
+        "retainedHeapAfterWarmup": 15280872,
+        "retainedHeapDelta": 2256968
+      },
+      "gc": {
+        "count": 6,
+        "durationMs": 6.294891059398651,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.6237190365791321
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.1799229979515076
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.3748340010643005
+          },
+          {
+            "kind": 8,
+            "durationMs": 0.38550102710723877
+          },
+          {
+            "kind": 4,
+            "durationMs": 1.911041021347046
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.8198729753494263
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 487.61173499999995
+      }
+    },
+    {
+      "file": "wide-child-churn-before-1.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 4,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 4,
+        "rootEntities": 4,
+        "networkedEntities": 2052,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.282,
+          "p50": 1.144,
+          "p95": 1.931,
+          "max": 3.327
+        },
+        "preStepMs": {
+          "avg": 2.567,
+          "p50": 2.467,
+          "p95": 3.175,
+          "max": 4.241
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 3.849,
+          "p50": 3.71,
+          "p95": 4.881,
+          "max": 5.904
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.282,
+          "p50": 1.144,
+          "p95": 1.931,
+          "max": 3.327
+        },
+        "totalMs": {
+          "avg": 3.849,
+          "p50": 3.71,
+          "p95": 4.881,
+          "max": 5.904
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 339240,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12648832,
+        "retainedHeapAfterWarmup": 14893840,
+        "retainedHeapDelta": 2245008
+      },
+      "gc": {
+        "count": 7,
+        "durationMs": 7.676017999649048,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.43738698959350586
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.7414109706878662
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.9925029873847961
+          },
+          {
+            "kind": 8,
+            "durationMs": 0.295835018157959
+          },
+          {
+            "kind": 4,
+            "durationMs": 1.827214002609253
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.910627007484436
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.4710410237312317
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 462.374309
+      }
+    },
+    {
+      "file": "wide-child-churn-before-2.json",
+      "config": {
+        "scenario": "channel-churn",
+        "users": 20,
+        "entities": 4,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 47.43416490252569,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-child-churn"
+      },
+      "result": {
+        "scenario": "channel-churn",
+        "entityShape": "standard",
+        "users": 20,
+        "entities": 4,
+        "rootEntities": 4,
+        "networkedEntities": 2052,
+        "visible": 1000,
+        "ticks": 120,
+        "warmup": 30,
+        "sharedUpdates": true,
+        "groups": true,
+        "cellSize": 50,
+        "viewHalf": 47.434,
+        "churn": 1,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 512,
+        "spatialDistribution": "default",
+        "spatialPlane": "xy",
+        "spatialViewShape": "aabb",
+        "worldSize": 5000,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "stepMs": {
+          "avg": 1.334,
+          "p50": 1.152,
+          "p95": 2.126,
+          "max": 3.704
+        },
+        "preStepMs": {
+          "avg": 2.784,
+          "p50": 2.716,
+          "p95": 3.499,
+          "max": 4.279
+        },
+        "indexMs": {
+          "avg": 0,
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "preStepPlusStepMs": {
+          "avg": 4.118,
+          "p50": 3.932,
+          "p95": 5.256,
+          "max": 6.661
+        },
+        "stepPlusIndexMs": {
+          "avg": 1.334,
+          "p50": 1.152,
+          "p95": 2.126,
+          "max": 3.704
+        },
+        "totalMs": {
+          "avg": 4.118,
+          "p50": 3.932,
+          "p95": 5.256,
+          "max": 6.661
+        },
+        "snapshots": 0,
+        "sharedSnapshots": 0,
+        "sends": 2400,
+        "bytesPerSnapshot": 0,
+        "bytesPerTick": 339240,
+        "collectMsPerSnapshot": 0,
+        "countMsPerSnapshot": 0,
+        "writeMsPerSnapshot": 0,
+        "commitMsPerSnapshot": 0,
+        "sendMsPerSnapshot": 0,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCollectMsPerBuild": 0,
+        "sharedFragmentCountMsPerBuild": 0,
+        "sharedFragmentWriteMsPerBuild": 0,
+        "sharedFragmentBytesPerBuild": 0,
+        "sharedFragmentCopyMsPerSharedSnapshot": 0,
+        "sharedFragmentCopyBytesPerSharedSnapshot": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "sharedFragmentCopyBytesPerSnapshot": 0,
+        "sharedMessageFragmentBuilds": 0,
+        "sharedMessageFragmentHits": 0,
+        "sharedMessageFragmentCountMsPerBuild": 0,
+        "sharedMessageFragmentWriteMsPerBuild": 0,
+        "sharedMessageFragmentBytesPerBuild": 0,
+        "sharedMessageFragmentMessagesPerBuild": 0,
+        "sharedMessageFragmentCopyMsPerSnapshot": 0,
+        "messagesPerSnapshot": 0,
+        "messagesMaxPerSnapshot": 0,
+        "engineMessagesPerSnapshot": 0,
+        "responsesPerSnapshot": 0,
+        "createsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 0,
+        "groupedPropsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      },
+      "memory": {
+        "heapBefore": 12648608,
+        "retainedHeapAfterWarmup": 14895664,
+        "retainedHeapDelta": 2247056
+      },
+      "gc": {
+        "count": 7,
+        "durationMs": 7.700882077217102,
+        "entries": [
+          {
+            "kind": 1,
+            "durationMs": 0.563785970211029
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.7130759954452515
+          },
+          {
+            "kind": 1,
+            "durationMs": 2.3639339804649353
+          },
+          {
+            "kind": 8,
+            "durationMs": 0.33546704053878784
+          },
+          {
+            "kind": 4,
+            "durationMs": 1.5485250353813171
+          },
+          {
+            "kind": 1,
+            "durationMs": 0.7621970176696777
+          },
+          {
+            "kind": 1,
+            "durationMs": 1.4138970375061035
+          }
+        ]
+      },
+      "measurement": {
+        "runtime": "v22.17.1",
+        "backend": "nengi-buffers",
+        "controlledClock": true,
+        "metrics": false,
+        "gcWindow": "Measured mutation/index/step loop, excluding forced warmup GC and result summarization",
+        "elapsedMs": 494.65216200000003
+      }
+    }
+  ],
+  "probesBefore": [
+    {
+      "scenario": "parent-child-channel",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "989da0512e7fb954c5b5e65a388d3c1fad40657a4b83f844a2a946039172ba15",
+      "stateSha256": "a277cf7d89e92efe34718c578785ab554ad74c8ca53d0d9383ec2e26ada4e998"
+    },
+    {
+      "scenario": "parent-child-channel",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "de93b7e4cb54c057e2198b046885c3d7385fcaa8d2b4340edf4378b2c65c54f1",
+      "stateSha256": "a277cf7d89e92efe34718c578785ab554ad74c8ca53d0d9383ec2e26ada4e998"
+    },
+    {
+      "scenario": "parent-child-manual-channel",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "ddddf69377b6c4b949aa5ac59384ed42c28717572c7c0bae482f4d2b72eac099",
+      "stateSha256": "423a8186004d51dc92b1c735a19ff0a041e702447f1f04d50c49941e46b8b07d"
+    },
+    {
+      "scenario": "parent-child-manual-channel",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "ddddf69377b6c4b949aa5ac59384ed42c28717572c7c0bae482f4d2b72eac099",
+      "stateSha256": "423a8186004d51dc92b1c735a19ff0a041e702447f1f04d50c49941e46b8b07d"
+    },
+    {
+      "scenario": "parent-child-channel-2d",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "3694e7927c5b4a46d621d28f584564f467ffd537ab431517265a67e3499d32f9",
+      "stateSha256": "797b51742bb1487c330d26baca32e5bdec81721545fc4e37468ea1a2213d5d66"
+    },
+    {
+      "scenario": "parent-child-channel-2d",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "3694e7927c5b4a46d621d28f584564f467ffd537ab431517265a67e3499d32f9",
+      "stateSha256": "797b51742bb1487c330d26baca32e5bdec81721545fc4e37468ea1a2213d5d66"
+    },
+    {
+      "scenario": "parent-child-manual-channel-2d",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "b0e02e2532197e95d151fcf53c9346c3e1a081a14c8454684a9a39b2597e1ca3",
+      "stateSha256": "f6dad752e48f67868759ab04bce05b37b29706026cda9e31503c81f5d03f37f0"
+    },
+    {
+      "scenario": "parent-child-manual-channel-2d",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "b0e02e2532197e95d151fcf53c9346c3e1a081a14c8454684a9a39b2597e1ca3",
+      "stateSha256": "f6dad752e48f67868759ab04bce05b37b29706026cda9e31503c81f5d03f37f0"
+    },
+    {
+      "scenario": "channel-churn",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "9a795a5a7a6c56cb74718dc8932b87049a7670d3a1a1f3a5ce8dbdbb16d19ce6",
+      "stateSha256": "fcfb59e76eb984fae390a2accba0e444bdf7cada23ca9a03bc767660f2d362e8"
+    },
+    {
+      "scenario": "channel-churn",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "e56cfe5ca63b08a401a505fa176246faa8af1ae88c76c98e72ae2e8a8e65796a",
+      "stateSha256": "fcfb59e76eb984fae390a2accba0e444bdf7cada23ca9a03bc767660f2d362e8"
+    }
+  ],
+  "probesAfter": [
+    {
+      "scenario": "parent-child-channel",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "989da0512e7fb954c5b5e65a388d3c1fad40657a4b83f844a2a946039172ba15",
+      "stateSha256": "a277cf7d89e92efe34718c578785ab554ad74c8ca53d0d9383ec2e26ada4e998"
+    },
+    {
+      "scenario": "parent-child-channel",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "de93b7e4cb54c057e2198b046885c3d7385fcaa8d2b4340edf4378b2c65c54f1",
+      "stateSha256": "a277cf7d89e92efe34718c578785ab554ad74c8ca53d0d9383ec2e26ada4e998"
+    },
+    {
+      "scenario": "parent-child-manual-channel",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "ddddf69377b6c4b949aa5ac59384ed42c28717572c7c0bae482f4d2b72eac099",
+      "stateSha256": "423a8186004d51dc92b1c735a19ff0a041e702447f1f04d50c49941e46b8b07d"
+    },
+    {
+      "scenario": "parent-child-manual-channel",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "ddddf69377b6c4b949aa5ac59384ed42c28717572c7c0bae482f4d2b72eac099",
+      "stateSha256": "423a8186004d51dc92b1c735a19ff0a041e702447f1f04d50c49941e46b8b07d"
+    },
+    {
+      "scenario": "parent-child-channel-2d",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "3694e7927c5b4a46d621d28f584564f467ffd537ab431517265a67e3499d32f9",
+      "stateSha256": "797b51742bb1487c330d26baca32e5bdec81721545fc4e37468ea1a2213d5d66"
+    },
+    {
+      "scenario": "parent-child-channel-2d",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "3694e7927c5b4a46d621d28f584564f467ffd537ab431517265a67e3499d32f9",
+      "stateSha256": "797b51742bb1487c330d26baca32e5bdec81721545fc4e37468ea1a2213d5d66"
+    },
+    {
+      "scenario": "parent-child-manual-channel-2d",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "b0e02e2532197e95d151fcf53c9346c3e1a081a14c8454684a9a39b2597e1ca3",
+      "stateSha256": "f6dad752e48f67868759ab04bce05b37b29706026cda9e31503c81f5d03f37f0"
+    },
+    {
+      "scenario": "parent-child-manual-channel-2d",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "b0e02e2532197e95d151fcf53c9346c3e1a081a14c8454684a9a39b2597e1ca3",
+      "stateSha256": "f6dad752e48f67868759ab04bce05b37b29706026cda9e31503c81f5d03f37f0"
+    },
+    {
+      "scenario": "channel-churn",
+      "sharedUpdates": false,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "9a795a5a7a6c56cb74718dc8932b87049a7670d3a1a1f3a5ce8dbdbb16d19ce6",
+      "stateSha256": "fcfb59e76eb984fae390a2accba0e444bdf7cada23ca9a03bc767660f2d362e8"
+    },
+    {
+      "scenario": "channel-churn",
+      "sharedUpdates": true,
+      "ticks": 7,
+      "subscribers": 3,
+      "wireSha256": "e56cfe5ca63b08a401a505fa176246faa8af1ae88c76c98e72ae2e8a8e65796a",
+      "stateSha256": "fcfb59e76eb984fae390a2accba0e444bdf7cada23ca9a03bc767660f2d362e8"
+    }
+  ],
+  "loam": {
+    "scope": "Synthetic construction/grid records, NOT physical vehicles of these sizes. Identical immutable game states; actual binary nengi snapshots, two subscribers, complete Loam history reconstruction. Four numeric cell edits per publication; runs edit 64 adjacent cells; structural case inserts/removes 32 cells every 15 publications. Balanced trial order after exact warm validation. Dirty variant additionally applies known edit operations inside server timing; scan variants discover changes from complete states. No physics/replay/rendering/socket framing or GC claims. Bootstrap measured separately.",
+    "parameters": {
+      "steps": 180,
+      "trials": 8,
+      "subscribers": 2
+    },
+    "before": [
+      {
+        "count": 64,
+        "pattern": "sparse",
+        "summary": {
+          "children": {
+            "serverMeanMs": 0.07574069444444578,
+            "serverP95Ms": 0.11743300000000545,
+            "projectionMeanMs": 0.054444761111103114,
+            "serializationMeanMs": 0.023125372222219515,
+            "clientMeanMs": 0.02618404166667037,
+            "reconstructionMeanMs": 0.017278077777777727,
+            "bootstrapServerMs": 0.5166499999999132,
+            "bootstrapClientMs": 0.2501200000001518,
+            "bootstrapBytes": 5978,
+            "bytesPerSnapshot": 332.27222222222224,
+            "networkRecords": 69
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.043759649999999636,
+            "serverP95Ms": 0.08251400000006015,
+            "projectionMeanMs": 0.017082111111105608,
+            "serializationMeanMs": 0.02262307222222009,
+            "clientMeanMs": 0.025185002777776806,
+            "reconstructionMeanMs": 0.016591169444446524,
+            "bootstrapServerMs": 0.6243349999999737,
+            "bootstrapClientMs": 0.28034999999999854,
+            "bootstrapBytes": 5978,
+            "bytesPerSnapshot": 332.27222222222224,
+            "networkRecords": 69
+          },
+          "collection-scan": {
+            "serverMeanMs": 0.0758241999999983,
+            "serverP95Ms": 0.1266409999998359,
+            "projectionMeanMs": 0.04558372222223031,
+            "serializationMeanMs": 0.03204624444443501,
+            "clientMeanMs": 0.030067719444451135,
+            "reconstructionMeanMs": 0.026182941666660832,
+            "bootstrapServerMs": 0.31563900000014655,
+            "bootstrapClientMs": 0.21874300000013136,
+            "bootstrapBytes": 5038,
+            "bytesPerSnapshot": 355.8722222222222,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.04104967222222247,
+            "serverP95Ms": 0.062422000000083244,
+            "projectionMeanMs": 0.011114266666665016,
+            "serializationMeanMs": 0.02898879999999748,
+            "clientMeanMs": 0.027213019444442606,
+            "reconstructionMeanMs": 0.02258794166666228,
+            "bootstrapServerMs": 0.2555760000000191,
+            "bootstrapClientMs": 0.1722789999998895,
+            "bootstrapBytes": 5038,
+            "bytesPerSnapshot": 355.8722222222222,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 512,
+        "pattern": "sparse",
+        "summary": {
+          "children": {
+            "serverMeanMs": 0.3310979222222411,
+            "serverP95Ms": 0.4804899999999179,
+            "projectionMeanMs": 0.3035197500000019,
+            "serializationMeanMs": 0.027578172222239218,
+            "clientMeanMs": 0.06563472500000292,
+            "reconstructionMeanMs": 0.055065163888883085,
+            "bootstrapServerMs": 3.923000000000229,
+            "bootstrapClientMs": 1.0215190000003531,
+            "bootstrapBytes": 41003,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 517
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.04687316666665487,
+            "serverP95Ms": 0.0871860000002016,
+            "projectionMeanMs": 0.02604861666665733,
+            "serializationMeanMs": 0.02140954999999091,
+            "clientMeanMs": 0.06185293055554869,
+            "reconstructionMeanMs": 0.053199622222209406,
+            "bootstrapServerMs": 4.15878100000009,
+            "bootstrapClientMs": 0.9341009999998278,
+            "bootstrapBytes": 41003,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 517
+          },
+          "collection-scan": {
+            "serverMeanMs": 0.29235318888887224,
+            "serverP95Ms": 0.4580080000000635,
+            "projectionMeanMs": 0.2641086666666575,
+            "serializationMeanMs": 0.02991674444445683,
+            "clientMeanMs": 0.05563303888889474,
+            "reconstructionMeanMs": 0.05110898055553055,
+            "bootstrapServerMs": 1.1703019999999924,
+            "bootstrapClientMs": 0.6300340000002507,
+            "bootstrapBytes": 33201,
+            "bytesPerSnapshot": 359.8666666666667,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.04154532777778412,
+            "serverP95Ms": 0.07494200000019191,
+            "projectionMeanMs": 0.019017127777813888,
+            "serializationMeanMs": 0.02196996111112589,
+            "clientMeanMs": 0.050776572222227714,
+            "reconstructionMeanMs": 0.04735714166664972,
+            "bootstrapServerMs": 0.7746720000000096,
+            "bootstrapClientMs": 0.5728899999999157,
+            "bootstrapBytes": 33201,
+            "bytesPerSnapshot": 359.8666666666667,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 4096,
+        "pattern": "sparse",
+        "summary": {
+          "children": {
+            "serverMeanMs": 2.636146305555566,
+            "serverP95Ms": 3.2846169999975245,
+            "projectionMeanMs": 2.5915815888888676,
+            "serializationMeanMs": 0.04456471666669838,
+            "clientMeanMs": 0.5066411777777678,
+            "reconstructionMeanMs": 0.4838232916666382,
+            "bootstrapServerMs": 147.92013800000132,
+            "bootstrapClientMs": 12.813616999999795,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 4101
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.07461125000003853,
+            "serverP95Ms": 0.10062199999993027,
+            "projectionMeanMs": 0.0439953277777224,
+            "serializationMeanMs": 0.03381415555567299,
+            "clientMeanMs": 0.3957525416666562,
+            "reconstructionMeanMs": 0.3753984861110793,
+            "bootstrapServerMs": 145.8430070000013,
+            "bootstrapClientMs": 12.49757899999895,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 4101
+          },
+          "collection-scan": {
+            "serverMeanMs": 1.9414220944445029,
+            "serverP95Ms": 2.556988000000274,
+            "projectionMeanMs": 1.897412466666669,
+            "serializationMeanMs": 0.045011644444447385,
+            "clientMeanMs": 0.23007604444442223,
+            "reconstructionMeanMs": 0.22170118611115364,
+            "bootstrapServerMs": 9.25386299999991,
+            "bootstrapClientMs": 5.378754999999728,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 360.74444444444447,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.05394615000000663,
+            "serverP95Ms": 0.07961599999907776,
+            "projectionMeanMs": 0.023590022222267887,
+            "serializationMeanMs": 0.03106287222228477,
+            "clientMeanMs": 0.22556692500007658,
+            "reconstructionMeanMs": 0.2187620194444359,
+            "bootstrapServerMs": 5.899515000000974,
+            "bootstrapClientMs": 4.789686000000074,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 360.74444444444447,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 4096,
+        "pattern": "runs",
+        "summary": {
+          "children": {
+            "serverMeanMs": 2.809832494444466,
+            "serverP95Ms": 3.6475810000010824,
+            "projectionMeanMs": 2.7532501222221577,
+            "serializationMeanMs": 0.04995590000004692,
+            "clientMeanMs": 0.47822298333342894,
+            "reconstructionMeanMs": 0.41106044166647027,
+            "bootstrapServerMs": 147.30833300000086,
+            "bootstrapClientMs": 11.619478000000527,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 998.2722222222222,
+            "networkRecords": 4101
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.15163126666625937,
+            "serverP95Ms": 0.2261930000022403,
+            "projectionMeanMs": 0.11696011666636978,
+            "serializationMeanMs": 0.03467114999988957,
+            "clientMeanMs": 0.4605333333336603,
+            "reconstructionMeanMs": 0.4068785222222181,
+            "bootstrapServerMs": 147.6066839999985,
+            "bootstrapClientMs": 12.4712720000025,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 998.2722222222222,
+            "networkRecords": 4101
+          },
+          "collection-scan": {
+            "serverMeanMs": 2.005421005555561,
+            "serverP95Ms": 2.8972409999987576,
+            "projectionMeanMs": 1.9522666777776572,
+            "serializationMeanMs": 0.054380277778020375,
+            "clientMeanMs": 0.2976504944443756,
+            "reconstructionMeanMs": 0.28880380277777373,
+            "bootstrapServerMs": 8.231026000001293,
+            "bootstrapClientMs": 4.251499999998487,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 826.8166666666667,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.08479470000024271,
+            "serverP95Ms": 0.1299700000017765,
+            "projectionMeanMs": 0.04937795000029534,
+            "serializationMeanMs": 0.03737105555559942,
+            "clientMeanMs": 0.25171158055548704,
+            "reconstructionMeanMs": 0.24527061666667577,
+            "bootstrapServerMs": 5.382379999999102,
+            "bootstrapClientMs": 4.3851510000022245,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 826.8166666666667,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 4096,
+        "pattern": "structural",
+        "summary": {
+          "children": {
+            "serverMeanMs": 3.10530128888895,
+            "serverP95Ms": 4.813778000003367,
+            "projectionMeanMs": 2.9724651000003277,
+            "serializationMeanMs": 0.13283618888862192,
+            "clientMeanMs": 0.6319100583333339,
+            "reconstructionMeanMs": 0.4821104555556506,
+            "bootstrapServerMs": 145.0943929999994,
+            "bootstrapClientMs": 12.799952000001213,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 1696.0111111111112,
+            "networkRecords": 4101
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.4389385444445199,
+            "serverP95Ms": 4.256503999997221,
+            "projectionMeanMs": 0.32425276666662184,
+            "serializationMeanMs": 0.11884254444468954,
+            "clientMeanMs": 0.6258184972220786,
+            "reconstructionMeanMs": 0.4851568416665436,
+            "bootstrapServerMs": 146.83285900000192,
+            "bootstrapClientMs": 11.887627000003704,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 1696.0111111111112,
+            "networkRecords": 4101
+          },
+          "collection-scan": {
+            "serverMeanMs": 1.9744494944447877,
+            "serverP95Ms": 2.5974679999999353,
+            "projectionMeanMs": 1.9255802555556631,
+            "serializationMeanMs": 0.04886923888912457,
+            "clientMeanMs": 0.22801609166682385,
+            "reconstructionMeanMs": 0.22042630833319787,
+            "bootstrapServerMs": 8.189990999999281,
+            "bootstrapClientMs": 5.06934000000183,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 428.6111111111111,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.07110833333325799,
+            "serverP95Ms": 0.24532599999656668,
+            "projectionMeanMs": 0.03671192222193188,
+            "serializationMeanMs": 0.033889338888669344,
+            "clientMeanMs": 0.21763433611118266,
+            "reconstructionMeanMs": 0.21158410277777068,
+            "bootstrapServerMs": 6.228258000002825,
+            "bootstrapClientMs": 4.6171010000034585,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 428.68333333333334,
+            "networkRecords": 5
+          }
+        }
+      }
+    ],
+    "after": [
+      {
+        "count": 64,
+        "pattern": "sparse",
+        "summary": {
+          "children": {
+            "serverMeanMs": 0.07124810555555933,
+            "serverP95Ms": 0.10675999999989472,
+            "projectionMeanMs": 0.04358486666666421,
+            "serializationMeanMs": 0.0225185166666664,
+            "clientMeanMs": 0.022914936111110742,
+            "reconstructionMeanMs": 0.013031344444443801,
+            "bootstrapServerMs": 0.4396470000000363,
+            "bootstrapClientMs": 0.22335000000009586,
+            "bootstrapBytes": 5978,
+            "bytesPerSnapshot": 332.27222222222224,
+            "networkRecords": 69
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.04232267777777376,
+            "serverP95Ms": 0.06665400000019872,
+            "projectionMeanMs": 0.022666211111095437,
+            "serializationMeanMs": 0.01965646666667832,
+            "clientMeanMs": 0.01923792222221563,
+            "reconstructionMeanMs": 0.011519377777781555,
+            "bootstrapServerMs": 0.46246099999996204,
+            "bootstrapClientMs": 0.2791819999999916,
+            "bootstrapBytes": 5978,
+            "bytesPerSnapshot": 332.27222222222224,
+            "networkRecords": 69
+          },
+          "collection-scan": {
+            "serverMeanMs": 0.07393582222221716,
+            "serverP95Ms": 0.12079999999991742,
+            "projectionMeanMs": 0.045223405555548074,
+            "serializationMeanMs": 0.02993259444444334,
+            "clientMeanMs": 0.02770176388889417,
+            "reconstructionMeanMs": 0.02402494166666587,
+            "bootstrapServerMs": 0.2860040000000481,
+            "bootstrapClientMs": 0.20799799999997504,
+            "bootstrapBytes": 5038,
+            "bytesPerSnapshot": 355.8722222222222,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.0414970055555519,
+            "serverP95Ms": 0.07241799999997056,
+            "projectionMeanMs": 0.012518544444443098,
+            "serializationMeanMs": 0.0289784611111088,
+            "clientMeanMs": 0.03534204444444716,
+            "reconstructionMeanMs": 0.03085251944444849,
+            "bootstrapServerMs": 0.22180699999989884,
+            "bootstrapClientMs": 0.20525399999996807,
+            "bootstrapBytes": 5038,
+            "bytesPerSnapshot": 355.8722222222222,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 512,
+        "pattern": "sparse",
+        "summary": {
+          "children": {
+            "serverMeanMs": 0.3403867444444485,
+            "serverP95Ms": 0.5267009999997754,
+            "projectionMeanMs": 0.31070123333335636,
+            "serializationMeanMs": 0.02462030555556996,
+            "clientMeanMs": 0.024936772222213223,
+            "reconstructionMeanMs": 0.012434513888885274,
+            "bootstrapServerMs": 3.785733000000164,
+            "bootstrapClientMs": 0.9923250000001644,
+            "bootstrapBytes": 41003,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 517
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.03837096666665679,
+            "serverP95Ms": 0.06826399999999921,
+            "projectionMeanMs": 0.021613238888933968,
+            "serializationMeanMs": 0.016297672222195716,
+            "clientMeanMs": 0.01902649444444175,
+            "reconstructionMeanMs": 0.011717313888900408,
+            "bootstrapServerMs": 3.936125999999831,
+            "bootstrapClientMs": 1.0007329999998547,
+            "bootstrapBytes": 41003,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 517
+          },
+          "collection-scan": {
+            "serverMeanMs": 0.2887499444444428,
+            "serverP95Ms": 0.36592799999993986,
+            "projectionMeanMs": 0.2596161444444331,
+            "serializationMeanMs": 0.028691955555556585,
+            "clientMeanMs": 0.056878341666662086,
+            "reconstructionMeanMs": 0.052474772222221744,
+            "bootstrapServerMs": 1.278845999999703,
+            "bootstrapClientMs": 0.6442839999999705,
+            "bootstrapBytes": 33201,
+            "bytesPerSnapshot": 359.8666666666667,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.039096127777770565,
+            "serverP95Ms": 0.07153600000037841,
+            "projectionMeanMs": 0.017743038888887792,
+            "serializationMeanMs": 0.021374344444431394,
+            "clientMeanMs": 0.05410650555555397,
+            "reconstructionMeanMs": 0.050251263888888946,
+            "bootstrapServerMs": 0.772237000000132,
+            "bootstrapClientMs": 0.6889510000000882,
+            "bootstrapBytes": 33201,
+            "bytesPerSnapshot": 359.8666666666667,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 4096,
+        "pattern": "sparse",
+        "summary": {
+          "children": {
+            "serverMeanMs": 2.7606420166665884,
+            "serverP95Ms": 3.608344999998735,
+            "projectionMeanMs": 2.711045011111037,
+            "serializationMeanMs": 0.045753355555421475,
+            "clientMeanMs": 0.053730880555506,
+            "reconstructionMeanMs": 0.031332258333319866,
+            "bootstrapServerMs": 146.83426499999769,
+            "bootstrapClientMs": 11.36203899999964,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 4101
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.04546818888896572,
+            "serverP95Ms": 0.084949999998571,
+            "projectionMeanMs": 0.027433227777863875,
+            "serializationMeanMs": 0.018024938888882187,
+            "clientMeanMs": 0.03177104999995714,
+            "reconstructionMeanMs": 0.021922097222204687,
+            "bootstrapServerMs": 148.50487900000007,
+            "bootstrapClientMs": 13.428375999999844,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 338.27222222222224,
+            "networkRecords": 4101
+          },
+          "collection-scan": {
+            "serverMeanMs": 1.9582768166667341,
+            "serverP95Ms": 2.641410000000178,
+            "projectionMeanMs": 1.9114387944444187,
+            "serializationMeanMs": 0.04775237222226376,
+            "clientMeanMs": 0.2403464111111033,
+            "reconstructionMeanMs": 0.2310686111110954,
+            "bootstrapServerMs": 8.588815999999497,
+            "bootstrapClientMs": 4.479452000001402,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 360.74444444444447,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.05333643333332374,
+            "serverP95Ms": 0.08284500000081607,
+            "projectionMeanMs": 0.023416683333329677,
+            "serializationMeanMs": 0.03025553333331522,
+            "clientMeanMs": 0.227729772222099,
+            "reconstructionMeanMs": 0.22061043055557295,
+            "bootstrapServerMs": 5.633764000001975,
+            "bootstrapClientMs": 4.839308999999048,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 360.74444444444447,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 4096,
+        "pattern": "runs",
+        "summary": {
+          "children": {
+            "serverMeanMs": 2.7488497777778322,
+            "serverP95Ms": 3.6633830000027956,
+            "projectionMeanMs": 2.6936694000002817,
+            "serializationMeanMs": 0.04962350555560988,
+            "clientMeanMs": 0.12872179999989788,
+            "reconstructionMeanMs": 0.0640197583332843,
+            "bootstrapServerMs": 144.87890399999742,
+            "bootstrapClientMs": 11.915802999999869,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 998.2722222222222,
+            "networkRecords": 4101
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.13873589444432988,
+            "serverP95Ms": 0.20270800000071176,
+            "projectionMeanMs": 0.10715629444443443,
+            "serializationMeanMs": 0.03446387222213364,
+            "clientMeanMs": 0.09990330000002562,
+            "reconstructionMeanMs": 0.05368585555560357,
+            "bootstrapServerMs": 143.29493699999875,
+            "bootstrapClientMs": 11.448190000002796,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 998.2722222222222,
+            "networkRecords": 4101
+          },
+          "collection-scan": {
+            "serverMeanMs": 1.9924817166664273,
+            "serverP95Ms": 2.933375000000524,
+            "projectionMeanMs": 1.9372443722220851,
+            "serializationMeanMs": 0.05523734444434215,
+            "clientMeanMs": 0.285112199999983,
+            "reconstructionMeanMs": 0.2761178833333159,
+            "bootstrapServerMs": 7.934353999997256,
+            "bootstrapClientMs": 4.964456000001519,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 826.8166666666667,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.0871781499997572,
+            "serverP95Ms": 0.13783799999873736,
+            "projectionMeanMs": 0.046616561111214753,
+            "serializationMeanMs": 0.03885587222222158,
+            "clientMeanMs": 0.27912896111110963,
+            "reconstructionMeanMs": 0.27186962222221056,
+            "bootstrapServerMs": 4.610434000001987,
+            "bootstrapClientMs": 4.656143999993219,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 826.8166666666667,
+            "networkRecords": 5
+          }
+        }
+      },
+      {
+        "count": 4096,
+        "pattern": "structural",
+        "summary": {
+          "children": {
+            "serverMeanMs": 3.084362194444677,
+            "serverP95Ms": 4.703710999994655,
+            "projectionMeanMs": 2.950967655555764,
+            "serializationMeanMs": 0.13522162222228265,
+            "clientMeanMs": 0.29622899166665273,
+            "reconstructionMeanMs": 0.14589234444423105,
+            "bootstrapServerMs": 151.1270319999967,
+            "bootstrapClientMs": 12.543572000002314,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 1696.0111111111112,
+            "networkRecords": 4101
+          },
+          "children-dirty": {
+            "serverMeanMs": 0.4534163833335495,
+            "serverP95Ms": 4.488979000001564,
+            "projectionMeanMs": 0.3264183055553682,
+            "serializationMeanMs": 0.10743684999983492,
+            "clientMeanMs": 0.25815181944449755,
+            "reconstructionMeanMs": 0.13079504444451434,
+            "bootstrapServerMs": 145.65008800000214,
+            "bootstrapClientMs": 12.083425999997417,
+            "bootstrapBytes": 320555,
+            "bytesPerSnapshot": 1696.0111111111112,
+            "networkRecords": 4101
+          },
+          "collection-scan": {
+            "serverMeanMs": 1.9752749722218546,
+            "serverP95Ms": 2.7624460000006366,
+            "projectionMeanMs": 1.9258030055553617,
+            "serializationMeanMs": 0.05079304444467804,
+            "clientMeanMs": 0.24537958888908584,
+            "reconstructionMeanMs": 0.23642215000005912,
+            "bootstrapServerMs": 8.753741000000446,
+            "bootstrapClientMs": 4.8831759999957285,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 428.6111111111111,
+            "networkRecords": 5
+          },
+          "collection-dirty": {
+            "serverMeanMs": 0.07096079444446433,
+            "serverP95Ms": 0.2626059999965946,
+            "projectionMeanMs": 0.036744372222084265,
+            "serializationMeanMs": 0.03427899999967647,
+            "clientMeanMs": 0.2236601944445081,
+            "reconstructionMeanMs": 0.21741191111123043,
+            "bootstrapServerMs": 5.3684270000012475,
+            "bootstrapClientMs": 5.025555000000168,
+            "bootstrapBytes": 258993,
+            "bytesPerSnapshot": 428.68333333333334,
+            "networkRecords": 5
+          }
+        }
+      }
+    ],
+    "repeats": "Eight balanced orders of the four modes per workload, all before runs then all after runs. Absolute timings are not host-isolated.",
+    "rawEvidence": "nengi-rc-notes/child-tree-entity-reader-performance/loam-before.json and loam-after.json; also Loam design/collection-replication/2026-09-20-entity-reader.json"
+  },
+  "validation": {
+    "coreTests": {
+      "suites": 62,
+      "tests": 810
+    },
+    "coreTypecheck": true,
+    "coreLint": true,
+    "coreBuild": true,
+    "wireAndStateProbes": 10,
+    "loamTypecheck": true,
+    "loamModeledSuite": true,
+    "loamCollectionSuite": true,
+    "loamBenchmark": "Exact reconstruction before timing each mode; all bootstrap and update byte counts match before/after",
+    "caveats": "No FPS, WAN capacity, or allocation/GC improvement claimed from these timings.",
+    "loamBuild": true
+  }
+}

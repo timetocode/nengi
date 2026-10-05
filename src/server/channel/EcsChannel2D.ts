@@ -75,7 +75,7 @@ export type EcsChannelVisibilityGroup = {
         updateProps: number
         updateGroups: number
         groupedUpdateProps: number
-    }
+    } | null
 }
 
 export type EcsChannelVisibilityPlan = {

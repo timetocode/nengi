@@ -4,6 +4,11 @@ Before choosing a channel, decide what kind of network data the feature needs.
 
 ## Connection handshake
 
+Each `Client` permits one established session and one pending connection attempt
+at a time. After a failed initial attempt rejects, retry on the same Client. After
+an established session ends, create a fresh Client and its session helpers; the
+`Context` can be reused. See [connection lifetime](./client-state.md#connection-lifetime).
+
 Use the connection handshake for facts the server needs before accepting a
 socket:
 
@@ -34,46 +39,242 @@ The server validates that value in `instance.onConnect`. Treat handshake data as
 untrusted client input: use it to look up server-side facts, not as proof that a
 user is an admin or owns a character.
 
+Check shape and field sizes before starting authentication or database work.
+nengi checks binary structure, JSON syntax and byte budgets; it cannot infer the
+application's allowed fields. This handler expects three string fields:
+
 ```ts
-instance.onConnect = async handshake => {
-    const session = await verifySessionToken(handshake.token)
+type ConnectionInput = { token: string, characterId: string, clientBuild: string }
+
+function isConnectionInput(value: unknown): value is ConnectionInput {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    const input = value as Record<string, unknown>
+    return typeof input.token === 'string' && input.token.length > 0 && input.token.length <= 4096 &&
+        typeof input.characterId === 'string' && input.characterId.length > 0 && input.characterId.length <= 64 &&
+        typeof input.clientBuild === 'string' && input.clientBuild.length > 0 && input.clientBuild.length <= 128 &&
+        Object.keys(input).every(key => key === 'token' || key === 'characterId' || key === 'clientBuild')
+}
+
+instance.onConnect = async (handshake, { signal }) => {
+    if (!isConnectionInput(handshake)) {
+        return { deny: { reason: 'invalid_handshake' } }
+    }
+
+    const session = await verifySessionToken(handshake.token, { signal })
+    signal.throwIfAborted()
     if (!session) {
         return false
     }
 
-    const character = await loadOwnedCharacter(session.accountId, handshake.characterId)
+    const character = await loadOwnedCharacter(session.accountId, handshake.characterId, { signal })
+    signal.throwIfAborted()
     if (!character) {
         return false
     }
 
     return {
-        accountId: session.accountId,
-        characterId: character.id,
-        isAdmin: session.roles.includes('admin')
+        serverData: {
+            accountId: session.accountId,
+            character,
+            isAdmin: session.roles.includes('admin')
+        },
+        clientData: {
+            characterId: character.id,
+            characterName: character.name
+        }
     }
 }
 ```
 
-Returning `false` denies the connection. Any other return value accepts it and
-becomes `event.payload` on the server-side `NetworkEvent.UserConnected` event:
+Choose field bounds for your application. String `.length` counts UTF-16 code
+units; `limits.maxHandshakeBytes` limits the complete encoded packet to 8 KiB by
+default, including wire metadata. Raise that finite limit for a deliberate larger
+setup payload; see [network limits](./network-limits.md#handshake-input).
+
+Valid JSON can contain deeply nested arrays or objects. Reject unexpected shapes
+before logging the entire input, merging it into server objects, or walking it
+recursively. The shallow validator above never traverses unexpected nested
+values. Applications accepting recursive data must bound depth and collection
+sizes themselves. A byte budget alone does not establish a safe recursion depth.
+
+Return `false` to deny or `true` to accept without setup data. To accept with data,
+use `{ serverData?, clientData? }` (the exported `ConnectionAcceptance` type).
+Both fields are optional. To deny with a public explanation, return `{ deny: detail }`
+(the exported `ConnectionDenial` type); see below. Other return shapes are rejected;
+wrap an existing server-local payload in `serverData`.
+
+nengi waits for `onConnect` before admitting the user. `serverData` becomes
+`event.payload` on the server-side `NetworkEvent.UserConnected` event, by reference.
+It is never serialized, so it can contain loaded records and other local objects:
 
 ```ts
 if (event.type === NetworkEvent.UserConnected) {
-    const session = event.payload as {
-        accountId: string
-        characterId: string
-        isAdmin: boolean
-    }
-
+    const session = event.payload
     users.set(event.user.id, session)
-    spawnCharacter(event.user, session.characterId)
+    spawnCharacter(event.user, session.character)
 }
 ```
 
-The accepted payload is not a replicated client bootstrap message. If the client
-needs to know which entity it controls, what character loaded, or which UI mode
-to enter, send that with normal messages, channel headers, or initial replicated
-state after the connection is accepted.
+On acceptance, only `clientData` crosses the network. Choose a small JSON-serializable value
+containing public setup facts; keep credentials, private records and live server
+objects in `serverData`. The client's `connect()` resolves with decoded `clientData`,
+or `undefined` if omitted. JSON values such as `null`, `false`, `0`, and `""` remain
+distinct from omission. Normal JSON serialization rules apply; circular values,
+BigInt, and values that cannot produce JSON reject admission before acceptance.
+
+```ts
+type ConnectionSetup = { characterId: string, characterName: string }
+const setup = await client.connect<ConnectionSetup>(address, { token, characterId })
+if (setup) {
+    showCharacterName(setup.characterName)
+}
+```
+
+The generic describes application data; it does not validate the payload at runtime.
+Without a generic the result is `unknown`. A failed connection rejects a
+`ClientConnectionError`, regardless of whether the game uses setup data.
+
+Acceptance means asynchronous admission has completed. It does not wait for the
+game loop to handle `UserConnected`, create the player, or send the first snapshot.
+Keep evolving state such as health and inventory on the replication path. Wait
+for the player's replicated entity before entering gameplay when needed.
+The connection deadlines include setup and encoding time. See
+[connection budgets](./timing-and-liveness.md#handshake-deadlines) when authentication
+needs longer than the default five seconds.
+
+### Public connection denials
+
+Use an explicit denial for an expected refusal that the client should understand:
+
+```ts
+instance.onConnect = async (handshake, { signal }) => {
+    const account = await authenticate(handshake.token, { signal })
+    signal.throwIfAborted()
+    if (!account) return false
+    if (account.banned) {
+        return { deny: { reason: 'banned' } }
+    }
+    return { serverData: account }
+}
+```
+
+The client rejects with `ClientConnectionError.code === 'CONNECTION_DENIED'` and
+the decoded public value in `detail`. That value is `unknown`; validate its shape
+before using application-specific fields. Denial delivery is best effort, so a
+transport close or the client's own timeout can arrive instead.
+
+| Server outcome | Public `detail` |
+| --- | --- |
+| `return false` | `{ reason: 'connection_denied' }` |
+| `return { deny: detail }` | The JSON-decoded `detail` |
+| Unexpected exception or invalid setup/denial data | `{ reason: 'server_error' }` |
+| Handshake deadline exceeded | `{ reason: 'handshake_timeout' }` |
+| Wire/schema incompatibility | `reason: 'wire_protocol_mismatch'`, `'schema_fingerprint_required'`, or `'schema_fingerprint_mismatch'`, with the relevant version/fingerprint fields |
+
+Choose small, deliberately public JSON denial data. The same JSON rules as
+`clientData` apply, except `deny: undefined` is invalid. Do not combine `deny` with
+acceptance fields or other top-level fields. Invalid detail, including a cycle
+or BigInt, becomes a generic server error. An expired or cancelled attempt takes
+precedence over a late denial, just as it does over a late acceptance.
+
+Throwing an Error or another value is a server failure, not a public refusal API.
+The original exception stays in the server's `UserConnectionDenied` event payload
+and the attempt's `signal.reason`. Explicit denials preserve the original detail
+by reference in those local diagnostics. Log failures on the server; do not put
+credentials, private records or backend exception messages into `deny`.
+
+### Cancellation and setup ownership
+
+The second `onConnect` argument is a `ConnectionAttemptContext`: `{ user, signal }`.
+Existing one-argument handlers remain valid. `user` identifies this specific
+attempt; it has no accepted ID (`id` is 0) or `instance` yet. Do not spawn, subscribe,
+or send gameplay data through this provisional user. Its identity can be used as
+a reservation token; its accepted ID is assigned only on successful admission.
+
+nengi aborts `signal` if the attempt fails before acceptance: peer close, timeout,
+adapter shutdown, protocol/limit failure, application denial or exception, invalid
+setup data, or failure to encode/send acceptance. Core state and capacity are
+released before abort listeners run. `signal.reason` carries the denial/close
+reason when available; otherwise it is an Error. Treat it as diagnostic data,
+not a fixed error schema. nengi does not await asynchronous listeners.
+
+Abort listeners must catch their own cleanup errors, including Promise rejections.
+In Node, an uncaught listener exception or rejection becomes an uncaught exception
+and terminates the process by default. A peer disconnect can trigger this cleanup.
+A `try/catch` around the operation that aborts the signal cannot catch the later
+platform exception. For cleanup that can fail, use a handler such as:
+
+```ts
+signal.addEventListener('abort', async () => {
+    try {
+        await releaseReservation()
+    } catch (error) {
+        reportCleanupFailure(error) // Application logging that does not throw.
+    }
+}, { once: true })
+```
+
+Pass the signal to application I/O that supports it and check it after `await`.
+The functions above are application helpers; forwarding `{ signal }` only cancels
+their work if they implement that support. For non-cancellable I/O, check after it
+finishes and explicitly release any resource it acquired. nengi discards late
+results, but cannot cancel arbitrary Promises or roll back database transactions.
+
+Returning `{ serverData }` is not the resource handoff: acceptance encoding or
+sending can still fail afterwards. Keep cancellation cleanup registered until
+acceptance succeeds. A successful acceptance queues `UserConnected` with that
+payload, after which cleanup belongs to the normal `UserDisconnected` lifecycle.
+The attempt signal does **not** abort on an accepted session's later disconnect.
+Once supplied to `onConnect`, it aborts on failure before server-side acceptance
+and remains unaborted on acceptance. This handoff does not prove that the client
+received the acceptance packet.
+
+For a single-login reservation, compare its owner before releasing it. This
+prevents old cleanup from erasing a replacement session's reservation:
+
+```ts
+const accountOwners = new Map<string, object>()
+
+instance.onConnect = async (handshake, { user, signal }) => {
+    const account = await verifySessionToken(handshake.token, { signal })
+    signal.throwIfAborted()
+    if (!account || accountOwners.has(account.id)) return false
+
+    accountOwners.set(account.id, user)
+    const release = () => {
+        if (accountOwners.get(account.id) === user) accountOwners.delete(account.id)
+        signal.removeEventListener('abort', release)
+    }
+    signal.addEventListener('abort', release, { once: true })
+
+    const character = await loadOwnedCharacter(account.id, handshake.characterId, { signal })
+    signal.throwIfAborted()
+    if (!character) return false
+    return { serverData: { character, release } }
+}
+
+// In the game loop's ordered event drain:
+if (event.type === NetworkEvent.UserConnected) {
+    sessions.set(event.user.id, event.payload)
+}
+if (event.type === NetworkEvent.UserDisconnected) {
+    sessions.get(event.user.id)?.release()
+    sessions.delete(event.user.id)
+}
+```
+
+Here loading returns a plain record. A loader that acquires a resource must also
+dispose of an abandoned result. Release functions should be idempotent. Process
+both lifecycle events even when a user disconnected before the game drained its
+`UserConnected` event; skip spawning if `user.connectionState !== UserConnectionState.Open`, but
+still retain or release the payload's resources. Do not depend on a denial event
+for every abandoned attempt: peer close and shutdown before acceptance use the
+signal and do not emit `UserDisconnected` or an additional denial event.
+
+This policy rejects a new login while the old session remains alive, which may
+last until the Pong deadline after a network drop. A game can instead authenticate
+the new login and deliberately disconnect/replace the old session. Choose that
+account policy explicitly and retain the owner comparison in either model.
 
 ## Entity
 
@@ -236,13 +437,19 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command, commandFrameNumber
 })
 ```
 
+Ordinary `client.addCommand(...)` / `addCommandWithTiming(...)` inputs are released
+after a successful send. Games using them need no command confirmation call.
+Explicit completion is needed for command/state prediction, or when the application
+itself uses a completed-input boundary. Request predictions resolve by response.
+
 Each applied frame exposes `frame.confirmedCommandFrameNumber`: the server game
 has completed authoritative handling of every received command batch through
 that number. A command deliberately rejected by game validation is still
 confirmed; confirmation does not mean its requested action succeeded.
 
-Game code must call `user.confirmCommandsThrough(commandFrameNumber)` after the
-relevant simulation work and before `instance.step()`. Receiving packets,
+For command/state prediction, game code must call
+`user.confirmCommandsThrough(commandFrameNumber)` after the relevant simulation
+work and before `instance.step()`. Receiving packets,
 dequeueing events, returning from `CommandRouter` handlers and producing snapshots
 do not advance confirmation. The initial confirmed number is 0. The method
 returns the confirmed number, ignores older/duplicate completions, and throws
@@ -270,15 +477,15 @@ code owns the assertion that all work through it is complete. Keep the snapshot'
 predicted fields aligned with that boundary. Explicit confirmation alone does not
 define physics tick assignment or make a replay model deterministic.
 
-Games **without prediction** also confirm their command input: confirmation
-releases the client's retained command history. Omitting the call leaves that
-history growing. Snapshots, requests, responses and connection liveness continue
-independently; request-only applications have no command history to confirm.
-Use a request result when an individual asynchronous operation needs a response.
-See the [server cycle](./architecture-and-ticks.md#server-cycle).
+Without explicit confirmation the number stays 0. Snapshots, ordinary commands,
+requests, responses and connection liveness continue independently. Use a request
+result when an individual asynchronous operation needs a response. See the
+[prediction guide](./realtime-movement-prediction.md) for replay, expected-state
+reconciliation and diagnostics, and the [server cycle](./architecture-and-ticks.md#server-cycle).
 
 ```ts
-for (const frame of client.network.drainFrames()) {
+let frame
+while ((frame = client.network.processNextFrame())) {
     reconcilePredictionThrough(frame.confirmedCommandFrameNumber)
 }
 ```
@@ -364,6 +571,52 @@ request-flow fault to investigate, not a normal gameplay denial. A timeout does
 not prove rejection or cancel server work. API-style endpoints waiting on external
 work may have normal deadline failures. Keep these distinct from domain outcomes.
 
+### Client results and queued intent
+
+`client.request(endpoint, payload, options?)` returns a Promise. Use `await` with
+`try/catch`, or handle rejection in a Promise chain; there is no success-callback
+form. A response settles when its snapshot is applied, after authoritative state
+and request prediction reconciliation. Promise observers run asynchronously, so
+the live store can already contain newer applied frames when they run. Keep the
+normal client frame-processing and flush loop running while awaiting a result.
+
+```ts
+try {
+    const result = await client.request(OpenChest, { chestNid }, { timeoutMs: 5000 })
+    if (result.accepted) showInventory(result.inventoryNid)
+    else showDenied()
+} catch (error) {
+    showRequestFault(error)
+}
+```
+
+Choose the policy according to the meaning of the action:
+
+| Policy | Meaning |
+| --- | --- |
+| `RequestPolicy.Allow` (default) | Every request has its own outcome. Use for a switch where every press toggles it. |
+| `RequestPolicy.Dedupe` | With a matching `key`, return the existing outstanding Promise, even after sending. Use when another click means waiting for the same action. |
+| `RequestPolicy.ReplaceQueued` | Reject matching requests still in the outbound queue as `REPLACED`, then queue the new request. Requests selected for sending or already sent keep their own results. Use for a latest desired setting such as on/off. |
+
+Keys are client-session-wide, including across endpoints; include the action and
+object identity, such as `switch:42:desired-state`. Without a key, requests remain
+independent. `ReplaceQueued` can collapse multiple queued matches, but cannot
+recall server work or suppress its real outcome. Handle the replaced Promises too:
+`REPLACED` is expected local cancellation of unsent intent. Dedupe can suppress
+presses while waiting for a response, so it is not an input-rate-independent way
+to implement a toggle or a gameplay cooldown. None of these policies provide
+server-side idempotency or constrain a modified client.
+
+The timeout defaults to 10,000 ms, starts when queued, and includes waiting for
+flush and frame application. `timeoutMs: 0` disables it. A timeout or disconnect
+does not cancel an action already sent. The generic `HANDLER_ERROR`,
+`HANDLER_REJECTED`, `RESPONSE_ENCODING_ERROR`, and `RESPONSE_TOO_LARGE` failures
+also do not prove that the action had no effects: the server may have mutated
+state before the reply failed. Recover from current authority and action-specific
+retry rules. Do not blindly retry a purchase or restore captured old state.
+
+### Selecting the action model
+
 Movement, automatic fire and reload share an ordered simulation timeline; use
 commands for those coupled actions. Requests and commands are ordered within
 their categories, not interleaved by send-call order. Optimistic requests should
@@ -425,9 +678,6 @@ function tick() {
 
     instance.processRequests(100)
     stepAuthoritativeSimulation()
-    for (const user of instance.users.values()) {
-        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
-    }
     instance.step()
 }
 ```
@@ -438,6 +688,17 @@ once, or return a promise. Promise completion queues the response later; any
 authoritative mutation after `await` is outside the synchronous tick order and
 should be deliberately re-entered through the game's own queue if deterministic
 ordering matters.
+
+Prefer returning a value or returning an `async` function's result. Returning
+`undefined` without calling `send` leaves the request pending; for an immediate
+game action this usually means a forgotten return. Retaining `send` for later is
+supported deliberate deferral. Only the first chosen reply is used; a handler
+failure also consumes that reply opportunity. The client timeout cannot tell a
+forgotten reply from intentionally deferred work and does not cancel either.
+
+Handler throws/rejections and response encoding/size failures are reported locally
+through `instance.onRequestError`. The client receives a generic request error
+when it fits the normal output budgets. See [request failures](./operations.md#request-failures).
 
 Requests reach handlers in issue order, including across calls to
 `processRequests(max)`. Synchronous responses preserve that order; deferred
@@ -452,10 +713,37 @@ definition object for typed request/response payloads. The current API is
 client-request/server-response, not bidirectional RPC: server-initiated actions
 should use a command-like client message, a normal message, or replicated state.
 
+### Validate JSON request input
+
+JSON endpoints accept arbitrary valid JSON. A TypeScript request type constrains
+your client code, not a modified client. Validate the decoded body before looking
+up state or starting asynchronous work:
+
+```ts
+import type { User } from 'nengi'
+
+instance.respond(9, ({ user, body }: { user: User, body: unknown }) => {
+    if (typeof body !== 'object' || body === null || Array.isArray(body) ||
+        Object.keys(body).length !== 1 || !('chestId' in body) ||
+        typeof body.chestId !== 'number' || !Number.isSafeInteger(body.chestId) || body.chestId <= 0) {
+        return { accepted: false, reason: 'invalid_request' }
+    }
+
+    // This game function must check proximity/ownership using server-owned state.
+    return openNearbyChest(user, body.chestId)
+})
+```
+
+Apply the same field-size and nesting rules used for handshakes. Shared binary
+endpoint schemas constrain payload representation, but game code must still
+validate numeric ranges, permissions and whether the requested action is legal.
+Bound expensive work before starting it; `processRequests(max)` limits dequeues,
+not concurrent asynchronous operations. See [application budgets](./network-limits.md#application-responsibilities-and-migration).
+
 ### Complete an action before leaving
 
-`client.disconnect()` asks the adapter to close; it does not flush queued nengi
-work or wait for a server result. If a final action matters, use a game endpoint
+`client.disconnect()` ends the logical session immediately and discards queued nengi
+work. It does not wait for a server result. If a final action matters, use a game endpoint
 that responds after that action has completed, then disconnect from the client.
 For a shared `FinalAction` endpoint whose response includes `accepted`:
 

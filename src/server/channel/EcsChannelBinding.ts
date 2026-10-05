@@ -188,6 +188,7 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
         }
 
         for (const name of Object.keys(schema.props)) {
+            const prop = schema.props[name]
             const rawPropWriter = rawWriter.props[name]
             if (typeof rawPropWriter !== 'function') {
                 throw new Error(`ECS component writer is missing property ${name} for type ${definition.ntype}.`)
@@ -198,7 +199,15 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
                 rawPropWriter(component, value)
             }
             mutateProps[name] = (component, value) => {
-                this.mutatePatch(definition, schema, component, { [name]: value } as Partial<EcsNetworkComponentState<Definition>>)
+                this.assertWritableComponent(definition, component)
+                const previous = component[name]
+                component[name] = value
+                try {
+                    this.channelApi().appendBoundComponentProp(component, prop, value)
+                } catch (error) {
+                    component[name] = previous
+                    throw error
+                }
             }
         }
 
@@ -347,20 +356,16 @@ export class EcsChannelBinding<Channel extends BoundEcsChannel> {
             throw new Error(`ECS update group ${group.name} is not registered for component ${definition.ntype}.`)
         }
 
-        const previous = group.props.map((prop, index) => ({
-            name: prop.prop,
-            value: component[prop.prop],
-            next: values[index]
-        }))
-        for (const entry of previous) {
-            component[entry.name] = entry.next
+        const previous = group.props.map(prop => component[prop.prop])
+        for (let i = 0; i < group.props.length; i++) {
+            component[group.props[i].prop] = values[i]
         }
 
         try {
             this.channelApi().appendBoundComponentGroup(component, definition.ntype, group, values)
         } catch (error) {
-            for (const entry of previous) {
-                component[entry.name] = entry.value
+            for (let i = 0; i < group.props.length; i++) {
+                component[group.props[i].prop] = previous[i]
             }
             throw error
         }

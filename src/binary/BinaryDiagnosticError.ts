@@ -8,6 +8,8 @@ export type BinaryDiagnosticFields = {
     propKey?: number
     binaryType?: number
     offset?: number
+    expectedBytes?: number
+    payloadBytes?: number
     value?: any
 }
 

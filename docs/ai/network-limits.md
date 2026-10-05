@@ -5,8 +5,9 @@ These defaults are enabled without extra setup. They protect nengi's retained
 network work; they do not establish how many players your game simulation can
 support. Limits belong to one instance, not to a process-wide or per-IP registry.
 
-The 64 KiB default packet limit applies to **client-to-server input**, including
-the handshake. It does not limit server-to-client entity snapshots.
+The 64 KiB default packet limit applies to **client-to-server input**. Before
+acceptance, packets also have an 8 KiB handshake limit. Neither limits
+server-to-client entity snapshots.
 
 ## Configure a deployment
 
@@ -39,6 +40,7 @@ explicit finite budgets for synthetic loads or larger payloads.
 | `maxConnections` | 4,096 | Accepted plus pending connections |
 | `maxPendingConnections` | 256 | Connections waiting for a handshake or authentication; part of the total |
 | `maxPacketBytes` | 65,536 | Bytes in one incoming nengi packet |
+| `maxHandshakeBytes` | 8,192 | Bytes in one incoming packet before acceptance, including handshake JSON and wire metadata |
 | `packetsPerSecond` | 1,024 | Per-connection packet credit restored each second |
 | `packetBurst` | 2,048 | Maximum per-connection packet credit |
 | `bytesPerSecond` | 131,072 | Per-connection byte credit restored each second |
@@ -59,12 +61,39 @@ Per-user and instance ceilings both apply. Meeting one does not waive another.
 A large collection of individually permitted bursts can still exhaust a global
 budget; that budget protects the instance as a whole.
 
+## Handshake input
+
+`maxHandshakeBytes` rejects oversized packets before constructing a binary reader,
+decoding strings or parsing JSON. It also applies while asynchronous `onConnect`
+work is pending. After acceptance, `maxPacketBytes` remains the packet ceiling.
+Both ceilings apply before acceptance; raising one does not bypass the other.
+The transport may already have assembled a message before core rejects it.
+
+Keep setup data small. For a deliberate larger token or setup payload, configure
+the complete encoded packet budget, including nengi's metadata:
+
+```ts
+const instance = new Instance(context, {
+    limits: { maxHandshakeBytes: 16 * 1024 }
+})
+```
+
+This budget is in bytes, not JavaScript string length, and is not a nesting-depth
+limit. Validate the expected shape and field sizes before using handshake or JSON
+request data; see [connection setup](./networking-primitives.md#connection-handshake).
+Oversize input closes the sender and reports `onNetworkLimit` with
+`limit: 'maxHandshakeBytes'`. A client need not receive a detailed refusal.
+
 ## Bursts and sustained traffic
 
 Packet and byte credits start full and refill continuously using the server's
 monotonic `instance.now` clock. A packet must fit both remaining credits. Credits
 do not reset when authentication completes or when `instance.step()` runs.
 Empty packets, engine messages, Pong packets, commands and requests all count.
+Credits belong to a connection and start afresh on reconnect. Pending-connection
+ceilings bound simultaneous attempts, not attempts per second. Use transport or
+deployment controls for aggregate connection rates, and application budgets for
+expensive authentication work that survive reconnects.
 The packet limit is independent of the server tick rate: a 20 Hz server can
 legitimately receive a client's 240 Hz render-driven flushes.
 
@@ -141,16 +170,26 @@ queued values and byte charge independent of later application edits.
 
 ## What happens when a limit is exceeded
 
-An excess closes its sender immediately at the nengi level and uses hard
+A connection, traffic or accumulated queue excess closes its sender immediately at the nengi level and uses hard
 transport termination where available. Nengi does not silently truncate command
 batches, retry dropped input, or send a success confirmation for discarded work.
 Existing disconnected-user command handling still applies to earlier events.
 Requests not yet started and queued responses are purged for that user.
 
+A server-produced reply that cannot fit even in an empty response byte budget
+instead becomes a small `RESPONSE_TOO_LARGE` error when possible. Its originating
+handler is diagnosed through `instance.onRequestError`. Fallback errors consume
+normal queue budgets too; a full queue or a budget smaller than the fallback
+still closes the user. Invalid response encoding is handled similarly. These
+faults do not undo the requested action. See [request failures](./operations.md#request-failures).
+
 Already admitted users have reserved event capacity for lifecycle completion.
 A pending user reserves two slots and an accepted user reserves one disconnect
 slot. Command batches cannot consume this space. Under reconnect churn, nengi
 stops admitting connections before the event queue loses cleanup capacity.
+New admissions reclaim expired pending handshakes before checking capacity.
+They still reserve queue slots, so a service must keep draining events even when
+its simulation is idle. This housekeeping adds no background server timer.
 
 Admission refusals do not enqueue one `UserConnectionDenied` event per attempt;
 that would recreate an unbounded queue. Normal authentication denials and
@@ -196,8 +235,9 @@ sections and are separate from configurable traffic/queue budgets. The client
 encoder splits engine records into sections of at most 255, allowing a complete
 255-command timing batch plus ordinary controls. It keeps only the latest delay
 report before a flush, and rejects oversized batches instead of truncating their
-one-byte counts. Use `Client.flush()` so a failed encode/send rolls back pending
-outbound work.
+one-byte counts. Use `Client.flush()` so a failed encode rolls back pending
+outbound work. A transport send failure ends the session and rejects its pending
+requests; it cannot guarantee that the server did not receive the packet.
 
 Engine controls are applied after structural validation of the complete packet.
 A valid control prefix followed by a malformed suffix does not advance the
@@ -234,8 +274,12 @@ its false result means the user is closed and the callback should stop.
 ## Application responsibilities and migration
 
 Authenticate handshakes, authorize every action and limit expensive work before
-starting it. A pending-connection ceiling does not cancel an authentication job
-that outlives its socket. Global application job limits must survive reconnects.
+starting it. Use the `onConnect(handshake, { user, signal })` cancellation context
+to stop abandoned authentication and release attempt-owned reservations. See
+[setup ownership](./networking-primitives.md#cancellation-and-setup-ownership).
+A pending-connection ceiling and an aborted signal cannot forcibly stop arbitrary
+application work. Global job limits must survive reconnects, and non-cancellable
+work needs its own budget and cleanup when it eventually completes.
 Similarly, `instance.processRequests(max)` limits dequeues per call, not promise
 concurrency, database duration or external side effects. Client request timeouts
 and deduplication policies do not constrain a modified client.

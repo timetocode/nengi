@@ -1,0 +1,724 @@
+{
+  "recordedOn": "2026-09-18",
+  "purpose": "Preserve observed sampling capabilities and their context; observations are not timing gates.",
+  "environment": {
+    "timestamp": "2026-09-18T20:04:00.924Z",
+    "node": "v22.17.1",
+    "platform": "linux",
+    "release": "6.6.87.2-microsoft-standard-WSL2",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "logicalCpus": 16,
+    "memory": 33208586240,
+    "loadAverage": [
+      2.99,
+      7.01,
+      6.03
+    ],
+    "repetitions": 3,
+    "historyFrames": 120,
+    "warmup": 150,
+    "iterations": 600,
+    "note": "Fresh sequential processes, alternating before/after order by repetition. Development host, no CPU affinity."
+  },
+  "browserEnvironment": {
+    "timestamp": "2026-09-18T20:05:19.173Z",
+    "node": "v22.17.1",
+    "platform": "linux",
+    "release": "6.6.87.2-microsoft-standard-WSL2",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "logicalCpus": 16,
+    "memory": 33208586240,
+    "loadAverage": [
+      1.85,
+      5.69,
+      5.65
+    ],
+    "repetitions": 3,
+    "historyFrames": 120,
+    "warmup": 150,
+    "iterations": 600,
+    "note": "Fresh sequential processes, alternating before/after order by repetition. Development host, no CPU affinity."
+  },
+  "source": {
+    "baseCommit": "d78047ca62bf801af58e48f4b0ebb15065612d88",
+    "packageVersionAtMeasurement": "2.0.0-rc.127",
+    "state": "Both variants include earlier uncommitted Next RC work. After adds one-pass sampled-property construction and selected timeline sampling. Both run identical updated scalar/mutable harness files.",
+    "variants": {
+      "before": {
+        "sourceManifestSha256": "c788ee214f02109d755a108171bd5b569c6251e508681c168b06a61549399b11",
+        "samplingFiles": {
+          "client/FixedStepInterpolator.ts": "9871bc525c5ea4c77f936749d57d3d479aa50a810a1b1381e5d5ec0b7235b8ca",
+          "client/entityTimeline.ts": "553ad4fc31eae7b5ff3abb87d1bf5d6254419b6fa78208e860cf87e795d3de07"
+        }
+      },
+      "after": {
+        "sourceManifestSha256": "faf907834536dd3e01412c2c1713a477e7249aa286cecdd9d1f3f74394b5e1a9",
+        "samplingFiles": {
+          "client/FixedStepInterpolator.ts": "6db5e1750b8af41184de40d217ea9fb4dbfc4154fae717db7639486295dd6887",
+          "client/entityTimeline.ts": "cd9598bcaa4ae88e574623f07988dde8fc051a5910a6ba7a7c6fe853c38dc739"
+        }
+      }
+    },
+    "manifestDigestEncoding": "SHA-256 of sorted-key JSON path-to-SHA256 map for all src .ts files in the actual captured variant, using comma/colon separators without whitespace. Includes the identical workload overlay in both variants.",
+    "harnessSha256": {
+      "src/performance/ClientHistoryWorkload.ts": "ab2d3e74d2d4a30de06a112cd23ff6396ef584721267f267b8a89bfacb1974a3",
+      "src/performance/ClientHistory.performance.ts": "a4574aaeece44e1f4fa347cf1c78b3b27a60ab530a8e1a62a8dcda2f87d8d0c3",
+      "scripts/profile-client-history-browser.mjs": "3d8d8c3bfccdaff724bef3013c6f02fdb2ad4d98f807002f6d9539c94711ac16"
+    },
+    "comparisonRunnerSha256": "e39a8811de298d4b17ef2a0b504e552206f623eaebd38cb349572290dd9d2ca0",
+    "operationProbeSha256": "20b75b00a3a429e0931fea53f654befe7f531d556c98faf11b2a1c8c17b97311"
+  },
+  "measurement": "FixedStepInterpolator.sample/sampleEntities wall time, including its diagnostics and checksum consumption. History is prepared with real client frame application. Timeline reset and an initial diagnostics call are outside the timed interval. No renderer, live transport, receive-time jitter or live scheduling.",
+  "aggregation": "Median of three per-run percentiles, each 150 warmup samples and 600 measured samples in a fresh process. Variant order alternates by repetition. Source-variant runs are sequential; Node and browser batches are also sequential.",
+  "shapes": {
+    "scalar": "Interpolated Float64 x/y, UInt16 health, String label.",
+    "mutable": "Same scalar fields plus interpolated Vector3 and a non-interpolated 64-byte UInt8Array, updated alongside x/y."
+  },
+  "limits": [
+    "Development host with background services; an observed competing Jigsaw benchmark finished before timing began. No exclusive machine or CPU affinity.",
+    "No total allocated-byte or GC-pause measurements. Heap readings in the workspace archive are occupancy/retention only.",
+    "Fresh Maps, outer entities and mutable final values remain independently owned; no result pooling.",
+    "Node selected timings are workload-shaped controls, not a benchmark of the live Jigsaw renderer. Browser measurements cover full sampling only.",
+    "Browser clock resolution is coarse, approximately 0.1 ms in this run."
+  ],
+  "cases": [
+    {
+      "case": "selected-scalar",
+      "runtime": "v22.17.1",
+      "settings": {
+        "scenario": "selective",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "population": 10000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 500,
+      "checksum": 411585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 0.17832899999996243,
+          "p95": 0.30607300000002624,
+          "p99": 0.4516489999999749
+        },
+        "repeatsMs": [
+          {
+            "p50": 0.17832899999996243,
+            "p95": 0.30607300000002624,
+            "p99": 0.4516489999999749,
+            "max": 0.8644749999999704
+          },
+          {
+            "p50": 0.1776909999999816,
+            "p95": 0.21846799999997302,
+            "p99": 0.3460680000000025,
+            "max": 0.4779219999999782
+          },
+          {
+            "p50": 0.19065100000000257,
+            "p95": 0.44892599999997174,
+            "p99": 0.5770559999999705,
+            "max": 0.8314409999999839
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 0.09561700000000428,
+          "p95": 0.20076899999997977,
+          "p99": 0.3544769999999744
+        },
+        "repeatsMs": [
+          {
+            "p50": 0.09399799999999914,
+            "p95": 0.20037199999995892,
+            "p99": 0.3544769999999744,
+            "max": 0.4873569999999745
+          },
+          {
+            "p50": 0.09561700000000428,
+            "p95": 0.2189199999999687,
+            "p99": 0.35641700000002174,
+            "max": 0.6231119999999919
+          },
+          {
+            "p50": 0.09788800000001174,
+            "p95": 0.20076899999997977,
+            "p99": 0.2838160000000016,
+            "max": 0.4856149999999957
+          }
+        ]
+      }
+    },
+    {
+      "case": "selected-mutable",
+      "runtime": "v22.17.1",
+      "settings": {
+        "scenario": "selective",
+        "phase": "sample",
+        "valueShape": "mutable",
+        "population": 10000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 500,
+      "checksum": 411585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 0.31136399999991227,
+          "p95": 0.5667000000000257,
+          "p99": 0.7157760000000053
+        },
+        "repeatsMs": [
+          {
+            "p50": 0.31075699999996687,
+            "p95": 0.5472220000000334,
+            "p99": 0.7157760000000053,
+            "max": 0.9650259999999662
+          },
+          {
+            "p50": 0.3150660000000016,
+            "p95": 0.5667000000000257,
+            "p99": 0.684223999999972,
+            "max": 0.9595709999999826
+          },
+          {
+            "p50": 0.31136399999991227,
+            "p95": 0.5934110000000032,
+            "p99": 0.7455590000000711,
+            "max": 0.885278000000028
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 0.16059699999999566,
+          "p95": 0.24398000000002185,
+          "p99": 0.5753149999999891
+        },
+        "repeatsMs": [
+          {
+            "p50": 0.16889600000001792,
+            "p95": 0.3862619999999879,
+            "p99": 0.5753149999999891,
+            "max": 0.9000130000000013
+          },
+          {
+            "p50": 0.16059699999999566,
+            "p95": 0.24398000000002185,
+            "p99": 0.5138840000000187,
+            "max": 0.6343269999999848
+          },
+          {
+            "p50": 0.1596829999999727,
+            "p95": 0.24336400000004232,
+            "p99": 0.5940870000000018,
+            "max": 0.9103190000000154
+          }
+        ]
+      }
+    },
+    {
+      "case": "full-stationary-scalar",
+      "runtime": "v22.17.1",
+      "settings": {
+        "scenario": "stationary",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "population": 10000,
+        "components": 1,
+        "fraction": 0,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 10000,
+      "checksum": 7536585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 4.005710999999792,
+          "p95": 4.980958000000101,
+          "p99": 5.951838999999836
+        },
+        "repeatsMs": [
+          {
+            "p50": 4.005710999999792,
+            "p95": 4.7550800000001345,
+            "p99": 5.5547909999997955,
+            "max": 7.898480999999947
+          },
+          {
+            "p50": 4.018914000000223,
+            "p95": 5.111574000000019,
+            "p99": 6.0293149999997695,
+            "max": 6.566898999999921
+          },
+          {
+            "p50": 3.9439830000001166,
+            "p95": 4.980958000000101,
+            "p99": 5.951838999999836,
+            "max": 7.338920000000144
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 2.306801999999948,
+          "p95": 3.5530710000000454,
+          "p99": 4.119932999999946
+        },
+        "repeatsMs": [
+          {
+            "p50": 2.458274000000074,
+            "p95": 3.8444859999999608,
+            "p99": 4.184972000000016,
+            "max": 4.989229999999907
+          },
+          {
+            "p50": 2.284297999999808,
+            "p95": 3.4276310000000194,
+            "p99": 3.817794000000049,
+            "max": 5.029731999999967
+          },
+          {
+            "p50": 2.306801999999948,
+            "p95": 3.5530710000000454,
+            "p99": 4.119932999999946,
+            "max": 4.649212000000034
+          }
+        ]
+      }
+    },
+    {
+      "case": "full-sparse-scalar",
+      "runtime": "v22.17.1",
+      "settings": {
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "population": 10000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 10000,
+      "checksum": 7536585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 4.554938999999649,
+          "p95": 7.270226999999977,
+          "p99": 13.943857000000207
+        },
+        "repeatsMs": [
+          {
+            "p50": 4.55648199999996,
+            "p95": 7.270226999999977,
+            "p99": 13.943857000000207,
+            "max": 18.096930000000157
+          },
+          {
+            "p50": 4.554938999999649,
+            "p95": 7.510819999999967,
+            "p99": 14.493846000000303,
+            "max": 19.96198400000003
+          },
+          {
+            "p50": 4.202764999999999,
+            "p95": 6.439865000000054,
+            "p99": 13.543853000000126,
+            "max": 21.183324999999968
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 2.512463000000025,
+          "p95": 3.7548020000001543,
+          "p99": 4.25757700000031
+        },
+        "repeatsMs": [
+          {
+            "p50": 2.512463000000025,
+            "p95": 3.7548020000001543,
+            "p99": 4.25757700000031,
+            "max": 6.633223000000044
+          },
+          {
+            "p50": 2.622823000000153,
+            "p95": 4.155193999999938,
+            "p99": 4.798909999999978,
+            "max": 5.68238099999985
+          },
+          {
+            "p50": 2.460456000000022,
+            "p95": 3.6519439999999577,
+            "p99": 4.025814000000082,
+            "max": 4.380223999999998
+          }
+        ]
+      }
+    },
+    {
+      "case": "full-dense-scalar",
+      "runtime": "v22.17.1",
+      "settings": {
+        "scenario": "dense",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "population": 2000,
+        "components": 1,
+        "fraction": 1,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 2000,
+      "checksum": 1536585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 0.7908070000000862,
+          "p95": 1.3632820000000265,
+          "p99": 1.733173000000079
+        },
+        "repeatsMs": [
+          {
+            "p50": 0.7537550000000692,
+            "p95": 1.1609449999999697,
+            "p99": 1.435045999999943,
+            "max": 1.6910950000000184
+          },
+          {
+            "p50": 0.8006709999999657,
+            "p95": 1.4776529999999184,
+            "p99": 1.8204749999999876,
+            "max": 2.5499459999998635
+          },
+          {
+            "p50": 0.7908070000000862,
+            "p95": 1.3632820000000265,
+            "p99": 1.733173000000079,
+            "max": 2.4717849999999544
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 0.43952600000000075,
+          "p95": 0.7331779999999526,
+          "p99": 0.9466980000000831
+        },
+        "repeatsMs": [
+          {
+            "p50": 0.45444799999995666,
+            "p95": 0.9020189999999957,
+            "p99": 1.2259020000000191,
+            "max": 1.5227689999999257
+          },
+          {
+            "p50": 0.4369130000000041,
+            "p95": 0.6275430000000597,
+            "p99": 0.8848770000000741,
+            "max": 1.2405840000000126
+          },
+          {
+            "p50": 0.43952600000000075,
+            "p95": 0.7331779999999526,
+            "p99": 0.9466980000000831,
+            "max": 1.393193999999994
+          }
+        ]
+      }
+    },
+    {
+      "case": "full-sparse-mutable",
+      "runtime": "v22.17.1",
+      "settings": {
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "mutable",
+        "population": 5000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 5000,
+      "checksum": 3786585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 4.294205000000147,
+          "p95": 6.568964999999935,
+          "p99": 9.603371000000152
+        },
+        "repeatsMs": [
+          {
+            "p50": 4.294205000000147,
+            "p95": 6.568964999999935,
+            "p99": 9.603371000000152,
+            "max": 16.766793000000234
+          },
+          {
+            "p50": 3.4407119999999622,
+            "p95": 4.630918000000065,
+            "p99": 7.297545999999784,
+            "max": 19.296334000000115
+          },
+          {
+            "p50": 4.455453999999918,
+            "p95": 7.082332999999835,
+            "p99": 14.210739999999987,
+            "max": 22.901824000000033
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 1.9863350000000537,
+          "p95": 4.806869000000006,
+          "p99": 5.887461999999687
+        },
+        "repeatsMs": [
+          {
+            "p50": 1.8910270000000082,
+            "p95": 4.538088000000016,
+            "p99": 5.479523999999856,
+            "max": 12.698480999999902
+          },
+          {
+            "p50": 1.9863350000000537,
+            "p95": 4.806869000000006,
+            "p99": 6.5315720000000965,
+            "max": 23.225018999999975
+          },
+          {
+            "p50": 2.036248000000114,
+            "p95": 4.84378700000002,
+            "p99": 5.887461999999687,
+            "max": 17.78126700000007
+          }
+        ]
+      }
+    },
+    {
+      "case": "full-sparse-scalar",
+      "runtime": "Chrome/151.0.7922.34",
+      "settings": {
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "population": 10000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 10000,
+      "checksum": 7536585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 3.300000011920929,
+          "p95": 4.300000011920929,
+          "p99": 5.100000023841858
+        },
+        "repeatsMs": [
+          {
+            "p50": 3.300000011920929,
+            "p95": 4.600000023841858,
+            "p99": 5.899999976158142,
+            "max": 7
+          },
+          {
+            "p50": 3.099999964237213,
+            "p95": 3.799999952316284,
+            "p99": 4.300000011920929,
+            "max": 5.399999976158142
+          },
+          {
+            "p50": 3.300000011920929,
+            "p95": 4.300000011920929,
+            "p99": 5.100000023841858,
+            "max": 6.600000023841858
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 1.600000023841858,
+          "p95": 2,
+          "p99": 2.300000011920929
+        },
+        "repeatsMs": [
+          {
+            "p50": 1.699999988079071,
+            "p95": 2.300000011920929,
+            "p99": 3.300000011920929,
+            "max": 3.899999976158142
+          },
+          {
+            "p50": 1.600000023841858,
+            "p95": 2,
+            "p99": 2.199999988079071,
+            "max": 2.700000047683716
+          },
+          {
+            "p50": 1.600000023841858,
+            "p95": 2,
+            "p99": 2.300000011920929,
+            "max": 2.600000023841858
+          }
+        ]
+      }
+    },
+    {
+      "case": "full-sparse-mutable",
+      "runtime": "Chrome/151.0.7922.34",
+      "settings": {
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "mutable",
+        "population": 5000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 120,
+        "warmup": 150,
+        "iterations": 600,
+        "serverHz": 20,
+        "renderHz": 60
+      },
+      "sampledEntities": 5000,
+      "checksum": 3786585,
+      "before": {
+        "medianOfRunPercentilesMs": {
+          "p50": 2.899999976158142,
+          "p95": 3.800000011920929,
+          "p99": 6.199999988079071
+        },
+        "repeatsMs": [
+          {
+            "p50": 2.899999976158142,
+            "p95": 4.200000047683716,
+            "p99": 6.899999976158142,
+            "max": 14.200000047683716
+          },
+          {
+            "p50": 2.600000023841858,
+            "p95": 3.199999988079071,
+            "p99": 3.600000023841858,
+            "max": 4.800000011920929
+          },
+          {
+            "p50": 2.899999976158142,
+            "p95": 3.800000011920929,
+            "p99": 6.199999988079071,
+            "max": 11.599999964237213
+          }
+        ]
+      },
+      "after": {
+        "medianOfRunPercentilesMs": {
+          "p50": 1.300000011920929,
+          "p95": 1.9000000357627869,
+          "p99": 2.199999988079071
+        },
+        "repeatsMs": [
+          {
+            "p50": 1.399999976158142,
+            "p95": 1.9000000357627869,
+            "p99": 2.199999988079071,
+            "max": 2.700000047683716
+          },
+          {
+            "p50": 1.300000011920929,
+            "p95": 2,
+            "p99": 2.5,
+            "max": 4.5
+          },
+          {
+            "p50": 1.300000011920929,
+            "p95": 1.800000011920929,
+            "p99": 2,
+            "max": 2.399999976158142
+          }
+        ]
+      }
+    }
+  ],
+  "operationProbe": {
+    "measurement": "100 selected entities, adjacent frames, alpha 0.5. Scalar probe matches Jigsaw transform types: interpolated Float32 x/y, non-interpolated Float32 rotation. Mutable probe uses interpolated Vector3, non-interpolated three-byte UInt8Array and String.",
+    "mutableResultsDefinition": "Objects returned by binary clone/interp callbacks, including typed arrays. Does not count backing buffers, Map storage, closures or total bytes.",
+    "checks": "Equal before/after sampled values; independent output Maps/entities/mutable values and history.",
+    "results": [
+      {
+        "shape": "scalar-transform",
+        "variant": "before",
+        "selected": 100,
+        "resultEntities": 100,
+        "schemaLookups": 600,
+        "timelineLookups": 200,
+        "propertyClones": 400,
+        "propertyInterpolations": 200,
+        "mutablePropertyResults": 0
+      },
+      {
+        "shape": "scalar-transform",
+        "variant": "after",
+        "selected": 100,
+        "resultEntities": 100,
+        "schemaLookups": 100,
+        "timelineLookups": 100,
+        "propertyClones": 100,
+        "propertyInterpolations": 200,
+        "mutablePropertyResults": 0
+      },
+      {
+        "shape": "mutable",
+        "variant": "before",
+        "selected": 100,
+        "resultEntities": 100,
+        "schemaLookups": 700,
+        "timelineLookups": 200,
+        "propertyClones": 500,
+        "propertyInterpolations": 100,
+        "mutablePropertyResults": 400
+      },
+      {
+        "shape": "mutable",
+        "variant": "after",
+        "selected": 100,
+        "resultEntities": 100,
+        "schemaLookups": 100,
+        "timelineLookups": 100,
+        "propertyClones": 200,
+        "propertyInterpolations": 100,
+        "mutablePropertyResults": 200
+      }
+    ]
+  },
+  "workspaceArchive": "nengi-rc-notes/sampling-performance/ beside the core repository: captured sources, source manifest, raw timings/heaps, runner and probe."
+}

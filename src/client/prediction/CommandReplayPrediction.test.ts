@@ -4,21 +4,11 @@ import { Context } from '../../common/Context'
 import { ChannelType, createChannelHeader } from '../../common/ChannelHeader'
 import { Client } from '../Client'
 import { CommandReplayPrediction } from './CommandReplayPrediction'
-import { testBinaryAdapter } from '../../testSupport/BufferBinary'
+import { connectedTestClient } from '../../testSupport/ClientTransport'
 import type { Snapshot } from '../Snapshot'
 
 const TEST_CHANNEL_ID = 1
 
-class MockAdapter {
-    binary = testBinaryAdapter
-    constructor() {
-    }
-    connect() {
-        return Promise.resolve({ accepted: true })
-    }
-    flush() {
-    }
-}
 
 function createClient() {
     const context = new Context()
@@ -26,7 +16,7 @@ function createClient() {
         x: Binary.Float64,
         y: Binary.Float64
     }))
-    return new Client(context, MockAdapter, 20)
+    return connectedTestClient(context)
 }
 
 function snapshot(args: Partial<Snapshot>): Snapshot {
@@ -152,7 +142,7 @@ describe('CommandReplayPrediction', () => {
         expect(client.network.pendingFrames).toHaveLength(0)
         expect(movement.reconcile()?.replayed).toBe(0)
         expect(local.x).toBe(599)
-        expect(client.network.outbound.getUnconfirmedCommands().size).toBe(0)
+        expect(client.predictor.log.getPendingCommands()).toEqual([])
     })
 
     it('does not correct when authority plus pending commands matches local prediction', () => {

@@ -7,13 +7,15 @@ import { LocalState } from '../LocalState'
 import { User } from '../User'
 import { createEcsChannelOutput } from './EcsChannelOutput'
 import { IChannel } from './IChannel'
+import { ChannelVisibilityCache, ChannelVisibilitySnapshot, RememberedVisibility } from './ChannelVisibilityCache'
 import {
     appendEcsSpatialManualProp,
     appendManualGroup,
     appendManualGroup1,
     appendManualGroup2,
     appendManualGroup3,
-    appendManualGroup4
+    appendManualGroup4,
+    coalesceEcsSpatialManualUpdateLog
 } from './EcsSpatialManualLog'
 
 export type EcsComponent = IEntity & { pid: number }
@@ -31,18 +33,7 @@ export type EcsChannelOptions = {
     header?: ChannelHeaderInput
 }
 
-export type EcsChannelSnapshotVisibility = {
-    toCreate: number[]
-    toUpdate: number[]
-    toDelete: number[]
-    visibleRef: number[]
-    visibleSet: Set<number>
-}
-
-type RememberedEcsChannelVisibility = {
-    visibleRef: number[]
-    visibleSet: Set<number>
-}
+export type EcsChannelSnapshotVisibility = ChannelVisibilitySnapshot
 
 /**
  * Full-visibility ECS channel with manual mutation emission. Userland must call
@@ -82,7 +73,9 @@ export class EcsChannel implements IChannel {
     private componentsByRoot: Map<number, EcsComponent[]> = new Map()
     private componentByNid: Map<number, EcsComponent> = new Map()
     private visibleNetworkedNidsCache: { membershipVersion: number, nids: number[] } | null = null
-    private snapshotVisibilityByUser: Map<number, RememberedEcsChannelVisibility> = new Map()
+    private snapshotVisibilityByUser: Map<number, RememberedVisibility> = new Map()
+    private snapshotVisibilityCache = new ChannelVisibilityCache()
+    private manualNeedsPrune = false
 
     constructor(localState: LocalState, options: EcsChannelOptions = {}) {
         this.localState = localState
@@ -178,6 +171,7 @@ export class EcsChannel implements IChannel {
         if (!component) {
             return
         }
+        this.manualNeedsPrune = true
         const pid = component.pid
         const createdIndex = this.createdComponents.findIndex(created => created.nid === nid)
         if (createdIndex > -1) {
@@ -263,42 +257,10 @@ export class EcsChannel implements IChannel {
 
     collectSnapshotVisibility(userOrId: User | number): EcsChannelSnapshotVisibility {
         const userId = typeof userOrId === 'number' ? userOrId : userOrId.id
-        const visibleRef = this.getVisibleNetworkedNids()
-        const previous = this.snapshotVisibilityByUser.get(userId)
-        if (previous && previous.visibleRef === visibleRef) {
-            return {
-                toCreate: [],
-                toUpdate: visibleRef.slice(),
-                toDelete: [],
-                visibleRef,
-                visibleSet: previous.visibleSet
-            }
-        }
-
-        const visibleSet = new Set(visibleRef)
-        const toCreate: number[] = []
-        const toUpdate: number[] = []
-        const toDelete: number[] = []
-
-        if (!previous) {
-            toCreate.push(...visibleRef)
-        } else {
-            for (let i = 0; i < visibleRef.length; i++) {
-                const nid = visibleRef[i]
-                if (previous.visibleSet.has(nid)) {
-                    toUpdate.push(nid)
-                } else {
-                    toCreate.push(nid)
-                }
-            }
-            previous.visibleSet.forEach(nid => {
-                if (!visibleSet.has(nid)) {
-                    toDelete.push(nid)
-                }
-            })
-        }
-
-        return { toCreate, toUpdate, toDelete, visibleRef, visibleSet }
+        return this.snapshotVisibilityCache.collect(
+            this.getVisibleNetworkedNids(),
+            this.snapshotVisibilityByUser.get(userId)
+        )
     }
 
     rememberSnapshotVisibility(userId: number, visibility: EcsChannelSnapshotVisibility) {
@@ -310,6 +272,43 @@ export class EcsChannel implements IChannel {
 
     createSnapshotOutput(user: User, instance: Instance, protocol: ProtocolConfig) {
         return createEcsChannelOutput(user, instance, this, protocol)
+    }
+
+    /** @internal Prepare the shared log once, before any subscriber encodes it. */
+    prepareManualUpdates() {
+        coalesceEcsSpatialManualUpdateLog(this)
+        if (!this.manualNeedsPrune) return
+
+        // A cancelled create or a new empty subscriber may have no CRUD records
+        // to trigger per-user filtering. Remove dead writes once for the channel.
+        let props = 0
+        for (let i = 0; i < this.manualPropNids.length; i++) {
+            const nid = this.manualPropNids[i]
+            if (!this.componentSet.has(nid)) continue
+            this.manualPropNids[props] = nid
+            this.manualPropSchemas[props] = this.manualPropSchemas[i]
+            this.manualPropValues[props++] = this.manualPropValues[i]
+        }
+        this.manualPropNids.length = this.manualPropSchemas.length = this.manualPropValues.length = props
+
+        let groups = 0
+        let values = 0
+        for (let i = 0; i < this.manualGroupNids.length; i++) {
+            const nid = this.manualGroupNids[i]
+            if (!this.componentSet.has(nid)) continue
+            const group = this.manualGroupSchemas[i]
+            let offset = this.manualGroupValueOffsets[i]
+            this.manualGroupNids[groups] = nid
+            this.manualGroupNTypes[groups] = this.manualGroupNTypes[i]
+            this.manualGroupSchemas[groups] = group
+            this.manualGroupValueOffsets[groups++] = values
+            for (let j = 0; j < group.props.length; j++) {
+                this.manualGroupValues[values++] = this.manualGroupValues[offset++]
+            }
+        }
+        this.manualGroupNids.length = this.manualGroupNTypes.length = this.manualGroupSchemas.length = this.manualGroupValueOffsets.length = groups
+        this.manualGroupValues.length = values
+        this.manualNeedsPrune = false
     }
 
     subscribe(user: User) {
@@ -349,6 +348,7 @@ export class EcsChannel implements IChannel {
         this.manualOpTypes.length = 0
         this.manualOpIndexes.length = 0
         this.manualNeedsCoalesce = false
+        this.manualNeedsPrune = false
         this.skipInterpolationNids.length = 0
         this.broadcastMessages.length = 0
         this.interpolatedBroadcastMessages.length = 0
@@ -357,6 +357,7 @@ export class EcsChannel implements IChannel {
         this.componentsByRoot.clear()
         this.componentByNid.clear()
         this.snapshotVisibilityByUser.clear()
+        this.snapshotVisibilityCache.clear()
         this.visibleNetworkedNidsCache = null
     }
 
@@ -407,6 +408,7 @@ export class EcsChannel implements IChannel {
         this.manualOpTypes.length = 0
         this.manualOpIndexes.length = 0
         this.manualNeedsCoalesce = false
+        this.manualNeedsPrune = false
         this.skipInterpolationNids.length = 0
     }
 

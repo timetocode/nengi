@@ -60,17 +60,15 @@ false sense of coverage.
 Use the Node client adapter for live bot processes:
 
 ```ts
+import { SERVER_TICK_RATE } from '../shared/network-config'
 import { Client } from 'nengi'
 import { WsClientAdapter } from 'nengi-ws-client-adapter'
 
-const bot = new Client(context, WsClientAdapter, serverTickRate)
-const result = await bot.connect(target, { role: 'bot', seed })
-
-if (!result.accepted) {
-    throw result.reason
-}
+const bot = new Client(context, WsClientAdapter, SERVER_TICK_RATE)
+await bot.connect(target, { role: 'bot', seed })
 
 function botStep() {
+    if (bot.connectionState !== 'connected') return
     for (const frame of bot.network.drainFrames()) {
         observeFrame(frame)
     }
@@ -80,7 +78,7 @@ function botStep() {
 }
 ```
 
-The live bot must use the exact Nengi and adapter versions used by the server,
+Record the exact core and compatible adapter versions used by the bot and server,
 and a Node binary backend such as `nengi-buffers`. See [adapters.md](./adapters.md)
 for the pinned installation shape. Use `LocalClientAdapter` and
 `LocalInstanceAdapter` when a deterministic in-memory workload is more useful
@@ -157,7 +155,11 @@ End-to-end bot tests can be limited by bot/client performance. If bots cannot ke
 
 ## Where to look in nengi
 
-Start with `src/performance/README.md` and the performance files in `src/performance`. They are research-oriented and may change, but they show the kinds of dimensions worth testing.
+The npm package contains the application manual and starter. Engine research
+harnesses live only in a nengi source checkout, under `src/performance`; start
+with its `README.md` and `PERFORMANCE.md` there. They record workload definitions,
+hardware, measured achievements and tradeoffs. They are optional references,
+not prerequisites for profiling a game with the steps above.
 
 Use bot/end-to-end tests throughout development for gameplay smoke coverage,
 connection behavior, lifecycle churn, and realistic load. Use synthetic tests

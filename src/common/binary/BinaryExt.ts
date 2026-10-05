@@ -8,7 +8,7 @@ type RegularOrTypedArray = [] | TypedArray
 /**
  * User definable binary type
  */
-type CustomBinarySpecification<T> = {
+export type CustomBinarySpecification<T> = {
     write: (value: any, bw: IBinaryWriter) => void,
     read: (br: IBinaryReader) => T,
     byteSize: (value: any) => number,
@@ -61,8 +61,14 @@ function stringByteLength(str: string): number {
         } else if (code < 0x800) {
             bytes += 2
         } else if (code >= 0xd800 && code <= 0xdbff) {
-            bytes += 4
-            i++
+            const next = str.charCodeAt(i + 1)
+            if (next >= 0xdc00 && next <= 0xdfff) {
+                bytes += 4
+                i++
+            } else {
+                // UTF-8 encoders replace an unpaired surrogate with U+FFFD.
+                bytes += 3
+            }
         } else {
             bytes += 3
         }
@@ -77,6 +83,9 @@ function countString(value: string): number {
 
 const data: Map<Binary, BinarySpecification<any>> = new Map()
 
+/** IDs below this value are reserved for nengi's built-in binary types. */
+export const CUSTOM_BINARY_TYPE_START = 1024
+
 const lerp = function (a: number, b: number, t: number) {
     return a + ((b - a) * t)
 }
@@ -87,20 +96,44 @@ const lerpRot = function (a: number, b: number, t: number) {
     return Math.atan2(s, c)
 }
 
-function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecification<T>) {
+/**
+ * Register one application-owned ID during shared protocol setup, before schemas.
+ * IDs below CUSTOM_BINARY_TYPE_START are reserved; duplicate registrations throw.
+ * Both endpoints must use the same ID and encoding. Returns the schema type value.
+ */
+function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecification<T>): Binary {
+    if (!Number.isSafeInteger(binaryIndex) || binaryIndex < CUSTOM_BINARY_TYPE_START) {
+        throw new RangeError(`Custom binary type IDs must be safe integers at least ${CUSTOM_BINARY_TYPE_START}; lower IDs are reserved for nengi.`)
+    }
+    installBinaryType(binaryIndex, spec)
+    return binaryIndex as Binary
+}
+
+function installBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecification<T>) {
+    if (data.has(binaryIndex)) {
+        throw new Error(`Binary type ${binaryIndex} is already registered. Register each ID once during shared protocol setup.`)
+    }
+    if (!spec || typeof spec !== 'object') {
+        throw new TypeError('A custom binary type requires a specification object.')
+    }
     const { write, read, byteSize, compare, pre, post, interp, clone } = spec
 
-    if (!write) {
+    if (typeof write !== 'function') {
         throw new Error('A custom binary type was declared with no write function. Please declare a function write(value: T, bw: IBinaryWriter) => void that writes your custom binary type to an IBinaryWriter.')
     }
-    if (!read) {
+    if (typeof read !== 'function') {
         throw new Error('A custom binary type was declared with no read function. Please declare a function (reader: IBinaryReader) => T that reads your custom binary type from an IBinaryReader.')
     }
-    if (!byteSize) {
+    if (typeof byteSize !== 'function') {
         throw new Error('A custom binary type was declared with no byteSize function. Please declare a function byteSize(a: T) => number that returns the byte size of your value.')
     }
-    if (!compare) {
+    if (typeof compare !== 'function') {
         throw new Error('A custom binary type was declared with no compare function. Please declare a function compare(a: T, b: T) => boolean that can compare two values of your binary type.')
+    }
+    for (const name of ['pre', 'post', 'interp', 'clone'] as const) {
+        if (spec[name] !== undefined && typeof spec[name] !== 'function') {
+            throw new TypeError(`Custom binary type ${name} must be a function when provided.`)
+        }
     }
 
     data.set(binaryIndex, {
@@ -118,7 +151,7 @@ function declareBinaryType<T>(binaryIndex: number, spec: CustomBinarySpecificati
     })
 }
 
-declareBinaryType<number>(Binary.UInt8, {
+installBinaryType<number>(Binary.UInt8, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeUInt8(value) },
     read: (br: IBinaryReader) => { return br.readUInt8() },
     byteSize: () => { return 1 },
@@ -126,7 +159,7 @@ declareBinaryType<number>(Binary.UInt8, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.Int8, {
+installBinaryType<number>(Binary.Int8, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeInt8(value) },
     read: (br: IBinaryReader) => { return br.readInt8() },
     byteSize: () => { return 1 },
@@ -134,7 +167,7 @@ declareBinaryType<number>(Binary.Int8, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.UInt16, {
+installBinaryType<number>(Binary.UInt16, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeUInt16(value) },
     read: (br: IBinaryReader) => { return br.readUInt16() },
     byteSize: () => { return 2 },
@@ -142,7 +175,7 @@ declareBinaryType<number>(Binary.UInt16, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.Int16, {
+installBinaryType<number>(Binary.Int16, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeInt16(value) },
     read: (br: IBinaryReader) => { return br.readInt16() },
     byteSize: () => { return 2 },
@@ -150,7 +183,7 @@ declareBinaryType<number>(Binary.Int16, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.UInt32, {
+installBinaryType<number>(Binary.UInt32, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeUInt32(value) },
     read: (br: IBinaryReader) => { return br.readUInt32() },
     byteSize: () => { return 4 },
@@ -158,7 +191,7 @@ declareBinaryType<number>(Binary.UInt32, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.Int32, {
+installBinaryType<number>(Binary.Int32, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeInt32(value) },
     read: (br: IBinaryReader) => { return br.readInt32() },
     byteSize: () => { return 4 },
@@ -166,7 +199,7 @@ declareBinaryType<number>(Binary.Int32, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.Float32, {
+installBinaryType<number>(Binary.Float32, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeFloat32(value) },
     read: (br: IBinaryReader) => { return br.readFloat32() },
     byteSize: () => { return 4 },
@@ -174,7 +207,7 @@ declareBinaryType<number>(Binary.Float32, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.Float64, {
+installBinaryType<number>(Binary.Float64, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeFloat64(value) },
     read: (br: IBinaryReader) => { return br.readFloat64() },
     byteSize: () => { return 8 },
@@ -182,7 +215,7 @@ declareBinaryType<number>(Binary.Float64, {
     interp: lerp
 })
 
-declareBinaryType<number>(Binary.Rotation, {
+installBinaryType<number>(Binary.Rotation, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeFloat64(value) },
     read: (br: IBinaryReader) => { return br.readFloat64() },
     byteSize: () => { return 8 },
@@ -190,7 +223,7 @@ declareBinaryType<number>(Binary.Rotation, {
     interp: lerpRot
 })
 
-declareBinaryType<number>(Binary.Rotation32, {
+installBinaryType<number>(Binary.Rotation32, {
     write: (value: number, bw: IBinaryWriter) => { bw.writeFloat32(value) },
     read: (br: IBinaryReader) => { return br.readFloat32() },
     byteSize: () => { return 4 },
@@ -198,7 +231,7 @@ declareBinaryType<number>(Binary.Rotation32, {
     interp: lerpRot
 })
 
-declareBinaryType<string>(Binary.String, {
+installBinaryType<string>(Binary.String, {
     write: (value: string, bw: IBinaryWriter) => { bw.writeString(value) },
     read: (br: IBinaryReader) => { return br.readString() },
     byteSize: countString,
@@ -213,7 +246,7 @@ function compareTypedArray(a: TypedArray, b: TypedArray) {
     return true
 }
 
-declareBinaryType<Uint8Array>(Binary.UInt8Array, {
+installBinaryType<Uint8Array>(Binary.UInt8Array, {
     write: (value: Uint8Array, bw: IBinaryWriter) => { bw.writeUInt8Array(value) },
     read: (br: IBinaryReader) => { return br.readUInt8Array() },
     byteSize: countByteArray,
@@ -221,7 +254,7 @@ declareBinaryType<Uint8Array>(Binary.UInt8Array, {
     clone: (value: Uint8Array) => new Uint8Array(value)
 })
 
-declareBinaryType<Int8Array>(Binary.Int8Array, {
+installBinaryType<Int8Array>(Binary.Int8Array, {
     write: (value: Int8Array, bw: IBinaryWriter) => { bw.writeInt8Array(value) },
     read: (br: IBinaryReader) => { return br.readInt8Array() },
     byteSize: countByteArray,
@@ -229,7 +262,7 @@ declareBinaryType<Int8Array>(Binary.Int8Array, {
     clone: (value: Int8Array) => new Int8Array(value)
 })
 
-declareBinaryType<Uint16Array>(Binary.UInt16Array, {
+installBinaryType<Uint16Array>(Binary.UInt16Array, {
     write: (value: Uint16Array, bw: IBinaryWriter) => { bw.writeUInt16Array(value) },
     read: (br: IBinaryReader) => { return br.readUInt16Array() },
     byteSize: count2ByteArray,
@@ -237,7 +270,7 @@ declareBinaryType<Uint16Array>(Binary.UInt16Array, {
     clone: (value: Uint16Array) => new Uint16Array(value)
 })
 
-declareBinaryType<Int16Array>(Binary.Int16Array, {
+installBinaryType<Int16Array>(Binary.Int16Array, {
     write: (value: Int16Array, bw: IBinaryWriter) => { bw.writeInt16Array(value) },
     read: (br: IBinaryReader) => { return br.readInt16Array() },
     byteSize: count2ByteArray,
@@ -245,7 +278,7 @@ declareBinaryType<Int16Array>(Binary.Int16Array, {
     clone: (value: Int16Array) => new Int16Array(value)
 })
 
-declareBinaryType<Uint32Array>(Binary.UInt32Array, {
+installBinaryType<Uint32Array>(Binary.UInt32Array, {
     write: (value: Uint32Array, bw: IBinaryWriter) => { bw.writeUInt32Array(value) },
     read: (br: IBinaryReader) => { return br.readUInt32Array() },
     byteSize: count4ByteArray,
@@ -253,7 +286,7 @@ declareBinaryType<Uint32Array>(Binary.UInt32Array, {
     clone: (value: Uint32Array) => new Uint32Array(value)
 })
 
-declareBinaryType<Int32Array>(Binary.Int32Array, {
+installBinaryType<Int32Array>(Binary.Int32Array, {
     write: (value: Int32Array, bw: IBinaryWriter) => { bw.writeInt32Array(value) },
     read: (br: IBinaryReader) => { return br.readInt32Array() },
     byteSize: count4ByteArray,
@@ -261,7 +294,7 @@ declareBinaryType<Int32Array>(Binary.Int32Array, {
     clone: (value: Int32Array) => new Int32Array(value)
 })
 
-declareBinaryType<Float32Array>(Binary.Float32Array, {
+installBinaryType<Float32Array>(Binary.Float32Array, {
     write: (value: Float32Array, bw: IBinaryWriter) => { bw.writeFloat32Array(value) },
     read: (br: IBinaryReader) => { return br.readFloat32Array() },
     byteSize: count4ByteArray,
@@ -269,7 +302,7 @@ declareBinaryType<Float32Array>(Binary.Float32Array, {
     clone: (value: Float32Array) => new Float32Array(value)
 })
 
-declareBinaryType<Float64Array>(Binary.Float64Array, {
+installBinaryType<Float64Array>(Binary.Float64Array, {
     write: (value: Float64Array, bw: IBinaryWriter) => { bw.writeFloat64Array(value) },
     read: (br: IBinaryReader) => { return br.readFloat64Array() },
     byteSize: count8ByteArray,
@@ -277,7 +310,7 @@ declareBinaryType<Float64Array>(Binary.Float64Array, {
     clone: (value: Float64Array) => new Float64Array(value)
 })
 
-declareBinaryType<boolean>(Binary.Boolean, {
+installBinaryType<boolean>(Binary.Boolean, {
     write: (value: any, bw: IBinaryWriter) => { bw.writeUInt8(value ? 1 : 0) },
     read: (br: IBinaryReader) => { return 1 === br.readUInt8() },
     byteSize: () => { return 1 },
@@ -286,7 +319,7 @@ declareBinaryType<boolean>(Binary.Boolean, {
 
 type Vector2 = { x: number, y: number }
 
-declareBinaryType<Vector2>(Binary.Vector2, {
+installBinaryType<Vector2>(Binary.Vector2, {
     write: (value: Vector2, bw: IBinaryWriter) => {
         const { x, y } = value
         bw.writeFloat64(x)
@@ -318,7 +351,7 @@ declareBinaryType<Vector2>(Binary.Vector2, {
 
 type Vector3 = { x: number, y: number, z: number }
 
-declareBinaryType<Vector3>(Binary.Vector3, {
+installBinaryType<Vector3>(Binary.Vector3, {
     write: (value: Vector3, bw: IBinaryWriter) => {
         const { x, y, z } = value
         bw.writeFloat64(x)
@@ -352,7 +385,7 @@ declareBinaryType<Vector3>(Binary.Vector3, {
 
 type Vector4 = { x: number, y: number, z: number, w: number }
 
-declareBinaryType<Vector4>(Binary.Vector4, {
+installBinaryType<Vector4>(Binary.Vector4, {
     write: (value: Vector4, bw: IBinaryWriter) => {
         const { x, y, z, w } = value
         bw.writeFloat64(x)
@@ -470,7 +503,7 @@ function quatSlerp(a: Quaternion, b: Quaternion, t: number) {
 
 type Quaternion = { x: number, y: number, z: number, w: number }
 
-declareBinaryType<Quaternion>(Binary.Quaternion, {
+installBinaryType<Quaternion>(Binary.Quaternion, {
     write: (value: Quaternion, bw: IBinaryWriter) => {
         const { x, y, z, w } = value
         bw.writeFloat64(x)

@@ -1,5 +1,3 @@
-import { NQueue } from '../NQueue'
-
 type Tick = number
 type Command = any
 
@@ -11,36 +9,20 @@ export type CommandTimingMetadata = {
     viewServerTimeMs: number
 }
 
-type ClientFrame = {
-    tick: number,
-    outboundCommands: NQueue<Command>
-    outboundEngineCommands: NQueue<Command>
-    unconfirmedCommands: NQueue<Command>
-}
-
 // used for the first frames, never has anything in it
 const emptyArr: any[] = []
 
 export class Outbound {
-    unconfirmedCommands: Map<Tick, Command[]>
     outboundEngineCommands: Map<Tick, Command[]>
     outboundCommands: Map<Tick, Command[]>
     outboundCommandTiming: Map<Tick, CommandTimingMetadata[]>
     tick: number
-    confirmedTick: number
-    lastSentTick: number
-
-    currentFrame: null | ClientFrame
 
     constructor() {
-        this.unconfirmedCommands = new Map()
         this.outboundEngineCommands = new Map()
         this.outboundCommands = new Map()
         this.outboundCommandTiming = new Map()
         this.tick = 0
-        this.currentFrame = null
-        this.confirmedTick = -1
-        this.lastSentTick = -1
     }
 
     getCurrentFrame() {
@@ -64,23 +46,17 @@ export class Outbound {
 
     addCommand(command: Command) {
         const tick = this.tick
-        if (this.outboundCommands.has(tick)) {
-            this.outboundCommands.get(tick)!.push(command)
-        } else {
-            this.outboundCommands.set(tick, [command])
+        const commands = this.outboundCommands.get(tick)
+        if (commands) {
+            return commands.push(command) - 1
         }
-        if (!this.unconfirmedCommands.has(tick)) {
-            this.unconfirmedCommands.set(tick, [command])
-        } else {
-            this.unconfirmedCommands.get(tick)!.push(command)
-        }
+        this.outboundCommands.set(tick, [command])
+        return 0
     }
 
     addCommandWithTiming(command: Command, metadata: Omit<CommandTimingMetadata, 'commandIndex'>) {
         const tick = this.tick
-        const commands = this.outboundCommands.get(tick)
-        const commandIndex = commands ? commands.length : 0
-        this.addCommand(command)
+        const commandIndex = this.addCommand(command)
         const timing = this.outboundCommandTiming.get(tick)
         const entry = {
             commandIndex,
@@ -94,22 +70,7 @@ export class Outbound {
         } else {
             this.outboundCommandTiming.set(tick, [entry])
         }
-    }
-
-    getEngineCommands(tick: Tick) {
-        if (this.outboundEngineCommands.has(tick)) {
-            return this.outboundEngineCommands.get(tick)!
-        } else {
-            return emptyArr
-        }
-    }
-
-    getCommands(tick: Tick) {
-        if (this.outboundCommands.has(tick)) {
-            return this.outboundCommands.get(tick)!
-        } else {
-            return emptyArr
-        }
+        return commandIndex
     }
 
     getCommandTiming(tick: Tick) {
@@ -118,19 +79,6 @@ export class Outbound {
         } else {
             return emptyArr
         }
-    }
-
-    confirmCommands(confirmedTick: Tick) {
-        this.unconfirmedCommands.forEach((commandQueue, tick) => {
-            if (tick <= confirmedTick) {
-                this.unconfirmedCommands.delete(tick)
-            }
-        })
-        this.confirmedTick = confirmedTick
-    }
-
-    getUnconfirmedCommands() {
-        return this.unconfirmedCommands
     }
 
     flush() {

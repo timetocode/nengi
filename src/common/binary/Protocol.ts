@@ -9,7 +9,7 @@ type ProtocolConfig = {
     ntypeType: NetworkIdType
 }
 
-const WIRE_PROTOCOL_VERSION = 1
+const WIRE_PROTOCOL_VERSION = 2
 
 const DEFAULT_PROTOCOL: ProtocolConfig = {
     nidType: Binary.UInt8,

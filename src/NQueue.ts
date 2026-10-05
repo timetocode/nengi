@@ -1,4 +1,5 @@
 export class NQueue<T> {
+    /** @internal Mutable queue storage bypasses removal accounting. */
     arr: T[]
 
     constructor(private readonly onRemove?: (item: T) => void) {
@@ -9,6 +10,7 @@ export class NQueue<T> {
         return this.arr.length === 0
     }
 
+    /** @internal Only the engine produces network events. */
     enqueue(item: T) {
         this.arr.unshift(item)
     }

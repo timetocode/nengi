@@ -12,6 +12,7 @@ import { SpatialGrid2D, SpatialGridCell } from './SpatialGrid'
 import { getSpatialPlaneAxes, normalizeSpatialView, objectInSpatialView, SpatialPlane, SpatialPlaneAxes, SpatialView } from './SpatialView'
 import { ChannelSnapshotOutput } from './ChannelSnapshotOutput'
 import { createCellFragmentChannelOutput } from './CellFragmentChannelOutput'
+import type { CellEntityFragment } from '../../binary/snapshot/cellEntityFragments'
 import {
     appendManualGroup,
     appendManualProp,
@@ -46,12 +47,15 @@ type Manual2DVisibilityGroup = {
 
 type Manual2DVisibilityPlan = {
     tick: number
+    entityTreeVersion: number
     groups: Manual2DVisibilityGroup[]
     userSnapshots: Map<number, Manual2DSnapshotVisibility>
+    cellUpdateFragments?: Map<string, CellEntityFragment>
 }
 
 type Manual2DVisibilityState = {
     cellSignature: string
+    entityTreeVersion: number
     visibleRef: number[]
     visibleSet: Set<number>
 }
@@ -130,8 +134,13 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private visibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
-    private rememberedCells: Map<number, Map<string, number[]>> = new Map()
+    private rememberedCells: Map<number, Map<string, readonly number[]>> = new Map()
     private rememberedCellSignatures: Map<number, string> = new Map()
+    private cellDeleteNids = new WeakMap<SpatialGridCell<SpatialEntity>, {
+        cellVersion: number
+        entityTreeVersion: number
+        nids: readonly number[]
+    }>()
     private spatialXProp: string
     private spatialYProp: string
     plane: SpatialPlane
@@ -372,6 +381,8 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         const state = this.visibilityStateByUser.get(user.id)
         if (state && state.visibleRef === group.visibleNids) {
             if (!group.stableSnapshot) {
+                // Unchanged membership can lend its read-only set to update filtering.
+                group.visibleNidSet ??= state.visibleSet
                 group.stableSnapshot = {
                     toCreate: EMPTY_NIDS,
                     toUpdate: EMPTY_NIDS,
@@ -387,8 +398,11 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             return group.stableSnapshot
         }
 
-        if (state && state.cellSignature === group.cellSignature && !this.hasVisibilityCellMove(group)) {
+        if (state && state.cellSignature === group.cellSignature &&
+            state.entityTreeVersion === this.localState.entityTreeVersion && !this.hasVisibilityCellMove(group)) {
             if (!group.stableSnapshot) {
+                // Unchanged membership can lend its read-only set to update filtering.
+                group.visibleNidSet ??= state.visibleSet
                 group.stableSnapshot = {
                     toCreate: EMPTY_NIDS,
                     toUpdate: EMPTY_NIDS,
@@ -492,16 +506,23 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         return { keys, nids }
     }
 
-    private getCellDeleteNids(key: string) {
-        const nids: number[] = []
+    private getCellDeleteNids(key: string): readonly number[] {
         const cell = this.grid.cells.get(key)
-        if (!cell) {
-            return nids
+        if (!cell) return []
+
+        const entityTreeVersion = this.localState.entityTreeVersion
+        const cached = this.cellDeleteNids.get(cell)
+        if (cached && cached.cellVersion === cell.version && cached.entityTreeVersion === entityTreeVersion) {
+            return cached.nids
         }
 
+        // Replace the result: subscribers can still retain the previous version.
+        // The WeakMap does not retain cells after the grid releases them.
+        const nids: number[] = []
         for (let i = 0; i < cell.ids.length; i++) {
             this.localState.collectEntityTreeDeletes(cell.ids[i], nids)
         }
+        this.cellDeleteNids.set(cell, { cellVersion: cell.version, entityTreeVersion, nids })
         return nids
     }
 
@@ -646,6 +667,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     clearSnapshotDeltas() {
+        this.clearVisibilityPlan()
         this.clearPendingWrites()
         for (const key of this.dirtyCells) {
             const cell = this.grid.cells.get(key) as Cell
@@ -813,7 +835,8 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
 
     private getVisibleCellVersionSignature(userId: number) {
         const keys = this.getVisibleCellKeys(userId)
-        let signature = ''
+        // Cell versions restart on recreation; child changes live outside the grid.
+        let signature = `${this.membershipVersion}:${this.localState.entityTreeVersion}|`
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i]
             signature += `${key}:${this.getCellVersion(key)}|`
@@ -862,7 +885,9 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
 
     prepareVisibilityPlan(tick: number) {
         this.flushPendingWrites()
-        if (this.visibilityPlan && this.visibilityPlan.tick === tick) {
+        const entityTreeVersion = this.localState.entityTreeVersion
+        if (this.visibilityPlan && this.visibilityPlan.tick === tick &&
+            this.visibilityPlan.entityTreeVersion === entityTreeVersion) {
             return this.visibilityPlan
         }
 
@@ -896,7 +921,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
             }
         }
 
-        this.visibilityPlan = { tick, groups, userSnapshots }
+        this.visibilityPlan = { tick, entityTreeVersion, groups, userSnapshots }
         return this.visibilityPlan
     }
 
@@ -930,13 +955,16 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
     }
 
     rememberVisibleCells(userId: number) {
-        const remembered = new Map<string, number[]>()
+        const signature = this.getVisibleCellVersionSignature(userId)
+        if (this.rememberedCellSignatures.get(userId) === signature) return
+
+        const remembered = new Map<string, readonly number[]>()
         const keys = this.getVisibleCellKeys(userId)
         for (let i = 0; i < keys.length; i++) {
             remembered.set(keys[i], this.getCellDeleteNids(keys[i]))
         }
         this.rememberedCells.set(userId, remembered)
-        this.rememberedCellSignatures.set(userId, this.getVisibleCellVersionSignature(userId))
+        this.rememberedCellSignatures.set(userId, signature)
     }
 
     rememberSnapshotVisibility(userId: number, visibility?: Manual2DSnapshotVisibility) {
@@ -944,6 +972,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         if (visibility?.nextCellSignature && visibility.nextVisibleRef && visibility.nextVisibleSet) {
             this.visibilityStateByUser.set(userId, {
                 cellSignature: visibility.nextCellSignature,
+                entityTreeVersion: this.localState.entityTreeVersion,
                 visibleRef: visibility.nextVisibleRef,
                 visibleSet: visibility.nextVisibleSet
             })
@@ -952,6 +981,7 @@ export class ManualChannel2D implements ICulledChannel<SpatialEntity, SpatialVie
         const visibleRef = this.getVisibleNetworkedNids(userId)
         this.visibilityStateByUser.set(userId, {
             cellSignature: this.getVisibleCellKeySignature(userId),
+            entityTreeVersion: this.localState.entityTreeVersion,
             visibleRef,
             visibleSet: new Set(visibleRef)
         })

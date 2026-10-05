@@ -1,8 +1,8 @@
 import { User } from '../../server/User'
 import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
-import { SnapshotPlan } from './SnapshotPlan'
+import { ReadonlySnapshotPlan } from './SnapshotPlan'
 
-export function commitSnapshotPlan(user: User, plan: SnapshotPlan) {
+export function commitSnapshotPlan(user: User, plan: ReadonlySnapshotPlan) {
     for (let i = 0; i < plan.channelCloses.length; i++) {
         user.knownChannelIds.delete(plan.channelCloses[i].channelId)
         user.knownChannelHeaderVersions.delete(plan.channelCloses[i].channelId)

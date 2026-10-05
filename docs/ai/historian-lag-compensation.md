@@ -54,8 +54,25 @@ const history = new Historian2D({
 })
 ```
 
-The index accelerates nearest-frame spatial queries without changing query
-results. Interpolated queries synthesize samples between retained frames while
+The index accelerates nearest-frame spatial queries while preserving their hit
+sets. Large query boxes use the frame's existing sample list when visiting grid
+cells would cost more work. Recording also bounds index entries relative to the
+number of samples: a frame with oversized hitboxes can remain unindexed, keeping
+all of its samples. Later frames can use the index again. `retainedIndexCells` in
+`getStats()` reports retained index storage; `spatialIndex` reports the configured
+mode, even when a frame falls back.
+
+Set `cellSize` to a finite positive number. Invalid or incomplete grid settings
+throw at construction. Positive sizes below 1 retain the existing minimum of 1.
+Index work also falls back when cell coordinates cannot advance safely with
+JavaScript numbers. These work bounds do not make arbitrary world scales
+numerically precise: use finite positions, finite nonnegative geometry extents,
+and sensible game-specific coordinate and weapon ranges. The historian does not
+validate whether a player's aim or chosen rewind is legal.
+
+Circle/sphere and AABB result order is unspecified. Rays are sorted by distance;
+if equal-distance hits require a deterministic tie rule, apply it in game code.
+Interpolated queries synthesize samples between retained frames while
 preserving the same temporal value and existence rules.
 
 Use `Historian2D` for 2D or projected-plane gameplay. Use `Historian3D` for true
@@ -181,7 +198,7 @@ A typical arena shooter can follow this shape:
 
 1. Process the player's movement command.
 2. Run weapon simulation and ammo prediction logic.
-3. Build a ray from the player's current raw position to the command aim point.
+3. Build a ray from the player's current raw position toward validated aim, limited to the weapon's range.
 4. Query historical target hitboxes at the command's view time.
 5. Apply damage if the historical target sample intersects the ray.
 6. Send a shot message that includes a debug ghost of the historical hitbox.
@@ -199,12 +216,21 @@ const queryTimeMs = getCommandViewTimeMs(timing, {
     maxRewindMs
 })
 
+// Aim comes from the client. Validate before spending ammo or applying damage.
+// weaponRange is a finite positive distance from the server's weapon definition.
+const dx = command.aimX - shooter.rawX
+const dy = command.aimY - shooter.rawY
+const aimDistance = Math.hypot(dx, dy)
+if (!Number.isFinite(dx) || !Number.isFinite(dy) ||
+    !Number.isFinite(aimDistance) || aimDistance === 0) return
+const scale = Math.min(1, weaponRange / aimDistance)
+
 const hit = history.queryRayNearest(
     queryTimeMs,
     shooter.rawX,
     shooter.rawY,
-    command.aimX,
-    command.aimY
+    shooter.rawX + dx * scale,
+    shooter.rawY + dy * scale
 ).find(candidate => candidate.sample.nid !== shooter.nid)
 
 if (hit) {
@@ -283,7 +309,7 @@ For games that do not care about trades or post-death interactions, the rule can
 be simple:
 
 ```ts
-const hit = history.queryRayNearest(...)
+const hit = history.queryRayNearest(...).find(candidate => candidate.sample.nid !== shooter.nid)
 const target = hit ? entitiesByNid.get(hit.sample.nid) : undefined
 if (!target || target.state !== 'alive') {
     return

@@ -136,10 +136,11 @@ import {
     EcsWorld,
     Instance,
     NetworkEvent,
-    User,
+    UserConnectionState,
     bindEcsChannel,
     ecs
 } from 'nengi'
+import type { User } from 'nengi'
 
 const context = createContext()
 const instance = new Instance(context)
@@ -202,7 +203,7 @@ function tick() {
     while (!instance.queue.isEmpty()) {
         const event = instance.queue.next()
         if (event.type === NetworkEvent.UserConnected) {
-            spawnPlayer(event.user)
+            if (event.user.connectionState === UserConnectionState.Open) spawnPlayer(event.user)
         } else if (event.type === NetworkEvent.UserDisconnected) {
             removePlayer(event.user)
         } else {
@@ -211,9 +212,6 @@ function tick() {
     }
 
     instance.processRequests()
-    for (const user of instance.users.values()) {
-        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
-    }
     instance.step()
 }
 ```
@@ -243,6 +241,7 @@ before a replacement can reuse their ids. Keep presentation code outside the
 network applier.
 
 ```ts
+import { SERVER_TICK_RATE } from '../shared/network-config'
 import {
     Client,
     EcsWorld,
@@ -252,7 +251,7 @@ import {
 } from 'nengi'
 import type { Frame } from 'nengi'
 
-const client = new Client(context, WebSocketClientAdapter, serverTickRate)
+const client = new Client(context, WebSocketClientAdapter, SERVER_TICK_RATE)
 const world = new EcsWorld()
 const channelByName = new Map<string, number>()
 const networkRoots = new Set<number>()
@@ -272,9 +271,8 @@ function clearNetworkSession() {
 }
 
 client.setDisconnectHandler(clearNetworkSession)
-client.setWebsocketErrorHandler(error => console.error('Network error', error))
-const connection = await client.connect('ws://localhost:8079')
-connected = connection.accepted
+await client.connect('ws://localhost:8079')
+connected = client.connectionState === 'connected'
 
 function applyNetworkFrame(frame: Frame) {
     frame.closedChannels.forEach(channel => {
@@ -409,7 +407,7 @@ Do not confuse these two. Parent/child is useful for scenegraph-like or object-w
 
 ECS channels are manual. If a component changes and game code does not call the component writer, nengi will not send the update.
 
-For the fast spatial ECS paths, create the root before adding its components.
+For plain and spatial ECS channels, create the root before adding its components.
 Arrange structural changes so that each newly created root or component survives
 its first server snapshot; remove it in a subsequent tick. Decide whether a
 temporary object is needed before allocating network identity. These lifetime
@@ -420,6 +418,11 @@ been written that tick. Other live components' writes must still arrive correctl
 If game logic can decide removals before producing manual writes, do so to avoid
 generating updates that will be discarded. Do not depend on same-tick creation
 and cancellation as part of the fast-channel contract.
+
+Plain `EcsChannel` discards already queued writes for removed components once
+before producing subscriber snapshots. This also contains a cancelled create
+that has no visible create/delete pair. It does not make a removed component's
+raw writer handle valid again. Prefer bound mutators for lifecycle validation.
 
 Do not call component writers with draft components that have not been added to
 the channel. A component with `nid: 0` is not networked. After a successful

@@ -1,3 +1,4 @@
+import { TestClientTransport } from '../../testSupport/ClientTransport'
 import { Binary } from '../../common/binary/Binary'
 import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { Context } from '../../common/Context'
@@ -10,11 +11,6 @@ import { AABB2D } from '../../server/channel/AABB2D'
 import { AABB3D } from '../../server/channel/AABB3D'
 import { testBinaryAdapter } from '../../testSupport/BufferBinary'
 
-class ClientAdapter {
-    binary = testBinaryAdapter
-    connect() { return Promise.resolve({ accepted: true }) }
-    flush() {}
-}
 
 function setup(dimensions: number, shared: boolean) {
     const context = new Context()
@@ -30,12 +26,12 @@ function setup(dimensions: number, shared: boolean) {
         const user = new User(undefined, { binary: testBinaryAdapter, send: jest.fn(), disconnect: jest.fn() } as any)
         user.id = id
         user.instance = instance
-        instance.users.set(id, user)
+        instance.connectedUsers.set(id, user)
         if (channel instanceof EcsChannel2D) channel.subscribe(user, new AABB2D(5, 5, 4, 4))
         else channel.subscribe(user, new AABB3D(5, 5, 5, 4, 4, 4))
         return user
     })
-    const clients = users.map(() => new Client(context, ClientAdapter, 20))
+    const clients = users.map(() => new Client(context, TestClientTransport, 20))
     const transform = (pid: number, spatial = true) => channel.addComponent(pid, {
         nid: 0, ntype: 1, x: 5, y: 5, z: 5
     }, { spatial })
@@ -46,7 +42,7 @@ function setup(dimensions: number, shared: boolean) {
             const buffer = send.mock.calls[send.mock.calls.length - 1][1]
             // Let malformed output fail this test directly rather than taking
             // the production decoder's disconnect/diagnostics path.
-            client.network.readSnapshotUnsafe(testBinaryAdapter.createReader(buffer))
+            client.network.readSnapshot(testBinaryAdapter.createReader(buffer))
             return client.network.processNextFrame()!
         })
     }

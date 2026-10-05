@@ -19,7 +19,8 @@ export type ChannelSnapshotStats = {
 export type ChannelSnapshotOutput = {
     channelId: number
     bytes: number
-    stats: ChannelSnapshotStats
+    /** Available when InstanceNetwork.snapshotPerformanceEnabled is enabled. */
+    stats: ChannelSnapshotStats | null
     write(writer: IBinaryWriter, options?: SnapshotChunkWriteOptions): void
     commit(): void
 }
@@ -27,7 +28,7 @@ export type ChannelSnapshotOutput = {
 export function createChunkedChannelSnapshotOutput(options: {
     channelId: number
     chunks: SnapshotChunk[]
-    stats: ChannelSnapshotStats
+    stats: ChannelSnapshotStats | null
     commit?: () => void
 }): ChannelSnapshotOutput {
     const chunks = options.chunks

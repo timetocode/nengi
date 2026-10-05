@@ -1,0 +1,1042 @@
+{
+  "provenance": "Final rc.128 release artifacts frozen 2026-10-05 for first publication; client contract 2 and server contract 1. Supersedes the preserved unpublished bootstrap, which predates the close-race fix and final documentation.",
+  "artifacts": [
+    {
+      "name": "nengi",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi",
+        "version": "2.0.0-rc.128",
+        "description": "High-performance realtime multiplayer networking for TypeScript games.",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "files": [
+          "build",
+          "docs/ai",
+          "CHANGELOG.md",
+          "examples/basic-movement/README.md",
+          "examples/basic-movement/package.json",
+          "examples/basic-movement/tsconfig.json",
+          "examples/basic-movement/protocol.ts",
+          "examples/basic-movement/game.ts",
+          "examples/basic-movement/server.ts",
+          "examples/basic-movement/client-state.ts",
+          "examples/basic-movement/client.ts",
+          "examples/basic-movement/dev.ts",
+          "examples/basic-movement/index.html",
+          "examples/basic-movement/style.css"
+        ],
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "scripts": {
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "test": "jest",
+          "build": "npm run clean && tsc",
+          "build:family": "node scripts/build-package-family.mjs",
+          "test:family": "node scripts/test-package-family.mjs",
+          "typecheck": "tsc --project tsconfig.test.json",
+          "verify:docs": "node scripts/verify-ai-docs.mjs",
+          "verify:release": "node scripts/verify-release.mjs",
+          "release:check": "npm run lint && npm run typecheck && npm run test:release && npm run test:family && npm run build:family && npm run verify:docs && npm run verify:release",
+          "release:login": "node scripts/npm-login.mjs",
+          "release:publish": "node scripts/publish-package-family.mjs",
+          "release:publish:dry-run": "node scripts/publish-package-family.mjs --dry-run",
+          "prepack": "npm run build",
+          "profile:snapshot": "node --import tsx src/performance/SnapshotPipeline.performance.ts",
+          "profile:history": "node --expose-gc --import tsx src/performance/ClientHistory.performance.ts",
+          "profile:history:browser": "node scripts/profile-client-history-browser.mjs",
+          "lint": "npx eslint . --config .eslintrc.js",
+          "lintfix": "npx eslint . --fix --config .eslintrc.js",
+          "test:release": "node --test scripts/package-policy.test.mjs scripts/check-public-docs.test.mjs",
+          "test:compatibility": "node scripts/test-adapter-compatibility.mjs",
+          "release:locks": "node scripts/prepare-release-locks.mjs"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.3",
+          "@types/node": "^20.4.8",
+          "@typescript-eslint/eslint-plugin": "^6.2.1",
+          "@typescript-eslint/parser": "^6.2.1",
+          "eslint": "^8.46.0",
+          "jest": "^29.6.2",
+          "ts-jest": "^29.1.1",
+          "tsx": "^4.22.4",
+          "typescript": "^5.9.3",
+          "semver": "^7.6.0"
+        },
+        "overrides": {
+          "minimatch": "^9.0.7"
+        }
+      },
+      "integrity": "sha512-f4o81iZucS9CKSoAvJAgva2dvXCxH+9xyNbU8sN+fRqkzMLbsZbrmW9mFwjyMZTZ94yljfpWtx8P+C/VIBJD1Q==",
+      "file": "nengi-2.0.0-rc.128.tgz",
+      "files": {
+        "build/binary/assertBinaryWriteSize.d.ts": "6275b6a8ded807fe4e7fcec8e6e39c4c8367ff6fc14d3347afe5c5fa8bc9e58d",
+        "build/binary/assertBinaryWriteSize.d.ts.map": "828b70b6ab8c1b1694f7aaf5cc99e86f221aa4036a6e8913e4ba3ae884ac34ad",
+        "build/binary/assertBinaryWriteSize.js": "644b243ed88db264fe82ba5668758601c6db6de07f26b16addd56bcfc19d6f5d",
+        "build/binary/BinaryDiagnosticError.d.ts": "0d9354dd4a4cd5e947971f481aa06aa670fec3a024cd4987ba1082efe1a06dfb",
+        "build/binary/BinaryDiagnosticError.d.ts.map": "d4db1cbf9a8fe7c9548eb2804f9a08a68206e65da4dc392128733d5ac4838096",
+        "build/binary/BinaryDiagnosticError.js": "5bfb2f4e79eef28a4ed93321fd03b6357d932a1f1d6246f790b33efb351a8375",
+        "build/binary/endpoint/EndpointPayload.d.ts": "d1ee77d5e39a9fae083ac1306a2b5d76d173e7ceb9486c04e758f7b65240b8d8",
+        "build/binary/endpoint/EndpointPayload.d.ts.map": "44ebfd231bb9503c5df10cb60bc556bdb88927533f47f0f5c638107177404e78",
+        "build/binary/endpoint/EndpointPayload.js": "13566e3d35b6354739241a3b44576b151569936933c52faceb9a631bedd3141b",
+        "build/binary/entity/countDiff.d.ts": "82fea6a49ddc7d38ae57d2ac72828c241147001af0ce295a2d6e26c84eff6853",
+        "build/binary/entity/countDiff.d.ts.map": "ac8acbf49a44ab226d033f55aca6d16c10414b85315c8fdaffa6bf29b56e87f4",
+        "build/binary/entity/countDiff.js": "95526e7262ecd34ff2acd396136a04e36005bde9686f9434bae4bce254bc7f03",
+        "build/binary/entity/countEntity.d.ts": "36543d6056437313c3a6b15d484a15646ce2004cc1fd6491f46a56c1a7689b62",
+        "build/binary/entity/countEntity.d.ts.map": "dccac54558d6c16a414647e7948be6ef79adb34e4977a5d419f27af11f4e8932",
+        "build/binary/entity/countEntity.js": "b2458c5c715a68083c60352a3c88711d0e1da8713fe987a36bba70c1761d1e87",
+        "build/binary/entity/countUpdateGroup.d.ts": "194cf0d0fb1b03ee9a6214a9aaaad6e564dcf17d2ae770388bce0dd453edd85e",
+        "build/binary/entity/countUpdateGroup.d.ts.map": "48a97008c00fa90a67d71b8f570af2caca4346ae063d6e114f0e25d55b82b281",
+        "build/binary/entity/countUpdateGroup.js": "57c35badac16555f746ac5cf5534aead25b02ab8699b0ba80a6d46016cd5efec",
+        "build/binary/entity/readDiff.d.ts": "00750f0808a0e7889feb5d33425e44ef4bf64b82a07dd0472210213f88500473",
+        "build/binary/entity/readDiff.d.ts.map": "7688d6956d18e5c9f5084072ac1d4da06eea241662ab93765af7e945c4b9bc78",
+        "build/binary/entity/readDiff.js": "174a27da2067d8c24bf2a2b0c33f5de48d0cdd7ca4b7322bc472555fb769b2b7",
+        "build/binary/entity/readEntity.d.ts": "968638d2c545a59197a1e1bebfe7ebe4ddedb9c4906d7d5b7090013fac7d4568",
+        "build/binary/entity/readEntity.d.ts.map": "5cb28b1185db1b32cbed109bcee4ab8c6bc5dd7b37bf7d41696518c64926f65a",
+        "build/binary/entity/readEntity.js": "95e8b843cb796c8c07dfbcd96c48962659614934a631486dff6d6afdbd8e4d68",
+        "build/binary/entity/readUpdateGroup.d.ts": "b980b3d7cdca5ef1949c89d002303680b9fdaaf46bd8fbe0ca65b0918a392f6b",
+        "build/binary/entity/readUpdateGroup.d.ts.map": "3013a70525f850d93423c66c333c852ef40c612989882401da686b48b2ff7b74",
+        "build/binary/entity/readUpdateGroup.js": "9b91a673ea218fffbe54b612a158f9966e82acb57ba231ae1fe8871e107c53dd",
+        "build/binary/entity/writeDiff.d.ts": "9b722f649b6b489eef5eaa2592eb30b7292d4eb0b8dac8af29b1587595f382e9",
+        "build/binary/entity/writeDiff.d.ts.map": "f5095463590533b1843385e40022a3d0b866be18f668ca27d8e92708b3976204",
+        "build/binary/entity/writeDiff.js": "d1b55ca8909a2447ebd0d4dd688ff846699201ba380a1948e9d01607ffad64c2",
+        "build/binary/entity/writeEntity.d.ts": "7ccb132cd59519190681d9a2f0ca52ad47a4ba48e89cad2dbb66d1561b9d2d96",
+        "build/binary/entity/writeEntity.d.ts.map": "ddd63c5577bc1b952bb25101a8c92e193723f8e1e6082a08cc148162d8e8a3b7",
+        "build/binary/entity/writeEntity.js": "5d12c0c61fde4d4d92acd0c42ca7d581e99580bb97efc75b856cbfec8c6b42e1",
+        "build/binary/entity/writeUpdateGroup.d.ts": "328b868ddb2192dccc2e2b7cd6dd513bb72a90f57a26f3d53817e732fa167130",
+        "build/binary/entity/writeUpdateGroup.d.ts.map": "6b6b66d8d3a45f9a8367fccbdb736573726b6fbdf2f0c1372c39957eb16b0b4c",
+        "build/binary/entity/writeUpdateGroup.js": "13948336c5cc0d998f2e7de07220cd4a573105b7b524eb23c9ce5cd9e598cb15",
+        "build/binary/message/count.d.ts": "27763194c85c9c2c4adad1f3a007d3a975263981252fcb1e9188e98b24ce3904",
+        "build/binary/message/count.d.ts.map": "806fed7cd277959c11c1a8109dca250af5395c31247dfef91fa7f5889adf7ab4",
+        "build/binary/message/count.js": "d0d4aa00e104387a0260c3feda6e57e7d43330ad2feb129c1b80ab5039f32293",
+        "build/binary/message/readEngineMessage.d.ts": "7d47e42e8e1e37920661bf46d59b70409ad2361db2d46afeebe7f3a493bea06c",
+        "build/binary/message/readEngineMessage.d.ts.map": "0c6999dd5732e8632f64a735bfc302caf3027cc4e8b6d884eaa6dac99d375294",
+        "build/binary/message/readEngineMessage.js": "a79bdf6347e6b9456c41c6214a2c2c95fc1d1f15b4dc38df513831ce70e1011f",
+        "build/binary/message/readMessage.d.ts": "37c174d689a433a37848dbc959608df8caa68d4b45d42bdcc420551b8368743e",
+        "build/binary/message/readMessage.d.ts.map": "adcb2be50ab8e33e2c1979653b5d7894104b14d5cf87d64d0bf6496711f38a6b",
+        "build/binary/message/readMessage.js": "620b395aea7b362a54ed20a7e509057bfeb1a2aebaa11a371bb4261715439722",
+        "build/binary/message/writeMessage.d.ts": "a4498b4a55dd268f05b7210be9ae0197bc9b2543a4a1d9b04dbd204fb85b7608",
+        "build/binary/message/writeMessage.d.ts.map": "23d028c73d8e69bbfbae1dbe1e62d42dbcb25689e3e963a712c09a3fa62d6cda",
+        "build/binary/message/writeMessage.js": "83de7a26ab565851e9f485d1bc35c225d9b1531acf0c440749eb5ca955c870d0",
+        "build/binary/snapshot/cellEntityFragments.d.ts": "5a4ace5f9e39ac54c0e6a9fdc120f98930450d06c9a8478bcfd09aa79e9200f5",
+        "build/binary/snapshot/cellEntityFragments.d.ts.map": "87ae74867e90974f54c015fba9acf004b4c0f67f1529d5850f98a0750501ae17",
+        "build/binary/snapshot/cellEntityFragments.js": "a9cdd468f8dde5d35b5d6d181651c86131ffc958cc2e23496a7a201c5ed6f9ef",
+        "build/binary/snapshot/cellFragmentBuilders.d.ts": "25b1b0436ec23c5e22d3c337f7142513cc10c1958b048f3f49c35d1ab86941f0",
+        "build/binary/snapshot/cellFragmentBuilders.d.ts.map": "b19dff3c42bb9eb59797db610e923dcc43b1249845b9007388e6a26328b0fe54",
+        "build/binary/snapshot/cellFragmentBuilders.js": "3982a88ce54ff1286e329619f856dd8506046705d27c6a24d168a4acbb98c7bd",
+        "build/binary/snapshot/channelHeaders.d.ts": "9b58b048ce275db2f408f1a5538477320f938190b259d5d71779a6b1992c4105",
+        "build/binary/snapshot/channelHeaders.d.ts.map": "bb0c867e470b7afc554f0b43d470fe3f4551161e3308b1b21714cb8dc5e8296f",
+        "build/binary/snapshot/channelHeaders.js": "9dd08030cce7b0a512a25886bf864dd97a9f819c2f10429fc6c92ee5855269c3",
+        "build/binary/snapshot/channelMessages.d.ts": "6cf1eeae5e325e7d39e309ed4c3d811078327decfa772c46e55b0d97ae9508c0",
+        "build/binary/snapshot/channelMessages.d.ts.map": "ff880c5e4b6b6c132a8ac00f5b42e429c33521dc625747245222824e9abc0ffd",
+        "build/binary/snapshot/channelMessages.js": "776d8a712cc0be2ef81ed69a3b68b9963ab8b603cee15f7fc22935fcaa69834f",
+        "build/binary/snapshot/channelModes.d.ts": "c5a03246c2b9004757e69ac37433060bbdaa289ef4abc5a4b46cd3caf8dedba2",
+        "build/binary/snapshot/channelModes.d.ts.map": "040c3dfe838218ff95c66d35db52f4391e51f88d3cd3d8ebb025d00a24a24ac5",
+        "build/binary/snapshot/channelModes.js": "ff25b15a5c89052181e2a324ea8b45fbff274bae63c53918c8cc78c0d8caf1e8",
+        "build/binary/snapshot/commitSnapshotPlan.d.ts": "56b9b14fd47e05fec2b55aabbecd926f105a2d8094c54bad6ce74718b61b9f9e",
+        "build/binary/snapshot/commitSnapshotPlan.d.ts.map": "6a1192a766e27f86b114c20710de75b4e8448f3c9af689be52cf5b6c4a8346e9",
+        "build/binary/snapshot/commitSnapshotPlan.js": "0ad54279adaa8a3b66556291a53b5675fd52e9141fd3b758de8b730de26b8e8e",
+        "build/binary/snapshot/countSnapshotBytes.d.ts": "7c66af98f5731aba8fabe0a501cb5ab64c0091c85d294b61b90262a72a435aa4",
+        "build/binary/snapshot/countSnapshotBytes.d.ts.map": "033faa85f4a463314b3ee5bd5224b74ff8640cd251bf29044b0d390a04edc685",
+        "build/binary/snapshot/countSnapshotBytes.js": "cd401277f048a9c0937ac5468dc715421c671a428acc91305c144e769256af0d",
+        "build/binary/snapshot/createSnapshotBuffer.d.ts": "8a8eb4488639c2c19ce72317fd244b6b84d8d82f4d41c839149ae5af695c4ff7",
+        "build/binary/snapshot/createSnapshotBuffer.d.ts.map": "0a721e72016b261d3427da5e120778173c492c7fde10a188300c70bf656f5eeb",
+        "build/binary/snapshot/createSnapshotBuffer.js": "fd4ded35783004de216acf1b9bd2cd1c83cba3354b8a20b380586a1a5ccdcaf1",
+        "build/binary/snapshot/ecsSnapshotCrud.d.ts": "d7e59ae405c1104d75523f324f2052391fb22967c70ce983626872af896b0649",
+        "build/binary/snapshot/ecsSnapshotCrud.d.ts.map": "06192bab87eb3659517bf93da70913d73d999135b47d10af5f6c66cf9a5543cb",
+        "build/binary/snapshot/ecsSnapshotCrud.js": "6024c2e8b009b07c85dd257d70d7a6fb1dce35befd532fc58ec0487c4d009341",
+        "build/binary/snapshot/entitySnapshotPlans.d.ts": "01600aa8a41d79f6da614fc9de4bd023632e20b8756f17040c675544a2d5d397",
+        "build/binary/snapshot/entitySnapshotPlans.d.ts.map": "6e4be02c798c4c5b9cf788878e3c2646909fd45165c399b22e11e4861e92c384",
+        "build/binary/snapshot/entitySnapshotPlans.js": "f2be2a5a2167a57a3c74d706ab5dc9d368844c0ff83b1de1ae8d125e62bc55a8",
+        "build/binary/snapshot/manualUpdates.d.ts": "5f37bb2c01c91758e7ced2902cd18542d86b1adf098c81b5cd8187bb457e127f",
+        "build/binary/snapshot/manualUpdates.d.ts.map": "49a8dec5405a242962169ede01e236102830e0e285ed1e9ebb31a99a884955c2",
+        "build/binary/snapshot/manualUpdates.js": "065947d7b637214cc7610cc9c8afb97b9108ce7b96fe28caf12c8ad8574b4cb5",
+        "build/binary/snapshot/messageFragments.d.ts": "1beab739ef139b7fb828ea7e51fe8f0498c0059100e930c8606868eea6eab9b8",
+        "build/binary/snapshot/messageFragments.d.ts.map": "1212cffc9286b38a378adaf8da1cb22201711e5d9318474a56db36ef5c52fc64",
+        "build/binary/snapshot/messageFragments.js": "bf88113ecc67084e182eaf45a0105fc8e220c02140451d482b51448961c5ecc6",
+        "build/binary/snapshot/sharedEntityFragments.d.ts": "dbb40fd303edd13dd7b68e490e1c9ea201db1814f6ec955836dbd2ad90eeae5f",
+        "build/binary/snapshot/sharedEntityFragments.d.ts.map": "4907aefc50366f3292472309ad3480a79f11c6920fd659c631fae09d12331295",
+        "build/binary/snapshot/sharedEntityFragments.js": "8ed839722ae6a9c9da4dc1aa275ecff25dece34af96666082ffea204805e5165",
+        "build/binary/snapshot/SnapshotChunk.d.ts": "1e41f347b21774d4fd0ba241c108be07ddbbef555e961305f70dbccef563597a",
+        "build/binary/snapshot/SnapshotChunk.d.ts.map": "a3addbe507b9c06c2f857fd42c30171480ed3570570b008194ed16b5a7c0a34f",
+        "build/binary/snapshot/SnapshotChunk.js": "f1e2a497d802dd2af6762165be81fa1b816fe49f21ecbb2b21eaacea2bf40eba",
+        "build/binary/snapshot/snapshotChunkBuilders.d.ts": "25b37c3a54e4ff974714a93259dff3a97c983047aad78aa1e223071d9bdf9c32",
+        "build/binary/snapshot/snapshotChunkBuilders.d.ts.map": "60bf0c55ed1218d60a296d2f3c70b10646ce257c8602a59fd11b991f74adbd8a",
+        "build/binary/snapshot/snapshotChunkBuilders.js": "ca6fb8c1d5bd75b48e753807da2b3a58503d90ac245e8ecb6c9a66db23d81e3e",
+        "build/binary/snapshot/snapshotEnvelope.d.ts": "283c2fe0800dfcd302598b7360646d87d034488a47b5054adb6142fc2d005e83",
+        "build/binary/snapshot/snapshotEnvelope.d.ts.map": "d5e1742c968bcc2c91c8dc0a8fca35f8a38efa37e748017eca1b43efb5f7a3d4",
+        "build/binary/snapshot/snapshotEnvelope.js": "c3d1d0a0e6fbc52e4501c8f070260e26c47a89081a127a99ec4894a5f01a36dd",
+        "build/binary/snapshot/snapshotHeader.d.ts": "8f7a1d14b176fcf13a0cd2fc21b3d67bdfa33dbc59e4b7a38b7753883ad5655b",
+        "build/binary/snapshot/snapshotHeader.d.ts.map": "93a06b4db646a009090f3795e8a7ec0a2d9c4355fda5d059dddcb26bb009815a",
+        "build/binary/snapshot/snapshotHeader.js": "3442c283988aa4a18c26fb709f0057ea76d24b1bb801de9b8cd342de2131f769",
+        "build/binary/snapshot/snapshotPayload.d.ts": "a38d9559b30ddd175b810d3b1e90a4a2aeea65e462230b021f1ef959b9dcec88",
+        "build/binary/snapshot/snapshotPayload.d.ts.map": "11324428f040bf9a905e45090c8f34f0b7e666db5048b6efed4a163b206cb373",
+        "build/binary/snapshot/snapshotPayload.js": "ae8127a7cead9f2c2d4a6cadbb815d0a286877114beffeed5d8444011292da5d",
+        "build/binary/snapshot/SnapshotPlan.d.ts": "dcdfc9139eb025759411d5f8125987d7babc1fc9b3fb0ff0804058dba110a6ea",
+        "build/binary/snapshot/SnapshotPlan.d.ts.map": "f6e1e965cb58b6f5c776329f49f4f57036106e6a617708c5f1952d3f52661d98",
+        "build/binary/snapshot/SnapshotPlan.js": "7f4ee30c7b62b79b2582b5d4e0dd90e7f23529d79013f3629a7c7b97063174b0",
+        "build/binary/snapshot/snapshotPlanStats.d.ts": "4e865257d867daaaa97da24cd5fad05455fd2d4f4ea7345d5830a953afeb796b",
+        "build/binary/snapshot/snapshotPlanStats.d.ts.map": "f417c3ae71e568832afbc43e4887acf179ea4fa322814c4c891203c3b03e4fb8",
+        "build/binary/snapshot/snapshotPlanStats.js": "b28498d73d01e32f8e32b54d97ad7777d2318b2492105dc54a53f84438db0b34",
+        "build/binary/snapshot/writeSnapshot.d.ts": "f762e2a051cf344e93496ea5df4014f733d5fe77811d727ce12e6f2355208b09",
+        "build/binary/snapshot/writeSnapshot.d.ts.map": "bca40972d03dc0d4cb4e13d6b8fbcb1da00d8509c0c761684c879ab1fca998dc",
+        "build/binary/snapshot/writeSnapshot.js": "7845e67c6bc1f252485ef37bfade9a934d298c074730a6ba03ded3cf32302b56",
+        "build/client/adapter/IClientNetworkAdapter.d.ts": "83e452658f0a582dfcf2bc0e367b3a25513a2715535d9aa2d2105706dee6fa2e",
+        "build/client/adapter/IClientNetworkAdapter.d.ts.map": "a99e76a802c88e35f3bc8d1c55731d4a0c4a59f52d178284fe2a6f10be2e688c",
+        "build/client/adapter/IClientNetworkAdapter.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/client/Client.d.ts": "5f3114509923184ba381674ac46146a8e9f06bf95815906d49cde6f4cba37a5f",
+        "build/client/Client.d.ts.map": "3fa03d497eb7161dc6299106d76ff1a204ed2a97a5bf652e6b905071165fa76c",
+        "build/client/Client.js": "db4d07b438353895c71ea8ce9056d877a6f2a7130a2ebee5f49fb0c9e355ca48",
+        "build/client/ClientConnection.d.ts": "1a26aebdd6d4acb9c18e89e80d90865d07fe97363b41612ed698b4e534154bc9",
+        "build/client/ClientConnection.d.ts.map": "981255cb7e17c56741213c8779a26642ee24ab8f4fe27be7514ffc5f89da5c29",
+        "build/client/ClientConnection.js": "ad438e086fc32f5cdd1ca2f5829546b074bbf9fca05e4dc7763af56de0f3eb01",
+        "build/client/ClientNetwork.d.ts": "e97462ad60bfa8f1230544e2da84ea693e33a11af0aa8696a6f9b9fdfc2e9251",
+        "build/client/ClientNetwork.d.ts.map": "f475a537267baeaa0d37c462850719f9edb5dddeeac8c57e8f0c050cac711b23",
+        "build/client/ClientNetwork.js": "1d9b655529425eb9b426c709d521946eba0b2d7ac57c8a3ffac152731edbb543",
+        "build/client/EntityHistory.d.ts": "2373d30b3a2deca5e8555d1b3e703d1392037d0dcd7404abc9b6c8cd3ef1ddc8",
+        "build/client/EntityHistory.d.ts.map": "1a53eeee6b023da37472fc764b7712654db779f35e429d50dad6766d122021ac",
+        "build/client/EntityHistory.js": "856b56c7109a03e2e710027e7dd8159195be9d58fed84e4128762ed103766483",
+        "build/client/EntityStore.d.ts": "b0c81955c7b04c4736aeb1031983a2f14c1ed82a516d2c9357799f3f56f9006e",
+        "build/client/EntityStore.d.ts.map": "cb18e7b968d3cb7f58a4a19cbed97463b58177b65e1a323e4e35dd5eaa3d8935",
+        "build/client/EntityStore.js": "a8ce6acded3269731750dad23cd37f5bc4e0c050fbf986312f61caf54e5a82db",
+        "build/client/entityTimeline.d.ts": "47d375e519b44e90bb53836a7d99e46ea649eea51ae3ca535881f66e74a54c49",
+        "build/client/entityTimeline.d.ts.map": "0c0b557756c8d425f426839439d6d81f9ba5db801bcc8ef2cb41006a4a04b3c3",
+        "build/client/entityTimeline.js": "9c6f7fadc8bb61060c64bf7653f5d4ca8585b41a9a75ae78432d5fca19c94d5e",
+        "build/client/FixedStepInterpolator.d.ts": "a35d040598b0fd09132799bec95221f8a41678bbbe3f0b98920cfbc895f57ca5",
+        "build/client/FixedStepInterpolator.d.ts.map": "7954f7e51486d1b2bc7141bddad3edab43a96a5d271bc2341d9551e95bf8dad0",
+        "build/client/FixedStepInterpolator.js": "4dc6e858587d05d7a94769cec54b46ef3ab7f2a0a6c1b4416c7d49f5b8165329",
+        "build/client/Frame.d.ts": "78701c442b66bda5b6a3cb44f2c50bc810dcded96fd5f046baa89e60e0a425fb",
+        "build/client/Frame.d.ts.map": "c214b302934cbcfca1edf6c13228b8a8156fa257ff538b5365672e7365846639",
+        "build/client/Frame.js": "7e84bb77f7aaaa694fd7436cab225129ac302884f2159eec2ec8937d607fece8",
+        "build/client/InterpolationDelayPolicy.d.ts": "1817b753d1e3a59e3110e4ed5400d8a5c1122fa1d8821dc26b08a3962d01bc95",
+        "build/client/InterpolationDelayPolicy.d.ts.map": "7d227eac5338de936237d586c6da97c3afffb5879c016f8f872986a2bc1c7fb0",
+        "build/client/InterpolationDelayPolicy.js": "4308757e6612f6618f32401d0f9ce698dd4d5a7ca8e9b8281336e09ee06a18da",
+        "build/client/InterpolationOutput.d.ts": "0f0675da88f7818937c97ff88ce997d22e2352f753f17493c36296d59cbb8c3e",
+        "build/client/InterpolationOutput.d.ts.map": "3d4b4b67b9e9bc6490657fa84b42034e9fdba2b4bc189718b227b58100357cac",
+        "build/client/InterpolationOutput.js": "8e76184c590ca738abd5ebfa768251ac7a880b0e696ce4ff502757a887811de9",
+        "build/client/Outbound.d.ts": "7e77d80281d3c75763e4f098449d7efcee5690eb559c49eb048e25efa141c0b1",
+        "build/client/Outbound.d.ts.map": "3318eb94932b9d86693d3e585843c991d58a0518504af43dc72867d8e0e10d04",
+        "build/client/Outbound.js": "79f7da621c0a76d6e845fa97d2f9207959079a6960c7f18687d8e3854f0d06ee",
+        "build/client/PlaybackCursor.d.ts": "5a59058b80ce190fa9dcd983ca016e89f96f1fdcd962f4cf6e39212a4e4316d9",
+        "build/client/PlaybackCursor.d.ts.map": "f833ebfee86cabbf792383ec151e6889014a60475bd63d7b0a7156c20503083b",
+        "build/client/PlaybackCursor.js": "a1199ac4348c1890f39f77db9f6da80655296a4ec3e6d5d31849d85d27e73213",
+        "build/client/prediction/CommandReplayPrediction.d.ts": "a036de5d109f9ca81f9f1a83bb39602935a8c90bfb1a169304f4688d77021bac",
+        "build/client/prediction/CommandReplayPrediction.d.ts.map": "e012a0a2f5d18935d1dfdb7938ca762d3d2286f283e51c7a6a3be14e3e797765",
+        "build/client/prediction/CommandReplayPrediction.js": "6d76e5a8f46535c62eb99a4a2a66611fda5de060ae464987984a9262ae93e8c0",
+        "build/client/prediction/PredictionLog.d.ts": "c997711ac8b0704e7df47b89076c883e7b883fc8e2d327b1716ba987e6a00ac4",
+        "build/client/prediction/PredictionLog.d.ts.map": "9fcbaff524288a025ac10945a3bc4698020e15fb102f53f74d2b86d78d3a2db0",
+        "build/client/prediction/PredictionLog.js": "32bf14a87baeeb6c5c68dd414a45ce918e10a076efee8a79860bf9166838143d",
+        "build/client/prediction/Predictor.d.ts": "bb4b6a2614e749f4823cc296d1b36f60b7c83de04e229adc52f0927e19dd13ef",
+        "build/client/prediction/Predictor.d.ts.map": "b6517b06bd5ba2aa601f5a18e79b35abaeb4b15c8f91e7b0df3866c42a13b38d",
+        "build/client/prediction/Predictor.js": "ec2d29c221fe3147632a26020f58f42825b5ac419f2144dc4c2fb1240e9e10fa",
+        "build/client/prediction/StateReplayPrediction.d.ts": "a631970dd295c595cc95c8507e1b4fec46bc9991c892926c9c379a4ab6de7ece",
+        "build/client/prediction/StateReplayPrediction.d.ts.map": "31006ff218d8c7965785d228a7ff1a0a8fc32a83f63ca205314fad2ca1fc2af2",
+        "build/client/prediction/StateReplayPrediction.js": "01ecb1fbf3cfead26feaef779c91728a96b9202459a5944630bd800c472c0915",
+        "build/client/Snapshot.d.ts": "754835119ec4989e0fac21741073296b8ecbc85505e962c2cf609753836a98f0",
+        "build/client/Snapshot.d.ts.map": "db58fc5d4cabe39dc89360ec5e8511b3afc54f658776e637e650a158f4e5c42a",
+        "build/client/Snapshot.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/client/time.d.ts": "13c14d19e29a9acd43ad55a8816a1c463d47691c9cadda12197e8420e8aed153",
+        "build/client/time.d.ts.map": "20aa4b7b7408a3d8120a199131b7f73176aeb7546c2be5fbf3ff935f9a935de3",
+        "build/client/time.js": "88019005fa27c0838fbece594537cb1bfabe16384d4fe1875e7634a635bb3cec",
+        "build/common/binary/Binary.d.ts": "fa1a56c505efe40e1232664dea0de3656ed0e93b7a286967b66645c196c26a59",
+        "build/common/binary/Binary.d.ts.map": "71b2006e247ba79e9f7ae436d5fc9c25ecab8320301afe8118c7a06de2ccc447",
+        "build/common/binary/Binary.js": "63bdb1d6dbc4bc3fafc0ad3cbc49f0fad0b4b98e38c579182fe21cddc4cf2f69",
+        "build/common/binary/BinaryAdapter.d.ts": "387e47aea265fcd39ec84769e634b5ddbb7b97a0de5155155581ca4afefadc15",
+        "build/common/binary/BinaryAdapter.d.ts.map": "a32ebf2e3f5d38e6e3e2969cfd567b375c227e575d727bd7ee597b4162748aa5",
+        "build/common/binary/BinaryAdapter.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/binary/BinaryExt.d.ts": "06fd87c0c58d33cb7065c833eb4129380811b52ff1aeed21fb46b69877c02009",
+        "build/common/binary/BinaryExt.d.ts.map": "a39ed4d4a2bcb036c99fb19fa195a76216115ecd52663d747af46870db72ff7e",
+        "build/common/binary/BinaryExt.js": "c26416086d804451f836c95e62e37bcda7dede018299f3cd4539c555fa6b8820",
+        "build/common/binary/BinarySection.d.ts": "38dc6b067e26fcf7e2dd701af62d25f08d832a097ef40a75b272ceb2082ea01a",
+        "build/common/binary/BinarySection.d.ts.map": "05be0616461af8a93ce1a7ffa0aa996f35a00ee58d90552ff6dde1ffba31082e",
+        "build/common/binary/BinarySection.js": "94db20c9ff291bff3e9a86a3bd6870d1767ce8d74e7128e34200a0c6a0b2878c",
+        "build/common/binary/IBinaryReader.d.ts": "8c11e27a59d273063d490a80791b9960e092a29d06533fc819824974a765b8cc",
+        "build/common/binary/IBinaryReader.d.ts.map": "6c19fb92e3f63f11a688ea0074a076cc1963774b1e7ccd3b1c6d951d95df2b7d",
+        "build/common/binary/IBinaryReader.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/binary/IBinaryWriter.d.ts": "f71e82b9927b0c2f938a10e51bfa46d9b91a4477936d74f008876c143937365a",
+        "build/common/binary/IBinaryWriter.d.ts.map": "39dedd41c661d496bafb124c5e0e6fae0f0f3a8e38259b0edaf1d1ce391f1d1a",
+        "build/common/binary/IBinaryWriter.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/binary/NetworkEvent.d.ts": "48dfe4bed4db63aabef7d05236b88e9dc975ea6a9917fc09672c4fc21d185774",
+        "build/common/binary/NetworkEvent.d.ts.map": "d3afa26bcef3e9a1cb24a9e64543ae482b60bda7b925b016e38e6c1c9b0afb5c",
+        "build/common/binary/NetworkEvent.js": "8435d2b887873595f39c799b7bf2611be71020df7caaa9e6a39d76ee738380c7",
+        "build/common/binary/Protocol.d.ts": "8b8c6fa57fbd7c7dd7e41e89adfe42a76197b0019d3c5f450a38ad04430fc087",
+        "build/common/binary/Protocol.d.ts.map": "e4a01069b26e16948a597070ad33946488596e6091918930cf580061acdda644",
+        "build/common/binary/Protocol.js": "fd9ae05d616a6428a31745cc2153c7f4da321bea01655102da6c6ed28b06d179",
+        "build/common/binary/schema/defineSchema.d.ts": "1d7ca06d95b935c5e189d8e3b6d12e04481c2c9929f88992d242970a92d0832d",
+        "build/common/binary/schema/defineSchema.d.ts.map": "f0b8a52e777a87e20daebddf8ed926373e45fdeb456d9d972726674b03f481d6",
+        "build/common/binary/schema/defineSchema.js": "e604f8a05848bdcb37a424ef6399e98657bec328f50ca2d437246f14c2920133",
+        "build/common/binary/schema/Schema.d.ts": "584ed47e759bd09c7bf3641f9e0fad362793167e826da7bc6a55037b496bc02b",
+        "build/common/binary/schema/Schema.d.ts.map": "c931cae75929c6e6ee83d86848b01b5616dcdd2a18f79d72203fbd08180bc418",
+        "build/common/binary/schema/Schema.js": "2e2dc40748a9f6729ac443f3425285c9e97811916037b4ff4d04e002b029b917",
+        "build/common/binary/schema/SchemaDefinition.d.ts": "ca6f00b48b195606c02dc4f075ddabc7591ba697eb8f60bafc0228f5aa6c7d3b",
+        "build/common/binary/schema/SchemaDefinition.d.ts.map": "bad21b466e7e60109f047432e40782a8b7f4eb14f9cbbf812c9d15d62c0ec416",
+        "build/common/binary/schema/SchemaDefinition.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/binary/schema/schemaFingerprint.d.ts": "907c92711c65daf4d6f7c63442f96c2bcd4e867c821dad722fa1f2db6ef1280d",
+        "build/common/binary/schema/schemaFingerprint.d.ts.map": "80b450f1b9ce1a297c0f84e91a64f63087771c83fb4dd56fe240f314b572678b",
+        "build/common/binary/schema/schemaFingerprint.js": "5dec9c4b9e4dc2dbca59b7b7725be37cfe0aeaa05b2c222a75d5d6f8c1ea08a5",
+        "build/common/binary/schema/util.d.ts": "d6d97fb9847414fa018f470734c7c3c4ad04f930bbf4e46ad9a36818248e3880",
+        "build/common/binary/schema/util.d.ts.map": "30e8b80bab539cf01ff70095901d2e86d9ad7b982a27af706ce078632b31ea68",
+        "build/common/binary/schema/util.js": "2856b1fe2c0e0a03f3d51c6e3ba23f1bbb3a2884213451c3020d2153026e2cd5",
+        "build/common/ChannelHeader.d.ts": "d0dab7719291be375d1a37f5c497259d81a8c37625412d8e214f869ec194f54d",
+        "build/common/ChannelHeader.d.ts.map": "b3e226aa5655b8129b4b8e9f83d09056d2e12885202a6370eb42ca0844ec5182",
+        "build/common/ChannelHeader.js": "d23c504a1c2d602f37a8b1334f9e1c1d29199cf7670fc84dff94d9efabd1b0aa",
+        "build/common/Context.d.ts": "eac0923363480d68c0996b80d7fcf4662820a707686b48f4bf18dca9d60eb77f",
+        "build/common/Context.d.ts.map": "f4ab70ffa00e4940b88f98a215b1b8c3acffdf093cc1c97dfac198754f5db2ba",
+        "build/common/Context.js": "2e66478c58bf81e8d6be2d58dca300ebd75c9921fda60149d413ad3f3050a99b",
+        "build/common/Endpoint.d.ts": "9c7f2a6ee6609f4f0077f37bef38f4e89f7349206205b5c180a140a682badc5d",
+        "build/common/Endpoint.d.ts.map": "3129cdf84d61a2fea28261759b02aa03825f3cb2a5a8629c2af51affad445fc8",
+        "build/common/Endpoint.js": "c435715b34cd3340cb8e3e3676379c5aa4b8003d3d6db88771fcc92938d377be",
+        "build/common/EngineMessage.d.ts": "5b0ddfb0d513f16b14a1fa51cb548a716d58277197c6aeaf8ae8fa8468a5ed66",
+        "build/common/EngineMessage.d.ts.map": "c2dfa18657a2668f48c7593990eb3b601bca6e7f2826122f41d7023cfcaed05c",
+        "build/common/EngineMessage.js": "28d4e92c1edb08d81f101eceb5750b23db2d3adcad7899eb0d0e34a603516a86",
+        "build/common/I2DSpatialEntity.d.ts": "254fad19684d511f5a678ff387c8a5e8b8a8ea9c3a495f50d95d639d4a064bf8",
+        "build/common/I2DSpatialEntity.d.ts.map": "4b64cad5226a230fe63fb143e1ebd1b7f5b2d032ee0a704f1ad8c0f33be8f66f",
+        "build/common/I2DSpatialEntity.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/I3DSpatialEntity.d.ts": "f69f50d74c86ea2fb51bd8ffc804914ce7b8a74e1b1c3f777b14a71f90906049",
+        "build/common/I3DSpatialEntity.d.ts.map": "7f220054fcf9abdc43564bc123e21419913ecde24a3ae9602797880ee4bde5ed",
+        "build/common/I3DSpatialEntity.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/IEntity.d.ts": "1cd7d5ec5ed09dc51824efd190be95acec154e1a42775c5af426ece4d071efce",
+        "build/common/IEntity.d.ts.map": "aa492b634f00e71e5164b3f972fb2a0385521813a6654bbf1548f4b8a2cea89d",
+        "build/common/IEntity.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/common/network/NetworkConditionLink.d.ts": "5a87e905f5c78233af12a3d423032da107e73200acb2eefd5f4c9cf71f0875db",
+        "build/common/network/NetworkConditionLink.d.ts.map": "a3cf53629f015927df55336a789a80aabc88841e41cb8a47933f46620029d3ee",
+        "build/common/network/NetworkConditionLink.js": "a9329f2272db20d4e227ea5b44a87b5e540742a45b10e62920ee7540837bf293",
+        "build/common/schemas/channelAddEntitySchema.d.ts": "b59e82cf56f317e0f44364aeda0fb4c51904174d40f963b4a6959517c097ed6c",
+        "build/common/schemas/channelAddEntitySchema.d.ts.map": "f3bcded699a2b9850a1a9c24ce54374227b2a42b4e2b9ce867ef09fcf05d992e",
+        "build/common/schemas/channelAddEntitySchema.js": "31dafc1a58ff48049cdeb335db49105aea4a458c9b9825f81e1c1555e37bf340",
+        "build/common/schemas/commandFrameNumberSchema.d.ts": "85c2dd58c8ddb33372dec2bdfa3e75c16c970597c8e75087ede25e347fd1d0fe",
+        "build/common/schemas/commandFrameNumberSchema.d.ts.map": "fd6997c3de35d62aaccc83db805c56c0efb2ff5b0db054568e582943f44c5f61",
+        "build/common/schemas/commandFrameNumberSchema.js": "49066aad9896a6492a77d437a07d4003d6b77b418be917c4b62ce9f4e1480376",
+        "build/common/schemas/commandTimingSchema.d.ts": "79e286c5bad9c1057d0c730fdbfa322947a330ee72372b8c4c8ddec576aa76c6",
+        "build/common/schemas/commandTimingSchema.d.ts.map": "864164ff49c0c8e58bf402da31e98020443e2d30b7794cebc2ce6cf89d312589",
+        "build/common/schemas/commandTimingSchema.js": "ae4d19da8b6f5960633e667bcc2b7ff5d935b15aa10dabd45fe2d783d81c1c5a",
+        "build/common/schemas/connectAttemptSchema.d.ts": "0fa946e3ef23403d462ec1e92db1b9cff96aba03811ee24fac7fcd8c01953633",
+        "build/common/schemas/connectAttemptSchema.d.ts.map": "ef70ad37b0d4a4ecaf31f7e88a80cd7ddb3adc77b7743b4eb51daa764f46de1d",
+        "build/common/schemas/connectAttemptSchema.js": "708a70e31b78ebc3ef195c34980b89956c7fd1a365c8e89710d3f1907d9be181",
+        "build/common/schemas/connectionAcceptedSchema.d.ts": "d57f09d17a05c2e467486fedc0b9bc08aa13327790d89b8e4bcc712b80f27798",
+        "build/common/schemas/connectionAcceptedSchema.d.ts.map": "b4860b6959a05fceafbc60aa1dd6a0b99d298d799e741655702ba8851f3a6a7c",
+        "build/common/schemas/connectionAcceptedSchema.js": "de8687f7de1d05c1c0fff6edd6d1158386effa7550de0704ba4d7a039963f9fc",
+        "build/common/schemas/connectionDeniedSchema.d.ts": "494357a834290688c23bdb0c54237744685487279d3598e372921dd78606fd73",
+        "build/common/schemas/connectionDeniedSchema.d.ts.map": "e3dfc0e41d4dba0f60bf2615a15032cdb50199c434e77d2b64209a9fc7fd4df0",
+        "build/common/schemas/connectionDeniedSchema.js": "9a50bd5ef869b143a0cdb35cdb840d6630e99abb0f7d3b00184c0b4cc1b1cd0d",
+        "build/common/schemas/connectionTerminatedSchema.d.ts": "f5a87655059f63236793bcf3cc9873e39b41ea5873b8379c83e7c17b2615a0a5",
+        "build/common/schemas/connectionTerminatedSchema.d.ts.map": "2c9018f9f309b92e72159edf8d3c85864192ddf18466983d79c5ff94cd7a40f8",
+        "build/common/schemas/connectionTerminatedSchema.js": "e735374cc22d3d6dbf5a9d08e5a0ee5c0b28b15aed0b905dde4e795447a4151a",
+        "build/common/schemas/interpolationDelaySchema.d.ts": "99948206ef41954f815d1b036533c4cccdacec6a7df5f94dc3a384c08713970c",
+        "build/common/schemas/interpolationDelaySchema.d.ts.map": "7807aefd4c2e2f81c5f78bbed0d664473029d086d69924842e17e9470b298d15",
+        "build/common/schemas/interpolationDelaySchema.js": "ba4bd6cd0d318e074b6313da97442408e9ac1f1006968f674474cddbe9d3aa6c",
+        "build/common/schemas/pingSchema.d.ts": "cd73f58daa3c529c5dd5d0e76b542a48dd8dd6aa7cc170fd2731b80baf0e7c11",
+        "build/common/schemas/pingSchema.d.ts.map": "71216f38bd2bad93803349a4533f5d8927589da696ae663c079c6c6ce46f6f79",
+        "build/common/schemas/pingSchema.js": "d488cf98d7e68176013a018b5244e60db36f89ec2699504ef78ca53a9c5ae361",
+        "build/common/schemas/pongSchema.d.ts": "3912a7c30e0b54dcd79b310845e6c476a1533b970374d01956fabc4ecf81076e",
+        "build/common/schemas/pongSchema.d.ts.map": "08293e2a193368605a16f70ca8541093b8ac0ebe1fd76cc422702d369970625f",
+        "build/common/schemas/pongSchema.js": "2c9adc33bec80fe5b74f67804eab7a96c43a782994d55f304cc7904474d619b7",
+        "build/common/schemas/protocolSchema.d.ts": "d301aea818ac4fc69246b18d4e131a983898be86e7e33d543b2c3367638bf176",
+        "build/common/schemas/protocolSchema.d.ts.map": "377fbe55951656c16b0da272fd15dd81561119ed29fe6f0e4c058a3fd28c66e5",
+        "build/common/schemas/protocolSchema.js": "488a7dfc3e06aa4190f55125845853087e48d78578ca970e59ef65b290465ca7",
+        "build/common/time.d.ts": "30dad4e001948b1e6b925504e44fc495abad695fc839b6aa6516d65fa61d6844",
+        "build/common/time.d.ts.map": "4a5a1151005c18c9e062886835121c139e18190ada21f52e7df3ed29e0aadf0d",
+        "build/common/time.js": "406d7a9e59cf4bbe713b5a470d9fd9b04f996bdb0d3d8c525aaa67041bb42f63",
+        "build/ecs/applyEcsChannelFrame.d.ts": "5ce6b07385da7a9842b5fbaa832fdd3c094333a86f4aec3e45bdc2c9a5240100",
+        "build/ecs/applyEcsChannelFrame.d.ts.map": "786e454d6057809081ed9c8bec380554e96a5c9a4625ce457d687072c873da79",
+        "build/ecs/applyEcsChannelFrame.js": "8898c4264eb4a935fcd39b481142cc956422f755c986cc12506098ef645d2dfc",
+        "build/ecs/EcsWorld.d.ts": "235cf92139e959289c2044195d24732dc31af8bd3b770629a4857e20944622a6",
+        "build/ecs/EcsWorld.d.ts.map": "a9ae9bd40b7953621fedf966530012ac9bdc614d23da844cdb3ce2984c72b5f4",
+        "build/ecs/EcsWorld.js": "e8b8e17e20701d40f91b215c6ffd373eecf0f412cf057d928d4069f948e97793",
+        "build/index.d.ts": "b296fadc149fbcfe7424b586f19e3679fe79bc39110f8bb70e9c4fbcf7acd199",
+        "build/index.d.ts.map": "b1399c9b710bffd3d77d97bee9a3fc78c0385a584246981b150f6741df3b1f0f",
+        "build/index.js": "7cd2012dd1d2d63f1db8f5b1f7cf694668673310313aa5662ce55614e9de3314",
+        "build/NQueue.d.ts": "48a1be3fb160cc58a08c83e6a42c35dfd91911f8bb1e99926a6fe0162de91d66",
+        "build/NQueue.d.ts.map": "02b9c964e90a835cb565bfc73f5241647cbc0d80d1a9f1dd94559aca0e30fcc3",
+        "build/NQueue.js": "413fcf3a7070ad76bc370974121cc1c50cc230342b3751caa6c6dbcd20c08309",
+        "build/server/adapter/IServerNetworkAdapter.d.ts": "bd72f8405b18b314b931713ed20d66e21354af8bc7745ad195796c898b4fbf02",
+        "build/server/adapter/IServerNetworkAdapter.d.ts.map": "0bac3733fd00e8967f0eb82232351618e934283d6678f597548a0d3b952d8c7a",
+        "build/server/adapter/IServerNetworkAdapter.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/server/adapter/MockAdapter.d.ts": "23c935b49d3652cbc3e4ed4920f3e92d4bb940b54ee7e2414d13741523119353",
+        "build/server/adapter/MockAdapter.d.ts.map": "ed8da5476c388af3ca434f060bee5295a5af833627008918e53e0fc8674091e8",
+        "build/server/adapter/MockAdapter.js": "7307db0b875829d93cb2a47952be6b99964f7cd62afad79732b86c890551b2a7",
+        "build/server/channel/AABB2D.d.ts": "a6e9ca15a5f66bf967af25865239b729345719e390d93f2a51c88243cd694132",
+        "build/server/channel/AABB2D.d.ts.map": "fd23d1e9c70aa807d88bb81ccb523132ac41482998c5357dc6e2f594435c047f",
+        "build/server/channel/AABB2D.js": "0950b5f45acfcd322d2d49668a4e62ad032b1bae0117f3e05f9d424ca299c035",
+        "build/server/channel/AABB3D.d.ts": "2047fe9deb594cfa9e1d75463ad43a3d18b52600b5bc4608b5e0ba5e8fd6a4a3",
+        "build/server/channel/AABB3D.d.ts.map": "8fa370df18cc57a49f0ce14bf03e1c95d0ddf625aab28af64cd98c1a8ce74818",
+        "build/server/channel/AABB3D.js": "2739bfa7596748ed98442a5160602bb9d25065ba977b3e05dfa0263edd8de422",
+        "build/server/channel/CellFragmentChannelOutput.d.ts": "a8e9a737219fae0abcd273418b8309821b1275ae3663d25347f7c0761138566d",
+        "build/server/channel/CellFragmentChannelOutput.d.ts.map": "d012ad695010bf2bad648a67754fc7d12aad2c5b3edfb49e7da32fc16eb30c5a",
+        "build/server/channel/CellFragmentChannelOutput.js": "c45640f32af037ee80f4cee7608b0716b7f6b1418bc4748c7f07b21a618fbd1b",
+        "build/server/channel/Channel.d.ts": "8e942d379601ca5f816a02abd66e5c66a0870d6b70bd204681dd4132b7feb786",
+        "build/server/channel/Channel.d.ts.map": "c0e32d23f266bd7fbf7a8351d3ea2c729393046d549f90e8e8851ac7b80fd764",
+        "build/server/channel/Channel.js": "77edd3dcd77f13b9a93882809544a19ff2bff41623f571d2bf5952814dad592f",
+        "build/server/channel/Channel2D.d.ts": "94d2a7c0891959830311d385096102c73209bb8f3a91f5240de02e44d726de0f",
+        "build/server/channel/Channel2D.d.ts.map": "43bd022e7dc5dc8d41180a5e8374d449a6f8a705bc729d60c24d8ad1b05b68d1",
+        "build/server/channel/Channel2D.js": "d3ec9398913c6a470f78e034543f39d0c94ff9c64cb50a70142ef464ce55d6c3",
+        "build/server/channel/Channel3D.d.ts": "42c7ee05ae92b56fe6cbbf411551e1069a0e60190ef4e6596ac77ff8bb0a0a00",
+        "build/server/channel/Channel3D.d.ts.map": "c75262e1429b9d1a060ebcdf7f72a1ebd5ab39772f7e43f81e47c102b118f452",
+        "build/server/channel/Channel3D.js": "9c6e29b12d03a06c4497b4e0a7479b872b52c11ff1773423cb5337c6db27ea79",
+        "build/server/channel/ChannelOutput.d.ts": "1f28c569f899650f8ba28f73eeb44100c4263079c9af063cceafbd5793eae676",
+        "build/server/channel/ChannelOutput.d.ts.map": "ac7e5b37b16c423c49276a3fe58825ea3d66eada617a0c4ced3954ff5118097b",
+        "build/server/channel/ChannelOutput.js": "055bcfd8c8ae5e9c5b2e3e09f411086e14ceecc5d958a589696e3eab8680c962",
+        "build/server/channel/ChannelSnapshotOutput.d.ts": "7e1270b7e9e9467f22da9e3b56c4bc07e900f643b6ddd85ad03b560ff7718a52",
+        "build/server/channel/ChannelSnapshotOutput.d.ts.map": "c4e76cb9efae54b2778ea7f04c30250f38a963eb12166505e2314c4b756fa4d2",
+        "build/server/channel/ChannelSnapshotOutput.js": "c34dd7beb387cc467feb4e4206b50711ea722355c29294baa6e58294cc83b798",
+        "build/server/channel/ChannelVisibilityCache.d.ts": "43c4dd47eb5a559f268b6f09b5be9defba6b2c2b8e68f853487e5474402b2126",
+        "build/server/channel/ChannelVisibilityCache.d.ts.map": "58527acff1447341229fb6f1cb52e79ee8915b63f6cc0ea4a82669beb0575d59",
+        "build/server/channel/ChannelVisibilityCache.js": "686946bc10b9b404f1565f079e8f80519c0e4cf04541809224cb5348bc548fa0",
+        "build/server/channel/EcsChannel.d.ts": "e019591ed965c4958f9ba0ff0cbbeb58dd1c4ef169133a00922c673772fbc8c3",
+        "build/server/channel/EcsChannel.d.ts.map": "d8c1161d401fdb7db7e941aa46afb88227f0a1c431a29a7da297b3c7093c0399",
+        "build/server/channel/EcsChannel.js": "bf9a23d3a88f7bc3e1fba6e5f360725a457f65a8c970c8cf0e2b0428b4af9170",
+        "build/server/channel/EcsChannel2D.d.ts": "cead6386115239cbcb9c12d71654077cbf6727b0481b01152d8319d0330d9824",
+        "build/server/channel/EcsChannel2D.d.ts.map": "fdcad0dfc5d565db48ca9775e95e858fcf2d592cf2ff40b5caa5f6f5813e2468",
+        "build/server/channel/EcsChannel2D.js": "009926e4a12fc8ee129f5b4d0ecc57b0210345d87922d33852eb376bfdc84301",
+        "build/server/channel/EcsChannel3D.d.ts": "0aec31e95673abed37dffd9be7648f2fbeafcd1313243709fc8ee5055fa078b1",
+        "build/server/channel/EcsChannel3D.d.ts.map": "a9f40c2d60d7d6d1e6991e891478bd0cefc9a2146a7e75fa876a1159f4e7fb22",
+        "build/server/channel/EcsChannel3D.js": "6d3e69c0d895a21a62e1a245ab539a3fa8461d92935be5caf0f34b682d3e5113",
+        "build/server/channel/EcsChannelBinding.d.ts": "4065bbae4fc427a43f27bca659f644c33249f6fbdf94686429888cca069626b4",
+        "build/server/channel/EcsChannelBinding.d.ts.map": "9f5f0a97e175019206d752d688835a756d0717bafcaa00387a22352e06141214",
+        "build/server/channel/EcsChannelBinding.js": "a63da9e0595c47f16bb48da3f4b57caae598d0ef33de2fc9b46d27e190f6b2e4",
+        "build/server/channel/EcsChannelOutput.d.ts": "3c9325336a31bc411efc5847edd376ac518378c8966b8c6f925e5cba9150c643",
+        "build/server/channel/EcsChannelOutput.d.ts.map": "6e65e61ae26803b14f7a9a09a0a7c777ce733fe27bcb64a25f3b65d3359d7040",
+        "build/server/channel/EcsChannelOutput.js": "6617c07c5583537b2bd3aa51e025d0de28eae0a1bebe01b3779437e7855177a9",
+        "build/server/channel/EcsChannelSnapshot.d.ts": "47ab33a309a2177c12955575ad1fcd0c647b6881f06924fdbf82b3321ee3e247",
+        "build/server/channel/EcsChannelSnapshot.d.ts.map": "62c778696642aa2e19d2d58d018d1cc54f6f8517ee87f8f59e125885aa618063",
+        "build/server/channel/EcsChannelSnapshot.js": "b40496a6a8d5c1553e40e1031088c59d2ccf622dc2485b301c0b3e7f38205e06",
+        "build/server/channel/EcsSpatialEntityStore.d.ts": "f7f8532d60726b7b1ea29aedcfbfc3afc2dddc8035abe1f05a436928fdba48a0",
+        "build/server/channel/EcsSpatialEntityStore.d.ts.map": "494be05f4bfae5600403a3abd10fb55401ac81b91dcb07dd692e015f5ce9df2f",
+        "build/server/channel/EcsSpatialEntityStore.js": "84ed0ead21ae4d3dcdbab4d0ab5282dafe30833ced28fea515362111850b2222",
+        "build/server/channel/EcsSpatialManualLog.d.ts": "852e87b4aaccf331960bccfa19a90cb0804d83d9ae5fea662e80535831af2cf8",
+        "build/server/channel/EcsSpatialManualLog.d.ts.map": "dd428c0b7d92e54900717a71d56e8f9a2ed7902397274732f045ab6d64d7e201",
+        "build/server/channel/EcsSpatialManualLog.js": "3b922d99e414e473a169f3375ad991cb80647dacd2cc51aca04ba9c3da565584",
+        "build/server/channel/IChannel.d.ts": "9c2b8e1fa9e251154b26bf350cece6b56c9c7ac802a237f65396e1f5f6b45d04",
+        "build/server/channel/IChannel.d.ts.map": "73276923063bae8d0ecf70f82560072156ee4e20ee27c09957a110b057740864",
+        "build/server/channel/IChannel.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/server/channel/ManualChannel.d.ts": "de34202fb3dc2842e77aadc9514d897b2e0d093da2ab92c0f2178d83fdfc3c77",
+        "build/server/channel/ManualChannel.d.ts.map": "fa1578a35c389d17ee0be0fff48717b80fc409f5810884f5e1686ba51cbbedde",
+        "build/server/channel/ManualChannel.js": "0728029ebe70031f0356e1caf3164ee737dc2abea6c7d20e87c96fc21b8f8792",
+        "build/server/channel/ManualChannel2D.d.ts": "2c369060f16b8aa1f701e78fc9ac7f2d67755a9d2ca7f0f1384e5cb334f48ee0",
+        "build/server/channel/ManualChannel2D.d.ts.map": "e5213b82e9c684dc43c7eb219dd1b89d1db521f1a4e91a0b3345f50eddd2e4bd",
+        "build/server/channel/ManualChannel2D.js": "22bdca3f5d1f073bb94332a75ea082fde95da2671ec20b5978715cf9bf816a7d",
+        "build/server/channel/ManualChannel3D.d.ts": "80d18af64005ba57868047c8dfd918be90b6ca256c9b5b4b9a3e5cfeaf50ba91",
+        "build/server/channel/ManualChannel3D.d.ts.map": "795d95c28be375798385289d61600fc96a769b48be704cb3a85a5bc6415b2cd1",
+        "build/server/channel/ManualChannel3D.js": "8c9ad241efc2199f84fb2484a5fa6b16ecde651b9a5b8dcc922978a0682bd76b",
+        "build/server/channel/ManualChannelOutput.d.ts": "f830135a07b58ae917db0b4adf54a205886f5f3c974537feaedbaa72a218643b",
+        "build/server/channel/ManualChannelOutput.d.ts.map": "042e2147f03760cb27880a8e507f3e00f6a329b1e02846a3b22d8e4d9bd8864d",
+        "build/server/channel/ManualChannelOutput.js": "f97d9c9c2a10d72ea12da6a4fe275d183e1c6a0855e962b5638f008480e9b220",
+        "build/server/channel/Point2D.d.ts": "77da03b8f4946a43536004dd2ebc7061319d97cd30f6b44a0056bc0f6a84e57e",
+        "build/server/channel/Point2D.d.ts.map": "1b575ee97c5a5620d01efdc34b67e30929ba0be80194983a10cbb8cfa689f99d",
+        "build/server/channel/Point2D.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/server/channel/Point3D.d.ts": "061d2fceacb7589f550924204802a5c753e3f2116680cde28d0cb7a04598d9c9",
+        "build/server/channel/Point3D.d.ts.map": "927500d69321a58bf9b81895d119707b7d34377cb5951fd84c2ebdf40caf36cf",
+        "build/server/channel/Point3D.js": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+        "build/server/channel/SpatialGrid.d.ts": "894725d312d505b84e2637be548e019fec8aa986d74312f19c90cee158631350",
+        "build/server/channel/SpatialGrid.d.ts.map": "8a5bc46c5cd697ed9e20cd620a2f63a7ed12a9a82a74e885071e2313f0191e1e",
+        "build/server/channel/SpatialGrid.js": "599504da0a29295aef50198e30a3a02ce78442e3851965d7da8347639c6afe0a",
+        "build/server/channel/SpatialView.d.ts": "55645ed970992a86043d038f4ff122d2ab82ea790d27d929b9492c9f770dc9bc",
+        "build/server/channel/SpatialView.d.ts.map": "387370959a7def03d508c6ff6ded033719bc1469c26ad1b2a0e1079891de9d2b",
+        "build/server/channel/SpatialView.js": "b2a232235ba68ee56ba5d5dd62487f5fa9a058f27b45588b0afba0a9191e2273",
+        "build/server/CommandRouter.d.ts": "7e780257c2904b4a9395e72d492e236a31994f1d88c57cf18b315f969e8284b4",
+        "build/server/CommandRouter.d.ts.map": "be9e1f330c324d6585d62c8e323391e299d1d37baeabfd20f1ed710f3043c4b3",
+        "build/server/CommandRouter.js": "57b1f72f4efc8b2a28e224bb4ef69a7ba51634f0329c88269a0a57238d64faaf",
+        "build/server/EntityCache.d.ts": "0b5ec71ef295e4ac44ff6e80f0615b907ffc13ac8db621b958ba09c433010310",
+        "build/server/EntityCache.d.ts.map": "25919a10836c6a742a1b390dc20c4f9b75460a44aef4f9d427107b8962b876cc",
+        "build/server/EntityCache.js": "ca59dc36ba7da4ef89499319953caf465aa32a3735fd23ab999a9a31f8dcbb51",
+        "build/server/Historian2D.d.ts": "ed5af9199a087bfd59f9f5b63cd8ff0c63f5a59db2b35778d546be45d08f6b48",
+        "build/server/Historian2D.d.ts.map": "94ec835ecfe277a04942b882320eb83b47244dab22732bd6e3b3daf3b58dd2ff",
+        "build/server/Historian2D.js": "8603deaf1e4e8eac40c7a9bb0d1910c59ea6c33972f925e11298cb8bbf79dfd7",
+        "build/server/Historian3D.d.ts": "a22163c1f73b9591a7005b107240a3a30b4641ed71762d4ec2b31f116277ee92",
+        "build/server/Historian3D.d.ts.map": "86cc0aa616c56426e9ccaf0e16698cf9a9aea047921ffdbdd81617005f1b876d",
+        "build/server/Historian3D.js": "7e683044e13b0dbbe3e99b36d309421ab85dc08569e330f02c1125d3fc8112b5",
+        "build/server/historianGrid.d.ts": "122a41ce4370d5e115b1d77ad17aed44d7cb61178e57ef0c85b25a59d47181ff",
+        "build/server/historianGrid.d.ts.map": "61739b465253d066e6d5f250b417b3917407f22193518db2c54e947c86e648e6",
+        "build/server/historianGrid.js": "51beda140dcb3ea757d495edb52b28a68374a17c4a62019bddfa3a8e7e97f04f",
+        "build/server/IdPool.d.ts": "12c221e9df32949f4c6fceb62c4097bcbb6fe8f1079ef791b28d1a9dfe8f4bc0",
+        "build/server/IdPool.d.ts.map": "b0c3fc4f74ca2aa11c129f5b3afcb30a63d281a58b6b8769d2782fda0082ad30",
+        "build/server/IdPool.js": "503fc026f00b9848d515f697788d690a280d827947125dbe12120333b36320a5",
+        "build/server/Instance.d.ts": "4f38a59c8efb747673f917f5341bd4eaedd5b03ddd5acc349e79f4fda0140655",
+        "build/server/Instance.d.ts.map": "3fc6a3a1a03e8be1c99d6d130e7d3b7fde890ead8445848eaa8c5848e122ab99",
+        "build/server/Instance.js": "3b2663a92fdc7e7ff8d70fb8ccc2aedbebaeca66127486d7b8f19cdf935fdabc",
+        "build/server/InstanceNetwork.d.ts": "aa2f2e8bb28d87bfb5c32466c43b8b8b2d5478672ae57d619b202e2e5e08579f",
+        "build/server/InstanceNetwork.d.ts.map": "f82250f05a7837a0b02a871a1381b1e0fd0c0b278ec528847c4a5ecb169369e1",
+        "build/server/InstanceNetwork.js": "5d3d61d84bc3d7d499840ca95c0941d4703d352a9b305c71180715cc7134bdd8",
+        "build/server/LocalState.d.ts": "fef4e3bc977d3cbd5db582162de0fcd101a26d733e5123ef5f4d325fbb523aef",
+        "build/server/LocalState.d.ts.map": "6f0aadf96d8dc0b6e4cdf5f38a6df31901f07fd75b33ad64cd001884cdb37ad5",
+        "build/server/LocalState.js": "4b1ca40d8b9806d804fed48cc01af533beeeb5a0814c4dd6b2139816de8893ce",
+        "build/server/NDictionary.d.ts": "cd5b5d554aa2e7179a85ca9b13a77323c4b3ea4c609936e7e00a94baa6ac8f58",
+        "build/server/NDictionary.d.ts.map": "a3ebe741031f3c5c28ce2325e2ca68eed06a0c3a8f312e855056436e4af8c07f",
+        "build/server/NDictionary.js": "44f9576a8884668bcca662e9216a6b265c9873fc63b730e5e96e451d7f1defd9",
+        "build/server/NetworkLimits.d.ts": "2c782ed0b256f1351628ad4e87730d20aa63121b9eaf0b232c70c6810ae09b35",
+        "build/server/NetworkLimits.d.ts.map": "c2ec659e6ed8363bfcf9343f4357465970e652c5ef1d58d4af87c485ecede87f",
+        "build/server/NetworkLimits.js": "d1980ed56fc2598826bda94827272e02164d473b48fdcfac24626c281d9aacb9",
+        "build/server/PublicPathSmoother2D.d.ts": "0d3cc115750edcaf3efc4138345749c6c712070dfcdd9f78af7dacb4fba639a7",
+        "build/server/PublicPathSmoother2D.d.ts.map": "eb126e7d32fc6e9f0b0b1f7e200dc132fede79d90be9077e13c166d8516cae0c",
+        "build/server/PublicPathSmoother2D.js": "74d350edcf5f5becdda7adada0c3de0bcff581292e1f12f9fc6984bf7cace994",
+        "build/server/PublicPathSmoother3D.d.ts": "6d8dc5738d223037c689c95a99b1a0e668ecfef35f486ba2e75f1b890117eecf",
+        "build/server/PublicPathSmoother3D.d.ts.map": "f62c031802a3c9c2b038cc23c4dd2b9b64ce1c06f0352a3cc5d29a2387852290",
+        "build/server/PublicPathSmoother3D.js": "31dddaa1b6b9bbfa2b9663d6909e2c618e5ad3506bc4e6b463b8e518e10aec2a",
+        "build/server/User.d.ts": "c9047d0503ac5c5313d171eea906693ab64f727e0e03184ac0ebfd9fd82e9c07",
+        "build/server/User.d.ts.map": "ef34233f7310433ba55f986fbdeadc3beda5c3acd872cb2a08f0032c107c5e63",
+        "build/server/User.js": "b22fbb759a2bfbdf5b52863b8c7cc185d04e815b28e562c8986bb5196a185d0a",
+        "docs/ai/adapters.md": "506c89eb30dac791fd6b9c1edb1a49c6c627cbec1b9932d6c678572a2ca6896e",
+        "docs/ai/anti-patterns.md": "0db06b78c58dc16e699e344b68446f49d191be6bb03e05e11c0e950bda66b537",
+        "docs/ai/api-surface.md": "577d650c0c9b724d97a5a659cb5ae3bfea5948704b23d89b85b633ab1eb3db8f",
+        "docs/ai/architecture-and-ticks.md": "f02a0eaf7913bb504f88c660316675e30703ff586ef1d764069cf3fdf63d0a51",
+        "docs/ai/benchmarking.md": "357bbd81d0a5cd3e07c813551fa8fdda77a0d4eddf208cefa7f3b5187959cc35",
+        "docs/ai/canonical-snippets.md": "c6daed48e86b3875bca1131738c2132946b4c518463c76b9c2302aa1f4013659",
+        "docs/ai/channel-recipes.md": "bc91804a667bd29af485f74b762fa0e6000e69ccafca41542fa5009bfa81cded",
+        "docs/ai/channel-selection.md": "66c965c4a13f9146bba3abc437cf66f187935d93c06024227a7fc56e08a4329a",
+        "docs/ai/client-state.md": "8cb07a98b32cb2c7cfecb2fa563be927d013cfafed73d14dcb1782f8c1d9eb0a",
+        "docs/ai/ecs-channels.md": "e65c770d824e89b4f2097e22eb8ec2d2657bf8f91f342b30adb780ba8a6c0647",
+        "docs/ai/ecs-world.md": "b37cfc3b3ea24b3c70d146015058e334aa1833643e6faa55cab2d243edae3bfd",
+        "docs/ai/getting-started.md": "9d8938de41df7b02d9e4aa45435d0e39cfddb1a27a2f34ef2428e8fbfc06f20d",
+        "docs/ai/historian-lag-compensation.md": "e15494a70f22c5f24254c1795d2dbeef4f1882facd565818acedd628c163c503",
+        "docs/ai/manual-mutations.md": "4cb231dce9b2941653b9187cdc8cf65cac64840aeefb8497d54dbb5660664714",
+        "docs/ai/migration.md": "da94e3b5cd60dff6e613bf66f7ac4a134df2ed91823137827e6afe5fe4fb56f6",
+        "docs/ai/minimal-spatial-game.md": "e75de46efc8c563d5bcbc4ff5bf2af71d9d4988f5987abb605f81af5b47bdd3f",
+        "docs/ai/network-condition-simulation.md": "de9ea52ae2b4a797ad08e12f30ae3ab344b5b3375cb14b367ea8eeeaf3dbe856",
+        "docs/ai/network-limits.md": "6c6919fa891d92ba5ab76a6ac4a8b8fc86a0e2a227f8d2698b344d8148402634",
+        "docs/ai/networking-primitives.md": "700971f49fbf70a6055708aec4c33cc3fd7f62c43235d671d340762d98d21eeb",
+        "docs/ai/operations.md": "a9e3cc9dabc8fa5e3413cc6e64dc66fbb68c9b737338c8e2a8c749ad44487199",
+        "docs/ai/package-compatibility.md": "7ca47958f0aa50ab2c70138617d07c6f6ec4c385571d8078f469622b67167564",
+        "docs/ai/plain-channels.md": "8e280b1d16206bd326c5a8c0020d3f7097a96199760962145182ef7c5435327b",
+        "docs/ai/README.md": "76d5fc02698e92eec09af105ce0206283812bc37b4aeb8991cdae15a10c42bb5",
+        "docs/ai/realtime-movement-prediction.md": "3e757e23aba848924c17edcd05549d3d181d1cfbc226e4e76eea3e09260f62ed",
+        "docs/ai/service-patterns.md": "6ea002ce0982c4554879f6101900292e73e59e94436c086f7395ffcecea3b3d7",
+        "docs/ai/shared-state.md": "59fde4bad10a765dc9c35e843c2d13b5ecc2e26f20657ab70ece3571fb414fe2",
+        "docs/ai/spatial-channels.md": "e94d608d3a51bfa85514c5205b612c44f9dfe2c03ab097d692490f271d800abc",
+        "docs/ai/testing-and-correctness.md": "3610c31694a804c82de554a2086e18c6b2a881aef4b9416d1a4b3168023deaeb",
+        "docs/ai/timing-and-liveness.md": "ee40ab21d3e4c32f4e17cf9ee035ed916eceab510450b2bbb43651d3bb4ec026",
+        "package.json": "c443377bd37b411d3cc91c726a3a09a4bbb2163d0d7c3dca2b79d1404e7666e0",
+        "README.md": "d077a6283534b68613b6588ede65d484a20492d7518e09f26aabf90600539844",
+        "CHANGELOG.md": "e75c54e9823794c34fd41b4d8714349a716a8e2f2bf9c8cdd0f16ae3ccd975d8",
+        "examples/basic-movement/README.md": "6e6f27a29f5f67feffa9feefc917edd11c9ec755fb2bce87c9a95ee310cd3f83",
+        "examples/basic-movement/package.json": "6b21e6640e8727a0ef149c84a5c6809822736b2a4039f06a08b32ab3e5efa2d2",
+        "examples/basic-movement/tsconfig.json": "21ae85756b60b656cc64669c531a032f61dc62a4203a630d3ce836bae67db0a1",
+        "examples/basic-movement/protocol.ts": "b1ce360d05f4f73d090a87cffd0498699dd22172f20a88337fa1c3e9213304d2",
+        "examples/basic-movement/game.ts": "1f55afc0fef4b931983731a15fcdb8df019789235044c9da9e85c5fabb02ac36",
+        "examples/basic-movement/server.ts": "60a3b90571a7e9a0628b635bd88fca703a53b23195081164379581d608a99e81",
+        "examples/basic-movement/client-state.ts": "cf14d4a079c77eaefbc9e271fb5b6abf9aa14cfa7611e3f7d46b635ca81ce151",
+        "examples/basic-movement/client.ts": "8aa2c43a302528237ba0921313b17ebdd2499b708d3095098de653214cacb4c3",
+        "examples/basic-movement/dev.ts": "ecc5a6f332af6808bbc0c64ce3e6fa1ae4d6bf8482920e46a098d1577f633a23",
+        "examples/basic-movement/index.html": "7f7a31dbc45254c3c6f5833d2e5244ffddd90fc5ecf4eb97c1138b93cc13071c",
+        "examples/basic-movement/style.css": "cb36ff66f4209214e1980d313c407515941dcf844d9746f682ee2b995c6ab6bc"
+      }
+    },
+    {
+      "name": "nengi-buffers",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-buffers",
+        "version": "2.0.0-rc.128",
+        "description": "Node Buffer reader and writer for nengi",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "jest",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-buffers.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-buffers#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-buffers/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.14",
+          "jest": "^29.7.0",
+          "nengi": "2.0.0-rc.128",
+          "ts-jest": "^29.4.0",
+          "typescript": "^5.9.3"
+        },
+        "dependencies": {
+          "@types/node": "^20.19.0"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        }
+      },
+      "integrity": "sha512-n4Pcibzlkoc44qFdiOE/Mhdb8dAJn7ZagipqWjOYDBPYfGEVhPRpQKr0FTruyexhV+LiReCeg2cZsvg87M7cfg==",
+      "file": "nengi-buffers-2.0.0-rc.128.tgz",
+      "files": {
+        "build/BufferBinary.d.ts": "a0670e512b7cff6cf495a2407cdfcb3986558cd498b71d9ebbc933e8c782f806",
+        "build/BufferBinary.js": "bec8c0fdf2ab4881d668ee900d8baabf1391982093a4dd8fa29b3ca2af1e4bb0",
+        "build/BufferReader.d.ts": "175338a1dc667ef1d08ed7bfcbfb039177229613c2911edf1a7d7d1b0f503ec7",
+        "build/BufferReader.js": "c3da3c08e7d725397f2356bcb0d27488766d7653ec565464a9cb23ad1df4f301",
+        "build/BufferWriter.d.ts": "cf05f556087c22ed20e8d4cf35df85b64487d783f738b93b95b81157ae8b7d39",
+        "build/BufferWriter.js": "040ca1dc908a0cd76738e3f52f2ce6f89b7560d37208490c360b7094c748351f",
+        "build/index.d.ts": "f4a4125916358afc265f77400396cdb0df150d63c98988ee2fdaea548df4b2ab",
+        "build/index.js": "979603927be7f4676f90619bfe36e06786f5a855f7efb456d32e8fea39e4249b",
+        "package.json": "e58895e5fabb8e5f54bdd8bec7252a8be3f5807413515b6951dc1c223f12fd2e",
+        "README.md": "328908901b3a47d7dd618e8903e9ac6b0f5d735da12e5ea04b130f6e6e59687f"
+      }
+    },
+    {
+      "name": "nengi-dataviews",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-dataviews",
+        "version": "2.0.0-rc.128",
+        "description": "DataView reader and writer for nengi",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "jest",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-dataviews.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-dataviews#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-dataviews/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.14",
+          "jest": "^29.7.0",
+          "nengi": "2.0.0-rc.128",
+          "ts-jest": "^29.4.0",
+          "typescript": "^5.9.3"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        }
+      },
+      "integrity": "sha512-anfGK3bCT3IwXOFdXH8ciuaF4w9XMKPU4p3fIDQwt74u06cj1Ztnxf3evZkiJzl/4A7zwae05E2n6O8daE59ZQ==",
+      "file": "nengi-dataviews-2.0.0-rc.128.tgz",
+      "files": {
+        "build/DataViewBinary.d.ts": "015bb04ce0dc5c6319c84e2cd9908718c778115315f716d8deca9c4b1985eec9",
+        "build/DataViewBinary.js": "0693f78d73eac600fab052c396600c80f306a7b20b0f2791c74abd94dcd746ea",
+        "build/DataViewReader.d.ts": "49304f6ec4058a933282adad019a6cc0b915b03373ca2d079a9427d074ec7ada",
+        "build/DataViewReader.js": "16c905738ca9991883570b70b175256062b8153f892d628ea0aaee7a0b3ac0bf",
+        "build/DataViewWriter.d.ts": "5281357b1bc7cba62335981317d4435566108a4d92698982b433f333a2116482",
+        "build/DataViewWriter.js": "9a7cc2b05bcb5b63ace90fe0f76762db8d4d1cb309e1b98aa40994fde23cd6e8",
+        "build/index.d.ts": "e5a9d19bbf9cfb47ed81f3eda6dee86f971a1ef35cf91877cce3b498b6cff64f",
+        "build/index.js": "e5234bbcc69d68eface2fa1cfe3fd4fa82802d79b90bf6c95a8716490d6fed54",
+        "package.json": "818aafd4f0d5fd35d2c937e3d5f680653d181796ced8512e39177ff3428be046",
+        "README.md": "d242f84399e9f2e87deae82a260df9d396f8a926b48cb703887e538545553829"
+      }
+    },
+    {
+      "name": "nengi-ws-instance-adapter",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-ws-instance-adapter",
+        "version": "2.0.0-rc.128",
+        "description": "ws adapter for nengi instance",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "npm run build && jest",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-ws-instance-adapter.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-ws-instance-adapter#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-ws-instance-adapter/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.14",
+          "@types/node": "^20.19.0",
+          "jest": "^29.7.0",
+          "nengi": "2.0.0-rc.128",
+          "ts-jest": "^29.4.0",
+          "typescript": "^5.9.3"
+        },
+        "dependencies": {
+          "@types/ws": "^8.18.1",
+          "nengi-buffers": ">=2.0.0-rc.128 <2.0.0",
+          "ws": "^8.17.1"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        }
+      },
+      "integrity": "sha512-o2r61gWwK0G+/ZGeOqu+erNGZdubm5zRn6MRgpO65Wx9wEoAtptUp1Lx9X+zqbvd+j1u/+SdCAcMUy5ceT7xtw==",
+      "file": "nengi-ws-instance-adapter-2.0.0-rc.128.tgz",
+      "files": {
+        "build/index.d.ts": "5e77c15068c2cc98dc6c68fbcda6c4d2cf77181d363b8799782a3f6b2398b732",
+        "build/index.js": "ca0ad7f16d68735e1e485811690995ff30d8f93fa6964fbc1bcfc8709653aff5",
+        "package.json": "65e0ea792a931a95a09176fa9a063b45720141aa37781c0fe6820760f474f4dc",
+        "README.md": "82799d0b430b5cd9f4496d4d19905af896a9b8c9232afb05bd1e242e51958422"
+      }
+    },
+    {
+      "name": "nengi-uws-instance-adapter",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-uws-instance-adapter",
+        "version": "2.0.0-rc.128",
+        "description": "uWebSockets.js adapter for nengi instance",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "npm run build && jest",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-uws-instance-adapter.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-uws-instance-adapter#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-uws-instance-adapter/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.14",
+          "@types/node": "^20.19.0",
+          "jest": "^29.7.0",
+          "nengi": "2.0.0-rc.128",
+          "ts-jest": "^29.4.0",
+          "typescript": "^5.9.3",
+          "ws": "^8.21.3"
+        },
+        "dependencies": {
+          "nengi-buffers": ">=2.0.0-rc.128 <2.0.0",
+          "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.66.0"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        }
+      },
+      "integrity": "sha512-3oxss6S3Bu3CjaK+Wt8sgcvJ/ZiDFTU12pp1oVIi8ZBOfo7V1Qiejv+9HLs/orHR9PTkee0UgL8FRBysoYY4qA==",
+      "file": "nengi-uws-instance-adapter-2.0.0-rc.128.tgz",
+      "files": {
+        "build/index.d.ts": "1deb34aa3256aa744d6f2d1f0af87c807f91955464e54e450770c4aa66e146a2",
+        "build/index.js": "1df5b6d85c1ade734c44e335641bd56866edbf6e1ac57ff380d63e47d1e7e9cf",
+        "package.json": "649806a2cc502fc2c664014695f374501e254aa6b032cbee0835213c4d6d2235",
+        "README.md": "1ad6f067c042b68ae771dfe227b19992345e92b94ad0a693d86af889ae24ec4a"
+      }
+    },
+    {
+      "name": "nengi-bun-instance-adapter",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-bun-instance-adapter",
+        "version": "2.0.0-rc.128",
+        "description": "Native Bun server adapter for nengi instances",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "npm run build && bun run test/native-smoke.ts",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-bun-instance-adapter.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-bun-instance-adapter#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-bun-instance-adapter/issues"
+        },
+        "dependencies": {
+          "nengi-dataviews": ">=2.0.0-rc.128 <2.0.0"
+        },
+        "devDependencies": {
+          "nengi": "2.0.0-rc.128",
+          "nengi-websocket-client-adapter": "2.0.0-rc.128",
+          "typescript": "^5.9.3"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        },
+        "engines": {
+          "bun": ">=1.3.0"
+        }
+      },
+      "integrity": "sha512-X/w8BlQZkzrOO2DNk9faAPchM1nTgZbyAVN5lPhmXJZKAUTeJiwKup4wg4tjCDtcpDnDlapDbgU+HUV4Ea6Wqg==",
+      "file": "nengi-bun-instance-adapter-2.0.0-rc.128.tgz",
+      "files": {
+        "build/index.d.ts": "17f0563fb891b79e89396d41fedac7b522eb3a008fd569b6fa176787e221ff58",
+        "build/index.js": "f07b2f9a49978b9dcbeb5323742568ba0900b41c1295e679c4a11d79b6bb6a34",
+        "package.json": "64404d5213aebb23ee6c7a927e7aacc218d88b2aa2077205fd5a8dbb7d4a7757",
+        "README.md": "4f5db6814171adf552c6452764ba2f7ee46318ebe2021ab092486cfa6e519dfc"
+      }
+    },
+    {
+      "name": "nengi-deno-instance-adapter",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-deno-instance-adapter",
+        "version": "2.0.0-rc.128",
+        "description": "Native Deno server adapter for nengi instances",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "npm run build && deno run --allow-net --allow-read test/native-smoke.ts",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-deno-instance-adapter.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-deno-instance-adapter#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-deno-instance-adapter/issues"
+        },
+        "dependencies": {
+          "nengi-dataviews": ">=2.0.0-rc.128 <2.0.0"
+        },
+        "devDependencies": {
+          "nengi": "2.0.0-rc.128",
+          "nengi-websocket-client-adapter": "2.0.0-rc.128",
+          "typescript": "^5.9.3"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        },
+        "engines": {
+          "deno": ">=2.0.0"
+        }
+      },
+      "integrity": "sha512-C7nGn86RaufDWequfQFH/pyjZm4pdIMyfXSmAMr1IDflfHogPsL3zsgwT4ZmdiG2ntDGS6RXf14KoW4jMelfWw==",
+      "file": "nengi-deno-instance-adapter-2.0.0-rc.128.tgz",
+      "files": {
+        "build/index.d.ts": "6e64a24aadbfdaa5773f271ec8f3ab1e7f69837060b33971a918a65bf8f5491d",
+        "build/index.js": "6f729f15aa6a321e645d396b5b563d63205e21c6d016e11c71e30420ad81f301",
+        "package.json": "2751afb6d61a2fa3d10277f60414316b87334b6ddd9aea66dd5bdf5add9de730",
+        "README.md": "cbe9f1a4b9a7241bec112bcc7f84ce83c6b2cfd67a70b1887e71446d274fab93"
+      }
+    },
+    {
+      "name": "nengi-ws-client-adapter",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-ws-client-adapter",
+        "version": "2.0.0-rc.128",
+        "description": "ws adapter for nengi client",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "jest --passWithNoTests",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-ws-client-adapter.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-ws-client-adapter#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-ws-client-adapter/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.14",
+          "@types/node": "^20.19.0",
+          "jest": "^29.7.0",
+          "nengi": "2.0.0-rc.128",
+          "nengi-ws-instance-adapter": "2.0.0-rc.128",
+          "ts-jest": "^29.4.0",
+          "typescript": "^5.9.3"
+        },
+        "dependencies": {
+          "@types/ws": "^8.18.1",
+          "nengi-buffers": ">=2.0.0-rc.128 <2.0.0",
+          "ws": "^8.17.1"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        }
+      },
+      "integrity": "sha512-7SV45sMYmMDNWGHZIp8O43KN/TvZyk7Fb2A9CLAVh6IXMbmPSzWT7IqqTlMwc+zUrhyJFZOJQy/a72pnDuTvug==",
+      "file": "nengi-ws-client-adapter-2.0.0-rc.128.tgz",
+      "files": {
+        "build/index.d.ts": "a5c931741f248eab025572d1270547ad617451792a5a8f3927de042cfd371de6",
+        "build/index.js": "2ba28a81a207a786a21a7693966236e99c539e53cbfcd5c2937256371a3c19e5",
+        "package.json": "93f9d20bff865e9ed0a188a547697bcb45ffb0c0dc9b637112ce6acf5a6beeaf",
+        "README.md": "1a295150b63177c5dfcea0a0db15d3a64f0dc477320cb9736c4759143e88d639"
+      }
+    },
+    {
+      "name": "nengi-websocket-client-adapter",
+      "version": "2.0.0-rc.128",
+      "manifest": {
+        "name": "nengi-websocket-client-adapter",
+        "version": "2.0.0-rc.128",
+        "description": "Browser websocket adapter for nengi client",
+        "main": "./build/index.js",
+        "types": "./build/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./build/index.d.ts",
+            "require": "./build/index.js",
+            "import": "./build/index.js",
+            "default": "./build/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": [
+          "build"
+        ],
+        "scripts": {
+          "test": "jest --passWithNoTests",
+          "clean": "node -e \"require('fs').rmSync('build', { recursive: true, force: true })\"",
+          "build": "npm run clean && tsc",
+          "prepack": "npm run build"
+        },
+        "author": "Alex // timetocode",
+        "license": "Apache-2.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/timetocode/nengi-websocket-client-adapter.git"
+        },
+        "homepage": "https://github.com/timetocode/nengi-websocket-client-adapter#readme",
+        "bugs": {
+          "url": "https://github.com/timetocode/nengi-websocket-client-adapter/issues"
+        },
+        "devDependencies": {
+          "@types/jest": "^29.5.14",
+          "jest": "^29.7.0",
+          "nengi": "2.0.0-rc.128",
+          "ts-jest": "^29.4.0",
+          "typescript": "^5.9.3"
+        },
+        "dependencies": {
+          "nengi-dataviews": ">=2.0.0-rc.128 <2.0.0"
+        },
+        "peerDependencies": {
+          "nengi": ">=2.0.0-rc.128 <2.0.0"
+        }
+      },
+      "integrity": "sha512-cMOXuenHOCY5IC7/90zRaNahgd619TWqRjyJdd9Kc6lgz74KAGVzO31AOrgUUG5awg6gFmJ1/PlrQAGzR3fv7g==",
+      "file": "nengi-websocket-client-adapter-2.0.0-rc.128.tgz",
+      "files": {
+        "build/index.d.ts": "a10743eb423fbe63bd1c37aa67435c7583596c111a1b138b59aa154289fa584c",
+        "build/index.js": "81b2588a37be20ca96fcfbde0a3cbd11606427e9681edfa850585b57686df7df",
+        "package.json": "40b9c11c7aadab33059419388bd3bf5cc4cff67c2adcb2a40d42c781608cb6a9",
+        "README.md": "f8989310f90f1893c5a22398cacc1c05b1e97aa8287f3d0b2ec79fa30979ee6d"
+      }
+    }
+  ]
+}

@@ -36,6 +36,11 @@ class Predictor {
         this.reconciliationHandlers = new Set()
     }
 
+    cancelSession() {
+        this.log.cancelSession()
+        this.reconciliationHandlers.clear()
+    }
+
     cleanUp(commandFrameNumber: number) {
         this.log.pruneResolvedBefore(commandFrameNumber - 50)
     }

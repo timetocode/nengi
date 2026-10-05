@@ -125,13 +125,12 @@ queues, event-loop scheduling and asymmetric links still affect the estimate.
 command view timestamps are anchored at receipt and do not advance while the
 command waits in the server queue.
 
-Pongs are engine traffic. Game code does not construct them manually. Official
-client adapters send a Pong-only packet immediately after a snapshot containing
-a Ping is parsed. This control packet does not advance the command frame and
-does not flush commands, requests, predicted operations, or other application
-traffic. A normal `client.flush()` also carries any Pong that remains queued,
-which preserves liveness for custom adapters that have not implemented the
-immediate control path.
+Pongs are engine traffic. Game code does not construct them manually. Core sends
+a Pong-only packet through the client transport immediately after decoding a
+snapshot containing a Ping. It does not advance the command frame or flush
+commands, requests, predictions, or other application traffic. All version 2
+client adapters use this same core path; no adapter-specific heartbeat hook is
+required. A fatal send failure ends the logical session.
 
 This separation matters in browsers. `requestAnimationFrame` commonly pauses in
 a hidden tab, but receiving and answering network traffic must not depend on the
@@ -141,7 +140,51 @@ connected while rendering is suspended.
 The server likewise needs a regular `instance.step()` cadence even when no game
 or service state changed. Snapshots carry Pings, and each step evaluates
 handshake and Pong deadlines. An event-driven service should schedule an idle
-network step rather than stepping only after application mutations.
+network step and drain lifecycle events even without application mutations.
+New admissions also reclaim expired pending handshakes, but do not run simulation
+or produce snapshots. Without steps or admissions no server deadline sweep runs;
+without event draining, denial events eventually fill the bounded queue.
+
+## Client deadlines
+
+The fifth `Client` constructor argument accepts these defaults:
+
+```ts
+const client = new Client(context, Adapter, 20, adapterConfig, {
+    connectTimeoutMs: 10_000,
+    serverTimeoutMs: 30_000
+})
+```
+
+`connectTimeoutMs` covers the entire attempt, including transport opening and
+nengi acceptance. It does not restart after the WebSocket upgrade. Expiry rejects
+`connect()` with `CONNECT_TIMEOUT`, cleans up the attempt, and permits a retry.
+
+`serverTimeoutMs` starts at acceptance and renews only when valid inbound nengi
+traffic is decoded. Expiry ends the accepted session with `SERVER_TIMEOUT`.
+Outgoing commands, native WebSocket control frames, rendering and draining frames
+do not renew it. Configure enough time for the server's intended publication
+interval, jitter and tolerated stalls; these defaults are policy, not RTT estimates.
+Keep calling `instance.step()` even when game state has no mutations.
+
+Both options require positive finite milliseconds no greater than 2147483647.
+Use `null` to disable a deadline explicitly, including in local simulations with
+no continuously publishing peer. Zero, negative values, NaN and Infinity are
+errors. They do not alter the server's independent handshake/Pong policies below.
+
+Core uses at most one lifecycle timer per Client. Packets update the deadline
+without allocating a replacement timer. Timer callbacks and inbound activity both
+check elapsed monotonic time. A suspended process cannot execute cleanup until it
+runs again; if the budget has already expired then, the connection ends before
+buffered traffic can revive it. A hidden page that continues receiving valid
+traffic remains alive. A game's pause policy should account for full browser/OS
+suspension separately from a paused animation loop.
+
+Simulated adapters renew liveness on simulated delivery, so artificial latency
+and stalls exercise the same deadlines. An injected `now` must remain monotonic
+and advance with elapsed time; deterministic tests should control timer wakeups
+as well as that clock. See [connection lifetime](./client-state.md#connection-lifetime)
+for cancellation, structured outcomes and cleanup.
 
 ## Heartbeat deadlines
 
@@ -183,16 +226,41 @@ playback does not reverse. A game may call `interpolator.resetTimeline()` after
 handling a pause backlog to restart at the current desired buffer immediately;
 that explicit reset can change the displayed point in time.
 
-The handshake timeout covers the complete pre-acceptance lifecycle: waiting for
-the initial Nengi handshake and waiting for `instance.onConnect` to resolve.
-Configure a larger value when authentication has a deliberately larger budget;
-do not leave an authentication promise unbounded.
+### Handshake deadlines
 
-If a handshake deadline expires before userland received `UserConnected`, Nengi
-closes the transport and emits one `UserConnectionDenied` event with
-`handshake_timeout`. It does not emit `UserDisconnected`. Once `UserConnected`
-has been emitted, a Pong timeout closes the transport and emits exactly one
-`UserDisconnected` event with `pong_timeout`.
+The server's `handshakeTimeoutMs` budget starts at transport admission. It covers
+waiting for the initial nengi handshake, `instance.onConnect`, and encoding setup
+data. nengi checks expiry during steps, during new admissions, before application
+authentication, after it completes, and immediately before sending acceptance.
+Finishing authentication after the deadline cannot sneak in between server ticks.
+
+Configure a larger server budget when authentication deliberately needs one.
+The client's independent `connectTimeoutMs` covers transport opening **and**
+waiting for acceptance. If you want the server's denial to arrive first, budget
+the client for transport opening + server handshake budget + return transit and
+scheduling margin. Raising only the server budget does not extend the client
+budget. A shorter client deadline is also a valid product choice; cancellation
+cleanup must work whichever side ends the attempt first.
+
+A client timeout is local; a failed or half-open transport may never deliver its
+close to the server. Keep calling `instance.step()` and draining lifecycle events,
+including in idle services, so pending work and accepted sessions expire on the
+server. Expiry checks on new admissions reclaim capacity, but do not guarantee
+timely cleanup when no new clients arrive and authentication never finishes.
+
+On expiry before acceptance, nengi closes the transport, aborts the
+[`onConnect` signal](./networking-primitives.md#cancellation-and-setup-ownership),
+and queues one `UserConnectionDenied` event with
+`payload: { reason: 'handshake_timeout' }`. It does not emit `UserDisconnected`.
+For a peer that has begun its nengi handshake it also tries to send that denial:
+the client can reject with `code: 'CONNECTION_DENIED'` and
+`detail: { reason: 'handshake_timeout' }`. Forced transport closure may discard
+queued bytes, so `REMOTE_CLOSE` or the client's own `CONNECT_TIMEOUT` can still
+win. A denial message is best effort, not a delivery guarantee.
+
+After acceptance, a Pong timeout closes the transport and queues exactly one
+`UserDisconnected` event with `pong_timeout`, even if the game has not yet drained
+its earlier `UserConnected` event. The attempt signal no longer owns that session.
 
 Adapters may provide an immediate `terminate` operation so a half-open
 transport does not wait indefinitely for a graceful WebSocket close.
@@ -206,8 +274,10 @@ test controls every deadline explicitly.
 
 The connection handshake and every snapshot carry Nengi's wire-protocol
 version. A mismatch is fatal and is distinct from the optional schema
-fingerprint check. Keep nengi and every official adapter or binary package on
-the same exact release-candidate version.
+fingerprint check. Adapter package versions are independent of this wire
+version. Install compatible package ranges and deploy the same tested core
+release at both ends during RC development; see
+[package compatibility](./package-compatibility.md).
 
 ## Interpolation is separate
 

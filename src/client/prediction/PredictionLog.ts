@@ -10,7 +10,8 @@ export enum PredictionOperationKind {
 export enum PredictionOperationStatus {
     Pending = 'pending',
     Confirmed = 'confirmed',
-    Rejected = 'rejected'
+    Rejected = 'rejected',
+    Cancelled = 'cancelled'
 }
 
 export type PredictionTarget = {
@@ -87,6 +88,14 @@ export class PredictionLog {
     nextId = 1
     operations = new Map<number, PredictionOperation>()
     byRequestId = new Map<number, PredictionOperation>()
+
+    cancelSession() {
+        for (const operation of this.operations.values()) {
+            if (operation.status === PredictionOperationStatus.Pending) operation.status = PredictionOperationStatus.Cancelled
+        }
+        this.operations.clear()
+        this.byRequestId.clear()
+    }
 
     addCommand(command: any, commandFrameNumber: number, options: PredictionOperationOptions = {}) {
         const operation = this.createOperation(PredictionOperationKind.Command, commandFrameNumber, command, options)
@@ -248,6 +257,8 @@ export class PredictionLog {
             }
         }
 
+        // Validation can end the session synchronously.
+        if (operation.status === PredictionOperationStatus.Cancelled) return { operation, accepted: false }
         operation.status = accepted ? PredictionOperationStatus.Confirmed : PredictionOperationStatus.Rejected
         const resolution: PredictionResolution<Response> = {
             operation,

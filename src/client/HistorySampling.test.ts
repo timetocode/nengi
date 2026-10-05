@@ -1,8 +1,9 @@
 import { Binary } from '../common/binary/Binary'
-import { binaryGet, declareBinaryType } from '../common/binary/BinaryExt'
+import { binaryGet, declareBinaryType, CUSTOM_BINARY_TYPE_START } from '../common/binary/BinaryExt'
 import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { InterpolationStatus } from './FixedStepInterpolator'
 import { InterpolationTestHarness } from './InterpolationTestHarness'
+import { InterpolationOutput } from './InterpolationOutput'
 
 test.each([false, true])('built-in array history and samples are independent with interp=%s', interp => {
     const harness = new InterpolationTestHarness()
@@ -21,7 +22,7 @@ test.each([false, true])('built-in array history and samples are independent wit
 
 test('full sampling agrees with selected sampling across lifecycle boundaries and backward targets', () => {
     const harness = new InterpolationTestHarness()
-    const bytesType = Binary.LAST_INDEX + 101
+    const bytesType = CUSTOM_BINARY_TYPE_START + 101
     declareBinaryType(bytesType, {
         ...binaryGet(Binary.UInt8Array),
         clone: (value: Uint8Array) => value.slice()
@@ -58,6 +59,7 @@ test('full sampling agrees with selected sampling across lifecycle boundaries an
     const interpolator = harness.interpolator
     const diagnostics = interpolator.getSampleDiagnostics(50, 1150)
     const bounds = jest.spyOn(interpolator, 'getSampleDiagnostics')
+    const output = new InterpolationOutput()
     for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 3], [1, 2], [0, 1]]) {
         interpolator.resetTimeline()
         for (const alpha of [0, 0.5, 1]) {
@@ -65,6 +67,8 @@ test('full sampling agrees with selected sampling across lifecycle boundaries an
                 frameA: frames[a], frameB: frames[b], alpha })
             const full = interpolator.sample(50, 1150).entities
             expect(full).toEqual(interpolator.sampleEntities([1, 2, 3, 4], 50, 1150).entities)
+            expect(full).toEqual(interpolator.getEntities([1, 2, 3, 4], 50, 1150))
+            expect(full).toEqual(interpolator.sampleEntitiesInto([1, 2, 3, 4], output, 50, 1150).entities)
             for (const nid of [1, 2, 3, 4]) {
                 expect(full.get(nid) ?? null).toEqual(interpolator.getEntity(nid, 50, 1150))
             }
@@ -85,6 +89,41 @@ test('full sampling agrees with selected sampling across lifecycle boundaries an
             expect(again.bytes[0]).not.toBe(255)
             expect(harness.client.network.store.history.getAt(2, frames[b].tick)!.position.x).not.toBe(-999)
         }
+    }
+    bounds.mockRestore()
+})
+
+test('selected sampling preserves iterator order and visibility after history pruning', () => {
+    const harness = new InterpolationTestHarness()
+    harness.receive({ createEntities: [
+        { nid: 1, ntype: 1, x: 0, y: 0, label: 'moving' },
+        { nid: 2, ntype: 1, x: 2, y: 0, label: 'leaving at B' },
+        { nid: 4, ntype: 1, x: 4, y: 0, label: 'already gone at A' }
+    ] })
+    harness.receive({ updateEntities: [{ nid: 1, prop: 'x', value: 10 }] }, 1050)
+    const frameA = harness.receive({
+        updateEntities: [{ nid: 1, prop: 'x', value: 20 }],
+        deleteEntities: [4]
+    }, 1100)
+    const frameB = harness.receive({
+        updateEntities: [{ nid: 1, prop: 'x', value: 30 }],
+        createEntities: [{ nid: 3, ntype: 1, x: 3, y: 0, label: 'arriving at B' }],
+        deleteEntities: [2]
+    }, 1150)
+    harness.client.network.store.history.pruneBefore(frameA.tick)
+    const interpolator = harness.interpolator
+    const diagnostics = interpolator.getSampleDiagnostics(50, 1150)
+    const bounds = jest.spyOn(interpolator, 'getSampleDiagnostics').mockReturnValue({
+        ...diagnostics, status: InterpolationStatus.Ok, frameA, frameB, alpha: 0.5
+    })
+    const selected = interpolator.sampleEntities([2, 99, 3, 1, 4, 2].values(), 50, 1150).entities
+    expect([...selected.keys()]).toEqual([2, 1])
+    expect(selected.get(1)!.x).toBe(25)
+    expect(selected.get(2)!.label).toBe('leaving at B')
+    expect(interpolator.getEntities([2, 99, 3, 1, 4, 2].values(), 50, 1150)).toEqual(selected)
+    expect(interpolator.sampleEntities([].values(), 50, 1150).entities.size).toBe(0)
+    for (const [nid, entity] of selected) {
+        expect(entity).toEqual(interpolator.getEntity(nid, 50, 1150))
     }
     bounds.mockRestore()
 })

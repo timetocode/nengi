@@ -1,12 +1,24 @@
 {
   "name": "nengi",
-  "version": "2.0.0-rc.127",
+  "version": "2.0.0-rc.128",
   "description": "High-performance realtime multiplayer networking for TypeScript games.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "files": [
     "build",
-    "docs/ai"
+    "docs/ai",
+    "CHANGELOG.md",
+    "examples/basic-movement/README.md",
+    "examples/basic-movement/package.json",
+    "examples/basic-movement/tsconfig.json",
+    "examples/basic-movement/protocol.ts",
+    "examples/basic-movement/game.ts",
+    "examples/basic-movement/server.ts",
+    "examples/basic-movement/client-state.ts",
+    "examples/basic-movement/client.ts",
+    "examples/basic-movement/dev.ts",
+    "examples/basic-movement/index.html",
+    "examples/basic-movement/style.css"
   ],
   "exports": {
     ".": {
@@ -26,7 +38,7 @@
     "typecheck": "tsc --project tsconfig.test.json",
     "verify:docs": "node scripts/verify-ai-docs.mjs",
     "verify:release": "node scripts/verify-release.mjs",
-    "release:check": "npm run lint && npm run typecheck && npm run test:family && npm run build:family && npm run verify:docs && npm run verify:release",
+    "release:check": "npm run lint && npm run typecheck && npm run test:release && npm run test:family && npm run build:family && npm run verify:docs && npm run verify:release",
     "release:login": "node scripts/npm-login.mjs",
     "release:publish": "node scripts/publish-package-family.mjs",
     "release:publish:dry-run": "node scripts/publish-package-family.mjs --dry-run",
@@ -35,7 +47,10 @@
     "profile:history": "node --expose-gc --import tsx src/performance/ClientHistory.performance.ts",
     "profile:history:browser": "node scripts/profile-client-history-browser.mjs",
     "lint": "npx eslint . --config .eslintrc.js",
-    "lintfix": "npx eslint . --fix --config .eslintrc.js"
+    "lintfix": "npx eslint . --fix --config .eslintrc.js",
+    "test:release": "node --test scripts/package-policy.test.mjs scripts/check-public-docs.test.mjs",
+    "test:compatibility": "node scripts/test-adapter-compatibility.mjs",
+    "release:locks": "node scripts/prepare-release-locks.mjs"
   },
   "author": "Alex // timetocode",
   "license": "Apache-2.0",
@@ -56,7 +71,8 @@
     "jest": "^29.6.2",
     "ts-jest": "^29.1.1",
     "tsx": "^4.22.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "semver": "^7.6.0"
   },
   "overrides": {
     "minimatch": "^9.0.7"

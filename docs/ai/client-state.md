@@ -23,14 +23,44 @@ clock domains. Server time is useful for command timing and lag compensation;
 the default interpolators use local playback and arrival history instead of
 requiring a synchronized server render clock.
 
-## Basic loop
+## Games that own their history
+
+Entity history is enabled by default for nengi's interpolators. A game that
+maintains its own checkpoints or only needs current authoritative state can
+disable that recording when constructing its client:
 
 ```ts
-const client = new Client(context, WebSocketClientAdapter, serverTickRate)
+const client = new Client(context, WebSocketClientAdapter, SERVER_TICK_RATE, undefined, {
+    entityHistory: false
+})
+```
+
+This skips per-entity history copies, timeline/deletion records and their
+pruning. The raw store, returned frame facts, requests and prediction helpers
+continue to work. `client.network.store.historyEnabled` reports the fixed
+construction-time choice; history reads on a disabled store return no records.
+`FixedStepInterpolator`, `AdaptiveInterpolator` and `StaticInterpolator` require
+entity history and throw when constructed with it disabled.
+
+This option does not change recent-frame retention (`maxFrameHistory`) or the
+prediction command log. Received values remain read-only; copy the data your
+own history retains from live entity/header objects. Nested received values can
+remain shared while read-only; copy them before mutating them. For a physics tick that differs from nengi's
+publication tick, see [application tick headers](./channel-recipes.md#application-tick-per-publication).
+
+## Basic loop
+
+`SERVER_TICK_RATE` is the shared server snapshot frequency, not the renderer's
+rate; see [shared snapshot rate](./architecture-and-ticks.md#shared-snapshot-rate).
+
+```ts
+import { SERVER_TICK_RATE } from '../shared/network-config'
+const client = new Client(context, WebSocketClientAdapter, SERVER_TICK_RATE)
 const interpolator = new AdaptiveInterpolator(client)
 await client.connect('ws://localhost:8079')
 
 function frame() {
+    if (client.connectionState !== 'connected') return
     for (const frame of client.network.drainFrames()) {
         applyNetworkFrame(frame)
     }
@@ -41,6 +71,10 @@ function frame() {
     requestAnimationFrame(frame)
 }
 ```
+
+This fragment shows frame handling while connected. Use the
+[complete starter](./getting-started.md) for the connection UI, disconnect cleanup,
+fresh-session creation and background frame draining.
 
 Always process queued frames in order. Snapshots contain deltas; skipping an
 older queued snapshot can leave the store missing state required by a later
@@ -101,17 +135,89 @@ that a new subscriber must reconstruct; use messages for transient events.
 
 ## Connection lifetime
 
-Use a fresh `Client` for a replacement connection, and recreate session-bound
-interpolators and prediction helpers around it. Register disconnect/error
-handlers before connecting and start the network loop only after acceptance.
-On disconnect, stop the old loop and release its application-owned presentation,
-input and prediction state.
+Core owns connection state, handshake orchestration, deadlines and teardown. Read
+`client.connectionState`: `idle`, `connecting`, `connected`, or `closed`. A socket
+being open does not mean that nengi has accepted the session.
 
-`client.connect()` opens a transport; it does not reset a previous session.
-Received state, retained frames/history and unsent commands can survive a
-transport close on the old Client. Reusing it can carry old state or input into
-the replacement connection. Keep persistent application state outside the Client
-and explicitly restore only the state intended for the new session.
+`await client.connect(target, handshake?, { signal }?)` resolves after acceptance
+with the server's optional JSON `clientData`, or `undefined` when omitted. This
+does not wait for the first snapshot or the player's entity. Use
+`connect<Setup>(...)` for a `Setup | undefined` result; without a generic it is
+`unknown`. See [connection setup data](./networking-primitives.md#connection-handshake).
+Every unsuccessful attempt rejects a `ClientConnectionError`
+with a stable `code`, plus optional `detail` and `cause`. The connect Promise is the
+only lifecycle outcome for an unsuccessful initial attempt. Once connected,
+`client.setDisconnectHandler(info => ...)` receives the session's terminal outcome
+once. Register it before connecting. There is no separate WebSocket-error callback.
+
+```ts
+import { Client, ClientConnectionError } from 'nengi'
+
+const client = new Client(context, Adapter, 20, adapterConfig, {
+    connectTimeoutMs: 10_000,
+    serverTimeoutMs: 30_000
+})
+client.setDisconnectHandler(info => {
+    stopSessionLoop()
+    releasePresentation()
+    showDisconnected(info.code)
+})
+
+try {
+    await client.connect(target, { token }, { signal: attemptController.signal })
+    // A peer can close immediately after acceptance, before this continuation.
+    if (client.connectionState === 'connected') startSessionLoop(client)
+} catch (error) {
+    if (error instanceof ClientConnectionError) showConnectionFailure(error.code)
+    else throw error
+}
+```
+
+Initial outcomes are `CONNECT_TIMEOUT`, `CANCELLED`, `CONNECTION_DENIED`,
+`REMOTE_CLOSE`, `TRANSPORT_ERROR`, or `PROTOCOL_ERROR`. Overlapping attempts and
+reuse after an accepted session reject with `INVALID_STATE` without disturbing
+existing work. An established session can end with `LOCAL_DISCONNECT`,
+`REMOTE_CLOSE`, `SERVER_TIMEOUT`, `TRANSPORT_ERROR`, or `PROTOCOL_ERROR`.
+`CONNECTION_DENIED` keeps the server's denial data in `detail`; malformed data or
+transport errors keep the underlying error/event in `cause`. A remote transport
+close supplies its transport details in `detail`.
+
+A failed, denied, cancelled or timed-out initial attempt returns to `idle` after
+invalidating its transport and callbacks. Retry the same Client after its Promise
+rejects; handlers and helpers can stay attached. An already-aborted signal opens
+no socket. Aborting after acceptance does nothing: use `disconnect()` to end an
+established session.
+
+Each Client supports one established session. Once it ends, state is `closed`;
+create a fresh Client, interpolator and prediction helpers for another session.
+Reuse the Context and persistent application state as needed. Retry/backoff,
+authentication refresh, and restoring gameplay identity belong to the application.
+Nengi never automatically reconnects or replays actions.
+
+`disconnect(detail?)` completes logical teardown synchronously on all transports.
+While connecting it cancels the attempt; in `idle` or `closed` it is a no-op.
+Before notifying game code, nengi clears unsent commands, queued inbound frames,
+request timers and pending prediction bookkeeping. Pending requests reject with
+`DISCONNECTED`: their server outcome is unknown. Pending prediction operations
+become `Cancelled`, without calling reconciliation as if authority rejected them.
+The last applied store, frames and history remain readable for disconnected UI.
+Application-owned presentation, input and physics state remain the game's cleanup
+responsibility. Handler exceptions are logged after cleanup and do not prevent
+other request promises from settling.
+
+Commands, requests and network prediction require `connected`; otherwise they
+throw `ClientConnectionError` with `INVALID_STATE` before queuing anything.
+`flush()` outside that state does nothing and does not advance command frames.
+`reportInterpolationDelay()` returns false without queuing a report, so reading
+presentation state before acceptance or after close remains harmless.
+An application serialization error before a send still throws and rolls outbound
+bookkeeping back; it does not itself end the session.
+
+Physical socket closure can finish later. Local diagnostic `detail` is kept as-is;
+only a short standard code is sent as the transport close reason, so circular
+objects and long Unicode strings cannot prevent cleanup. Use an application
+message for rich data that the other peer must receive before disconnecting.
+See [deadlines and suspension](./timing-and-liveness.md#client-deadlines).
 
 ## Plain channels
 
@@ -202,12 +308,65 @@ bounds. Use `sampleEntities(nids, interpDelay)` or `getEntities(nids, interpDela
 when a presentation query already identifies the relevant subset. Full sampling
 still constructs an output object for every sampled entity; stationary scenery
 and locally predicted objects often do not need that work every render frame.
-History copy methods such as `getAt()` and interpolation samples return
+History copy methods such as `getAt()` and allocating interpolation samples return
 independent schema values for built-in types, including numeric arrays. Methods
 whose names end in `Ref` or `Refs` expose retained history and must be treated as
 read-only. Custom mutable binary types must supply an independent `clone` and,
 if they define `interp`, return an independent interpolation result. Without a
 custom `interp`, the binary type uses its clone of the latest value.
+
+### Reusable presentation output
+
+For frequently sampled selections, create one `InterpolationOutput` per
+presentation consumer and reuse it with `sampleEntitiesInto`. This API is
+available on the fixed, static and adaptive interpolators:
+
+```ts
+import { InterpolationOutput } from 'nengi'
+
+// Create once alongside the client's presentation state.
+const output = new InterpolationOutput()
+
+// Each render frame: use the game's existing interpolation delay.
+interpolator.sampleEntitiesInto(visibleMovingNids, output, interpDelay)
+output.entities.forEach(entity => moveSprite(entity.nid, entity.x, entity.y))
+client.reportInterpolationDelay(output.desiredBufferMs)
+```
+
+`sampleEntitiesInto(nids, output, interpDelay, now?)` returns the same output
+object. It contains the usual sample diagnostics and a `ReadonlyMap` of poses
+keyed by nid. Nengi manages membership; each pose is mutable presentation data.
+The next call into that buffer overwrites its current values and diagnostics.
+Separate buffers are independent, even when using the same interpolator.
+Independent playback timelines still require separate interpolators.
+
+Compatible outer pose objects and the Map are reused. Mutable vector, array and
+custom properties still follow their binary type's independent `clone`/`interp`
+contract and may allocate new values. This is a lower-allocation API, not a
+zero-allocation guarantee. The regular `sample`, `sampleEntities`, `getEntity`
+and `getEntities` APIs continue returning independent results.
+
+Keep these lifetime rules explicit:
+
+- Only selected entities visible at the sampled bounds appear. Unselected or
+  unavailable entries are removed; empty selections and unavailable history
+  empty the result. An absent sample is not an entity-destruction event. The
+  application chooses whether to fall back to authority, hold or hide a visual.
+- Surviving Map entries keep their insertion order; reordering the selection
+  does not reorder the output. Manage draw order in the renderer.
+- Object identity is reusable storage, not an entity-lifetime identifier. Process
+  create/delete/channel-close facts independently, including ID reuse between
+  render frames. Different schemas get fresh poses. Sampling with another
+  Context discards previous storage to avoid carrying incompatible fields.
+- Do not retain the output as a historical snapshot or prediction checkpoint.
+  Use an allocating sample or explicitly copy the fields needed for later work.
+  Keep renderer resources and other game-owned metadata outside sampled poses.
+- Call `output.clear()` to release its current poses and frame references. It can
+  then be reused. Departed poses are not cached for future selections.
+- If an input iterator or custom binary function throws, sampling rethrows and
+  clears the buffer. References already held by the application may have been
+  partially updated; the operation is not transactional. Recursive sampling or
+  clearing of the same buffer during a sample is rejected.
 
 ## Prediction
 

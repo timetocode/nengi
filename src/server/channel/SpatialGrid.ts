@@ -48,6 +48,8 @@ export class SpatialGrid2D<T> {
     readonly cellSize: number
     readonly cells: Map<string, SpatialGridCell<T>> = new Map()
     readonly objectCells: Map<number, SpatialGridCellRef> = new Map()
+    // Membership revisions must remain distinct when a cell key is recreated.
+    private nextCellVersion = 0
     private getX: (object: T) => number
     private getY: (object: T) => number
     private initializeCell?: (cell: SpatialGridCell<T>) => void
@@ -96,7 +98,7 @@ export class SpatialGrid2D<T> {
         this.objectCells.set(id, { key: cell.key, index: cell.objects.length })
         cell.objects.push(object)
         cell.ids.push(id)
-        cell.version++
+        cell.version = ++this.nextCellVersion
         return { cell, createdCell: wasEmpty }
     }
 
@@ -127,7 +129,7 @@ export class SpatialGrid2D<T> {
         if (removedCell) {
             this.cells.delete(ref.key)
         } else {
-            cell.version++
+            cell.version = ++this.nextCellVersion
         }
         this.objectCells.delete(id)
         return { cell, removedCell }
@@ -208,6 +210,8 @@ export class SpatialGrid3D<T> {
     readonly cellSize: number
     readonly cells: Map<string, SpatialGridCell<T>> = new Map()
     readonly objectCells: Map<number, SpatialGridCellRef> = new Map()
+    // Membership revisions must remain distinct when a cell key is recreated.
+    private nextCellVersion = 0
     private getX: (object: T) => number
     private getY: (object: T) => number
     private getZ: (object: T) => number
@@ -263,7 +267,7 @@ export class SpatialGrid3D<T> {
         this.objectCells.set(id, { key: cell.key, index: cell.objects.length })
         cell.objects.push(object)
         cell.ids.push(id)
-        cell.version++
+        cell.version = ++this.nextCellVersion
         return { cell, createdCell: wasEmpty }
     }
 
@@ -294,7 +298,7 @@ export class SpatialGrid3D<T> {
         if (removedCell) {
             this.cells.delete(ref.key)
         } else {
-            cell.version++
+            cell.version = ++this.nextCellVersion
         }
         this.objectCells.delete(id)
         return { cell, removedCell }

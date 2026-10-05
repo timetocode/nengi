@@ -17,8 +17,8 @@ export type ChannelOpen = {
 
 export type ChannelHeaderUpdate = {
     channelId: number
-    changes: EntityChange[]
-    groups: EntityUpdateGroup[]
+    changes: readonly EntityChange[]
+    groups: readonly EntityUpdateGroup[]
 }
 
 export type ChannelClose = {
@@ -63,6 +63,34 @@ export type SnapshotPlan = {
     updateEntityGroups: EntityUpdateGroup[],
     deleteEntities: number[]
 }
+
+// Count/write/commit only read these collections. Builders keep their mutable
+// SnapshotPlan; envelopes can borrow immutable empty sections instead.
+export type ReadonlySnapshotPlan = {
+    [Key in keyof SnapshotPlan]: Readonly<SnapshotPlan[Key]>
+}
+
+export const EMPTY_SNAPSHOT_ARRAY: readonly never[] = Object.freeze([])
+
+export const EMPTY_SNAPSHOT_PLAN: ReadonlySnapshotPlan = Object.freeze({
+    engineMessages: EMPTY_SNAPSHOT_ARRAY,
+    messages: EMPTY_SNAPSHOT_ARRAY,
+    interpolatedMessages: EMPTY_SNAPSHOT_ARRAY,
+    channels: EMPTY_SNAPSHOT_ARRAY,
+    responses: EMPTY_SNAPSHOT_ARRAY,
+    channelOpens: EMPTY_SNAPSHOT_ARRAY,
+    channelHeaderUpdates: EMPTY_SNAPSHOT_ARRAY,
+    channelCloses: EMPTY_SNAPSHOT_ARRAY,
+    channelHeaderVersions: EMPTY_SNAPSHOT_ARRAY,
+    skipInterpolationNids: EMPTY_SNAPSHOT_ARRAY,
+    ecsCreateEntities: EMPTY_SNAPSHOT_ARRAY,
+    ecsCreateComponents: EMPTY_SNAPSHOT_ARRAY,
+    ecsDeleteEntities: EMPTY_SNAPSHOT_ARRAY,
+    createEntities: EMPTY_SNAPSHOT_ARRAY,
+    updateEntities: EMPTY_SNAPSHOT_ARRAY,
+    updateEntityGroups: EMPTY_SNAPSHOT_ARRAY,
+    deleteEntities: EMPTY_SNAPSHOT_ARRAY
+})
 
 export function createEmptySnapshotPlan(): SnapshotPlan {
     return {

@@ -58,9 +58,10 @@ instance.step()
 `confirmCommandsThrough(K)` means the snapshot reflects the handling of the
 entire received prefix through K, including deliberately rejected inputs. It
 never means merely received. A deferred simulation retains batch numbers and
-confirms only its completed prefix. Games without prediction also confirm
-commands to release retained client inputs; request-only services need no command
-confirmation. See [the command contract](./networking-primitives.md#command-payloads-and-sequencing).
+confirms only its completed prefix. Using command/state prediction opts into this
+contract; no configuration flag is required. Games using ordinary commands need
+no confirmation call, and request predictions resolve through their responses.
+See [the command contract](./networking-primitives.md#command-payloads-and-sequencing).
 
 ## Client loop
 
@@ -80,6 +81,7 @@ const prediction = new CommandReplayPrediction({
 })
 
 function renderFrame(dtMs: number) {
+    if (client.connectionState !== 'connected') return
     let frame
     while ((frame = client.network.processNextFrame())) {
         applyNetworkFrame(frame)
@@ -124,7 +126,38 @@ position as an offset from the corrected prediction, then decay that offset.
 New input moves the corrected prediction immediately. Large teleports can clear
 the offset. Display smoothing never changes pending inputs or expected results.
 
+## Missing or delayed confirmation
+
+If a sent command/state prediction stays pending across received snapshots for
+at least two seconds, the client warns once per session. This can mean missing
+confirmation or intentionally deferred simulation; the client cannot determine
+which. Check that the server confirms the completed input prefix after integration
+and before `instance.step()`. The warning never resolves or discards predictions.
+
+`ClientOptions.predictionWarningAfterMs` changes this observation window; use a
+positive finite duration in milliseconds, or `null` to disable the warning:
+
+```ts
+import { SERVER_TICK_RATE } from '../shared/network-config'
+const client = new Client(context, ClientAdapter, SERVER_TICK_RATE, adapterConfig, {
+    predictionWarningAfterMs: 5000
+})
+```
+
+The check runs when applying snapshots and uses their local receipt times, so
+delayed client application alone does not age the warning. Unflushed predictions,
+ordinary commands and request predictions do not trigger it. It also detects a
+stall after earlier successful confirmations. It is a diagnostic, not a timeout
+or a measurement of network latency; connection liveness has separate budgets.
+
 ## Persistent predictions and skipped confirmations
+
+`client.predictState(payload, options)` and `StateReplayPrediction.predict(...)`
+record a local expectation against the current command batch. They **send no
+command**. Queue the command that causes the expected change in that same batch,
+and confirm it on the server only after its authoritative handling is complete.
+Do not attach a request's expected result to an unrelated command batch; use the
+request's `prediction` option so its response resolves the operation instead.
 
 Confirmation is cumulative. The server may confirm 1007 without publishing
 1000–1006. An expected switch value from input 1000 must still be compared at
@@ -154,7 +187,9 @@ retired by command confirmation.
 ## Public path smoothing
 
 Raw input integration can arrive at the server in bursts. `PublicPathSmoother2D`
-is an optional game-owned body that follows the actual raw route for observers.
+and `PublicPathSmoother3D` are optional game-owned bodies that follow the actual
+raw route for observers. The 3D helper adds `z` to construction, getters,
+`enqueue(x, y, z)` and `reset(x, y, z)`; all other options and behavior match 2D.
 Store one on a player or in a local ECS component. Enqueue **every** resulting
 raw position, including collision waypoints if a command takes a multi-segment
 route. Enqueueing only the last position of a server tick loses those turns.
@@ -186,6 +221,27 @@ past the queued endpoint. An identical enqueue needs no slot. A full ring or
 exceeded `maxDistance` returns false without changing the existing path. The
 point limit defaults to 128; distance is unlimited unless configured. Handle
 failure explicitly, rather than silently dropping an old waypoint.
+
+For a multi-segment command, use `enqueueRoute(waypoints)`. Each waypoint has
+`x, y` (and `z` in 3D). This checks the complete route against both limits before
+copying any points. On `false`, neither the existing queue nor the public
+position changes. Commit the proposed raw state only after admission succeeds:
+
+```ts
+const proposed = simulateOnCopy(raw, command)
+if (publicBody.enqueueRoute(proposed.waypoints)) {
+    commitRaw(proposed.state)
+} else {
+    rejectThisInput()
+}
+```
+
+Use ordinary coordinate objects and keep the route unchanged during the call.
+Consecutive identical points need no slot. Coordinates must be finite; invalid
+coordinates throw without partial admission. Each accepted route is traversed
+twice, with no temporary waypoint array. Existing single-point `enqueue` retains
+its one-point cost. These helpers do not validate collisions or movement speed;
+the game must produce a valid raw route before admission.
 
 `reset(x, y)` clears the path and teleports the public body. Game code updates
 raw authority too and marks the replicated transform with `skipInterpolation`.

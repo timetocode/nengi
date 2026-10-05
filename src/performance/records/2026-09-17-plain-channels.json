@@ -1,0 +1,403 @@
+{
+  "recordedOn": "2026-09-18",
+  "measurementDateLocal": "2026-09-17",
+  "timezone": "America/Los_Angeles",
+  "purpose": "Preserve demonstrated capabilities and their context; these are observations, not timing gates.",
+  "environment": {
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "physicalCores": 8,
+    "logicalCpus": 16,
+    "node": "v22.17.1",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39"
+  },
+  "engine": {
+    "baseCommit": "d78047ca62bf801af58e48f4b0ebb15065612d88",
+    "packageVersionAtMeasurement": "2.0.0-rc.127",
+    "sourceState": "Uncommitted Next RC work based on RC-127. Both variants include earlier pending Client/path/shutdown work; after also includes plain-channel membership sharing. Neither is identified by the base commit or package version alone.",
+    "sourceManifestSha256": {
+      "before": "7aa24bbf95319d2e6fb301fdf9b3505087744b2e4d658462968ea1a904cf45fd",
+      "after": "a596514b19512a0df7728f47ed9a195b5d542831dc27d8e0c907198e61c685b4"
+    },
+    "manifestDigestEncoding": "SHA-256 of the archived path-to-SHA256 map encoded as sorted-key JSON with comma/colon separators and no whitespace.",
+    "snapshotHarnessSha256": "19d69b9949578dac0753ccb1a6e9886205b55681b10f2902408da6f6d400f3cc"
+  },
+  "snapshotPipeline": {
+    "measurement": "Instance.step() elapsed time, including snapshot production with the official nengi-buffers writer and counting transport. Excludes application mutation before step, sockets and client processing.",
+    "aggregation": "Median of three per-run means, p95s and retained-heap deltas. Individual step timing summaries are retained in stepRepeats.",
+    "backend": "nengi-buffers",
+    "protocolClock": "Controlled, instance.now() returns 1000 + instance.tick; elapsed timings still use performance.now().",
+    "workload": {
+      "roots": 10000,
+      "componentsPerRoot": 3,
+      "networkIds": 40000,
+      "users": 100,
+      "channelsPerUser": 1,
+      "groupWrites": true,
+      "warmupTicks": 30,
+      "measuredTicks": 120,
+      "repeatsPerVariant": 3,
+      "variantOrder": "Sequential fresh processes, before/after order alternated between repetitions.",
+      "defaultSharedUpdates": false,
+      "sparseWrites": "All three component groups on 100 roots per measured tick; no membership churn."
+    },
+    "retainedHeapDefinition": "Heap after construction and warmup minus heap before construction, both following explicit GC. MiB uses 1048576 bytes; this is not cumulative allocation.",
+    "cases": [
+      {
+        "case": "ecs-large-idle",
+        "settings": {
+          "scenario": "ecs-channel",
+          "entities": 10000,
+          "users": 100,
+          "moveFraction": 0
+        },
+        "before": {
+          "repeats": 3,
+          "meanStepMs": 30.413,
+          "p95StepMs": 36.641,
+          "meanTotalMs": 30.416,
+          "retainedHeapMiB": 139.18741607666016,
+          "gcCount": 230,
+          "gcDurationMs": 693.6770232915878,
+          "stepRepeats": [
+            {
+              "avg": 51.999,
+              "p50": 49.554,
+              "p95": 64.077,
+              "max": 106.093
+            },
+            {
+              "avg": 30.413,
+              "p50": 29.814,
+              "p95": 36.641,
+              "max": 40.939
+            },
+            {
+              "avg": 28.461,
+              "p50": 28.035,
+              "p95": 31.823,
+              "max": 59.407
+            }
+          ],
+          "bytesPerTick": [
+            2000
+          ]
+        },
+        "after": {
+          "repeats": 3,
+          "meanStepMs": 0.572,
+          "p95StepMs": 1.431,
+          "meanTotalMs": 0.572,
+          "retainedHeapMiB": 15.367790222167969,
+          "gcCount": 4,
+          "gcDurationMs": 1.9183769822120667,
+          "stepRepeats": [
+            {
+              "avg": 0.865,
+              "p50": 0.608,
+              "p95": 2.389,
+              "max": 6.17
+            },
+            {
+              "avg": 0.572,
+              "p50": 0.379,
+              "p95": 1.431,
+              "max": 3.932
+            },
+            {
+              "avg": 0.535,
+              "p50": 0.419,
+              "p95": 1.127,
+              "max": 1.551
+            }
+          ],
+          "bytesPerTick": [
+            2000
+          ]
+        },
+        "speedup": 53.16958041958043
+      },
+      {
+        "case": "ecs-large-sparse",
+        "settings": {
+          "scenario": "ecs-channel",
+          "entities": 10000,
+          "users": 100,
+          "moveFraction": 0.01
+        },
+        "before": {
+          "repeats": 3,
+          "meanStepMs": 33.748,
+          "p95StepMs": 39.461,
+          "meanTotalMs": 33.785,
+          "retainedHeapMiB": 140.0274658203125,
+          "gcCount": 230,
+          "gcDurationMs": 702.9195926189423,
+          "stepRepeats": [
+            {
+              "avg": 33.438,
+              "p50": 32.633,
+              "p95": 39.461,
+              "max": 45.752
+            },
+            {
+              "avg": 34.58,
+              "p50": 34.463,
+              "p95": 40.303,
+              "max": 43.841
+            },
+            {
+              "avg": 33.748,
+              "p50": 33.134,
+              "p95": 38.187,
+              "max": 44.408
+            }
+          ],
+          "bytesPerTick": [
+            354100
+          ]
+        },
+        "after": {
+          "repeats": 3,
+          "meanStepMs": 3.887,
+          "p95StepMs": 5.713,
+          "meanTotalMs": 3.92,
+          "retainedHeapMiB": 16.233612060546875,
+          "gcCount": 17,
+          "gcDurationMs": 7.632148027420044,
+          "stepRepeats": [
+            {
+              "avg": 3.938,
+              "p50": 3.546,
+              "p95": 5.713,
+              "max": 9.388
+            },
+            {
+              "avg": 3.887,
+              "p50": 3.629,
+              "p95": 5.787,
+              "max": 7.226
+            },
+            {
+              "avg": 3.487,
+              "p50": 3.304,
+              "p95": 4.971,
+              "max": 6.689
+            }
+          ],
+          "bytesPerTick": [
+            354100
+          ]
+        },
+        "speedup": 8.682274247491637
+      },
+      {
+        "case": "ecs-large-sparse-shared",
+        "settings": {
+          "scenario": "ecs-channel",
+          "entities": 10000,
+          "users": 100,
+          "moveFraction": 0.01,
+          "sharedUpdates": true
+        },
+        "before": {
+          "repeats": 3,
+          "meanStepMs": 30.138,
+          "p95StepMs": 33.792,
+          "meanTotalMs": 30.187,
+          "retainedHeapMiB": 140.05592346191406,
+          "gcCount": 230,
+          "gcDurationMs": 667.9355271458626,
+          "stepRepeats": [
+            {
+              "avg": 31.824,
+              "p50": 30.568,
+              "p95": 39.078,
+              "max": 48.194
+            },
+            {
+              "avg": 30.138,
+              "p50": 30.125,
+              "p95": 33.792,
+              "max": 35.559
+            },
+            {
+              "avg": 29.56,
+              "p50": 29.424,
+              "p95": 32.601,
+              "max": 36.057
+            }
+          ],
+          "bytesPerTick": [
+            354100
+          ]
+        },
+        "after": {
+          "repeats": 3,
+          "meanStepMs": 0.691,
+          "p95StepMs": 1.332,
+          "meanTotalMs": 0.721,
+          "retainedHeapMiB": 16.205535888671875,
+          "gcCount": 5,
+          "gcDurationMs": 2.244670033454895,
+          "stepRepeats": [
+            {
+              "avg": 0.729,
+              "p50": 0.563,
+              "p95": 1.602,
+              "max": 2.348
+            },
+            {
+              "avg": 0.691,
+              "p50": 0.541,
+              "p95": 1.227,
+              "max": 3.361
+            },
+            {
+              "avg": 0.658,
+              "p50": 0.521,
+              "p95": 1.332,
+              "max": 2.349
+            }
+          ],
+          "bytesPerTick": [
+            354100
+          ]
+        },
+        "speedup": 43.615050651230106
+      }
+    ]
+  },
+  "jigsaw": {
+    "gameCommitReportedByRuns": "4405ecbe26f500c233d4d06e4d842f8c9d6a9130",
+    "sourceState": "nengi-rc worktree with existing uncommitted workload/configuration changes; all four captured 200-file source manifests match.",
+    "sourceManifestSha256": "8b60a4f00cf3496be37d84b6c348e4e88708001eace97faf602823d27e8f1d6b",
+    "engineVariants": "The same frozen-before and current-after engine variants as the snapshot comparison, selected through a process-scoped loader.",
+    "workload": {
+      "pieces": 10000,
+      "componentsPerPiece": 2,
+      "actors": 100,
+      "observers": 1,
+      "subscriptions": "Board channel plus puzzle channels",
+      "tickRateHz": 20,
+      "commandCadenceMs": 50,
+      "sharedUpdateFragments": false,
+      "warmupSeconds": 8,
+      "measuredSeconds": 20,
+      "repeatsPerVariantWorkload": 1,
+      "seed": 20260917,
+      "workerProcesses": 7,
+      "gameLogicalCpu": "0",
+      "workersAndHubLogicalCpus": "2-15",
+      "botFrameHistory": 2,
+      "botInterpolationSampling": false,
+      "dragAction": "Each actor continuously moves one distinct staged group.",
+      "measurement": "All serverFrame callbacks, including application work and real WebSocket output; joins and staging precede measurement."
+    },
+    "runs": [
+      {
+        "variant": "before",
+        "workload": "idle",
+        "tick": {
+          "count": 394,
+          "mean": 32.09287899746193,
+          "p50": 29.038605000001553,
+          "p95": 50.950198999998975,
+          "p99": 66.95285599999988,
+          "max": 116.17069800000172
+        },
+        "gameCpuPercentOfOneCore": 60.90121119026334,
+        "verified": true,
+        "generatorLimited": false,
+        "minFramesPerClientSecond": 19.61668044151714,
+        "minCommandsPerMoverSecond": 0,
+        "report": "jigsaw-before-idle-100-10000/summary.json",
+        "runStartedAt": "2026-09-18T06:28:51.453Z"
+      },
+      {
+        "variant": "after",
+        "workload": "idle",
+        "tick": {
+          "count": 399,
+          "mean": 5.093519255639149,
+          "p50": 4.820604000000458,
+          "p95": 7.020964000003005,
+          "p99": 9.330723999999464,
+          "max": 13.030318000004627
+        },
+        "gameCpuPercentOfOneCore": 13.211067650128177,
+        "verified": true,
+        "generatorLimited": false,
+        "minFramesPerClientSecond": 19.945961386616847,
+        "minCommandsPerMoverSecond": 0,
+        "report": "jigsaw-after-idle-100-10000/summary.json",
+        "runStartedAt": "2026-09-18T06:29:27.718Z"
+      },
+      {
+        "variant": "after",
+        "workload": "drag",
+        "tick": {
+          "count": 398,
+          "mean": 6.602702459798903,
+          "p50": 6.156664000001911,
+          "p95": 9.055822000002081,
+          "p99": 13.370289999998931,
+          "max": 21.144985000002634
+        },
+        "gameCpuPercentOfOneCore": 16.995979860812184,
+        "verified": true,
+        "generatorLimited": false,
+        "minFramesPerClientSecond": 19.893445958012304,
+        "minCommandsPerMoverSecond": 19.043240643628675,
+        "report": "jigsaw-after-drag-100-10000/summary.json",
+        "runStartedAt": "2026-09-18T06:30:03.418Z"
+      },
+      {
+        "variant": "before",
+        "workload": "drag",
+        "tick": {
+          "count": 399,
+          "mean": 33.76006545112785,
+          "p50": 33.417709000001196,
+          "p95": 40.05253100000118,
+          "p99": 46.08292500000243,
+          "max": 58.41120199999932
+        },
+        "gameCpuPercentOfOneCore": 67.81988938108883,
+        "verified": true,
+        "generatorLimited": false,
+        "minFramesPerClientSecond": 19.891821143484467,
+        "minCommandsPerMoverSecond": 19.293570883530048,
+        "report": "jigsaw-before-drag-100-10000/summary.json",
+        "runStartedAt": "2026-09-18T06:30:41.430Z"
+      }
+    ]
+  },
+  "interpretation": [
+    "These selected cases preserve a capability, not a claim of universal improvement or maximum server capacity. The original comparison also included automatic/manual, dense and spatial controls.",
+    "Development services remained active. Parts of snapshot repetitions 0/1 overlapped another headless browser workload; it ended before repetition 2. Small timing differences should not be treated as precise limits.",
+    "All four Jigsaw runs passed verification and sustained generator cadence. They were not generator-limited; the separately recorded maintainer observation about bot saturation is not measured by these runs.",
+    "Core before/after output byte and operation counts agreed. A separate lifecycle probe produced identical encoded bytes, and decode/apply integration checks validated channel behavior.",
+    "This is a compact evidence extract, not a complete source archive. Exact historical runners, raw results and source snapshots remain in the original workspace archive."
+  ],
+  "originalWorkspaceArchive": {
+    "location": "nengi-rc-notes/plain-channel-performance/ beside the nengi repository",
+    "filesSha256": {
+      "metadata.json": "553e4ea3a7a4bea9c367ace8b723e202c9e4559f4b030c07ea1ff5afd40fb09c",
+      "summary.json": "0ceef04b1d616b5c1ceaf75094299467302dc19077f2d4421d66623dcf755acf",
+      "paired.jsonl": "e02e519b0ef8e57abbcf9b1b7881a3ff81b6fb5de37f1cd0783d252274b576a5",
+      "cases.json": "b52a38564edff99b529fd0fecf4ee1edbb2d9c67d26b2b45fa601d2c8be7338b",
+      "jigsaw-summary.json": "f79deb5ab259b5f62f3a05f4203978b61ee1c4e50aa5492c2317164b637d6137",
+      "run-case.cjs": "2ad8a9e7bd4ce486513faed15c4591e371d229b4cbb0e1466e0206d6c57d4cb5",
+      "run-paired.py": "474785cc660705e31a2f7e68bc9942b6f6ffb10778a7843962cd9d4a2e56eebd",
+      "run-jigsaw.py": "5a340a834e13d3a2ad414eaca0f623ff216c5a7e9a95a98773c6502cdc9a43c0",
+      "jigsaw-before-idle-100-10000/summary.json": "6d2adb755fce300e113adc37c081920cca7832037b4317e6a8b4ce1a4f0f245e",
+      "jigsaw-after-idle-100-10000/summary.json": "ca095f7b33826054ac485e7aaae88e7ee97465a6922bd4d4f9ac69fd1f97ba79",
+      "jigsaw-after-drag-100-10000/summary.json": "1b46cdca2cbb3f32c35677dd5c45a64a14b8c36ae7f6d34610316a17d5b819fa",
+      "jigsaw-before-drag-100-10000/summary.json": "3a5a43cb52b03aea9c6edf11bd9ebe91a85a7d466bfeeb0b7ab522dca4f326e4"
+    },
+    "snapshotRunner": "python3 run-paired.py (cases.json, run-case.cjs)",
+    "gameRunner": "python3 run-jigsaw.py VARIANT WORKLOAD 100 10000 20",
+    "fullReport": "README.md",
+    "historyInvestigation": "HISTORY.md"
+  }
+}

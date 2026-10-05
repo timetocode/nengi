@@ -21,6 +21,19 @@ check, not authentication or a cryptographic protocol proof. Register endpoint
 definitions in the shared context before connecting if their payload schemas
 should be covered.
 
+Fingerprints are cached per `Context`. `context.register(...)` and
+`context.registerEndpoint(...)` invalidate the cache when adding a definition.
+Complete registrations before accepting connections; changing a live protocol
+does not update peers that have already connected.
+
+Treat compiled schemas and endpoint definitions as immutable setup data. Do not
+edit their properties, property order, update-group definitions or payload schemas
+after registration. `context.schemas` and `context.endpointDefinitions` are
+read-only inspection views in TypeScript; writing through a cast or JavaScript
+bypasses registration and cache invalidation. Make new definitions and a new
+context for a changed protocol. This does not restrict mutation of game entities
+or nengi's internal update-group counters.
+
 ## Malformed traffic and send failures
 
 Malformed inbound packets are reported and then the sender is disconnected:
@@ -35,12 +48,13 @@ instance.onSnapshotSendError = ({ user, error, byteLength, tick }) => {
 }
 ```
 
-On the client, use `client.network.onMalformedSnapshot`,
-`client.setDisconnectHandler`, and `client.setWebsocketErrorHandler` to connect
-transport failures to the application's diagnostics. A malformed snapshot is
-fatal because decoding may already have changed protocol bookkeeping; Nengi
-reports it and closes the client transport. These callbacks should be small and
-should not mutate authoritative state directly.
+On the client, catch `client.connect()` failures and register
+`client.setDisconnectHandler(info => ...)` before connecting. Initial failure
+rejects the Promise; after acceptance, terminal outcomes use the disconnect
+handler exactly once. Record `info.code`, `info.detail`, and `info.cause` for
+diagnostics. Malformed snapshots end the session with `PROTOCOL_ERROR`; transport
+failures use `TRANSPORT_ERROR`. There is no separate error callback to trigger a
+second reconnect. See [connection lifetime](./client-state.md#connection-lifetime).
 
 The server validates the complete initial handshake packet before invoking
 `onConnect`; a valid handshake prefix followed by malformed data does not start
@@ -60,10 +74,17 @@ the server's `pingIntervalMs`, `pongTimeoutMs`, and `handshakeTimeoutMs`.
 Pre-acceptance handshake expiry emits `UserConnectionDenied`; Pong expiry after
 acceptance emits `UserDisconnected`. See
 [timing-and-liveness.md](./timing-and-liveness.md) for the clock domains and
-adapter termination contract. Official adapters answer Pings independently of
+adapter termination contract. Core answers Pings through the transport independently of
 the application's render and flush cadence, so `pong_timeout` means the client
 stopped processing network traffic or could not return it, not merely that a
 browser paused `requestAnimationFrame`.
+
+Log `UserConnectionDenied` on the server to diagnose admission failures. Its
+payload and the attempt's abort reason retain the original local error; unexpected
+exceptions reach the client only as `{ reason: 'server_error' }`. For an expected
+public refusal, return `{ deny: detail }` from `onConnect`. See
+[public denials](./networking-primitives.md#public-connection-denials) and
+[safe setup cleanup](./networking-primitives.md#cancellation-and-setup-ownership).
 
 For an accepted connection, nengi completes its channel-side cleanup before
 `UserDisconnected` is observable. The disconnected user is removed from every
@@ -86,11 +107,14 @@ before each command. Unstarted requests are removed automatically; running
 asynchronous work remains application-owned. See
 [request and disconnect workflows](./networking-primitives.md#disconnect-during-an-asynchronous-request).
 
-Local and simulated-local adapters notify the client through its normal
-disconnect handler, reject outstanding requests with `DISCONNECTED`, and clear
-their connected state. Close notification happens synchronously for these
-in-memory transports, so disconnect handlers should tolerate being called from
-within `client.disconnect()` or a local server kick.
+All client transports complete logical disconnect synchronously, including browser
+and Node WebSockets. Stop the game loop and release presentation in the disconnect
+handler. Pending requests reject with `DISCONNECTED` and their server outcomes
+may be unknown. Queued frames and commands are discarded; last applied state and
+history remain readable. Transport close can finish later, and does not notify
+again. Local server kicks can also invoke the client handler synchronously.
+Configure client `connectTimeoutMs` and `serverTimeoutMs` to bound unreachable
+servers and accepted peers that stop publishing.
 
 Engine controls are validated independently of game commands and requests.
 All official adapters reject text data. ws/uWS/Bun also budget native WebSocket
@@ -107,18 +131,57 @@ consumption rules.
 
 Requests have a timeout by default. Set `timeoutMs` per request when a feature
 needs a shorter or longer budget, and use `RequestPolicy.Dedupe` or
-`RequestPolicy.Replace` with a stable `key` when duplicate UI actions should be
-collapsed. These client policies do not constrain a modified or hostile client.
+`RequestPolicy.ReplaceQueued` with a stable `key` when the action semantics permit
+collapsing input. Dedupe shares an outstanding result; ReplaceQueued supersedes
+only unsent intent. Sent requests keep their results. See the
+[policy table](./networking-primitives.md#client-results-and-queued-intent).
+These client policies do not constrain a modified or hostile client.
 `instance.processRequests(max)` limits the number of requests dequeued in that
 call. It does not cap the incoming queue, handler duration, concurrent async
 operations, or queued response bytes. Limit expensive operations in game code
-before starting them, including authentication work in `onConnect`; a connection
-timeout does not cancel an already running database operation.
+before starting them, including authentication work in `onConnect`. Its new
+cancellation signal lets cooperating I/O stop on timeout or abandonment, but
+cannot forcibly cancel arbitrary database work. See
+[setup ownership](./networking-primitives.md#cancellation-and-setup-ownership)
+for reservation cleanup and late results.
 
 The client and server expose request/response backlog observers. Treat a
 backlog as an operational signal: it means the current request production rate
 or handler budget is not keeping up with the wire cadence. Do not hide a growing
 backlog by making handlers mutate state from arbitrary promise continuations.
+
+## Request failures
+
+Register the protected server diagnostic hook to see handler and reply failures:
+
+```ts
+instance.onRequestError = ({ user, requestId, endpointId, phase, code, error }) => {
+    logger.error('nengi request failed', {
+        userId: user.id, requestId, endpointId, phase, code, error
+    })
+}
+```
+
+`phase` is `handler` or `response`. Codes are `HANDLER_ERROR`, `HANDLER_REJECTED`,
+`RESPONSE_ENCODING_ERROR`, and `RESPONSE_TOO_LARGE`. The original `error` stays on
+the server; size errors include `byteLength` and `maximum`. Keep logging bounded
+and local. Observer exceptions are contained, and the hook does not choose a
+response. A handler failure is still reported after it has already replied or
+its user has disconnected; nengi does not produce a second reply.
+
+A single successful reply that exceeds either the per-user or whole-instance
+response byte budget is replaced by a small `RESPONSE_TOO_LARGE` error. Encoding
+failures, such as circular JSON or a missing schema string, produce
+`RESPONSE_ENCODING_ERROR`. Both preserve the connection when the fallback fits.
+Fallbacks count toward all normal response budgets. Accumulated output pressure,
+or a configured budget too small for even the fallback, retains the normal
+`onNetworkLimit` disconnect behavior. These checks bound retained responses;
+they cannot prevent application allocation or undo work already performed.
+
+Use normal response data for gameplay denial. Catch client Promise failures and
+investigate missing responses to immediate game actions. A handler that returns
+`undefined` and never calls `send` remains a likely application bug; nengi also
+permits retaining `send` for deliberate deferral and cannot infer that intent.
 
 ## Transport budgets
 
@@ -157,7 +220,62 @@ adapter now uses the direct peer address unless its `trustProxy` callback
 explicitly trusts that peer. The trusted proxy must sanitize `X-Forwarded-For`;
 the other official server adapters expose the direct peer address.
 
+## Snapshot step failures
+
+`Instance.step()` is not transactional. Collection can advance shared diff
+baselines and consume queues before encoding finishes, and earlier users can
+already have received this tick's snapshot. Repairing a bad value and retrying
+the same instance cannot reliably restore missing updates or messages.
+
+An exception after snapshot work begins throws `InstanceStepError` and records
+it in the read-only `instance.failure` property. The error exposes `tick` and
+`cause`, which retains the original error and any binary diagnostic context.
+Later `step()` calls throw the same error before doing any work. There is no reset
+or resume operation. Cleanup errors also fail the instance; if encoding failed
+first, that original cause is preserved.
+
+The application must stop its game loop and shut down every adapter serving the
+failed instance. The failure flag does not itself close sockets, stop admission,
+cancel application async work, or stop timers. Use the ordinary
+[adapter shutdown](./adapters.md#server-shutdown) path, process lifecycle cleanup,
+then recreate the instance and adapters if the game should restart. Other
+instances in the process are unaffected. Keep detailed errors in server logs;
+use a generic shutdown reason for clients.
+
+Inside a game's tick callback:
+
+```ts
+try {
+    instance.step()
+} catch (error) {
+    clearInterval(ticking)
+    logger.error('Snapshot step failed', { error, failure: instance.failure })
+    void adapter.shutdown('Server error').catch(shutdownError => {
+        logger.error('Adapter shutdown failed', { error: shutdownError })
+    })
+    return
+}
+```
+
+This pattern conservatively stops on any step error. An invalid clock rejected
+before snapshot preparation does not set `instance.failure` and can be retried
+after repairing the clock. Ordinary caught transport send errors still close
+only that user and invoke `onSnapshotSendError`; they do not fail the instance.
+
 ## Binary diagnostics
+
+nengi always checks each independently allocated outbound payload's written
+byte count and payload length before caching or sending it. This includes shared
+fragments, completed snapshots, commands, handshakes and Pongs. A mismatch raises
+a binary diagnostic error with the section, expected bytes, writer offset and
+payload bytes. A snapshot-step error retains it as `instance.failure.cause`.
+There is no second scan of entities or property values in these checks.
+
+These checks detect size disagreements, not every incorrect value or schema
+mistake. Correct-sized but semantically wrong data still needs application
+validation and tests. Client encoding failures retain their existing lifecycle:
+`flush()` restores queued outbound work when construction fails, while connection
+and control failures follow the client's connection-error policy.
 
 When a snapshot write fails and the raw error lacks enough context, enable:
 
@@ -165,6 +283,8 @@ When a snapshot write fails and the raw error lacks enough context, enable:
 instance.network.diagnosticBinaryWrites = true
 ```
 
-This reruns the failed write with section, entity, property, and value context.
-Disable it during normal play and benchmarks because it adds work to the hot
-path.
+This can rerun a throwing snapshot chunk with section, entity, property, and
+value context. Size-mismatch errors identify the allocation boundary; they do not
+promise a specific offending property. This diagnostic mode can change fragment
+selection, so disable it during normal play and benchmarks. The allocation size
+checks remain enabled.

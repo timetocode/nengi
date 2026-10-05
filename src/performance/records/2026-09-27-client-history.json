@@ -1,0 +1,3617 @@
+{
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "cpu": 2,
+  "node": "v22.17.1",
+  "cases": [
+    {
+      "name": "decode-65-59-moving",
+      "script": "ClientDecode.performance.ts",
+      "settings": {
+        "PROFILE_ENTITIES": "65",
+        "PROFILE_MOVING": "59",
+        "PROFILE_WARMUP": "1500",
+        "PROFILE_ITERATIONS": "6000"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": true,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.16048941766666472,
+              "p50": 0.048661999999922045,
+              "p95": 0.10734999999999673,
+              "p99": 5.825794999999971
+            },
+            "gc": {
+              "count": 70,
+              "durationMs": 530.901580452919
+            },
+            "history": {
+              "timelines": 65,
+              "records": 15995,
+              "retainedRecords": 14225
+            },
+            "retainedHeapBefore": 26008072,
+            "heapBeforeFinalGc": 129377072,
+            "retainedHeapAfter": 25596536,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 0
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": true,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.12734695166666615,
+              "p50": 0.044760999999994056,
+              "p95": 0.08210699999995086,
+              "p99": 4.367840000000001
+            },
+            "gc": {
+              "count": 60,
+              "durationMs": 395.6146903038025
+            },
+            "history": {
+              "timelines": 65,
+              "records": 15995,
+              "retainedRecords": 14225
+            },
+            "retainedHeapBefore": 25390448,
+            "heapBeforeFinalGc": 126951976,
+            "retainedHeapAfter": 25234648,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 118
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": false,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.0931612551666666,
+              "p50": 0.029228999999986627,
+              "p95": 0.05349699999999302,
+              "p99": 0.2286900000000287
+            },
+            "gc": {
+              "count": 44,
+              "durationMs": 293.7108542919159
+            },
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "retainedHeapBefore": 20629032,
+            "heapBeforeFinalGc": 35980680,
+            "retainedHeapAfter": 20831616,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 118
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": true,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.14063943099999918,
+              "p50": 0.04706599999997252,
+              "p95": 0.10684300000002622,
+              "p99": 5.006356000000096
+            },
+            "gc": {
+              "count": 60,
+              "durationMs": 426.93000078201294
+            },
+            "history": {
+              "timelines": 65,
+              "records": 15995,
+              "retainedRecords": 14225
+            },
+            "retainedHeapBefore": 25389664,
+            "heapBeforeFinalGc": 105232128,
+            "retainedHeapAfter": 25239544,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 118
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": false,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.09528893550000092,
+              "p50": 0.02995099999998274,
+              "p95": 0.0585399999999936,
+              "p99": 0.32314999999994143
+            },
+            "gc": {
+              "count": 44,
+              "durationMs": 288.748846411705
+            },
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "retainedHeapBefore": 20627952,
+            "heapBeforeFinalGc": 34197504,
+            "retainedHeapAfter": 20835880,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 118
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": true,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.138650409,
+              "p50": 0.04701399999999012,
+              "p95": 0.10822699999994256,
+              "p99": 4.772819999999911
+            },
+            "gc": {
+              "count": 68,
+              "durationMs": 407.47083353996277
+            },
+            "history": {
+              "timelines": 65,
+              "records": 15995,
+              "retainedRecords": 14225
+            },
+            "retainedHeapBefore": 26371096,
+            "heapBeforeFinalGc": 131109784,
+            "retainedHeapAfter": 25431216,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 0
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": false,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.10029322749999985,
+              "p50": 0.029395000000022264,
+              "p95": 0.06228299999997944,
+              "p99": 0.4538400000000138
+            },
+            "gc": {
+              "count": 44,
+              "durationMs": 307.595237493515
+            },
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "retainedHeapBefore": 20627504,
+            "heapBeforeFinalGc": 33266552,
+            "retainedHeapAfter": 20832960,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 118
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": true,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.13378013816666795,
+              "p50": 0.0462280000000419,
+              "p95": 0.09818000000007032,
+              "p99": 4.612251000000015
+            },
+            "gc": {
+              "count": 68,
+              "durationMs": 395.11516404151917
+            },
+            "history": {
+              "timelines": 65,
+              "records": 15995,
+              "retainedRecords": 14225
+            },
+            "retainedHeapBefore": 25510160,
+            "heapBeforeFinalGc": 128612152,
+            "retainedHeapAfter": 25352144,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 0
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 65,
+            "moving": 59,
+            "warmup": 1500,
+            "iterations": 6000,
+            "entityHistory": true,
+            "groupsPerPublication": 118,
+            "updatePacketBytes": 3092,
+            "elapsedMs": {
+              "mean": 0.14163457916666589,
+              "p50": 0.04597599999988233,
+              "p95": 0.10364499999991494,
+              "p99": 5.147697000000107
+            },
+            "gc": {
+              "count": 60,
+              "durationMs": 426.88485634326935
+            },
+            "history": {
+              "timelines": 65,
+              "records": 15995,
+              "retainedRecords": 14225
+            },
+            "retainedHeapBefore": 25391392,
+            "heapBeforeFinalGc": 111909752,
+            "retainedHeapAfter": 25241664,
+            "checksum": 2124000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 118
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.04701399999999012,
+          "p95": 0.10734999999999673
+        },
+        "after": {
+          "p50": 0.04597599999988233,
+          "p95": 0.10364499999991494
+        },
+        "history-off": {
+          "p50": 0.029395000000022264,
+          "p95": 0.0585399999999936
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    },
+    {
+      "name": "decode-1000-dense",
+      "script": "ClientDecode.performance.ts",
+      "settings": {
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_MOVING": "1000",
+        "PROFILE_WARMUP": "600",
+        "PROFILE_ITERATIONS": "1800"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": true,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 2.6448822877777745,
+              "p50": 0.9286919999999554,
+              "p95": 9.861488000000008,
+              "p99": 14.016163000000233
+            },
+            "gc": {
+              "count": 346,
+              "durationMs": 2450.1880198717117
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 473000,
+              "retainedRecords": 241000
+            },
+            "retainedHeapBefore": 247858648,
+            "heapBeforeFinalGc": 327711248,
+            "retainedHeapAfter": 277637120,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 0
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": true,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 2.6304839088888774,
+              "p50": 0.9067839999997886,
+              "p95": 10.612988999999743,
+              "p99": 14.353718999999728
+            },
+            "gc": {
+              "count": 308,
+              "durationMs": 2333.6506984233856
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 473000,
+              "retainedRecords": 241000
+            },
+            "retainedHeapBefore": 247738480,
+            "heapBeforeFinalGc": 326217016,
+            "retainedHeapAfter": 277507024,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 2000
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": false,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 1.036110295555556,
+              "p50": 0.6626859999996668,
+              "p95": 1.7569029999999657,
+              "p99": 4.929124000000002
+            },
+            "gc": {
+              "count": 104,
+              "durationMs": 192.83997786045074
+            },
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "retainedHeapBefore": 152721768,
+            "heapBeforeFinalGc": 228981864,
+            "retainedHeapAfter": 152811816,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 2000
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": true,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 2.5961415205555642,
+              "p50": 0.9047679999998763,
+              "p95": 10.290437999999995,
+              "p99": 13.437919000000875
+            },
+            "gc": {
+              "count": 308,
+              "durationMs": 2292.350706577301
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 473000,
+              "retainedRecords": 241000
+            },
+            "retainedHeapBefore": 247740384,
+            "heapBeforeFinalGc": 331347928,
+            "retainedHeapAfter": 277511680,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 2000
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": false,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 1.0862095222222174,
+              "p50": 0.7407869999997274,
+              "p95": 1.8167430000000877,
+              "p99": 7.89049
+            },
+            "gc": {
+              "count": 104,
+              "durationMs": 213.28781974315643
+            },
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "retainedHeapBefore": 152729304,
+            "heapBeforeFinalGc": 222027176,
+            "retainedHeapAfter": 152817360,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 2000
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": true,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 2.759922293888882,
+              "p50": 0.9655699999998433,
+              "p95": 9.91345599999977,
+              "p99": 12.22317699999985
+            },
+            "gc": {
+              "count": 346,
+              "durationMs": 2498.577470421791
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 473000,
+              "retainedRecords": 241000
+            },
+            "retainedHeapBefore": 247860512,
+            "heapBeforeFinalGc": 326448944,
+            "retainedHeapAfter": 277642256,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 0
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": false,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 1.6148707894444307,
+              "p50": 0.5950309999998353,
+              "p95": 8.745850000000246,
+              "p99": 12.388349999999264
+            },
+            "gc": {
+              "count": 227,
+              "durationMs": 1557.4087216854095
+            },
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "retainedHeapBefore": 152723624,
+            "heapBeforeFinalGc": 186189736,
+            "retainedHeapAfter": 152816456,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 2000
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": true,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 2.7631848161111274,
+              "p50": 0.9532340000005206,
+              "p95": 9.701465999999982,
+              "p99": 12.58916599999975
+            },
+            "gc": {
+              "count": 346,
+              "durationMs": 2504.1101216077805
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 473000,
+              "retainedRecords": 241000
+            },
+            "retainedHeapBefore": 247866312,
+            "heapBeforeFinalGc": 328522680,
+            "retainedHeapAfter": 277648416,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 0
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "binary": "official nengi-buffers, pending rc.128",
+            "explicitGc": true,
+            "population": 1000,
+            "moving": 1000,
+            "warmup": 600,
+            "iterations": 1800,
+            "entityHistory": true,
+            "groupsPerPublication": 2000,
+            "updatePacketBytes": 54025,
+            "elapsedMs": {
+              "mean": 2.664220563888891,
+              "p50": 0.9273880000000645,
+              "p95": 10.4915060000003,
+              "p99": 13.950714999999946
+            },
+            "gc": {
+              "count": 308,
+              "durationMs": 2362.781349301338
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 473000,
+              "retainedRecords": 241000
+            },
+            "retainedHeapBefore": 247756208,
+            "heapBeforeFinalGc": 326473216,
+            "retainedHeapAfter": 277532720,
+            "checksum": 10800000
+          },
+          "temporaryGroupArraysRemovedPerPublication": 2000
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.9532340000005206,
+          "p95": 9.861488000000008
+        },
+        "after": {
+          "p50": 0.9067839999997886,
+          "p95": 10.4915060000003
+        },
+        "history-off": {
+          "p50": 0.6626859999996668,
+          "p95": 1.8167430000000877
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    },
+    {
+      "name": "apply-1000-dense",
+      "script": "ClientHistory.performance.ts",
+      "settings": {
+        "PROFILE_SCENARIO": "dense",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_WARMUP": "400",
+        "PROFILE_ITERATIONS": "1000"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.3475149999999303,
+              "p95": 0.7620749999998679,
+              "p99": 9.721928999999818,
+              "max": 12.48755200000005
+            },
+            "pruneMs": {
+              "p50": 0.03121299999997973,
+              "p95": 0.047706999999945765,
+              "p99": 0.08179500000005646,
+              "max": 1.1248769999999695
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 435000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 111537016,
+            "heapBeforeFinalGc": 437039352,
+            "retainedHeapAfter": 117036096,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.34765199999992547,
+              "p95": 0.8582549999998719,
+              "p99": 9.641937999999982,
+              "max": 19.86085100000014
+            },
+            "pruneMs": {
+              "p50": 0.030385000000023865,
+              "p95": 0.05915400000003501,
+              "p99": 0.10129000000006272,
+              "max": 0.45885599999996884
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 435000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 111363560,
+            "heapBeforeFinalGc": 436962504,
+            "retainedHeapAfter": 116863736,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.11127799999997023,
+              "p95": 0.2360800000000154,
+              "p99": 7.562135000000012,
+              "max": 9.589801999999963
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 43297504,
+            "heapBeforeFinalGc": 181934832,
+            "retainedHeapAfter": 43309168,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.36122500000010405,
+              "p95": 0.9179010000000289,
+              "p99": 9.248667000000069,
+              "max": 11.954316000000063
+            },
+            "pruneMs": {
+              "p50": 0.032046000000036656,
+              "p95": 0.053078999999797816,
+              "p99": 0.1139220000000023,
+              "max": 1.4602800000000116
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 435000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 111324696,
+            "heapBeforeFinalGc": 436906632,
+            "retainedHeapAfter": 116823728,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.11164400000006935,
+              "p95": 0.19902999999999338,
+              "p99": 7.628940999999941,
+              "max": 9.992322000000058
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 43297576,
+            "heapBeforeFinalGc": 181884280,
+            "retainedHeapAfter": 43309488,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.3478629999999612,
+              "p95": 1.2305160000000797,
+              "p99": 8.762887999999975,
+              "max": 15.215787999999975
+            },
+            "pruneMs": {
+              "p50": 0.030745000000024447,
+              "p95": 0.04716199999984383,
+              "p99": 0.10113700000010795,
+              "max": 14.819795999999997
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 435000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 111402712,
+            "heapBeforeFinalGc": 436934472,
+            "retainedHeapAfter": 116902032,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.11035200000003442,
+              "p95": 0.203228000000081,
+              "p99": 7.070009000000027,
+              "max": 8.626040999999987
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 43299760,
+            "heapBeforeFinalGc": 181886176,
+            "retainedHeapAfter": 43311624,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.34579600000006394,
+              "p95": 1.077976999999919,
+              "p99": 9.50609099999997,
+              "max": 16.5688990000001
+            },
+            "pruneMs": {
+              "p50": 0.02973799999995208,
+              "p95": 0.045618999999987864,
+              "p99": 0.10089500000003682,
+              "max": 1.3848820000000615
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 435000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 111336000,
+            "heapBeforeFinalGc": 436926280,
+            "retainedHeapAfter": 116836192,
+            "checksum": 1345620
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 400,
+            "iterations": 1000,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.347088999999869,
+              "p95": 1.0655990000000202,
+              "p99": 9.486281999999846,
+              "max": 16.545206000000007
+            },
+            "pruneMs": {
+              "p50": 0.03029900000001362,
+              "p95": 0.05744100000015351,
+              "p99": 0.23622399999999288,
+              "max": 16.21906100000001
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 435000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 111324024,
+            "heapBeforeFinalGc": 436822256,
+            "retainedHeapAfter": 116823864,
+            "checksum": 1345620
+          }
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.3475149999999303,
+          "p95": 1.077976999999919
+        },
+        "after": {
+          "p50": 0.34765199999992547,
+          "p95": 0.9179010000000289
+        },
+        "history-off": {
+          "p50": 0.11127799999997023,
+          "p95": 0.203228000000081
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    },
+    {
+      "name": "apply-1000-mutable",
+      "script": "ClientHistory.performance.ts",
+      "settings": {
+        "PROFILE_SCENARIO": "dense",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_VALUE_SHAPE": "mutable",
+        "PROFILE_WARMUP": "200",
+        "PROFILE_ITERATIONS": "600"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.8544820000001891,
+              "p95": 10.929575000000114,
+              "p99": 14.555905000000166,
+              "max": 17.164502999999968
+            },
+            "pruneMs": {
+              "p50": 0.04224399999975503,
+              "p95": 0.07854300000008152,
+              "p99": 0.18659699999989243,
+              "max": 2.1822010000000773
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 317000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 359767104,
+            "heapBeforeFinalGc": 1001106512,
+            "retainedHeapAfter": 301179736,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.6147659999996904,
+              "p95": 11.65540400000009,
+              "p99": 13.291419000000133,
+              "max": 25.065650000000005
+            },
+            "pruneMs": {
+              "p50": 0.03867900000022928,
+              "p95": 0.0657059999998637,
+              "p99": 0.16296799999986433,
+              "max": 11.465525999999954
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 317000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 359687336,
+            "heapBeforeFinalGc": 1004123488,
+            "retainedHeapAfter": 301099848,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.4251289999999699,
+              "p95": 0.7076879999999619,
+              "p99": 8.929716000000099,
+              "max": 10.877166000000216
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 148244864,
+            "heapBeforeFinalGc": 495059312,
+            "retainedHeapAfter": 148270344,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.6188359999998738,
+              "p95": 11.047288999999637,
+              "p99": 13.161491000000296,
+              "max": 16.696677000000136
+            },
+            "pruneMs": {
+              "p50": 0.038681999999880645,
+              "p95": 0.06892199999992954,
+              "p99": 0.44396599999981845,
+              "max": 16.09734000000003
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 317000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 359694584,
+            "heapBeforeFinalGc": 1004023688,
+            "retainedHeapAfter": 301085960,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.24791899999991074,
+              "p95": 0.6502309999998488,
+              "p99": 11.041818000000148,
+              "max": 16.389022999999952
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 148248936,
+            "heapBeforeFinalGc": 492146184,
+            "retainedHeapAfter": 148273304,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.6168179999999666,
+              "p95": 11.179258000000118,
+              "p99": 13.85600700000009,
+              "max": 16.79094999999984
+            },
+            "pruneMs": {
+              "p50": 0.039110999999820706,
+              "p95": 0.06095299999992676,
+              "p99": 0.2522780000003877,
+              "max": 10.319341999999779
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 317000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 359772840,
+            "heapBeforeFinalGc": 1004012488,
+            "retainedHeapAfter": 301178576,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.23850100000004204,
+              "p95": 0.41619700000001103,
+              "p99": 9.198883000000023,
+              "max": 10.517618000000084
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 148245464,
+            "heapBeforeFinalGc": 492165344,
+            "retainedHeapAfter": 148269816,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.6394599999998718,
+              "p95": 11.588596999999936,
+              "p99": 13.788931999999932,
+              "max": 15.314926999999898
+            },
+            "pruneMs": {
+              "p50": 0.03987800000004427,
+              "p95": 0.06721999999990658,
+              "p99": 0.1623620000000301,
+              "max": 11.271791000000121
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 317000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 359703832,
+            "heapBeforeFinalGc": 1003865208,
+            "retainedHeapAfter": 301096992,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "dense",
+            "phase": "prune",
+            "valueShape": "mutable",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 1,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.6291250000003856,
+              "p95": 11.523948000000019,
+              "p99": 14.25710799999979,
+              "max": 20.871762999999874
+            },
+            "pruneMs": {
+              "p50": 0.04264499999999316,
+              "p95": 0.0736469999997098,
+              "p99": 0.30867799999987255,
+              "max": 12.524756000000252
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 317000,
+              "retainedRecords": 241000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 240000
+            },
+            "retainedHeapBefore": 359639056,
+            "heapBeforeFinalGc": 1003715656,
+            "retainedHeapAfter": 301032272,
+            "checksum": 541320
+          }
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.6394599999998718,
+          "p95": 11.179258000000118
+        },
+        "after": {
+          "p50": 0.6188359999998738,
+          "p95": 11.523948000000019
+        },
+        "history-off": {
+          "p50": 0.24791899999991074,
+          "p95": 0.6502309999998488
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    },
+    {
+      "name": "apply-50000-sparse",
+      "script": "ClientHistory.performance.ts",
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_WARMUP": "200",
+        "PROFILE_ITERATIONS": "600"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.305150000000026,
+              "p95": 0.6278439999999819,
+              "p99": 2.4677330000000666,
+              "max": 10.72375199999999
+            },
+            "pruneMs": {
+              "p50": 0.031254999999987376,
+              "p95": 0.06861800000001494,
+              "p99": 0.14412399999991976,
+              "max": 1.8352909999999838
+            },
+            "history": {
+              "timelines": 50000,
+              "records": 569500,
+              "retainedRecords": 170000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 120000
+            },
+            "retainedHeapBefore": 93211936,
+            "heapBeforeFinalGc": 180931416,
+            "retainedHeapAfter": 138465824,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.33265700000015386,
+              "p95": 0.566868999999997,
+              "p99": 4.174070000000029,
+              "max": 13.958388000000014
+            },
+            "pruneMs": {
+              "p50": 0.03356400000006943,
+              "p95": 0.07225099999993745,
+              "p99": 0.1290800000000445,
+              "max": 0.25115199999993365
+            },
+            "history": {
+              "timelines": 50000,
+              "records": 569500,
+              "retainedRecords": 170000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 120000
+            },
+            "retainedHeapBefore": 93134792,
+            "heapBeforeFinalGc": 181443528,
+            "retainedHeapAfter": 138388280,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.09296399999999494,
+              "p95": 0.1454469999999901,
+              "p99": 0.20743999999996277,
+              "max": 2.4825690000000122
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 36793048,
+            "heapBeforeFinalGc": 82577368,
+            "retainedHeapAfter": 36817824,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.3221959999999626,
+              "p95": 0.6914379999999483,
+              "p99": 3.0486080000000584,
+              "max": 16.609861000000024
+            },
+            "pruneMs": {
+              "p50": 0.03354899999999361,
+              "p95": 0.0746599999999944,
+              "p99": 0.19762600000001385,
+              "max": 1.4594439999999622
+            },
+            "history": {
+              "timelines": 50000,
+              "records": 569500,
+              "retainedRecords": 170000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 120000
+            },
+            "retainedHeapBefore": 93135120,
+            "heapBeforeFinalGc": 180855304,
+            "retainedHeapAfter": 138388552,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.09192299999995157,
+              "p95": 0.17000199999995402,
+              "p99": 0.22994699999992463,
+              "max": 2.8511610000000474
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 36787192,
+            "heapBeforeFinalGc": 84594368,
+            "retainedHeapAfter": 36818224,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.3109319999999798,
+              "p95": 0.6039880000000721,
+              "p99": 4.917630000000031,
+              "max": 11.992905000000064
+            },
+            "pruneMs": {
+              "p50": 0.031074999999987085,
+              "p95": 0.0660609999999906,
+              "p99": 0.11987199999998666,
+              "max": 11.454500000000053
+            },
+            "history": {
+              "timelines": 50000,
+              "records": 569500,
+              "retainedRecords": 170000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 120000
+            },
+            "retainedHeapBefore": 93146448,
+            "heapBeforeFinalGc": 180684688,
+            "retainedHeapAfter": 138389672,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.09017100000005485,
+              "p95": 0.14707600000002685,
+              "p99": 0.21250700000001643,
+              "max": 1.9030219999999645
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 36793248,
+            "heapBeforeFinalGc": 82577568,
+            "retainedHeapAfter": 36817944,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.31158300000004147,
+              "p95": 0.6841909999999416,
+              "p99": 4.05165999999997,
+              "max": 13.742853999999966
+            },
+            "pruneMs": {
+              "p50": 0.03134699999998247,
+              "p95": 0.06996200000003228,
+              "p99": 0.23293699999999262,
+              "max": 1.579672999999957
+            },
+            "history": {
+              "timelines": 50000,
+              "records": 569500,
+              "retainedRecords": 170000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 120000
+            },
+            "retainedHeapBefore": 93212640,
+            "heapBeforeFinalGc": 180939528,
+            "retainedHeapAfter": 138466128,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "sparse",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 50000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.30817400000000816,
+              "p95": 0.5666999999999689,
+              "p99": 4.818585999999982,
+              "max": 14.102795000000015
+            },
+            "pruneMs": {
+              "p50": 0.03166199999998298,
+              "p95": 0.07862499999998818,
+              "p99": 0.14726499999994758,
+              "max": 1.6725599999999758
+            },
+            "history": {
+              "timelines": 50000,
+              "records": 569500,
+              "retainedRecords": 170000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 120000
+            },
+            "retainedHeapBefore": 93127352,
+            "heapBeforeFinalGc": 181144600,
+            "retainedHeapAfter": 138371816,
+            "checksum": 541320
+          }
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.3109319999999798,
+          "p95": 0.6278439999999819
+        },
+        "after": {
+          "p50": 0.3221959999999626,
+          "p95": 0.566868999999997
+        },
+        "history-off": {
+          "p50": 0.09192299999995157,
+          "p95": 0.14707600000002685
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    },
+    {
+      "name": "apply-1000-churn",
+      "script": "ClientHistory.performance.ts",
+      "settings": {
+        "PROFILE_SCENARIO": "churn",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_WARMUP": "300",
+        "PROFILE_ITERATIONS": "600"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.009144999999989523,
+              "p95": 0.028084999999975935,
+              "p99": 1.4054859999999962,
+              "max": 6.047841000000005
+            },
+            "pruneMs": {
+              "p50": 0.002223000000014963,
+              "p95": 0.0036180000000172186,
+              "p99": 0.04735099999999193,
+              "max": 1.5105709999999704
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 30210,
+              "retainedRecords": 7360
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 6360
+            },
+            "retainedHeapBefore": 14061056,
+            "heapBeforeFinalGc": 31065984,
+            "retainedHeapAfter": 16420256,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.008924999999976535,
+              "p95": 0.026743000000010397,
+              "p99": 1.3426039999999944,
+              "max": 5.4979320000000484
+            },
+            "pruneMs": {
+              "p50": 0.0020870000000172695,
+              "p95": 0.004488000000037573,
+              "p99": 0.02803300000005038,
+              "max": 1.4009770000000117
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 30210,
+              "retainedRecords": 7360
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 6360
+            },
+            "retainedHeapBefore": 14047488,
+            "heapBeforeFinalGc": 30782776,
+            "retainedHeapAfter": 16407032,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.00425799999999299,
+              "p95": 0.013162000000022545,
+              "p99": 0.7061620000000062,
+              "max": 2.55920100000003
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 11669560,
+            "heapBeforeFinalGc": 22167032,
+            "retainedHeapAfter": 11691504,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.009731999999985419,
+              "p95": 0.03348700000003646,
+              "p99": 1.3323149999999941,
+              "max": 5.345549000000005
+            },
+            "pruneMs": {
+              "p50": 0.0021600000000034925,
+              "p95": 0.004404999999962911,
+              "p99": 0.030779999999992924,
+              "max": 1.3870489999999904
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 30210,
+              "retainedRecords": 7360
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 6360
+            },
+            "retainedHeapBefore": 14049280,
+            "heapBeforeFinalGc": 30744688,
+            "retainedHeapAfter": 16407328,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.004059000000040669,
+              "p95": 0.01405299999998988,
+              "p99": 0.6712909999999965,
+              "max": 2.947144000000037
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 11665544,
+            "heapBeforeFinalGc": 21447224,
+            "retainedHeapAfter": 11691896,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.00927099999995562,
+              "p95": 0.026040000000023156,
+              "p99": 1.2450709999999958,
+              "max": 7.110734999999977
+            },
+            "pruneMs": {
+              "p50": 0.0021600000000034925,
+              "p95": 0.0044039999999654356,
+              "p99": 0.03235300000000052,
+              "max": 1.491074000000026
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 30210,
+              "retainedRecords": 7360
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 6360
+            },
+            "retainedHeapBefore": 14122224,
+            "heapBeforeFinalGc": 31123184,
+            "retainedHeapAfter": 16480256,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.004215999999985343,
+              "p95": 0.01173599999998487,
+              "p99": 0.7605280000000221,
+              "max": 2.790931999999998
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 11665280,
+            "heapBeforeFinalGc": 21423392,
+            "retainedHeapAfter": 11691896,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.012449000000003707,
+              "p95": 0.04147699999998622,
+              "p99": 1.3466310000000021,
+              "max": 12.910489999999982
+            },
+            "pruneMs": {
+              "p50": 0.0022860000000264336,
+              "p95": 0.00880899999998519,
+              "p99": 0.044299000000023625,
+              "max": 12.899362999999994
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 30210,
+              "retainedRecords": 7360
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 6360
+            },
+            "retainedHeapBefore": 14123104,
+            "heapBeforeFinalGc": 31313816,
+            "retainedHeapAfter": 16491952,
+            "checksum": 650370
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "churn",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 1000,
+            "components": 1,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 300,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.009081999999978052,
+              "p95": 0.032405999999980395,
+              "p99": 1.4222770000000082,
+              "max": 5.723538000000019
+            },
+            "pruneMs": {
+              "p50": 0.0021280000000274413,
+              "p95": 0.0034600000000182263,
+              "p99": 0.030833999999970274,
+              "max": 1.976602000000014
+            },
+            "history": {
+              "timelines": 1000,
+              "records": 30210,
+              "retainedRecords": 7360
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 6360
+            },
+            "retainedHeapBefore": 14046336,
+            "heapBeforeFinalGc": 30749040,
+            "retainedHeapAfter": 16411552,
+            "checksum": 650370
+          }
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.00927099999995562,
+          "p95": 0.028084999999975935
+        },
+        "after": {
+          "p50": 0.009081999999978052,
+          "p95": 0.032405999999980395
+        },
+        "history-off": {
+          "p50": 0.004215999999985343,
+          "p95": 0.013162000000022545
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    },
+    {
+      "name": "apply-10000-ecs",
+      "script": "ClientHistory.performance.ts",
+      "settings": {
+        "PROFILE_SCENARIO": "ecs",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_WARMUP": "200",
+        "PROFILE_ITERATIONS": "600"
+      },
+      "runs": [
+        {
+          "variant": "before",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.17797000000007301,
+              "p95": 0.2985710000000381,
+              "p99": 1.7699440000000095,
+              "max": 11.092800000000011
+            },
+            "pruneMs": {
+              "p50": 0.018506000000002132,
+              "p95": 0.04212999999992917,
+              "p99": 0.05528700000002118,
+              "max": 1.6489649999999756
+            },
+            "history": {
+              "timelines": 30000,
+              "records": 341700,
+              "retainedRecords": 102000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 72000
+            },
+            "retainedHeapBefore": 63865504,
+            "heapBeforeFinalGc": 122025448,
+            "retainedHeapAfter": 90993144,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.1983260000000655,
+              "p95": 0.4334640000000718,
+              "p99": 3.011549000000059,
+              "max": 14.985316000000012
+            },
+            "pruneMs": {
+              "p50": 0.02041899999994712,
+              "p95": 0.06082600000002003,
+              "p99": 0.12671799999998257,
+              "max": 1.884922999999958
+            },
+            "history": {
+              "timelines": 30000,
+              "records": 341700,
+              "retainedRecords": 102000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 72000
+            },
+            "retainedHeapBefore": 63707864,
+            "heapBeforeFinalGc": 122266736,
+            "retainedHeapAfter": 90861184,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 1,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.04907700000001114,
+              "p95": 0.11089099999998098,
+              "p99": 0.16453899999999066,
+              "max": 1.8013240000000224
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 30058512,
+            "heapBeforeFinalGc": 64282472,
+            "retainedHeapAfter": 30083184,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.1890250000000151,
+              "p95": 0.3235300000000052,
+              "p99": 0.7717059999999947,
+              "max": 5.423834000000056
+            },
+            "pruneMs": {
+              "p50": 0.018558999999982007,
+              "p95": 0.052680999999893174,
+              "p99": 0.12469999999996162,
+              "max": 1.7077780000000757
+            },
+            "history": {
+              "timelines": 30000,
+              "records": 341700,
+              "retainedRecords": 102000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 72000
+            },
+            "retainedHeapBefore": 63782872,
+            "heapBeforeFinalGc": 121888528,
+            "retainedHeapAfter": 90914736,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.06058500000000322,
+              "p95": 0.11205699999999297,
+              "p99": 0.15389399999997977,
+              "max": 2.563414000000023
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 29990264,
+            "heapBeforeFinalGc": 64213288,
+            "retainedHeapAfter": 30014624,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 2,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.17460700000003726,
+              "p95": 0.27693199999998797,
+              "p99": 0.4697310000000243,
+              "max": 11.367631000000074
+            },
+            "pruneMs": {
+              "p50": 0.017687000000023545,
+              "p95": 0.03510000000005675,
+              "p99": 0.06755199999997785,
+              "max": 11.126124000000004
+            },
+            "history": {
+              "timelines": 30000,
+              "records": 341700,
+              "retainedRecords": 102000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 72000
+            },
+            "retainedHeapBefore": 63867392,
+            "heapBeforeFinalGc": 121808792,
+            "retainedHeapAfter": 90994560,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "history-off",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": false,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.050307000000032076,
+              "p95": 0.08695099999999911,
+              "p99": 0.1244989999999575,
+              "max": 1.8621389999999565
+            },
+            "pruneMs": null,
+            "history": {
+              "timelines": 0,
+              "records": 0,
+              "retainedRecords": 0
+            },
+            "expirationIndex": {
+              "frames": 0,
+              "ids": 0
+            },
+            "retainedHeapBefore": 30003408,
+            "heapBeforeFinalGc": 64649360,
+            "retainedHeapAfter": 30028200,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "before",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.18195300000002135,
+              "p95": 0.29289600000004157,
+              "p99": 0.47881100000006427,
+              "max": 16.426287000000002
+            },
+            "pruneMs": {
+              "p50": 0.018148999999993976,
+              "p95": 0.046616999999969266,
+              "p99": 0.09804800000006253,
+              "max": 1.9940260000000762
+            },
+            "history": {
+              "timelines": 30000,
+              "records": 341700,
+              "retainedRecords": 102000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 72000
+            },
+            "retainedHeapBefore": 63852112,
+            "heapBeforeFinalGc": 122602944,
+            "retainedHeapAfter": 91006456,
+            "checksum": 541320
+          }
+        },
+        {
+          "variant": "after",
+          "repeat": 3,
+          "data": {
+            "runtime": "v22.17.1",
+            "explicitGc": true,
+            "scenario": "ecs",
+            "phase": "prune",
+            "valueShape": "scalar",
+            "sampling": "allocate",
+            "selection": "stable",
+            "population": 10000,
+            "components": 3,
+            "fraction": 0.01,
+            "historyFrames": 240,
+            "entityHistory": true,
+            "warmup": 200,
+            "iterations": 600,
+            "serverHz": 20,
+            "renderHz": 60,
+            "elapsedMs": {
+              "p50": 0.19099000000005617,
+              "p95": 0.31704500000000735,
+              "p99": 1.6390440000000126,
+              "max": 5.579788000000008
+            },
+            "pruneMs": {
+              "p50": 0.02052400000002308,
+              "p95": 0.04252999999994245,
+              "p99": 0.09768100000007962,
+              "max": 1.4955019999999877
+            },
+            "history": {
+              "timelines": 30000,
+              "records": 341700,
+              "retainedRecords": 102000
+            },
+            "expirationIndex": {
+              "frames": 240,
+              "ids": 72000
+            },
+            "retainedHeapBefore": 63794680,
+            "heapBeforeFinalGc": 121752872,
+            "retainedHeapAfter": 90921640,
+            "checksum": 541320
+          }
+        }
+      ],
+      "medians": {
+        "before": {
+          "p50": 0.17797000000007301,
+          "p95": 0.29289600000004157
+        },
+        "after": {
+          "p50": 0.19099000000005617,
+          "p95": 0.3235300000000052
+        },
+        "history-off": {
+          "p50": 0.050307000000032076,
+          "p95": 0.11089099999998098
+        }
+      },
+      "defaultHistoryCountsMatch": true
+    }
+  ],
+  "sourceSha256": {
+    "before": {
+      "src/NQueue.test.ts": "92d0f2d02502c4e3dd8fbc8b9780d58bc9cc0ca9d6b1bf90dd0fcbccaf51b55a",
+      "src/NQueue.ts": "b95369f46e18780ec8a29de4e1cbdd368d77d5a373e836bfb04d4f2a21207ccc",
+      "src/binary/BinaryDiagnosticError.ts": "72e7a03f05bd40b7f1595263d03cd5bda13c9b91858feaeb26dfa2a024429e4d",
+      "src/binary/BinaryWriteSize.test.ts": "ab8114f659d01c8fad928927ad85a1bf8211727e5c6a385a98089f897a559813",
+      "src/binary/assertBinaryWriteSize.ts": "a50b1174cb89a4d0c373fbef68c57057bb08613acb50e4d9752f0be9325ab84f",
+      "src/binary/endpoint/EndpointPayload.test.ts": "eb925cb93a1d4c89907110c3da91530f362e04499bcecabecd5f65f1d55d0acf",
+      "src/binary/endpoint/EndpointPayload.ts": "66c21a0c9002ff4180eedd8f300661ea590ef68b00d4e77cf3067b268cb5f487",
+      "src/binary/entity/countDiff.ts": "b2c444391ce676ab018b50f0dd034d614bc935051819d8e34997b1198480dce8",
+      "src/binary/entity/countEntity.ts": "a6031d3abe5ff9474397b09183b7a90a9d3db99fb442be6f79246ff66e67ae3f",
+      "src/binary/entity/countUpdateGroup.ts": "a53d23317b890270f66efee14c1de441d3a157f1edc8ee1b99cc812787c77be4",
+      "src/binary/entity/diffSerialization.test.ts": "9bbfcb54357f4981740172821d2fee04e8716a86adb0ad42f9d1e43543afef23",
+      "src/binary/entity/entitySerialization.test.ts": "bc2cb78c8a7206d9143111618074a71cdc6531bd29e54b3f45adeb2cbb32db04",
+      "src/binary/entity/readDiff.ts": "e1754f334c40343ed062dc01b1ef9f29ebc53a22087cc9a8ef0c9cf3bed08919",
+      "src/binary/entity/readEntity.ts": "c4c11f7375e82362b6087b229b2f50d1a3d0e2ba20b599a85cf5ae41ecedd7f0",
+      "src/binary/entity/readUpdateGroup.ts": "1f45f14b753d7b004744c01cd13bd78e77f0ee197207b6a12bbd89bd52113088",
+      "src/binary/entity/writeDiff.ts": "4c0e709781c96feea15fc48dfc343f76c6ade7b844cfc128d5325ea433ca954f",
+      "src/binary/entity/writeEntity.ts": "903370543d4c9a713e542a5d86439c9b16b49a050ed71fbaa5c960e3412df2a8",
+      "src/binary/entity/writeUpdateGroup.ts": "89edba7bae2b1318b852eb0be45f7faac382e53f47264d677a2c4e9c6befb2c5",
+      "src/binary/message/count.ts": "dfb303db797d30ecb984139b3ce9fc567ace60ce80e1a24e6b22a19bf29de4da",
+      "src/binary/message/messageSerialization.test.ts": "0844340ff0095714a110bc5c71b488effefe932c535f281bcfe050b520112769",
+      "src/binary/message/readEngineMessage.ts": "6d625300d31cf664e1abee141b20f226c3e77b05a7298dfd33900f8732a7cf6e",
+      "src/binary/message/readMessage.ts": "ef90a7639f9025f059382c9802df264f4c323dc3e5d461b22818bbab58e402b3",
+      "src/binary/message/writeMessage.ts": "0b54a20a44a7e97dfee028ddf630a07204534b3fe233e58886cfb0af6857bbf4",
+      "src/binary/snapshot/EcsChannelCorrectness.test.ts": "e64486386524c4c06b2470dc1117624b2c037921b7396fcf6c44089f478388c6",
+      "src/binary/snapshot/EcsChannelLifecycle.test.ts": "905870e36e3ae73c976ac1337759490a3d90c67f960690dbb8f526473e9a95ca",
+      "src/binary/snapshot/EcsSpatialLifecycle.test.ts": "163210ad3be938077f75cb2fdb2ce1a0db362cd2004a52e2ed557b215e7d327c",
+      "src/binary/snapshot/ObjectChannelCorrectness.test.ts": "6baabb44e3e65d30c8b8da09eecba930dfed97e09bca19cceb11970e1ca466ec",
+      "src/binary/snapshot/SnapshotChunk.ts": "a29f8c54544b19a3d591f5f57d79182dc42fe4d694e38ba70725f9452bd7da44",
+      "src/binary/snapshot/SnapshotPlan.ts": "72bc50e940042e84af1c8028c5bd500e1e9fffe899609c717aa030e55411ca98",
+      "src/binary/snapshot/cellEntityFragments.ts": "582a3731d18000fe4a424440231c5c32a71ee041f20876d741668431e55d1086",
+      "src/binary/snapshot/cellFragmentBuilders.ts": "2b887fce9b5e9090b573259ad11a8ccfe8eaeb69b4c28eb2a4094d80ad567cf5",
+      "src/binary/snapshot/channelHeaders.ts": "d2c4802e44bec468ae16b024b794efb95e000ea410428825fd2824c54357c138",
+      "src/binary/snapshot/channelMessages.ts": "fc710d696cd9c2626fd785b22d1fda797124a363af3f2a235d0eef9fb1a2de2e",
+      "src/binary/snapshot/channelModes.ts": "f79d56bd24d74ff6d206038b0c0ab3d2d7147194ce0e28c736cbbbd05718c960",
+      "src/binary/snapshot/commitSnapshotPlan.ts": "a83bfa96857623cfaeb928faee96dc5927f5008dac715c1e93433a95e20c4076",
+      "src/binary/snapshot/countSnapshotBytes.ts": "ba29f41bfb1ac9fb3f0ef57112be0991c8f39f364fc4a1de4f7470c9dd1d5316",
+      "src/binary/snapshot/createSnapshotBuffer.test.ts": "05690930c68de9d4c3b9d0fa94ed04c9d384433a4c2f1c9d595df31222278651",
+      "src/binary/snapshot/createSnapshotBuffer.ts": "a78c93dc7052e611f8a19dc2d98d6e3f7169d6319bbc64e429ff7076377a9ceb",
+      "src/binary/snapshot/ecsSnapshotCrud.ts": "48259469eb65276936875300325dd1c82dbb4522649f6df71fb77cf1f6ae35a1",
+      "src/binary/snapshot/entitySnapshotPlans.ts": "32dc4b840b7d80aa34f9fa3fd82bdb95a2de8df13568fd221636fb733d275f68",
+      "src/binary/snapshot/manualUpdates.ts": "d57c40955de24553d85037057a60c212800be29c531a87be1a72c890b6c0bf2c",
+      "src/binary/snapshot/messageFragments.ts": "59768bce76110ab59bfcacc549d4b3b806117107b9a30800cef2b3921d7e594c",
+      "src/binary/snapshot/sharedEntityFragments.ts": "13d9df9c75ad90e92b38cb7380ef74977bd303f76ffad1ea7aceeece8cbdc75a",
+      "src/binary/snapshot/snapshotChunkBuilders.ts": "82ca52f192786f827b462d71655b4eb6f1e68798e8148ef93ce85e63efffe53b",
+      "src/binary/snapshot/snapshotEnvelope.ts": "ac9a84b13187ab330a38a6117f0ec995c5658cd57abd8a0c5b75ea2942569886",
+      "src/binary/snapshot/snapshotHeader.test.ts": "7ba5d7045dc4ed5e4f584609dbade6648f471d8aac54aa41727dee281ba2cb8d",
+      "src/binary/snapshot/snapshotHeader.ts": "b71ce5b25e8928587a61d0aa9e386c3844b498e8a77ff2b7e1f4b80e9192cfd9",
+      "src/binary/snapshot/snapshotPayload.ts": "e605c706b71fa33065c0761286c6f66ebf0dda9414b7de91b83b2a29d9f2e590",
+      "src/binary/snapshot/snapshotPlanStats.ts": "74de4b89ac38942be8c4e2e95c33f8bed2b951298dff6f0c4d7d109450b361f5",
+      "src/binary/snapshot/writeSnapshot.ts": "6de11a0a7ca4a941bb75acb0e1bfc8de979a2683e271e97c73ffc4bb9333438e",
+      "src/client/Client.ts": "843e2595378a5d2d3213ffeca3577910b26ce8051cef9c348e2ab4c812d50f3b",
+      "src/client/ClientCommandTiming.test.ts": "e2e83d0dae40ffd3edd2dd8de8ac807967bdc825c8a8c887ef972f7372a3ca52",
+      "src/client/ClientConnection.test.ts": "62bff307cac5fac00e98187df6357c1d6780607a465ca63fbfff565d23b6242a",
+      "src/client/ClientConnection.ts": "4baa878214ecc4cb207d7ae25a27cb96dbef9bcf9ec2685c47c446672a99c20e",
+      "src/client/ClientDecodeLifecycle.test.ts": "6d8faf74d9a5b519bb49d566f232c58dd40040c286bc21d85f9eda8770fd6b7a",
+      "src/client/ClientHistoryLifecycle.test.ts": "2f8ee7c5feee2e8715d1bd4ace1ea8a2a7eea132c52bf225efd9c85f412d6abf",
+      "src/client/ClientLiveness.test.ts": "afe5e55d4f2e5b250d5494471795a7d0b5953bad89c1babc0b9389e57e946e6b",
+      "src/client/ClientNetwork.ts": "4a5f3c331eb909fce68bd843a8d9f349736b9a77c20e57fb2fe56b2dc57bb909",
+      "src/client/ClientPrediction.test.ts": "44fb647056346a47be7426442f372540bd91a370cba257624bc8fa55d7456f25",
+      "src/client/CommandConfirmation.test.ts": "ad2bccfabbc401f36e1cf64b9e3d6b8acf2dc64e9fe302595b758958ace61010",
+      "src/client/DocumentationWorkflows.test.ts": "f3602736a7f9e4197a3bbc8db8e410eff6a7cfb647479ead96d9e0306e47afd5",
+      "src/client/EntityHistory.test.ts": "69dc3a2e14e72ff7bd354133eab8667b32e52ebc8747fd8f252582e3d7d3b257",
+      "src/client/EntityHistory.ts": "2b00ef23e0eff9ee4ac66dce5a010bc8362b8151b1adc59ed849f9ba409b2012",
+      "src/client/EntityStore.test.ts": "d987d4e3c961fbc328defadc3bf071e912c40f129dbad528907660bc872af60e",
+      "src/client/EntityStore.ts": "42385a2b31fd9d9cff10526214612de087a30f6392dc90468e238859fc829170",
+      "src/client/FixedStepInterpolator.test.ts": "945cd24c22f55259cd168a57141b01288b8a9ae9363718b2f677c35831d16de9",
+      "src/client/FixedStepInterpolator.ts": "69fd7782a8db438c7d4c50044f63ec1ea145e5484179326dd76b5ced4c3ff245",
+      "src/client/Frame.ts": "aa2118880bbd3c14c1e5ca5f3a0c7ee53549d14cd04962b593c071c731316419",
+      "src/client/HistorySampling.test.ts": "ea98cd4c821f66827e13ac1c9142d00aefd4086d071edc7a80c58037087ff79a",
+      "src/client/InterpolationDelayPolicy.test.ts": "0d6d18388da8299cae70f37edc7f45304c38625836d77435d3d224a90bf7662a",
+      "src/client/InterpolationDelayPolicy.ts": "b9318c48647891f4bfb7ce5e10a07ca683b33d3cea18dad2bda17a9489c8e2ff",
+      "src/client/InterpolationOutput.test.ts": "f92f7cc39722e209cd4c9242858d34c4e319b8f2144456e4cd54df8448b8c260",
+      "src/client/InterpolationOutput.ts": "5fb7f8ba8a1e7b7f1cddc497aa8077f1bb3b1f015b3186fb4fe9d65d18bb1401",
+      "src/client/InterpolationTestHarness.ts": "4017202b30b1cc1e4d995fc3ebbf793eb0703ec067bb61c26431f443cef4b1f4",
+      "src/client/Outbound.test.ts": "6b4dd09c3398f17b58fda8f62c57ed59f9c0216a995ede4e6339275e94afd29e",
+      "src/client/Outbound.ts": "fddc791c1d61316f4deda200c7f372f7d0d62f270065c4bdbad5ff28a22f18de",
+      "src/client/PlaybackCursor.ts": "b9a9543a47ba5261f086898c0c6268d0ddec172b3935567f41e2e0f5a2538990",
+      "src/client/RequestResponse.test.ts": "1e9d37f27d18f96308db7a693200c665b43dfb3775f10ae81a92f52c56732b56",
+      "src/client/RequestWorkflow.test.ts": "0123c0632b8ccb0cb5a461553a833048c00f581528220eaf6ad628dcec1e1d6a",
+      "src/client/ScopedMessageLifecycle.test.ts": "9646474c1c3ee0fd03000a4faaebfcfff0c23b5ab8f9c1c5a4064a8b45b4c052",
+      "src/client/Snapshot.ts": "85edaaa3c67b9d4f82b070069065e5cebb8d597df9223d34af862559d3c6d97c",
+      "src/client/adapter/IClientNetworkAdapter.ts": "99fa5b51abd7812590569b77aea25ed3a3ad83ae2d0b5672651a5b47fba667e6",
+      "src/client/entityTimeline.ts": "9ba5ec4a8d2d4aae3e126d77a780992d6a7c15c737c3e13a608436555a9ab636",
+      "src/client/prediction/CommandReplayPrediction.test.ts": "0dea5577cbaca2df1c340466de179833f528d3e793495a0017fc4a5b9f1d12d8",
+      "src/client/prediction/CommandReplayPrediction.ts": "1820681d648d89d357680e31b795b94ec86b5cf87a70d25276fb808f9fb2e419",
+      "src/client/prediction/PredictionLog.test.ts": "0838c77567f803728a4c3929fd70f8eedde514a0dd0a1f55f1b9766d3e9b9212",
+      "src/client/prediction/PredictionLog.ts": "b45fc767f6b363eda7c9b4170637edda8b0e0861142c067b52b15227b63fff3a",
+      "src/client/prediction/Predictor.ts": "87a4cf87ac6ff5577fdabfe5b3123debb0a16bad78a7bd16239fa94734780b1d",
+      "src/client/prediction/StateReplayPrediction.ts": "95b1a0b5a93aa602a38637ae0ef778aea8a59904015c700606c20f198500d1b4",
+      "src/client/time.ts": "a5b765df1bf1e4df926ed82fcb6cd41cd64cbb2affdbfc6e90048c1ebc0b0ca1",
+      "src/common/ChannelHeader.ts": "4371ba84519bf7bf0143a42d90bd754d7a7aa2ef45dd7d93749ba1eb3346388c",
+      "src/common/Context.test.ts": "d52eaa6b2dd3f1b4403d1cee42ae4e2f25deccf3f153c5191a282da24952dcee",
+      "src/common/Context.ts": "c6670b000ef77559ba1c74c3c38726884f5587c5541bda6e3df0558d1f32f375",
+      "src/common/Endpoint.ts": "504da477eed1def118e6834e9d6f94eb0dcb0bd5658fc1bacf489813ca1d1269",
+      "src/common/EngineMessage.ts": "2ba7fe53db947fa25d8ea3c9889faf9559bab057171e93f52569b1e5b16631c2",
+      "src/common/I2DSpatialEntity.ts": "0b34aa172019e613375a315a4381af2bf945ce4b34282f80c88dc8e184f9a67e",
+      "src/common/I3DSpatialEntity.ts": "e76c48e3862809b299aa1efd478f93c2867cf9d65c964598a4cc0332fab33b5a",
+      "src/common/IEntity.ts": "44c15b731f331a37794944a1c135346f619dc1e091f2bc6dfb055ee210b5f553",
+      "src/common/binary/Binary.ts": "249605978efa5e787956d88bb25213292d08643fe39bb9db909e31b39f881b8b",
+      "src/common/binary/BinaryAdapter.ts": "3db431ecbb6acfe6425df1ce69421f007d8f07206b8b7fa705d6e9fc8846ee8a",
+      "src/common/binary/BinaryExt.test.ts": "4adc29561eb2a66931750b12e23b83fc1e373add18bf43b378ad735095d20880",
+      "src/common/binary/BinaryExt.ts": "8327ca8aabd2129efae2ad6786d129f7bc71d25e3ec5b48b38e7d31029e26c03",
+      "src/common/binary/BinarySection.ts": "1019c40aa6c35a69ef900bfdad0dc4be5df2e258fc96771ff016145e65cc7f4d",
+      "src/common/binary/IBinaryReader.ts": "2294e9d421b7087e26b6246959698e341f1b2ed05cbef98c291891ed632ae36a",
+      "src/common/binary/IBinaryWriter.ts": "548b81bf2c5ba035a68a1e79d16ea569cf9326bea49f36b2ca60add270656962",
+      "src/common/binary/NetworkEvent.ts": "09e5a185675d24fdd1f7fae1a5b6a6eceee97e4c62a2197276c8ec8a8584e44e",
+      "src/common/binary/Protocol.ts": "6edccf3b8504f41ed6211d6a4c015a4a0b72d33f8196d5d0840bf8b2a7f671ad",
+      "src/common/binary/schema/Schema.ts": "da0cde88623069df9615333f33b3ae104f0c70e4eb52defe75c23671adb4a57b",
+      "src/common/binary/schema/SchemaDefinition.ts": "0e3297309c6fe5a711b0ccade474ec0eb7290fe9c840c473c4503c00309ece21",
+      "src/common/binary/schema/defineSchema.test.ts": "bc31b7f49a40bf9083e76a63978c55503f3329a4be1a354fd99e18ef18340eaf",
+      "src/common/binary/schema/defineSchema.ts": "eb076fec02aeedfebb05486517286daa2c1695d970764ba698c27c31538e96a7",
+      "src/common/binary/schema/schemaFingerprint.ts": "f6ebdb8b7704cd0a2c583ee52470f7d18d22c66c10351db84fda8d217396a426",
+      "src/common/binary/schema/util.ts": "93a2c74e0d19470387ac2d71cac06a99669ac77ee88a99d93ed36127e170e0d4",
+      "src/common/network/NetworkConditionLink.test.ts": "de842d82b060943bbc151e4b0c63fb2cfa87513733b5bc0318cd2f8ac500ab57",
+      "src/common/network/NetworkConditionLink.ts": "5e36dfc4e4da13f83966b8d84f6893caa55f224e424697f679d8e137bca43a11",
+      "src/common/schemas/channelAddEntitySchema.ts": "8fdfd555879a8521aaaa4c20d5bdafaab47d5c528167c5f2735d1cde0fd29acc",
+      "src/common/schemas/commandFrameNumberSchema.ts": "e2cf63ee93c71f06a010846f93fb3c0e891445b387138e62b83227f768960e90",
+      "src/common/schemas/commandTimingSchema.ts": "6346e5ba860fcad5782f18d4affaea5f12bc4fd91fff8c3008d55dbb2102d445",
+      "src/common/schemas/connectAttemptSchema.ts": "6a882d1c0621056c81916f645d75b7e02ae5f4eaca0222f2398e64e7dbc854f1",
+      "src/common/schemas/connectionAcceptedSchema.ts": "e49b308c4b8740fdd7c9b0ff88fbd31081759438a13938923a0873b1feda0eb5",
+      "src/common/schemas/connectionDeniedSchema.ts": "929a881ea0a30684cac382c74e8ebbd1f44008dd0ccd39dfc2c70188bf885f00",
+      "src/common/schemas/connectionTerminatedSchema.ts": "73cafc39cafcf271f5f0c28b0a7bc9f35b5f18c45b7aafefb3d83e4ed8b25abf",
+      "src/common/schemas/interpolationDelaySchema.ts": "4d54554a63fbc55aa219b451108839ea4acc5dc13bb5089fc89588c88550f436",
+      "src/common/schemas/pingSchema.ts": "181c204f5b324f74d9d42adfbf6f5f5855cf149b6e1264295f77d6321f627ccf",
+      "src/common/schemas/pongSchema.ts": "72456b1d645145a26df8dba3dcc4b045383d4c4246b121e863f04b27b3b30117",
+      "src/common/schemas/protocolSchema.ts": "db6649fbca7afe1cfa396fd09f9ebd782be53be0a87b7d3a8138726e5918d094",
+      "src/common/time.ts": "a6929786da602a0c8f417f9e500dbc21ad3166febc00ffda76ab90a7c6fb568a",
+      "src/ecs/EcsWorld.test.ts": "6505e44f10deff698ed01722d75f4e898a89c99c7e13cbb423b0c80f576e4399",
+      "src/ecs/EcsWorld.ts": "82d7a1ae5c2df8042d7da55b45cf47d84f0a88348e04bab1b07c8fd6f7a4a003",
+      "src/ecs/applyEcsChannelFrame.ts": "c093ae37eaf138230b5e4854a26cac97db3eada1340d86948ac3d2263fa5e094",
+      "src/index.ts": "32689894bfb92cc533f3ecfa65cdf23645ca8d2a7cd3af1c44d8fc7305a707d2",
+      "src/performance/ClientDecode.performance.ts": "799f2cbafad6c42321a82feae4a90815f185b789d8f9f1ea1e0977ad9c83f1a1",
+      "src/performance/ClientHistory.performance.ts": "0291ba9a42aa7f2726ffb569df2558f32a8267fae65b8fbec420f24508e1549f",
+      "src/performance/ClientHistoryWorkload.ts": "05f8675976bb434886fc605776695d6fed21b59513f711cc66016c18c4dd18f1",
+      "src/performance/EcsBinding.performance.ts": "916c94faca69a197df3b2cf929a00ff50a63e7e09564bb72d484b9dee5dda70c",
+      "src/performance/EntityTree.performance.ts": "5c7b15a03e34cbb4c17829a27110a0b20273a698ef473581633ccc035428a0ab",
+      "src/performance/Historian.performance.ts": "972976371fd587645c033763b0a9879f58d7c9efbbd6bf05a93ce40f1928be0d",
+      "src/performance/ServerAllocation.test.ts": "a8818658b172b4267b8cb86528c63ffd3e5d39d9a55d0cb782d572013726c5ce",
+      "src/performance/SnapshotPipeline.performance.ts": "f2b122388964fdf0a1f32b407b498c8bc810955a34e83f0f1ef42b60286212e9",
+      "src/performance/SnapshotPipeline.test.ts": "fde0de14f80c64d63dd9ce95c1c7c41f155e527a19cf3220208107a8c6064a46",
+      "src/server/CommandRouter.test.ts": "10ad4755d07a89be2bebab088302bc437c8f6c96978d09f6f8475dce9ea28620",
+      "src/server/CommandRouter.ts": "4962e6740f1d5811646d8d1e44eb7b249558b02ae959a5f6d17dbdd84ae86e8c",
+      "src/server/ConnectionAdmission.test.ts": "37e3f2affc328c6d5c35595706617bceda099c0e1dd3d1434ea2e58c553642d6",
+      "src/server/EngineControl.test.ts": "4cd83724cd88c19c6041725c4ad051b9894dba44a5ce62b20e988e58a74222fd",
+      "src/server/EntityCache.test.ts": "371300a263d77c048e6d65dcffa47672a5f8b5bddcdae7afe18e903265e1f1d3",
+      "src/server/EntityCache.ts": "b80ef1b9fcd6dd08604e922b4cb539e98ea16a3fed4f7201ab56c7fc1fb3fd7c",
+      "src/server/Historian2D.scenarios.test.ts": "c0aacb25740c487f0e1413480b001b3e0600ff8724d8c23ee5ca8086db8675bf",
+      "src/server/Historian2D.test.ts": "51318674cdbefc1df9d588b7fcba64049eeaee8be330a47d0e54a1f9b7c99bf9",
+      "src/server/Historian2D.ts": "c0f1b302f7db27d45b1c227b00377afeb6f9677bdf909dc67ee7be3cbdf87c7e",
+      "src/server/Historian3D.test.ts": "ccc1719846ec6a16c13f6fdb1a186424b1d2f535e1b42143984572ed87d502c4",
+      "src/server/Historian3D.ts": "e866b7cd51079e81ac2f05925d94621bdb6dbada7d165f9db3fe24ba5b0a1c08",
+      "src/server/HistorianIndex.test.ts": "3e21196901706b9373679e90d6e8ae41fb3d067daabd9e25d146dc2bbb01fffa",
+      "src/server/HistorianValues.test.ts": "74475242d524f9f8513cee6fe4b688fb04a5760126953b5dcb79931b624b45cc",
+      "src/server/IdPool.test.ts": "2748229096968bf9a56b9f50ec12f52320e5a81ab715b10fa18d05833edca84c",
+      "src/server/IdPool.ts": "9a3ca4856bdb42fef33cc23b6b9c28d725fb1a266f7dcfb8bc3b8a155eb7394f",
+      "src/server/IdentityLifecycle.test.ts": "edcdcdb2cd7edf2a6932da0a406fbbf325df9182d46aa29811ce3a097d064314",
+      "src/server/Instance.ts": "632a1e486677bbac45abd6461c44270263e5fbe7986051f6ca1189e972c7b34b",
+      "src/server/InstanceNetwork.test.ts": "93f7f00f343bccb82ff295ec2820a8d2d884551f3d59657eda0e392af37c40bc",
+      "src/server/InstanceNetwork.ts": "ba547c71d3dff94387990da06ae2335ace31bd379e9e9f99c162c84d7481a322",
+      "src/server/InstanceStep.test.ts": "bddb30a9c9676443c8476a1d0bae7dbb0a3b26c8456b750ea640336d3a8bf790",
+      "src/server/LocalState.test.ts": "db7953692772ccb60b60519c0ad881b81b95d642eb3cedf99afea1310b6c103b",
+      "src/server/LocalState.ts": "07f16fd73b84fbb97e85fcf63c7ddb64f6f32e1b6053e6f3f6938dbc13fc5ebb",
+      "src/server/NDictionary.test.ts": "25e6bc9de1fa84ba245fc193b1f662a6396fb30c9b6c0bd5196a9a7e4e2db6e0",
+      "src/server/NDictionary.ts": "57e565593d245886ed147215d33091bdb84790698e549d15257dcf2798fbc212",
+      "src/server/NetworkLimits.test.ts": "32b208afce31aa3dc4ce5633d45199de5ad61632de80d74ccf285a1c0deb858c",
+      "src/server/NetworkLimits.ts": "f82e4f6c50aeda87466526de90697289ecf8d219150e432f2095ca1f043aff4a",
+      "src/server/PublicPathSmoother.test.ts": "656fa483d4110c0bb913cc8d36415b4dd813ac548b234bcfd58c231f0eb82afa",
+      "src/server/PublicPathSmoother2D.test.ts": "a5ceaabb421a25ca9c1716daa7705f9749349df6631f5d597b01f3e463ea80f0",
+      "src/server/PublicPathSmoother2D.ts": "047142fef0b90565ee4f64e98621305e8b876365e275de686c7c9e45f203b463",
+      "src/server/PublicPathSmoother3D.ts": "93e1499acfce63cb04a325a21bf7f592af2cf7e5905cea837632b35fe7870205",
+      "src/server/User.ts": "71d9ef89dce01832a97830280193ac20509eb7594d232ed3981b2f1d6fe9a5e3",
+      "src/server/UserClockSync.test.ts": "51072a26f58641fda16e8fa3c378d6b04ce2240014f4f3b945e6f51fdbf3f856",
+      "src/server/adapter/AdapterShutdown.test.ts": "8af7fb1f082094257c68a0404680683c530f903ac0e68a47955cf90cd6fc75b1",
+      "src/server/adapter/IServerNetworkAdapter.ts": "4ba19cd4effa3dc4af219ebb15fda41958c69b007d8ea9b9b5fa2518fb2afa7c",
+      "src/server/adapter/LocalAdapter.test.ts": "208f52465b0463867a20351543cd5ff5128a38dee7db1249e7cde35289a11a94",
+      "src/server/adapter/MockAdapter.ts": "7c1777ac6262a4139536180dc4a15b962e6603dfa989e8eac8d8d4b6c5b0cffd",
+      "src/server/channel/AABB2D.ts": "d0b30845edcbbe7d988e0a3c905a9518887ca38e850b8d92dae770dfe005d4a4",
+      "src/server/channel/AABB3D.ts": "058d9ddb929a8cc1eb3a4cb1fbc1a218fc666a36ccf062ee710d34dc6609f418",
+      "src/server/channel/CellFragmentChannelOutput.ts": "c098c1559a284df74e09bcda2e548036ddeac45aa2990311c7d00124d8521a0c",
+      "src/server/channel/Channel.test.ts": "e1abdad71ec24a45e7cbd8b659ca3155dce7fdc2521de9cd12b01dee1f416ca0",
+      "src/server/channel/Channel.ts": "b12f96f29b9782339d93451cb0761542374c71f4a6d2053baf1b01e9feabb726",
+      "src/server/channel/Channel2D.ts": "17a584be5158a81b1f47d0a57a1d527b6ab36457c8d184590d54bf261d376dc6",
+      "src/server/channel/Channel3D.ts": "39ad636ef2d0c9e06345bebba60a4a57fd53485329b34afe82b4dc72f1706587",
+      "src/server/channel/ChannelHeader.test.ts": "6a4ebd8b983533b7b7d52f5a8b8a2342a433f6f29b22515fc3624d0861adf6ee",
+      "src/server/channel/ChannelOutput.ts": "b9851900bf8f585dabef6b804af1a119475219e46f0c5464ebe7f780f2ec9089",
+      "src/server/channel/ChannelSnapshotOutput.ts": "ac33b0d84daf82bb23b741a71833b84de635491ba5f34468d90136a583e0ccb7",
+      "src/server/channel/ChannelVisibilityCache.test.ts": "99b706c779514aca9ed731c6fe336f34e60d65338543f6c7f53c4a52c2eda0f6",
+      "src/server/channel/ChannelVisibilityCache.ts": "c84a51ca9a58cb1b15ed37d8d17fa13c180b989151260d0f01571584f32f1099",
+      "src/server/channel/EcsChannel.test.ts": "00434a235ba986576d35950596868b41c3581de35a382bac594279828af0da34",
+      "src/server/channel/EcsChannel.ts": "28bf2c402278238129fc605342e1cbab1aa8f556670fe2e57ccce056f1663592",
+      "src/server/channel/EcsChannel2D.ts": "8f92c597ec96991f7483e24ff8d7a3d6d11da7f47bad9e21902800a1fe67a4f7",
+      "src/server/channel/EcsChannel3D.ts": "a64f85996ba13a8e3f3de5db5af8fac49178f1e5ef4735d542294287700cdd05",
+      "src/server/channel/EcsChannelBinding.test.ts": "776e38c5ec91962eea3263666b9ebb789e64b58be6118e1a54d367b5bb717fcb",
+      "src/server/channel/EcsChannelBinding.ts": "00f0bf4d05c359867e3e18b41a100bfbc3e5f2dedcf664b142a653958fd71182",
+      "src/server/channel/EcsChannelOutput.ts": "323bdf29a7301d342284d6826ae500156e860d8faf1d84ed37deae9780b2bc3e",
+      "src/server/channel/EcsChannelSnapshot.ts": "ec12dee9a460501170793c92168ee3ec03158b2c67fba1424e187fb099f04863",
+      "src/server/channel/EcsSpatialEntityStore.ts": "023e28943a505c27013e003548620d16eefbd25e2b6c37f7e5d2f712110b0f41",
+      "src/server/channel/EcsSpatialManualLog.ts": "0d3cf569acf88b26517e29617f323f5d67112138c4d92c7a1836e891af56f3fd",
+      "src/server/channel/IChannel.ts": "df6ace7913c21f5245b2de93ab95fead9395e2c560a73dc3f917c2c17b6a5799",
+      "src/server/channel/ManualChannel.ts": "376cc78d0ebb496a91b4b731f188e8098955b92ebc1a53205b9e51c9026b1fcd",
+      "src/server/channel/ManualChannel2D.test.ts": "70fd0d1ed72f60b3230dceea22e29ed141340cd5357b0b7fee0ad4fed3f49599",
+      "src/server/channel/ManualChannel2D.ts": "f9b6699b34391c5eebb6f36fbd18c439e94cef50977dc56aa6f02c7dcc8234db",
+      "src/server/channel/ManualChannel3D.ts": "4b5ff7a0a373d4032a55cebfd46a65e594645db72017f482b3de9cc0177a52f2",
+      "src/server/channel/ManualChannelOutput.ts": "29dc5b46c2c628b3c135f795477577a3feebc204a17f5de9ea21ce17560f4c9e",
+      "src/server/channel/Point2D.ts": "5c636084a41f3fa3ffe8d78b98cf53965ed3fe6d4005d121e1e73f6ed5b1100d",
+      "src/server/channel/Point3D.ts": "0ce8474acaf2c3594a3d4a63794c3bc234184408af36cd64bc901cd6924ae2ba",
+      "src/server/channel/SpatialGrid.test.ts": "bcaf6f02041c9e59b1450dc5d87633b90787d7dc85f1ad52cde28f6886ba3b3a",
+      "src/server/channel/SpatialGrid.ts": "6bf7f604f6a9e72065e7a10fee9e3086d5047d99c3227ad7b92afde5932483ad",
+      "src/server/channel/SpatialView.test.ts": "31f6eada69a4f9f163a941faf09966549a1c04657b29f8e9f8e5b521c62eb398",
+      "src/server/channel/SpatialView.ts": "b11e22fbe2a489b673ac7d647a9afa64bf6fc80e32c179372714c0f98e0adf1b",
+      "src/server/historianGrid.ts": "e91ee234450d41c9533c04eca21c01380ca1787d0381254c8341e06bd1000df4",
+      "src/testSupport/BufferBinary.ts": "0cc0d69a07bea076ef6f900ba8326c59d907c54c82784ef446d95b87978afc14",
+      "src/testSupport/ClientTransport.ts": "88975cce6c15fca5eed272f1e0427b6c6a341a106c0d74549d6547f28a0dd29b"
+    },
+    "after": {
+      "src/NQueue.test.ts": "92d0f2d02502c4e3dd8fbc8b9780d58bc9cc0ca9d6b1bf90dd0fcbccaf51b55a",
+      "src/NQueue.ts": "b95369f46e18780ec8a29de4e1cbdd368d77d5a373e836bfb04d4f2a21207ccc",
+      "src/binary/BinaryDiagnosticError.ts": "72e7a03f05bd40b7f1595263d03cd5bda13c9b91858feaeb26dfa2a024429e4d",
+      "src/binary/BinaryWriteSize.test.ts": "ab8114f659d01c8fad928927ad85a1bf8211727e5c6a385a98089f897a559813",
+      "src/binary/assertBinaryWriteSize.ts": "a50b1174cb89a4d0c373fbef68c57057bb08613acb50e4d9752f0be9325ab84f",
+      "src/binary/endpoint/EndpointPayload.test.ts": "eb925cb93a1d4c89907110c3da91530f362e04499bcecabecd5f65f1d55d0acf",
+      "src/binary/endpoint/EndpointPayload.ts": "66c21a0c9002ff4180eedd8f300661ea590ef68b00d4e77cf3067b268cb5f487",
+      "src/binary/entity/countDiff.ts": "b2c444391ce676ab018b50f0dd034d614bc935051819d8e34997b1198480dce8",
+      "src/binary/entity/countEntity.ts": "a6031d3abe5ff9474397b09183b7a90a9d3db99fb442be6f79246ff66e67ae3f",
+      "src/binary/entity/countUpdateGroup.ts": "a53d23317b890270f66efee14c1de441d3a157f1edc8ee1b99cc812787c77be4",
+      "src/binary/entity/diffSerialization.test.ts": "a15c7a8c8fb60ee8f7bb1d3fa9a269e36f3ba69031f5fe0b1df3b1c59d5569c9",
+      "src/binary/entity/entitySerialization.test.ts": "bc2cb78c8a7206d9143111618074a71cdc6531bd29e54b3f45adeb2cbb32db04",
+      "src/binary/entity/readDiff.ts": "e1754f334c40343ed062dc01b1ef9f29ebc53a22087cc9a8ef0c9cf3bed08919",
+      "src/binary/entity/readEntity.ts": "c4c11f7375e82362b6087b229b2f50d1a3d0e2ba20b599a85cf5ae41ecedd7f0",
+      "src/binary/entity/readUpdateGroup.ts": "0514e9d528e2620515c899cc2abd9c1edf83eeb37482e38da18ffcd6a8abe59c",
+      "src/binary/entity/writeDiff.ts": "4c0e709781c96feea15fc48dfc343f76c6ade7b844cfc128d5325ea433ca954f",
+      "src/binary/entity/writeEntity.ts": "903370543d4c9a713e542a5d86439c9b16b49a050ed71fbaa5c960e3412df2a8",
+      "src/binary/entity/writeUpdateGroup.ts": "89edba7bae2b1318b852eb0be45f7faac382e53f47264d677a2c4e9c6befb2c5",
+      "src/binary/message/count.ts": "dfb303db797d30ecb984139b3ce9fc567ace60ce80e1a24e6b22a19bf29de4da",
+      "src/binary/message/messageSerialization.test.ts": "0844340ff0095714a110bc5c71b488effefe932c535f281bcfe050b520112769",
+      "src/binary/message/readEngineMessage.ts": "6d625300d31cf664e1abee141b20f226c3e77b05a7298dfd33900f8732a7cf6e",
+      "src/binary/message/readMessage.ts": "ef90a7639f9025f059382c9802df264f4c323dc3e5d461b22818bbab58e402b3",
+      "src/binary/message/writeMessage.ts": "0b54a20a44a7e97dfee028ddf630a07204534b3fe233e58886cfb0af6857bbf4",
+      "src/binary/snapshot/EcsChannelCorrectness.test.ts": "e64486386524c4c06b2470dc1117624b2c037921b7396fcf6c44089f478388c6",
+      "src/binary/snapshot/EcsChannelLifecycle.test.ts": "905870e36e3ae73c976ac1337759490a3d90c67f960690dbb8f526473e9a95ca",
+      "src/binary/snapshot/EcsSpatialLifecycle.test.ts": "163210ad3be938077f75cb2fdb2ce1a0db362cd2004a52e2ed557b215e7d327c",
+      "src/binary/snapshot/ObjectChannelCorrectness.test.ts": "6baabb44e3e65d30c8b8da09eecba930dfed97e09bca19cceb11970e1ca466ec",
+      "src/binary/snapshot/SnapshotChunk.ts": "a29f8c54544b19a3d591f5f57d79182dc42fe4d694e38ba70725f9452bd7da44",
+      "src/binary/snapshot/SnapshotPlan.ts": "72bc50e940042e84af1c8028c5bd500e1e9fffe899609c717aa030e55411ca98",
+      "src/binary/snapshot/cellEntityFragments.ts": "582a3731d18000fe4a424440231c5c32a71ee041f20876d741668431e55d1086",
+      "src/binary/snapshot/cellFragmentBuilders.ts": "2b887fce9b5e9090b573259ad11a8ccfe8eaeb69b4c28eb2a4094d80ad567cf5",
+      "src/binary/snapshot/channelHeaders.ts": "d2c4802e44bec468ae16b024b794efb95e000ea410428825fd2824c54357c138",
+      "src/binary/snapshot/channelMessages.ts": "fc710d696cd9c2626fd785b22d1fda797124a363af3f2a235d0eef9fb1a2de2e",
+      "src/binary/snapshot/channelModes.ts": "f79d56bd24d74ff6d206038b0c0ab3d2d7147194ce0e28c736cbbbd05718c960",
+      "src/binary/snapshot/commitSnapshotPlan.ts": "a83bfa96857623cfaeb928faee96dc5927f5008dac715c1e93433a95e20c4076",
+      "src/binary/snapshot/countSnapshotBytes.ts": "ba29f41bfb1ac9fb3f0ef57112be0991c8f39f364fc4a1de4f7470c9dd1d5316",
+      "src/binary/snapshot/createSnapshotBuffer.test.ts": "05690930c68de9d4c3b9d0fa94ed04c9d384433a4c2f1c9d595df31222278651",
+      "src/binary/snapshot/createSnapshotBuffer.ts": "a78c93dc7052e611f8a19dc2d98d6e3f7169d6319bbc64e429ff7076377a9ceb",
+      "src/binary/snapshot/ecsSnapshotCrud.ts": "48259469eb65276936875300325dd1c82dbb4522649f6df71fb77cf1f6ae35a1",
+      "src/binary/snapshot/entitySnapshotPlans.ts": "32dc4b840b7d80aa34f9fa3fd82bdb95a2de8df13568fd221636fb733d275f68",
+      "src/binary/snapshot/manualUpdates.ts": "d57c40955de24553d85037057a60c212800be29c531a87be1a72c890b6c0bf2c",
+      "src/binary/snapshot/messageFragments.ts": "59768bce76110ab59bfcacc549d4b3b806117107b9a30800cef2b3921d7e594c",
+      "src/binary/snapshot/sharedEntityFragments.ts": "13d9df9c75ad90e92b38cb7380ef74977bd303f76ffad1ea7aceeece8cbdc75a",
+      "src/binary/snapshot/snapshotChunkBuilders.ts": "82ca52f192786f827b462d71655b4eb6f1e68798e8148ef93ce85e63efffe53b",
+      "src/binary/snapshot/snapshotEnvelope.ts": "ac9a84b13187ab330a38a6117f0ec995c5658cd57abd8a0c5b75ea2942569886",
+      "src/binary/snapshot/snapshotHeader.test.ts": "7ba5d7045dc4ed5e4f584609dbade6648f471d8aac54aa41727dee281ba2cb8d",
+      "src/binary/snapshot/snapshotHeader.ts": "b71ce5b25e8928587a61d0aa9e386c3844b498e8a77ff2b7e1f4b80e9192cfd9",
+      "src/binary/snapshot/snapshotPayload.ts": "e605c706b71fa33065c0761286c6f66ebf0dda9414b7de91b83b2a29d9f2e590",
+      "src/binary/snapshot/snapshotPlanStats.ts": "74de4b89ac38942be8c4e2e95c33f8bed2b951298dff6f0c4d7d109450b361f5",
+      "src/binary/snapshot/writeSnapshot.ts": "6de11a0a7ca4a941bb75acb0e1bfc8de979a2683e271e97c73ffc4bb9333438e",
+      "src/client/Client.ts": "6459b8df95e25466636c4424cfc2f3d23e3305a9c9cbdf0669b970a7a234d361",
+      "src/client/ClientCommandTiming.test.ts": "e2e83d0dae40ffd3edd2dd8de8ac807967bdc825c8a8c887ef972f7372a3ca52",
+      "src/client/ClientConnection.test.ts": "62bff307cac5fac00e98187df6357c1d6780607a465ca63fbfff565d23b6242a",
+      "src/client/ClientConnection.ts": "4baa878214ecc4cb207d7ae25a27cb96dbef9bcf9ec2685c47c446672a99c20e",
+      "src/client/ClientDecodeLifecycle.test.ts": "6d8faf74d9a5b519bb49d566f232c58dd40040c286bc21d85f9eda8770fd6b7a",
+      "src/client/ClientHistoryLifecycle.test.ts": "843ce25355b8ac966b5e88b1e78e562096492ca2a13ebbc8edccfdf1a15d19ba",
+      "src/client/ClientLiveness.test.ts": "afe5e55d4f2e5b250d5494471795a7d0b5953bad89c1babc0b9389e57e946e6b",
+      "src/client/ClientNetwork.ts": "e410dfa04fd6f4254ffeaa761a02c86ec556cf6c1337695869a593521977ea26",
+      "src/client/ClientPrediction.test.ts": "7c6da0b888183959b0d36e1112dfc67af305faa3d904c2a2f8d45a40e60a82cc",
+      "src/client/CommandConfirmation.test.ts": "ad2bccfabbc401f36e1cf64b9e3d6b8acf2dc64e9fe302595b758958ace61010",
+      "src/client/DocumentationWorkflows.test.ts": "f3602736a7f9e4197a3bbc8db8e410eff6a7cfb647479ead96d9e0306e47afd5",
+      "src/client/EntityHistory.test.ts": "69dc3a2e14e72ff7bd354133eab8667b32e52ebc8747fd8f252582e3d7d3b257",
+      "src/client/EntityHistory.ts": "2b00ef23e0eff9ee4ac66dce5a010bc8362b8151b1adc59ed849f9ba409b2012",
+      "src/client/EntityStore.test.ts": "d987d4e3c961fbc328defadc3bf071e912c40f129dbad528907660bc872af60e",
+      "src/client/EntityStore.ts": "e9bee565e570d54969e8a7df9f6ba7d181c40b6b1a8db1e08d6709cf055afc11",
+      "src/client/FixedStepInterpolator.test.ts": "945cd24c22f55259cd168a57141b01288b8a9ae9363718b2f677c35831d16de9",
+      "src/client/FixedStepInterpolator.ts": "ac5a0f45cea01e4a1765120ea7cd571507b3ada0c035882311d59c5a90c692c6",
+      "src/client/Frame.ts": "aa2118880bbd3c14c1e5ca5f3a0c7ee53549d14cd04962b593c071c731316419",
+      "src/client/HistorySampling.test.ts": "ea98cd4c821f66827e13ac1c9142d00aefd4086d071edc7a80c58037087ff79a",
+      "src/client/InterpolationDelayPolicy.test.ts": "0d6d18388da8299cae70f37edc7f45304c38625836d77435d3d224a90bf7662a",
+      "src/client/InterpolationDelayPolicy.ts": "b9318c48647891f4bfb7ce5e10a07ca683b33d3cea18dad2bda17a9489c8e2ff",
+      "src/client/InterpolationOutput.test.ts": "f92f7cc39722e209cd4c9242858d34c4e319b8f2144456e4cd54df8448b8c260",
+      "src/client/InterpolationOutput.ts": "5fb7f8ba8a1e7b7f1cddc497aa8077f1bb3b1f015b3186fb4fe9d65d18bb1401",
+      "src/client/InterpolationTestHarness.ts": "4017202b30b1cc1e4d995fc3ebbf793eb0703ec067bb61c26431f443cef4b1f4",
+      "src/client/Outbound.test.ts": "6b4dd09c3398f17b58fda8f62c57ed59f9c0216a995ede4e6339275e94afd29e",
+      "src/client/Outbound.ts": "fddc791c1d61316f4deda200c7f372f7d0d62f270065c4bdbad5ff28a22f18de",
+      "src/client/PlaybackCursor.ts": "b9a9543a47ba5261f086898c0c6268d0ddec172b3935567f41e2e0f5a2538990",
+      "src/client/RequestResponse.test.ts": "1e9d37f27d18f96308db7a693200c665b43dfb3775f10ae81a92f52c56732b56",
+      "src/client/RequestWorkflow.test.ts": "2ed3ffe99cd98a6e8eb16b2fb7154b3bf298bcce491b3cc307dc7198214ef84c",
+      "src/client/ScopedMessageLifecycle.test.ts": "9646474c1c3ee0fd03000a4faaebfcfff0c23b5ab8f9c1c5a4064a8b45b4c052",
+      "src/client/Snapshot.ts": "85edaaa3c67b9d4f82b070069065e5cebb8d597df9223d34af862559d3c6d97c",
+      "src/client/adapter/IClientNetworkAdapter.ts": "99fa5b51abd7812590569b77aea25ed3a3ad83ae2d0b5672651a5b47fba667e6",
+      "src/client/entityTimeline.ts": "9ba5ec4a8d2d4aae3e126d77a780992d6a7c15c737c3e13a608436555a9ab636",
+      "src/client/prediction/CommandReplayPrediction.test.ts": "0dea5577cbaca2df1c340466de179833f528d3e793495a0017fc4a5b9f1d12d8",
+      "src/client/prediction/CommandReplayPrediction.ts": "1820681d648d89d357680e31b795b94ec86b5cf87a70d25276fb808f9fb2e419",
+      "src/client/prediction/PredictionLog.test.ts": "0838c77567f803728a4c3929fd70f8eedde514a0dd0a1f55f1b9766d3e9b9212",
+      "src/client/prediction/PredictionLog.ts": "b45fc767f6b363eda7c9b4170637edda8b0e0861142c067b52b15227b63fff3a",
+      "src/client/prediction/Predictor.ts": "87a4cf87ac6ff5577fdabfe5b3123debb0a16bad78a7bd16239fa94734780b1d",
+      "src/client/prediction/StateReplayPrediction.ts": "95b1a0b5a93aa602a38637ae0ef778aea8a59904015c700606c20f198500d1b4",
+      "src/client/time.ts": "a5b765df1bf1e4df926ed82fcb6cd41cd64cbb2affdbfc6e90048c1ebc0b0ca1",
+      "src/common/ChannelHeader.ts": "4371ba84519bf7bf0143a42d90bd754d7a7aa2ef45dd7d93749ba1eb3346388c",
+      "src/common/Context.test.ts": "d52eaa6b2dd3f1b4403d1cee42ae4e2f25deccf3f153c5191a282da24952dcee",
+      "src/common/Context.ts": "c6670b000ef77559ba1c74c3c38726884f5587c5541bda6e3df0558d1f32f375",
+      "src/common/Endpoint.ts": "504da477eed1def118e6834e9d6f94eb0dcb0bd5658fc1bacf489813ca1d1269",
+      "src/common/EngineMessage.ts": "2ba7fe53db947fa25d8ea3c9889faf9559bab057171e93f52569b1e5b16631c2",
+      "src/common/I2DSpatialEntity.ts": "0b34aa172019e613375a315a4381af2bf945ce4b34282f80c88dc8e184f9a67e",
+      "src/common/I3DSpatialEntity.ts": "e76c48e3862809b299aa1efd478f93c2867cf9d65c964598a4cc0332fab33b5a",
+      "src/common/IEntity.ts": "44c15b731f331a37794944a1c135346f619dc1e091f2bc6dfb055ee210b5f553",
+      "src/common/binary/Binary.ts": "249605978efa5e787956d88bb25213292d08643fe39bb9db909e31b39f881b8b",
+      "src/common/binary/BinaryAdapter.ts": "3db431ecbb6acfe6425df1ce69421f007d8f07206b8b7fa705d6e9fc8846ee8a",
+      "src/common/binary/BinaryExt.test.ts": "4adc29561eb2a66931750b12e23b83fc1e373add18bf43b378ad735095d20880",
+      "src/common/binary/BinaryExt.ts": "8327ca8aabd2129efae2ad6786d129f7bc71d25e3ec5b48b38e7d31029e26c03",
+      "src/common/binary/BinarySection.ts": "1019c40aa6c35a69ef900bfdad0dc4be5df2e258fc96771ff016145e65cc7f4d",
+      "src/common/binary/IBinaryReader.ts": "2294e9d421b7087e26b6246959698e341f1b2ed05cbef98c291891ed632ae36a",
+      "src/common/binary/IBinaryWriter.ts": "548b81bf2c5ba035a68a1e79d16ea569cf9326bea49f36b2ca60add270656962",
+      "src/common/binary/NetworkEvent.ts": "09e5a185675d24fdd1f7fae1a5b6a6eceee97e4c62a2197276c8ec8a8584e44e",
+      "src/common/binary/Protocol.ts": "6edccf3b8504f41ed6211d6a4c015a4a0b72d33f8196d5d0840bf8b2a7f671ad",
+      "src/common/binary/schema/Schema.ts": "da0cde88623069df9615333f33b3ae104f0c70e4eb52defe75c23671adb4a57b",
+      "src/common/binary/schema/SchemaDefinition.ts": "0e3297309c6fe5a711b0ccade474ec0eb7290fe9c840c473c4503c00309ece21",
+      "src/common/binary/schema/defineSchema.test.ts": "bc31b7f49a40bf9083e76a63978c55503f3329a4be1a354fd99e18ef18340eaf",
+      "src/common/binary/schema/defineSchema.ts": "eb076fec02aeedfebb05486517286daa2c1695d970764ba698c27c31538e96a7",
+      "src/common/binary/schema/schemaFingerprint.ts": "f6ebdb8b7704cd0a2c583ee52470f7d18d22c66c10351db84fda8d217396a426",
+      "src/common/binary/schema/util.ts": "93a2c74e0d19470387ac2d71cac06a99669ac77ee88a99d93ed36127e170e0d4",
+      "src/common/network/NetworkConditionLink.test.ts": "de842d82b060943bbc151e4b0c63fb2cfa87513733b5bc0318cd2f8ac500ab57",
+      "src/common/network/NetworkConditionLink.ts": "5e36dfc4e4da13f83966b8d84f6893caa55f224e424697f679d8e137bca43a11",
+      "src/common/schemas/channelAddEntitySchema.ts": "8fdfd555879a8521aaaa4c20d5bdafaab47d5c528167c5f2735d1cde0fd29acc",
+      "src/common/schemas/commandFrameNumberSchema.ts": "e2cf63ee93c71f06a010846f93fb3c0e891445b387138e62b83227f768960e90",
+      "src/common/schemas/commandTimingSchema.ts": "6346e5ba860fcad5782f18d4affaea5f12bc4fd91fff8c3008d55dbb2102d445",
+      "src/common/schemas/connectAttemptSchema.ts": "6a882d1c0621056c81916f645d75b7e02ae5f4eaca0222f2398e64e7dbc854f1",
+      "src/common/schemas/connectionAcceptedSchema.ts": "e49b308c4b8740fdd7c9b0ff88fbd31081759438a13938923a0873b1feda0eb5",
+      "src/common/schemas/connectionDeniedSchema.ts": "929a881ea0a30684cac382c74e8ebbd1f44008dd0ccd39dfc2c70188bf885f00",
+      "src/common/schemas/connectionTerminatedSchema.ts": "73cafc39cafcf271f5f0c28b0a7bc9f35b5f18c45b7aafefb3d83e4ed8b25abf",
+      "src/common/schemas/interpolationDelaySchema.ts": "4d54554a63fbc55aa219b451108839ea4acc5dc13bb5089fc89588c88550f436",
+      "src/common/schemas/pingSchema.ts": "181c204f5b324f74d9d42adfbf6f5f5855cf149b6e1264295f77d6321f627ccf",
+      "src/common/schemas/pongSchema.ts": "72456b1d645145a26df8dba3dcc4b045383d4c4246b121e863f04b27b3b30117",
+      "src/common/schemas/protocolSchema.ts": "db6649fbca7afe1cfa396fd09f9ebd782be53be0a87b7d3a8138726e5918d094",
+      "src/common/time.ts": "a6929786da602a0c8f417f9e500dbc21ad3166febc00ffda76ab90a7c6fb568a",
+      "src/ecs/EcsWorld.test.ts": "6505e44f10deff698ed01722d75f4e898a89c99c7e13cbb423b0c80f576e4399",
+      "src/ecs/EcsWorld.ts": "82d7a1ae5c2df8042d7da55b45cf47d84f0a88348e04bab1b07c8fd6f7a4a003",
+      "src/ecs/applyEcsChannelFrame.ts": "c093ae37eaf138230b5e4854a26cac97db3eada1340d86948ac3d2263fa5e094",
+      "src/index.ts": "32689894bfb92cc533f3ecfa65cdf23645ca8d2a7cd3af1c44d8fc7305a707d2",
+      "src/performance/ClientDecode.performance.ts": "799f2cbafad6c42321a82feae4a90815f185b789d8f9f1ea1e0977ad9c83f1a1",
+      "src/performance/ClientHistory.performance.ts": "0291ba9a42aa7f2726ffb569df2558f32a8267fae65b8fbec420f24508e1549f",
+      "src/performance/ClientHistoryWorkload.ts": "05f8675976bb434886fc605776695d6fed21b59513f711cc66016c18c4dd18f1",
+      "src/performance/EcsBinding.performance.ts": "916c94faca69a197df3b2cf929a00ff50a63e7e09564bb72d484b9dee5dda70c",
+      "src/performance/EntityTree.performance.ts": "5c7b15a03e34cbb4c17829a27110a0b20273a698ef473581633ccc035428a0ab",
+      "src/performance/Historian.performance.ts": "972976371fd587645c033763b0a9879f58d7c9efbbd6bf05a93ce40f1928be0d",
+      "src/performance/ServerAllocation.test.ts": "a8818658b172b4267b8cb86528c63ffd3e5d39d9a55d0cb782d572013726c5ce",
+      "src/performance/SnapshotPipeline.performance.ts": "f2b122388964fdf0a1f32b407b498c8bc810955a34e83f0f1ef42b60286212e9",
+      "src/performance/SnapshotPipeline.test.ts": "fde0de14f80c64d63dd9ce95c1c7c41f155e527a19cf3220208107a8c6064a46",
+      "src/server/CommandRouter.test.ts": "10ad4755d07a89be2bebab088302bc437c8f6c96978d09f6f8475dce9ea28620",
+      "src/server/CommandRouter.ts": "4962e6740f1d5811646d8d1e44eb7b249558b02ae959a5f6d17dbdd84ae86e8c",
+      "src/server/ConnectionAdmission.test.ts": "37e3f2affc328c6d5c35595706617bceda099c0e1dd3d1434ea2e58c553642d6",
+      "src/server/EngineControl.test.ts": "4cd83724cd88c19c6041725c4ad051b9894dba44a5ce62b20e988e58a74222fd",
+      "src/server/EntityCache.test.ts": "371300a263d77c048e6d65dcffa47672a5f8b5bddcdae7afe18e903265e1f1d3",
+      "src/server/EntityCache.ts": "b80ef1b9fcd6dd08604e922b4cb539e98ea16a3fed4f7201ab56c7fc1fb3fd7c",
+      "src/server/Historian2D.scenarios.test.ts": "c0aacb25740c487f0e1413480b001b3e0600ff8724d8c23ee5ca8086db8675bf",
+      "src/server/Historian2D.test.ts": "51318674cdbefc1df9d588b7fcba64049eeaee8be330a47d0e54a1f9b7c99bf9",
+      "src/server/Historian2D.ts": "c0f1b302f7db27d45b1c227b00377afeb6f9677bdf909dc67ee7be3cbdf87c7e",
+      "src/server/Historian3D.test.ts": "ccc1719846ec6a16c13f6fdb1a186424b1d2f535e1b42143984572ed87d502c4",
+      "src/server/Historian3D.ts": "e866b7cd51079e81ac2f05925d94621bdb6dbada7d165f9db3fe24ba5b0a1c08",
+      "src/server/HistorianIndex.test.ts": "3e21196901706b9373679e90d6e8ae41fb3d067daabd9e25d146dc2bbb01fffa",
+      "src/server/HistorianValues.test.ts": "74475242d524f9f8513cee6fe4b688fb04a5760126953b5dcb79931b624b45cc",
+      "src/server/IdPool.test.ts": "2748229096968bf9a56b9f50ec12f52320e5a81ab715b10fa18d05833edca84c",
+      "src/server/IdPool.ts": "9a3ca4856bdb42fef33cc23b6b9c28d725fb1a266f7dcfb8bc3b8a155eb7394f",
+      "src/server/IdentityLifecycle.test.ts": "edcdcdb2cd7edf2a6932da0a406fbbf325df9182d46aa29811ce3a097d064314",
+      "src/server/Instance.ts": "632a1e486677bbac45abd6461c44270263e5fbe7986051f6ca1189e972c7b34b",
+      "src/server/InstanceNetwork.test.ts": "93f7f00f343bccb82ff295ec2820a8d2d884551f3d59657eda0e392af37c40bc",
+      "src/server/InstanceNetwork.ts": "ba547c71d3dff94387990da06ae2335ace31bd379e9e9f99c162c84d7481a322",
+      "src/server/InstanceStep.test.ts": "bddb30a9c9676443c8476a1d0bae7dbb0a3b26c8456b750ea640336d3a8bf790",
+      "src/server/LocalState.test.ts": "db7953692772ccb60b60519c0ad881b81b95d642eb3cedf99afea1310b6c103b",
+      "src/server/LocalState.ts": "07f16fd73b84fbb97e85fcf63c7ddb64f6f32e1b6053e6f3f6938dbc13fc5ebb",
+      "src/server/NDictionary.test.ts": "25e6bc9de1fa84ba245fc193b1f662a6396fb30c9b6c0bd5196a9a7e4e2db6e0",
+      "src/server/NDictionary.ts": "57e565593d245886ed147215d33091bdb84790698e549d15257dcf2798fbc212",
+      "src/server/NetworkLimits.test.ts": "32b208afce31aa3dc4ce5633d45199de5ad61632de80d74ccf285a1c0deb858c",
+      "src/server/NetworkLimits.ts": "f82e4f6c50aeda87466526de90697289ecf8d219150e432f2095ca1f043aff4a",
+      "src/server/PublicPathSmoother.test.ts": "656fa483d4110c0bb913cc8d36415b4dd813ac548b234bcfd58c231f0eb82afa",
+      "src/server/PublicPathSmoother2D.test.ts": "a5ceaabb421a25ca9c1716daa7705f9749349df6631f5d597b01f3e463ea80f0",
+      "src/server/PublicPathSmoother2D.ts": "047142fef0b90565ee4f64e98621305e8b876365e275de686c7c9e45f203b463",
+      "src/server/PublicPathSmoother3D.ts": "93e1499acfce63cb04a325a21bf7f592af2cf7e5905cea837632b35fe7870205",
+      "src/server/User.ts": "71d9ef89dce01832a97830280193ac20509eb7594d232ed3981b2f1d6fe9a5e3",
+      "src/server/UserClockSync.test.ts": "51072a26f58641fda16e8fa3c378d6b04ce2240014f4f3b945e6f51fdbf3f856",
+      "src/server/adapter/AdapterShutdown.test.ts": "8af7fb1f082094257c68a0404680683c530f903ac0e68a47955cf90cd6fc75b1",
+      "src/server/adapter/IServerNetworkAdapter.ts": "4ba19cd4effa3dc4af219ebb15fda41958c69b007d8ea9b9b5fa2518fb2afa7c",
+      "src/server/adapter/LocalAdapter.test.ts": "208f52465b0463867a20351543cd5ff5128a38dee7db1249e7cde35289a11a94",
+      "src/server/adapter/MockAdapter.ts": "7c1777ac6262a4139536180dc4a15b962e6603dfa989e8eac8d8d4b6c5b0cffd",
+      "src/server/channel/AABB2D.ts": "d0b30845edcbbe7d988e0a3c905a9518887ca38e850b8d92dae770dfe005d4a4",
+      "src/server/channel/AABB3D.ts": "058d9ddb929a8cc1eb3a4cb1fbc1a218fc666a36ccf062ee710d34dc6609f418",
+      "src/server/channel/CellFragmentChannelOutput.ts": "c098c1559a284df74e09bcda2e548036ddeac45aa2990311c7d00124d8521a0c",
+      "src/server/channel/Channel.test.ts": "e1abdad71ec24a45e7cbd8b659ca3155dce7fdc2521de9cd12b01dee1f416ca0",
+      "src/server/channel/Channel.ts": "b12f96f29b9782339d93451cb0761542374c71f4a6d2053baf1b01e9feabb726",
+      "src/server/channel/Channel2D.ts": "17a584be5158a81b1f47d0a57a1d527b6ab36457c8d184590d54bf261d376dc6",
+      "src/server/channel/Channel3D.ts": "39ad636ef2d0c9e06345bebba60a4a57fd53485329b34afe82b4dc72f1706587",
+      "src/server/channel/ChannelHeader.test.ts": "78a22c4f3c6602138e493825629a7c2311e56b79ca3dcc2a2b134aeb98991677",
+      "src/server/channel/ChannelOutput.ts": "b9851900bf8f585dabef6b804af1a119475219e46f0c5464ebe7f780f2ec9089",
+      "src/server/channel/ChannelSnapshotOutput.ts": "ac33b0d84daf82bb23b741a71833b84de635491ba5f34468d90136a583e0ccb7",
+      "src/server/channel/ChannelVisibilityCache.test.ts": "99b706c779514aca9ed731c6fe336f34e60d65338543f6c7f53c4a52c2eda0f6",
+      "src/server/channel/ChannelVisibilityCache.ts": "c84a51ca9a58cb1b15ed37d8d17fa13c180b989151260d0f01571584f32f1099",
+      "src/server/channel/EcsChannel.test.ts": "00434a235ba986576d35950596868b41c3581de35a382bac594279828af0da34",
+      "src/server/channel/EcsChannel.ts": "28bf2c402278238129fc605342e1cbab1aa8f556670fe2e57ccce056f1663592",
+      "src/server/channel/EcsChannel2D.ts": "8f92c597ec96991f7483e24ff8d7a3d6d11da7f47bad9e21902800a1fe67a4f7",
+      "src/server/channel/EcsChannel3D.ts": "a64f85996ba13a8e3f3de5db5af8fac49178f1e5ef4735d542294287700cdd05",
+      "src/server/channel/EcsChannelBinding.test.ts": "776e38c5ec91962eea3263666b9ebb789e64b58be6118e1a54d367b5bb717fcb",
+      "src/server/channel/EcsChannelBinding.ts": "00f0bf4d05c359867e3e18b41a100bfbc3e5f2dedcf664b142a653958fd71182",
+      "src/server/channel/EcsChannelOutput.ts": "323bdf29a7301d342284d6826ae500156e860d8faf1d84ed37deae9780b2bc3e",
+      "src/server/channel/EcsChannelSnapshot.ts": "ec12dee9a460501170793c92168ee3ec03158b2c67fba1424e187fb099f04863",
+      "src/server/channel/EcsSpatialEntityStore.ts": "023e28943a505c27013e003548620d16eefbd25e2b6c37f7e5d2f712110b0f41",
+      "src/server/channel/EcsSpatialManualLog.ts": "0d3cf569acf88b26517e29617f323f5d67112138c4d92c7a1836e891af56f3fd",
+      "src/server/channel/IChannel.ts": "df6ace7913c21f5245b2de93ab95fead9395e2c560a73dc3f917c2c17b6a5799",
+      "src/server/channel/ManualChannel.ts": "376cc78d0ebb496a91b4b731f188e8098955b92ebc1a53205b9e51c9026b1fcd",
+      "src/server/channel/ManualChannel2D.test.ts": "70fd0d1ed72f60b3230dceea22e29ed141340cd5357b0b7fee0ad4fed3f49599",
+      "src/server/channel/ManualChannel2D.ts": "f9b6699b34391c5eebb6f36fbd18c439e94cef50977dc56aa6f02c7dcc8234db",
+      "src/server/channel/ManualChannel3D.ts": "4b5ff7a0a373d4032a55cebfd46a65e594645db72017f482b3de9cc0177a52f2",
+      "src/server/channel/ManualChannelOutput.ts": "29dc5b46c2c628b3c135f795477577a3feebc204a17f5de9ea21ce17560f4c9e",
+      "src/server/channel/Point2D.ts": "5c636084a41f3fa3ffe8d78b98cf53965ed3fe6d4005d121e1e73f6ed5b1100d",
+      "src/server/channel/Point3D.ts": "0ce8474acaf2c3594a3d4a63794c3bc234184408af36cd64bc901cd6924ae2ba",
+      "src/server/channel/SpatialGrid.test.ts": "bcaf6f02041c9e59b1450dc5d87633b90787d7dc85f1ad52cde28f6886ba3b3a",
+      "src/server/channel/SpatialGrid.ts": "6bf7f604f6a9e72065e7a10fee9e3086d5047d99c3227ad7b92afde5932483ad",
+      "src/server/channel/SpatialView.test.ts": "31f6eada69a4f9f163a941faf09966549a1c04657b29f8e9f8e5b521c62eb398",
+      "src/server/channel/SpatialView.ts": "b11e22fbe2a489b673ac7d647a9afa64bf6fc80e32c179372714c0f98e0adf1b",
+      "src/server/historianGrid.ts": "e91ee234450d41c9533c04eca21c01380ca1787d0381254c8341e06bd1000df4",
+      "src/testSupport/BufferBinary.ts": "0cc0d69a07bea076ef6f900ba8326c59d907c54c82784ef446d95b87978afc14",
+      "src/testSupport/ClientTransport.ts": "88975cce6c15fca5eed272f1e0427b6c6a341a106c0d74549d6547f28a0dd29b"
+    }
+  },
+  "backendSha256": {
+    "BufferBinary.js": "bec8c0fdf2ab4881d668ee900d8baabf1391982093a4dd8fa29b3ca2af1e4bb0",
+    "BufferReader.js": "c3da3c08e7d725397f2356bcb0d27488766d7653ec565464a9cb23ad1df4f301",
+    "BufferWriter.js": "040ca1dc908a0cd76738e3f52f2ce6f89b7560d37208490c360b7094c748351f",
+    "index.js": "979603927be7f4676f90619bfe36e06786f5a855f7efb456d32e8fea39e4249b"
+  },
+  "date": "2026-09-27",
+  "machine": "AMD Ryzen 7 7800X3D, 8 physical cores / 16 logical CPUs, WSL2",
+  "description": "Entity-history opt-out and grouped-update decode allocation cleanup against the preceding dirty rc.128 candidate; identical harnesses in both sources.",
+  "followupEcs": [
+    {
+      "variant": "before",
+      "repeat": 1,
+      "data": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "ecs",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 10000,
+        "components": 3,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "entityHistory": true,
+        "warmup": 1500,
+        "iterations": 3000,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.19307400000002417,
+          "p95": 0.29860499999995227,
+          "p99": 0.5913049999999203,
+          "max": 12.765785999999935
+        },
+        "pruneMs": {
+          "p50": 0.018041000000039276,
+          "p95": 0.035082999999985987,
+          "p99": 0.054446999999981927,
+          "max": 2.1795250000000124
+        },
+        "history": {
+          "timelines": 30000,
+          "records": 1451700,
+          "retainedRecords": 102000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 72000
+        },
+        "retainedHeapBefore": 122822320,
+        "heapBeforeFinalGc": 417631984,
+        "retainedHeapAfter": 275857704,
+        "checksum": 11236170
+      }
+    },
+    {
+      "variant": "after",
+      "repeat": 1,
+      "data": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "ecs",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 10000,
+        "components": 3,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "entityHistory": true,
+        "warmup": 1500,
+        "iterations": 3000,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.18275099999982558,
+          "p95": 0.28975900000000365,
+          "p99": 0.4832200000000739,
+          "max": 12.90968399999997
+        },
+        "pruneMs": {
+          "p50": 0.017237999999906606,
+          "p95": 0.035296999999900436,
+          "p99": 0.05855899999983194,
+          "max": 0.3389670000001388
+        },
+        "history": {
+          "timelines": 30000,
+          "records": 1451700,
+          "retainedRecords": 102000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 72000
+        },
+        "retainedHeapBefore": 122752432,
+        "heapBeforeFinalGc": 427677112,
+        "retainedHeapAfter": 275763840,
+        "checksum": 11236170
+      }
+    },
+    {
+      "variant": "after",
+      "repeat": 2,
+      "data": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "ecs",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 10000,
+        "components": 3,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "entityHistory": true,
+        "warmup": 1500,
+        "iterations": 3000,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.17742300000008981,
+          "p95": 0.29217099999982565,
+          "p99": 0.7084400000001096,
+          "max": 16.81861499999991
+        },
+        "pruneMs": {
+          "p50": 0.01714300000003277,
+          "p95": 0.03138000000012653,
+          "p99": 0.05505199999993238,
+          "max": 0.6742270000002009
+        },
+        "history": {
+          "timelines": 30000,
+          "records": 1451700,
+          "retainedRecords": 102000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 72000
+        },
+        "retainedHeapBefore": 122807216,
+        "heapBeforeFinalGc": 417239576,
+        "retainedHeapAfter": 275841256,
+        "checksum": 11236170
+      }
+    },
+    {
+      "variant": "before",
+      "repeat": 2,
+      "data": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "ecs",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 10000,
+        "components": 3,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "entityHistory": true,
+        "warmup": 1500,
+        "iterations": 3000,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.1803829999998925,
+          "p95": 0.29981599999996433,
+          "p99": 0.6686349999999948,
+          "max": 24.479262000000062
+        },
+        "pruneMs": {
+          "p50": 0.017343999999866355,
+          "p95": 0.031095000000050277,
+          "p99": 0.05745299999989584,
+          "max": 24.23714199999995
+        },
+        "history": {
+          "timelines": 30000,
+          "records": 1451700,
+          "retainedRecords": 102000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 72000
+        },
+        "retainedHeapBefore": 122891728,
+        "heapBeforeFinalGc": 428232424,
+        "retainedHeapAfter": 275925080,
+        "checksum": 11236170
+      }
+    },
+    {
+      "variant": "before",
+      "repeat": 3,
+      "data": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "ecs",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 10000,
+        "components": 3,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "entityHistory": true,
+        "warmup": 1500,
+        "iterations": 3000,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.18828100000018821,
+          "p95": 0.3175699999999324,
+          "p99": 0.6060879999999997,
+          "max": 20.680824999999913
+        },
+        "pruneMs": {
+          "p50": 0.018542000000024927,
+          "p95": 0.040692999999919266,
+          "p99": 0.0607479999998759,
+          "max": 0.6085610000000088
+        },
+        "history": {
+          "timelines": 30000,
+          "records": 1451700,
+          "retainedRecords": 102000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 72000
+        },
+        "retainedHeapBefore": 122882800,
+        "heapBeforeFinalGc": 427931208,
+        "retainedHeapAfter": 275916472,
+        "checksum": 11236170
+      }
+    },
+    {
+      "variant": "after",
+      "repeat": 3,
+      "data": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "ecs",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 10000,
+        "components": 3,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "entityHistory": true,
+        "warmup": 1500,
+        "iterations": 3000,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.18162900000015725,
+          "p95": 0.30462099999999737,
+          "p99": 0.7227699999998549,
+          "max": 24.92381499999999
+        },
+        "pruneMs": {
+          "p50": 0.01741900000001806,
+          "p95": 0.032498000000032334,
+          "p99": 0.05177499999990687,
+          "max": 1.7376950000000306
+        },
+        "history": {
+          "timelines": 30000,
+          "records": 1451700,
+          "retainedRecords": 102000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 72000
+        },
+        "retainedHeapBefore": 122813064,
+        "heapBeforeFinalGc": 427959880,
+        "retainedHeapAfter": 275840736,
+        "checksum": 11236170
+      }
+    }
+  ],
+  "limitations": [
+    "Fresh sequential Node processes pinned to logical CPU 2, including runtime helper threads. Other development services were running.",
+    "Decode cases use official nengi-buffers and alternating pre-encoded packets; no transport, physics, renderer or game checkpoint reconstruction.",
+    "Apply cases exclude synthetic snapshot construction and binary decoding. Heap readings are occupancy/retention, not allocated bytes.",
+    "GC observations are runtime event counts/durations in the decode loop, not complete game pauses; one large history-off run has a slower tail.",
+    "No full Loam benchmark was run. Public performance numbers identify source hashes, not just the candidate version."
+  ]
+}

@@ -3,7 +3,7 @@ import { DEFAULT_PROTOCOL, ProtocolConfig } from '../../common/binary/Protocol'
 import { Context } from '../../common/Context'
 import { BinaryDiagnosticError, createBinaryDiagnosticError } from '../BinaryDiagnosticError'
 import { countSnapshotBytes } from './countSnapshotBytes'
-import { SnapshotPlan } from './SnapshotPlan'
+import { ReadonlySnapshotPlan } from './SnapshotPlan'
 import { writeSnapshot, writeSnapshotDiagnostic } from './writeSnapshot'
 
 export type SnapshotChunk = {
@@ -24,7 +24,7 @@ export type SnapshotChunkWriteOptions = {
 // specialize without re-coupling visibility collection to binary writing.
 export function createSnapshotPlanChunk(
     label: string,
-    plan: SnapshotPlan,
+    plan: ReadonlySnapshotPlan,
     context: Context,
     protocol: ProtocolConfig = DEFAULT_PROTOCOL
 ): SnapshotChunk {

@@ -1,33 +1,23 @@
 import { Binary } from '../common/binary/Binary'
 import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { Context } from '../common/Context'
-import { Client } from './Client'
+import { Client, ClientOptions } from './Client'
 import { StateReplayPrediction } from './prediction/StateReplayPrediction'
-import { testBinaryAdapter } from '../testSupport/BufferBinary'
+import { connectedTestClient } from '../testSupport/ClientTransport'
 import { ChannelType, createChannelHeader } from '../common/ChannelHeader'
 import type { Snapshot } from './Snapshot'
 
 const TEST_CHANNEL_ID = 1
 
-class MockAdapter {
-    binary = testBinaryAdapter
-    constructor() {
-    }
-    connect() {
-        return Promise.resolve({ accepted: true })
-    }
-    flush() {
-    }
-}
 
-function createClient() {
+function createClient(options: ClientOptions = {}) {
     const context = new Context()
     context.register(1, defineEntitySchema({
         x: Binary.Float64,
         semiAmmo: Binary.UInt16,
         autoAmmo: Binary.UInt16
     }))
-    return new Client(context, MockAdapter, 20)
+    return connectedTestClient(context, options)
 }
 
 function snapshot(args: Partial<Snapshot>): Snapshot {
@@ -62,8 +52,11 @@ function snapshot(args: Partial<Snapshot>): Snapshot {
 }
 
 describe('client prediction', () => {
-    it.each([false, true])('rebuilds pending expectations after a rejected spend (callback=%s)', callback => {
-        const client = createClient()
+    it.each([
+        { callback: false, entityHistory: true }, { callback: true, entityHistory: true },
+        { callback: false, entityHistory: false }, { callback: true, entityHistory: false }
+    ])('rebuilds pending expectations after a rejected spend (callback=$callback, entityHistory=$entityHistory)', ({ callback, entityHistory }) => {
+        const client = createClient({ entityHistory })
         const local = { semiAmmo: 10 }
         const reused = { semiAmmo: 0 }
         const ammo = new StateReplayPrediction({
@@ -191,8 +184,8 @@ describe('client prediction', () => {
         expect(client.predictor.log.operations.has(op.id)).toBe(true)
     })
 
-    it('sends predicted commands and resolves them when their command frame number is confirmed', () => {
-        const client = createClient()
+    it.each([true, false])('sends and confirms predicted commands (entityHistory=%s)', entityHistory => {
+        const client = createClient({ entityHistory })
         const localPlayer = { x: 0 }
         const events: string[] = []
 
@@ -208,7 +201,7 @@ describe('client prediction', () => {
         })
 
         expect(localPlayer.x).toBe(1)
-        expect(client.network.outbound.getCommands(1)).toEqual([{ ntype: 2, dx: 1 }])
+        expect(client.network.outbound.getCurrentFrame().outboundCommands).toEqual([{ ntype: 2, dx: 1 }])
         expect(client.predictor.log.getPendingCommands().map(op => op.id)).toEqual([operation!.id])
         expect(operation!.commandFrameNumber).toBe(1)
 
@@ -413,7 +406,7 @@ describe('client prediction', () => {
         expect(client.predictor.log.getPendingCommands()).toEqual([])
     })
 
-    it('keeps later command predictions and outbound commands pending after a stale confirmation', () => {
+    it('keeps later command predictions pending after a stale confirmation', () => {
         const client = createClient()
         const events: string[] = []
 
@@ -428,8 +421,7 @@ describe('client prediction', () => {
 
         expect(first!.commandFrameNumber).toBe(1)
         expect(second!.commandFrameNumber).toBe(2)
-        expect(client.network.outbound.getUnconfirmedCommands().has(1)).toBe(true)
-        expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(true)
+        expect(client.predictor.log.getPendingCommands()).toEqual([first, second])
 
         client.network.queueSnapshot(snapshot({
             serverTimeMs: 1050,
@@ -443,8 +435,6 @@ describe('client prediction', () => {
 
         expect(events).toEqual(['first'])
         expect(client.predictor.log.getPendingCommands().map(op => op.id)).toEqual([second!.id])
-        expect(client.network.outbound.getUnconfirmedCommands().has(1)).toBe(false)
-        expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(true)
 
         client.network.queueSnapshot(snapshot({
             serverTimeMs: 1100,
@@ -458,6 +448,5 @@ describe('client prediction', () => {
 
         expect(events).toEqual(['first', 'second'])
         expect(client.predictor.log.getPendingCommands()).toEqual([])
-        expect(client.network.outbound.getUnconfirmedCommands().has(2)).toBe(false)
     })
 })

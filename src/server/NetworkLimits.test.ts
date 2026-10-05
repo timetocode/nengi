@@ -1,11 +1,10 @@
 import { Buffer } from 'buffer'
 import { readFileSync } from 'fs'
 import { join as joinPath } from 'path'
-import {
-    Binary, BinarySection, Client, CommandRouter, Context, DEFAULT_NETWORK_LIMITS,
-    EngineMessage, Instance, LocalClientAdapter, LocalInstanceAdapter, NetworkEvent,
-    User, UserConnectionState, defineEndpoint, defineMessageSchema, definePayloadSchema
-} from '../index'
+import { Binary, Client, CommandRouter, Context, DEFAULT_NETWORK_LIMITS, Instance, LocalClientAdapter, LocalInstanceAdapter, NetworkEvent, UserConnectionState, defineEndpoint, defineMessageSchema, definePayloadSchema } from '../index'
+import { BinarySection } from '../common/binary/BinarySection'
+import { EngineMessage } from '../common/EngineMessage'
+import { User } from './User'
 import type { NetworkLimits } from './NetworkLimits'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
 import { countEndpointPayload, createEndpointPayload } from '../binary/endpoint/EndpointPayload'
@@ -20,7 +19,7 @@ function fixture(limits: Partial<NetworkLimits> = {}) {
     instance.network.onResponseBacklog = () => {}
     const errors = jest.fn()
     instance.onNetworkLimit = errors
-    const adapter = { binary: testBinaryAdapter, send: jest.fn(), disconnect: jest.fn(), terminate: jest.fn(), listen: jest.fn() }
+    const adapter = { serverAdapterVersion: 1 as const, binary: testBinaryAdapter, send: jest.fn(), disconnect: jest.fn(), terminate: jest.fn(), listen: jest.fn(), shutdown: jest.fn().mockResolvedValue(undefined) }
     const pending = () => {
         const user = new User(undefined, adapter)
         instance.network.onOpen(user)
@@ -65,12 +64,14 @@ describe('network admission and queue limits', () => {
         const { instance } = fixture({ maxConnections: 8 })
         expect(instance.limits.maxConnections).toBe(8)
         expect(instance.limits.maxPacketBytes).toBe(65536)
+        expect(instance.limits.maxHandshakeBytes).toBe(8192)
         expect(DEFAULT_NETWORK_LIMITS.maxConnections).toBe(4096)
         expect(Object.isFrozen(instance.limits)).toBe(true)
     })
 
     it.each([0, -1, Infinity, NaN, 1.5])('rejects invalid limits: %s', value => {
         expect(() => fixture({ packetBurst: value })).toThrow(/positive safe integer/)
+        expect(() => fixture({ maxHandshakeBytes: value })).toThrow(/positive safe integer/)
     })
 
     it('rejects misspelled keys and a burst smaller than one allowed packet', () => {
@@ -176,6 +177,76 @@ describe('network admission and queue limits', () => {
             expect(diagnostic).toHaveBeenCalledTimes(1)
             expect(user.connectionState).toBe(UserConnectionState.Closed)
         } finally { reader.mockRestore() }
+    })
+
+    it.each([UserConnectionState.OpenPreHandshake, UserConnectionState.OpenAwaitingHandshake])(
+        'rejects oversized pre-acceptance input before decoding in state %i', state => {
+            const { instance, pending, adapter, errors } = fixture()
+            const user = pending()
+            user.connectionState = state
+            instance.onConnect = jest.fn(async () => true)
+            const client = new Client(instance.context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
+            const packet = client.network.createHandshake({ token: 'x'.repeat(8192) }, testBinaryAdapter)
+            const reader = jest.spyOn(adapter.binary, 'createReader')
+            try {
+                instance.network.onMessage(user, packet)
+                expect(reader).not.toHaveBeenCalled()
+                expect(instance.onConnect).not.toHaveBeenCalled()
+                expect(errors).toHaveBeenCalledWith(expect.objectContaining({
+                    limit: 'maxHandshakeBytes', maximum: 8192, value: packet.byteLength
+                }))
+                expect(user.connectionState).toBe(UserConnectionState.Closed)
+                expect(instance.network.pendingUsers.size).toBe(0)
+                expect(instance.queue.length).toBe(0)
+                expect(instance.network.queuedInputBytes).toBe(0)
+            } finally {
+                reader.mockRestore()
+            }
+        }
+    )
+
+    it('counts UTF-8 and handshake metadata at the exact configured byte boundary', async () => {
+        const context = new Context()
+        const client = new Client(context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
+        client.network.sendSchemaFingerprint = true
+        const handshake = { token: 'é🚀'.repeat(1500) }
+        const packet = client.network.createHandshake(handshake, testBinaryAdapter)
+        expect(packet.byteLength).toBeGreaterThan(8192)
+        expect(packet.byteLength).toBeGreaterThan(JSON.stringify(handshake).length)
+        for (const difference of [0, -1]) {
+            const { instance, pending, errors } = fixture({ maxHandshakeBytes: packet.byteLength + difference })
+            const user = pending()
+            instance.onConnect = jest.fn(async () => true)
+            instance.network.onMessage(user, packet)
+            await Promise.resolve()
+            if (difference === 0) {
+                expect(instance.onConnect).toHaveBeenCalledWith(handshake, expect.objectContaining({ user }))
+                expect(user.connectionState).toBe(UserConnectionState.Open)
+                expect(errors).not.toHaveBeenCalled()
+                user.disconnect('test cleanup')
+            } else {
+                expect(instance.onConnect).not.toHaveBeenCalled()
+                expect(user.connectionState).toBe(UserConnectionState.Closed)
+                expect(errors.mock.calls[0][0].limit).toBe('maxHandshakeBytes')
+            }
+        }
+    })
+
+    it('keeps the packet ceiling authoritative even when the handshake budget is larger', () => {
+        const { instance, pending, errors } = fixture({ maxPacketBytes: 32, maxHandshakeBytes: 64 })
+        instance.network.onMessage(pending(), Buffer.alloc(33))
+        expect(errors.mock.calls[0][0].limit).toBe('maxPacketBytes')
+    })
+
+    it('does not apply the handshake ceiling to accepted clients', () => {
+        const { instance, accepted, errors } = fixture({ maxHandshakeBytes: 16 })
+        const user = accepted()
+        instance.queue.clear()
+        const packet = commands(...Array(100).fill(7))
+        instance.network.onMessage(user, packet)
+        expect(user.connectionState).toBe(UserConnectionState.Open)
+        expect(instance.queue.next().commands).toHaveLength(100)
+        expect(errors).not.toHaveBeenCalled()
     })
 
     it('allows packet bursts and refills by elapsed time, not step calls', () => {
@@ -354,10 +425,12 @@ describe('network admission and queue limits', () => {
         expect(instance.network.queuedResponseBytes).toBe(0)
     })
 
-    it.each(['maxQueuedResponseBytesPerUser', 'maxQueuedResponseBytes'] as const)('bounds %s before retaining an oversized reply', limit => {
+    it.each(['maxQueuedResponseBytesPerUser', 'maxQueuedResponseBytes'] as const)('still enforces %s when even a fallback reply cannot fit', limit => {
         const { instance, accepted, errors } = fixture({ [limit]: 20 })
         const user = accepted()
-        instance.network.queueResponse(user, 1, { endpoint: null, callback: () => undefined }, 'x'.repeat(30))
+        instance.respond(1, () => 'x'.repeat(30))
+        instance.network.onMessage(user, request(1))
+        instance.processRequests()
         expect(errors.mock.calls[0][0].limit).toBe(limit)
         expect(user.responseQueue).toHaveLength(0)
         expect(instance.network.queuedResponseBytes).toBe(0)
@@ -416,11 +489,11 @@ describe('network admission and queue limits', () => {
 
     it('settles an immediate local admission refusal before client.connect installs handlers', async () => {
         const { instance } = fixture({ maxPendingConnections: 1 })
-        const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+        const adapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
         adapter.createMockConnect()
         const refused = adapter.createMockConnect()
         const client = new Client(instance.context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
-        await expect(client.connect(refused.clientSocket)).rejects.toThrow(/closed/)
+        await expect(client.connect(refused.clientSocket)).rejects.toMatchObject({ code: 'TRANSPORT_ERROR' })
     })
 
     it('does not retain or re-admit a user closed synchronously during handshake acceptance send', async () => {

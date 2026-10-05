@@ -12,7 +12,7 @@ async function setup() {
         $options: { updateGroups: { position: ['x', 'y'] } } }))
     const instance = new Instance(context)
     instance.onConnect = async () => true
-    const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+    const adapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
     const socket = adapter.createMockConnect()
     const client = new Client(context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
     client.setDisconnectHandler(() => {})

@@ -1,8 +1,6 @@
-import { IServerNetworkAdapter } from './IServerNetworkAdapter'
-import { InstanceNetwork } from '../InstanceNetwork'
+import { IServerNetworkAdapter, ServerAdapterHost, ServerConnection } from './IServerNetworkAdapter'
 import { User } from '../User'
-import { ClientNetwork } from '../../client/ClientNetwork'
-import { IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
+import { ClientTransportHandlers, IClientNetworkAdapter } from '../../client/adapter/IClientNetworkAdapter'
 import { BinaryAdapter, BinaryPayload } from '../../common/binary/BinaryAdapter'
 import {
     NetworkConditionLink,
@@ -27,10 +25,15 @@ class LocalInstanceAdapter<
     InboundPayload extends BinaryPayload = BinaryPayload,
     OutboundPayload extends BinaryPayload = InboundPayload
 > implements IServerNetworkAdapter<InboundPayload, OutboundPayload, void | { ready?: () => void }> {
-    network: InstanceNetwork
+    network: ServerAdapterHost
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
+    readonly serverAdapterVersion = 1 as const
+    private shutdownPromise?: Promise<void>
 
-    constructor(network: InstanceNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
+    constructor(network: ServerAdapterHost, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
+        if (network?.serverAdapterVersion !== this.serverAdapterVersion) {
+            throw new Error('LocalInstanceAdapter requires nengi server adapter contract version 1. Pass instance.adapterHost.')
+        }
         this.network = network
 
         if (!config?.binary) {
@@ -41,8 +44,17 @@ class LocalInstanceAdapter<
     }
 
     listen(options?: void | { ready?: () => void }, ready?: () => void) {
+        if (this.shutdownPromise) throw new Error('LocalInstanceAdapter has shut down. Create a new adapter to listen again.')
         ready?.()
         options?.ready?.()
+    }
+
+    shutdown(reason?: any): Promise<void> {
+        if (!this.shutdownPromise) {
+            this.shutdownPromise = Promise.resolve()
+            this.network.shutdownAdapter(this, reason)
+        }
+        return this.shutdownPromise
     }
 
     createMockConnect() {
@@ -52,8 +64,8 @@ class LocalInstanceAdapter<
     }
 
     open(socket: MockServerSocket) {
-        const user = new User(socket, this)
-        socket.user = user
+        const user = this.network.createConnection(socket, this)
+        socket.user = user as User
         this.network.onOpen(user)
     }
 
@@ -61,113 +73,69 @@ class LocalInstanceAdapter<
         socket.end()
     }
 
-    disconnect(user: User, reason: any): void {
+    disconnect(user: ServerConnection<MockServerSocket>, reason: any): void {
         user.socket.end(reason)
     }
 
-    terminate(user: User, reason: any): void {
+    terminate(user: ServerConnection<MockServerSocket>, reason: any): void {
         user.socket.end(reason)
     }
 
-    send(user: User, buffer: OutboundPayload): void {
-        user.socket.send(buffer, true)
+    send(user: ServerConnection<MockServerSocket>, buffer: OutboundPayload): void {
+        user.socket.send(buffer)
     }
 }
 
 class LocalClientAdapter<
     InboundPayload extends BinaryPayload = BinaryPayload,
     OutboundPayload extends BinaryPayload = InboundPayload
-> implements IClientNetworkAdapter<InboundPayload, OutboundPayload, void | MockClientSocket> {
-    network: ClientNetwork
+> implements IClientNetworkAdapter<InboundPayload, OutboundPayload, MockClientSocket> {
+    readonly clientAdapterVersion = 2 as const
     binary: BinaryAdapter<InboundPayload, OutboundPayload>
     socket: MockClientSocket | null = null
-    connected = false
-    pendingConnect: {
-        resolve: (value: any) => void
-        reject: (reason: any) => void
-    } | null = null
+    private handlers: ClientTransportHandlers<InboundPayload> | null = null
 
-    constructor(network: ClientNetwork, config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
-        this.network = network
-        if (!config?.binary) {
-            throw new Error('LocalClientAdapter requires a config.binary to be created.')
-        }
+    constructor(config: MockAdapterConfig<InboundPayload, OutboundPayload>) {
+        if (!config?.binary) throw new Error('LocalClientAdapter requires a config.binary to be created.')
         this.binary = config.binary
     }
 
-    onMessage(buffer: InboundPayload) {
-        if (!this.connected) {
-            const result = this.network.readHandshakeResponse(this.binary.createReader(buffer))
-            if (result.accepted) {
-                this.connected = true
-                this.pendingConnect?.resolve(result)
-            } else {
-                this.pendingConnect?.reject(result.reason)
-            }
-            this.pendingConnect = null
-            return
+    open(socket: MockClientSocket, handlers: ClientTransportHandlers<InboundPayload>) {
+        if (!socket || socket.readyState !== MockSocketReadyState.OPEN) {
+            throw new Error('LocalClientAdapter requires an open MockClientSocket.')
         }
-        const br = this.binary.createReader(buffer)
-        this.network.readSnapshot(br)
+        this.socket = socket
+        this.handlers = handlers
+        socket.adapter = this
+        handlers.onOpen()
     }
 
-    connect(target?: void | MockClientSocket, handshake: any = {}) {
-        this.socket = target || null
-        if (!this.socket) {
-            this.connected = true
-            return Promise.resolve({ accepted: true })
+    send(payload: OutboundPayload) {
+        if (!this.socket || this.socket.readyState !== MockSocketReadyState.OPEN) {
+            throw new Error('The local transport is not open.')
         }
-
-        this.socket.adapter = this
-        if (this.socket.readyState !== MockSocketReadyState.OPEN) {
-            this.socket.adapter = null
-            this.socket = null
-            return Promise.reject(new Error('Connection closed before handshake began.'))
-        }
-        return new Promise((resolve, reject) => {
-            this.pendingConnect = { resolve, reject }
-            this.socket!.send(this.network.createHandshake(handshake, this.binary))
-        })
+        this.socket.send(payload)
     }
 
-    flush() {
-        if (!this.socket) {
-            return
-        }
-        if (!this.connected) {
-            return
-        }
-        this.socket.send(this.network.createOutbound(this.binary))
-    }
-
-    flushPongs() {
-        if (!this.socket || !this.connected) {
-            return
-        }
-        try {
-            this.network.flushPongs(this.binary, payload => {
-                this.socket!.send(payload)
-            })
-        } catch (error) {
-            this.network.onSocketError(error)
-        }
-    }
-
-    disconnect(reason?: any) {
-        if (this.socket) {
-            this.socket.close(reason)
-        } else if (this.connected || this.pendingConnect) {
-            this.onClose(reason)
-        }
-    }
-
-    onClose(reason?: any) {
-        const pending = this.pendingConnect
-        this.pendingConnect = null
+    close(reason: string) {
+        const socket = this.socket
         this.socket = null
-        this.connected = false
-        pending?.reject(reason ?? new Error('Disconnected before handshake completed.'))
-        this.network.onDisconnect(reason)
+        this.handlers = null
+        if (socket) {
+            socket.adapter = null
+            socket.close(reason)
+        }
+    }
+
+    onMessage(payload: InboundPayload) {
+        this.handlers?.onMessage(payload)
+    }
+
+    onClose(detail?: unknown) {
+        const handlers = this.handlers
+        this.socket = null
+        this.handlers = null
+        handlers?.onClose(detail)
     }
 }
 
@@ -198,10 +166,11 @@ enum MockSocketReadyState {
 class MockServerSocket {
     readyState: MockSocketReadyState
     clientSocket: MockClientSocket
+    /** @internal */
     user: User | null
-    network: InstanceNetwork
+    network: ServerAdapterHost
 
-    constructor(network: InstanceNetwork) {
+    constructor(network: ServerAdapterHost) {
         this.readyState = MockSocketReadyState.CONNECTING
         this.clientSocket = new MockClientSocket(this)
         this.user = null
@@ -266,7 +235,7 @@ class SimulatedMockServerSocket extends MockServerSocket {
     declare clientSocket: SimulatedMockClientSocket
     readonly conditions: NetworkConditionLink
 
-    constructor(network: InstanceNetwork, options: SimulatedLocalConnectOptions) {
+    constructor(network: ServerAdapterHost, options: SimulatedLocalConnectOptions) {
         super(network)
         this.conditions = new NetworkConditionLink(options.conditions, options)
         this.clientSocket = new SimulatedMockClientSocket(this)

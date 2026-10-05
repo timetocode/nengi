@@ -1,7 +1,11 @@
+import { connectedTestClient } from '../testSupport/ClientTransport'
 import { Buffer } from 'buffer'
-import { Binary, BinarySection, Client, Context, EngineMessage, Instance, LocalClientAdapter,
-    MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET, MAX_CLIENT_PACKET_SECTIONS, User, UserConnectionState,
-    defineMessageSchema, getCommandViewTimeMs } from '../index'
+import { Binary, Context, Instance, UserConnectionState, defineMessageSchema, getCommandViewTimeMs } from '../index'
+import { BinarySection } from '../common/binary/BinarySection'
+import { EngineMessage } from '../common/EngineMessage'
+import { MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET } from '../common/EngineMessage'
+import { MAX_CLIENT_PACKET_SECTIONS } from '../common/EngineMessage'
+import { User } from './User'
 import { testBinaryAdapter as binary } from '../testSupport/BufferBinary'
 import countMessage from '../binary/message/count'
 import { writeMessage } from '../binary/message/writeMessage'
@@ -16,12 +20,12 @@ function fixture(open = true) {
     instance.onConnect = jest.fn(async () => true)
     const errors = jest.fn()
     instance.onInboundMessageError = errors
-    const adapter = { binary, send: jest.fn(), disconnect: jest.fn(), terminate: jest.fn(), listen: jest.fn() }
+    const adapter = { serverAdapterVersion: 1 as const, binary, send: jest.fn(), disconnect: jest.fn(), terminate: jest.fn(), listen: jest.fn(), shutdown: jest.fn().mockResolvedValue(undefined) }
     const user = new User(null, adapter)
     instance.network.onOpen(user)
     if (open) { user.instance = instance; instance.network.onConnectionAccepted(user, {}) }
     instance.queue.clear()
-    const client = new Client(context, LocalClientAdapter, 20, { binary })
+    const client = connectedTestClient(context)
     const packet = (...messages: any[]) => {
         const bytes = messages.reduce((sum, msg) => sum + countMessage(context.getEngineSchema(msg.ntype), msg), 0)
             + 2 * Math.ceil(messages.length / 255)
@@ -202,7 +206,7 @@ describe('client engine control validation', () => {
 
     it('shares native control credits with data and never treats native Pong as clock proof', () => {
         const instance = new Instance(new Context(), { now: () => 100, limits: { packetBurst: 2, packetsPerSecond: 1 } })
-        const adapter = { binary, send: jest.fn(), disconnect: jest.fn(), terminate: jest.fn(), listen: jest.fn() }
+        const adapter = { serverAdapterVersion: 1 as const, binary, send: jest.fn(), disconnect: jest.fn(), terminate: jest.fn(), listen: jest.fn(), shutdown: jest.fn().mockResolvedValue(undefined) }
         const user = new User(null, adapter)
         instance.network.onOpen(user)
         expect(instance.network.onTransportControl(user, 0)).toBe(true)

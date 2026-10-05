@@ -1,3 +1,4 @@
+import { assertBinaryWriteSize } from '../assertBinaryWriteSize'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { BinarySection } from '../../common/binary/BinarySection'
@@ -120,7 +121,12 @@ type ManualGroupBatch = {
     count: number
 }
 
-function collectManualGroupBatches(channel: EcsManualUpdateLog) {
+const NO_GROUP_BATCHES: readonly ManualGroupBatch[] = Object.freeze([])
+
+// Prepare once for a count/write pair. The caller keeps the log unchanged until
+// writing finishes; batches are not cached across writes or snapshot ticks.
+export function collectManualGroupBatches(channel: EcsManualUpdateLog): readonly ManualGroupBatch[] {
+    if (channel.manualGroupSchemas.length === 0) return NO_GROUP_BATCHES
     const batches: ManualGroupBatch[] = []
     const ntypes = channel.manualGroupNTypes
     const groups = channel.manualGroupSchemas
@@ -146,9 +152,8 @@ function collectManualGroupBatches(channel: EcsManualUpdateLog) {
     return batches
 }
 
-export function countEcsManualUpdateBytes(channel: EcsManualUpdateLog, protocol: ProtocolConfig) {
+export function countEcsManualUpdateBytes(channel: EcsManualUpdateLog, protocol: ProtocolConfig, batches = collectManualGroupBatches(channel)) {
     let bytes = countManualPropUpdates(channel, protocol)
-    const batches = collectManualGroupBatches(channel)
     const nidBytes = byteSizeOfNetworkType(protocol.nidType)
     const ntypeBytes = byteSizeOfNetworkType(protocol.ntypeType)
     const ntypes = channel.manualGroupNTypes
@@ -175,8 +180,7 @@ export function countEcsManualUpdateBytes(channel: EcsManualUpdateLog, protocol:
     return bytes
 }
 
-function writeEcsManualGroupUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
-    const batches = collectManualGroupBatches(channel)
+function writeEcsManualGroupUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig, batches: readonly ManualGroupBatch[]) {
     const nids = channel.manualGroupNids
     const ntypes = channel.manualGroupNTypes
     const groups = channel.manualGroupSchemas
@@ -204,9 +208,9 @@ function writeEcsManualGroupUpdates(channel: EcsManualUpdateLog, writer: IBinary
     }
 }
 
-export function writeEcsManualUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig) {
+export function writeEcsManualUpdates(channel: EcsManualUpdateLog, writer: IBinaryWriter, protocol: ProtocolConfig, batches = collectManualGroupBatches(channel)) {
     writeManualPropUpdates(channel, writer, protocol)
-    writeEcsManualGroupUpdates(channel, writer, protocol)
+    writeEcsManualGroupUpdates(channel, writer, protocol, batches)
 }
 
 export function countManualGroupedProps(channel: ManualUpdateLog) {
@@ -222,9 +226,9 @@ export function getManualUpdateFragment(
     user: User,
     instance: Instance,
     channel: EcsManualUpdateLog & { nid: number },
-    keyPrefix: string
+    keyPrefix: string,
+    protocol = instance.network.getProtocol()
 ) {
-    const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:${keyPrefix}:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key) as ManualUpdateFragment | undefined
     if (cached) {
@@ -241,13 +245,15 @@ export function getManualUpdateFragment(
     if (measure) {
         countStart = performance.now()
     }
-    const bytes = countEcsManualUpdateBytes(channel, protocol)
+    const batches = collectManualGroupBatches(channel)
+    const bytes = countEcsManualUpdateBytes(channel, protocol, batches)
     if (measure) {
         countMs = performance.now() - countStart
         writeStart = performance.now()
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
-    writeEcsManualUpdates(channel, writer, protocol)
+    writeEcsManualUpdates(channel, writer, protocol, batches)
+    assertBinaryWriteSize(writer, bytes, 'ECS updates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -257,7 +263,7 @@ export function getManualUpdateFragment(
         bytes,
         updateProps: channel.manualPropNids.length,
         updateGroups: channel.manualGroupNids.length,
-        groupedUpdateProps: countManualGroupedProps(channel)
+        groupedUpdateProps: measure ? countManualGroupedProps(channel) : 0
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })

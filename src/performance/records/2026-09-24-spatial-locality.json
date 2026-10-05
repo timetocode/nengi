@@ -1,0 +1,5189 @@
+{
+  "date": "2026-09-24",
+  "cpu": "AMD Ryzen 7 7800X3D, 8 cores / 16 logical CPUs",
+  "node": "v22.17.1",
+  "os": "WSL2 Linux 6.6.87.2-microsoft-standard-WSL2",
+  "baseGitHead": "d78047ca62bf801af58e48f4b0ebb15065612d88",
+  "baseline": "Dirty Next RC working source after connection cancellation/deadline corrections; not the published RC-127 or HEAD alone.",
+  "scope": {
+    "ch1": "Grid-wide cell revisions; automatic spatial stability depends on visible cells and the retained global hierarchy version.",
+    "ch1-marker": "CH-1 plus checking the manual marker before the full structural channel guard.",
+    "limitations": "Root removal and hierarchy edits still invalidate unrelated views. Ordinary automatic property scanning remains. No game API or wire-format changes."
+  },
+  "method": {
+    "repeats": 3,
+    "warmupTicks": 50,
+    "measuredTicks": 150,
+    "processes": "117 sequential fresh Node processes; variant order rotated once per repeat; host not pinned or isolated.",
+    "backend": "Official nengi-buffers writer with counting transport; shared update fragments on; snapshot metrics and binary diagnostics off.",
+    "clock": "instance.now = () => 1000 + instance.tick",
+    "step": "Instance.step only; excludes application mutation and separate spatial-index work.",
+    "total": "Matching per-tick application mutation + spatial index + Instance.step.",
+    "gc": "Node GC observer over the measured loop, excluding explicit warmup GC; event duration, not allocated bytes or full game pauses.",
+    "memory": "Heap increase from before construction to after warmup, following explicit GC at each boundary; retained state only.",
+    "summary": "Median of the three per-run means and p95s, not a pooled distribution.",
+    "excluded": "Sockets, client decode/rendering, and real game load generators.",
+    "distributionNote": "The harness uses homogeneous 3D positions for channel-3d/manual-channel-3d unless cell-crossing is selected, even if the setting says single-cell. The 128-unit broad world initially fits within the 512-unit cell."
+  },
+  "provenance": {
+    "before": {
+      "sourceFingerprintSha256": "49bcafb1796f8171a47d117d3fd3af9d40f182fd597b0d257a9105e46c9374d7",
+      "files": {
+        "src/binary/snapshot/channelModes.ts": "f79d56bd24d74ff6d206038b0c0ab3d2d7147194ce0e28c736cbbbd05718c960",
+        "src/performance/ServerAllocation.test.ts": "e720f6c170102c31ac76979535fb58bfbfee3f02cbd7495a6b6d1f0dffb92407",
+        "src/server/channel/CellFragmentChannelOutput.ts": "4722fb7f4ec578f9d9158ab7bdeddeb94a4ad7c90b070b8d3b25f1cdaed03b0b",
+        "src/server/channel/Channel2D.ts": "6892c729058bed020daa5877ce30f3e312bd88bfb8a7255477a01bb6b176e35b",
+        "src/server/channel/Channel3D.ts": "359307f0c4dfc3aed4148ef9262ddb144e3ada4b1d23885081d21771e3a476d8",
+        "src/server/channel/ManualChannel2D.ts": "30217defee78d186ded053235603146f9c76e191a7fc7fd7eea1c5919545068b",
+        "src/server/channel/ManualChannel3D.ts": "fb53937dc72018b17375d8808903f33aadbff49cd8a88056b1136383461891d4",
+        "src/server/channel/SpatialGrid.ts": "4e6bc8b2f0a89135859eca2f64f6c92f60910e42a948d42110c9cf99d61f4dfb",
+        "src/performance/SnapshotPipeline.performance.ts": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031"
+      }
+    },
+    "ch1": {
+      "sourceFingerprintSha256": "abb010297b4d86b37ddf86b3693bfdb93710073854842157258c836737d12aeb",
+      "files": {
+        "src/binary/snapshot/channelModes.ts": "f79d56bd24d74ff6d206038b0c0ab3d2d7147194ce0e28c736cbbbd05718c960",
+        "src/performance/ServerAllocation.test.ts": "179a371b444be407f33d3a37b9acb1b9ad2c19ac704cf08437b96cde0a29cfd7",
+        "src/server/channel/CellFragmentChannelOutput.ts": "af55159b1c29922a5be981ca6338ecd5df743d37e1daaa5a4827a9e68e2e193b",
+        "src/server/channel/Channel2D.ts": "17a584be5158a81b1f47d0a57a1d527b6ab36457c8d184590d54bf261d376dc6",
+        "src/server/channel/Channel3D.ts": "39ad636ef2d0c9e06345bebba60a4a57fd53485329b34afe82b4dc72f1706587",
+        "src/server/channel/ManualChannel2D.ts": "f9b6699b34391c5eebb6f36fbd18c439e94cef50977dc56aa6f02c7dcc8234db",
+        "src/server/channel/ManualChannel3D.ts": "4b5ff7a0a373d4032a55cebfd46a65e594645db72017f482b3de9cc0177a52f2",
+        "src/server/channel/SpatialGrid.ts": "6bf7f604f6a9e72065e7a10fee9e3086d5047d99c3227ad7b92afde5932483ad",
+        "src/performance/SnapshotPipeline.performance.ts": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031"
+      }
+    },
+    "ch1-marker": {
+      "sourceFingerprintSha256": "36e5e92d25e8c3a0a21804aff39b90f2169e44e53b3d47205f182058c622470f",
+      "files": {
+        "src/binary/snapshot/channelModes.ts": "a4ebc304745e4493e9cecfd3aaa83ea0f2cca14d6046607ff229b2964877a46a",
+        "src/performance/ServerAllocation.test.ts": "179a371b444be407f33d3a37b9acb1b9ad2c19ac704cf08437b96cde0a29cfd7",
+        "src/server/channel/CellFragmentChannelOutput.ts": "af55159b1c29922a5be981ca6338ecd5df743d37e1daaa5a4827a9e68e2e193b",
+        "src/server/channel/Channel2D.ts": "17a584be5158a81b1f47d0a57a1d527b6ab36457c8d184590d54bf261d376dc6",
+        "src/server/channel/Channel3D.ts": "39ad636ef2d0c9e06345bebba60a4a57fd53485329b34afe82b4dc72f1706587",
+        "src/server/channel/ManualChannel2D.ts": "f9b6699b34391c5eebb6f36fbd18c439e94cef50977dc56aa6f02c7dcc8234db",
+        "src/server/channel/ManualChannel3D.ts": "4b5ff7a0a373d4032a55cebfd46a65e594645db72017f482b3de9cc0177a52f2",
+        "src/server/channel/SpatialGrid.ts": "6bf7f604f6a9e72065e7a10fee9e3086d5047d99c3227ad7b92afde5932483ad",
+        "src/performance/SnapshotPipeline.performance.ts": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031"
+      }
+    }
+  },
+  "configurations": [
+    {
+      "scenario": "channel-2d",
+      "users": 100,
+      "entities": 20000,
+      "visible": 20000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 640,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "homogeneous",
+      "spatialPlane": "xy",
+      "worldSize": 8192,
+      "clusters": 8,
+      "moveFraction": 0,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "wide-2d-idle"
+    },
+    {
+      "scenario": "channel-2d",
+      "users": 100,
+      "entities": 20000,
+      "visible": 20000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 640,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "homogeneous",
+      "spatialPlane": "xy",
+      "worldSize": 8192,
+      "clusters": 8,
+      "moveFraction": 0.01,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "wide-2d-sparse"
+    },
+    {
+      "scenario": "channel-3d",
+      "users": 100,
+      "entities": 20000,
+      "visible": 20000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 640,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "homogeneous",
+      "spatialPlane": "xy",
+      "worldSize": 8192,
+      "clusters": 8,
+      "moveFraction": 0.01,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "wide-3d-sparse"
+    },
+    {
+      "scenario": "channel-2d",
+      "users": 100,
+      "entities": 20000,
+      "visible": 20000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 640,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "homogeneous",
+      "spatialPlane": "xy",
+      "worldSize": 8192,
+      "clusters": 8,
+      "moveFraction": 0.001,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "wide-2d-tiny"
+    },
+    {
+      "scenario": "channel-2d",
+      "users": 50,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "single-cell",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "broad-2d-dense"
+    },
+    {
+      "scenario": "channel-3d",
+      "users": 50,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "single-cell",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "broad-3d-dense"
+    },
+    {
+      "scenario": "channel-2d",
+      "users": 50,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "cell-crossing",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "crossing-2d-dense"
+    },
+    {
+      "scenario": "channel-2d",
+      "users": 20,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 32,
+      "viewHalf": 128,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "homogeneous",
+      "spatialPlane": "xy",
+      "worldSize": 512,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "multi-2d-dense"
+    },
+    {
+      "scenario": "parent-child-channel-2d",
+      "users": 30,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 640,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 3,
+      "spatialDistribution": "homogeneous",
+      "spatialPlane": "xy",
+      "worldSize": 8192,
+      "clusters": 8,
+      "moveFraction": 0.01,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "hierarchy-2d-sparse"
+    },
+    {
+      "scenario": "manual-channel-2d",
+      "users": 50,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "cell-crossing",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "manual-2d-crossing"
+    },
+    {
+      "scenario": "manual-channel-3d",
+      "users": 50,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 20,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "single-cell",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "standard",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "manual-3d-churn"
+    },
+    {
+      "scenario": "ecs-channel-2d",
+      "users": 50,
+      "entities": 2000,
+      "visible": 2000,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "cell-crossing",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "ecs",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "ecs-2d-crossing"
+    },
+    {
+      "scenario": "ecs-channel-clump",
+      "users": 100,
+      "entities": 200,
+      "visible": 200,
+      "ticks": 150,
+      "warmup": 50,
+      "sharedUpdates": true,
+      "groups": true,
+      "nidStart": 1,
+      "cellSize": 512,
+      "viewHalf": 1024,
+      "churn": 0,
+      "ecsChurn": "none",
+      "ecsChurnOrder": "after-writes",
+      "ecsMaterialize": false,
+      "children": 0,
+      "spatialDistribution": "single-cell",
+      "spatialPlane": "xy",
+      "worldSize": 128,
+      "clusters": 8,
+      "moveFraction": 1,
+      "queryPadding": 0,
+      "fragmentCellLimit": 16,
+      "stableFragmentCellLimit": 64,
+      "manualEmitMode": "group4",
+      "entityShape": "ecs",
+      "spatialViewShape": "aabb",
+      "metrics": false,
+      "diagnostic": false,
+      "name": "ecs-clump-dense"
+    }
+  ],
+  "runs": [
+    {
+      "name": "wide-2d-idle",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 12.852,
+        "p50": 12.327,
+        "p95": 17.306,
+        "max": 34.295
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.002
+      },
+      "totalMs": {
+        "avg": 12.855,
+        "p50": 12.331,
+        "p95": 17.31,
+        "max": 34.3
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 60.62717819213867,
+      "memory": {
+        "heapBefore": 13242192,
+        "retainedHeapAfterWarmup": 37638512,
+        "retainedHeapDelta": 24396320
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 10.75,
+        "p50": 10.588,
+        "p95": 13.235,
+        "max": 17.671
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.003
+      },
+      "totalMs": {
+        "avg": 10.753,
+        "p50": 10.59,
+        "p95": 13.237,
+        "max": 17.674
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 56.60082399845123,
+      "memory": {
+        "heapBefore": 13642584,
+        "retainedHeapAfterWarmup": 38055984,
+        "retainedHeapDelta": 24413400
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 10.832,
+        "p50": 10.478,
+        "p95": 13.538,
+        "max": 17.153
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.002
+      },
+      "totalMs": {
+        "avg": 10.835,
+        "p50": 10.481,
+        "p95": 13.541,
+        "max": 17.156
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 40,
+      "gcDurationMs": 59.903789043426514,
+      "memory": {
+        "heapBefore": 13683608,
+        "retainedHeapAfterWarmup": 38081000,
+        "retainedHeapDelta": 24397392
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 14.947,
+        "p50": 13.128,
+        "p95": 30.832,
+        "max": 33.592
+      },
+      "indexMs": {
+        "avg": 0.087,
+        "p50": 0.077,
+        "p95": 0.155,
+        "max": 0.246
+      },
+      "totalMs": {
+        "avg": 15.063,
+        "p50": 13.24,
+        "p95": 30.93,
+        "max": 33.7
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 68,
+      "gcDurationMs": 89.91038239002228,
+      "memory": {
+        "heapBefore": 13302224,
+        "retainedHeapAfterWarmup": 39747008,
+        "retainedHeapDelta": 26444784
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.228,
+        "p50": 12.859,
+        "p95": 16.659,
+        "max": 20.556
+      },
+      "indexMs": {
+        "avg": 0.079,
+        "p50": 0.07,
+        "p95": 0.105,
+        "max": 0.386
+      },
+      "totalMs": {
+        "avg": 13.335,
+        "p50": 12.95,
+        "p95": 16.767,
+        "max": 20.81
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 53,
+      "gcDurationMs": 76.08108186721802,
+      "memory": {
+        "heapBefore": 13292080,
+        "retainedHeapAfterWarmup": 38317080,
+        "retainedHeapDelta": 25025000
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 12.51,
+        "p50": 12.165,
+        "p95": 15.392,
+        "max": 17.367
+      },
+      "indexMs": {
+        "avg": 0.078,
+        "p50": 0.068,
+        "p95": 0.13,
+        "max": 0.385
+      },
+      "totalMs": {
+        "avg": 12.615,
+        "p50": 12.273,
+        "p95": 15.478,
+        "max": 17.468
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 53,
+      "gcDurationMs": 72.46486592292786,
+      "memory": {
+        "heapBefore": 13304256,
+        "retainedHeapAfterWarmup": 38303224,
+        "retainedHeapDelta": 24998968
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 27.353,
+        "p50": 28.088,
+        "p95": 32.455,
+        "max": 37.866
+      },
+      "indexMs": {
+        "avg": 0.117,
+        "p50": 0.093,
+        "p95": 0.171,
+        "max": 2.141
+      },
+      "totalMs": {
+        "avg": 27.497,
+        "p50": 28.23,
+        "p95": 32.59,
+        "max": 37.979
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 132,
+      "gcDurationMs": 290.6199063062668,
+      "memory": {
+        "heapBefore": 13301264,
+        "retainedHeapAfterWarmup": 39006744,
+        "retainedHeapDelta": 25705480
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 24.681,
+        "p50": 24.001,
+        "p95": 30.841,
+        "max": 37.882
+      },
+      "indexMs": {
+        "avg": 0.106,
+        "p50": 0.093,
+        "p95": 0.192,
+        "max": 0.329
+      },
+      "totalMs": {
+        "avg": 24.81,
+        "p50": 24.143,
+        "p95": 30.982,
+        "max": 38.063
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 102,
+      "gcDurationMs": 265.3142955303192,
+      "memory": {
+        "heapBefore": 13299136,
+        "retainedHeapAfterWarmup": 38799088,
+        "retainedHeapDelta": 25499952
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 22.379,
+        "p50": 21.938,
+        "p95": 26.733,
+        "max": 30.621
+      },
+      "indexMs": {
+        "avg": 0.102,
+        "p50": 0.084,
+        "p95": 0.189,
+        "max": 0.411
+      },
+      "totalMs": {
+        "avg": 22.506,
+        "p50": 22.156,
+        "p95": 26.84,
+        "max": 30.747
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 100,
+      "gcDurationMs": 249.4857804775238,
+      "memory": {
+        "heapBefore": 13304952,
+        "retainedHeapAfterWarmup": 38822552,
+        "retainedHeapDelta": 25517600
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 12.968,
+        "p50": 12.73,
+        "p95": 16.091,
+        "max": 24.199
+      },
+      "indexMs": {
+        "avg": 0.022,
+        "p50": 0.019,
+        "p95": 0.041,
+        "max": 0.15
+      },
+      "totalMs": {
+        "avg": 13.002,
+        "p50": 12.756,
+        "p95": 16.124,
+        "max": 24.234
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 51,
+      "gcDurationMs": 70.51409864425659,
+      "memory": {
+        "heapBefore": 13299720,
+        "retainedHeapAfterWarmup": 39024728,
+        "retainedHeapDelta": 25725008
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.464,
+        "p50": 13.211,
+        "p95": 16.677,
+        "max": 21.335
+      },
+      "indexMs": {
+        "avg": 0.02,
+        "p50": 0.019,
+        "p95": 0.028,
+        "max": 0.147
+      },
+      "totalMs": {
+        "avg": 13.498,
+        "p50": 13.236,
+        "p95": 16.711,
+        "max": 21.384
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 51,
+      "gcDurationMs": 65.89300119876862,
+      "memory": {
+        "heapBefore": 13299280,
+        "retainedHeapAfterWarmup": 39011656,
+        "retainedHeapDelta": 25712376
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 13.583,
+        "p50": 13.4,
+        "p95": 16.422,
+        "max": 19.197
+      },
+      "indexMs": {
+        "avg": 0.022,
+        "p50": 0.018,
+        "p95": 0.027,
+        "max": 0.238
+      },
+      "totalMs": {
+        "avg": 13.616,
+        "p50": 13.432,
+        "p95": 16.449,
+        "max": 19.225
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 52,
+      "gcDurationMs": 69.85241770744324,
+      "memory": {
+        "heapBefore": 13305936,
+        "retainedHeapAfterWarmup": 39009280,
+        "retainedHeapDelta": 25703344
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 11.895,
+        "p50": 2.847,
+        "p95": 29.423,
+        "max": 30.735
+      },
+      "indexMs": {
+        "avg": 0.171,
+        "p50": 0.146,
+        "p95": 0.279,
+        "max": 1.609
+      },
+      "totalMs": {
+        "avg": 12.198,
+        "p50": 3.103,
+        "p95": 29.635,
+        "max": 31.002
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 107,
+      "gcDurationMs": 128.54647934436798,
+      "memory": {
+        "heapBefore": 13303568,
+        "retainedHeapAfterWarmup": 17801016,
+        "retainedHeapDelta": 4497448
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 12.011,
+        "p50": 3.304,
+        "p95": 30.482,
+        "max": 32.973
+      },
+      "indexMs": {
+        "avg": 0.188,
+        "p50": 0.155,
+        "p95": 0.363,
+        "max": 1.455
+      },
+      "totalMs": {
+        "avg": 12.359,
+        "p50": 3.528,
+        "p95": 30.639,
+        "max": 33.261
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 108,
+      "gcDurationMs": 125.25259137153625,
+      "memory": {
+        "heapBefore": 13299320,
+        "retainedHeapAfterWarmup": 17789376,
+        "retainedHeapDelta": 4490056
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 12.351,
+        "p50": 3.448,
+        "p95": 30.636,
+        "max": 32.955
+      },
+      "indexMs": {
+        "avg": 0.181,
+        "p50": 0.163,
+        "p95": 0.319,
+        "max": 0.972
+      },
+      "totalMs": {
+        "avg": 12.688,
+        "p50": 3.811,
+        "p95": 30.959,
+        "max": 33.295
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 107,
+      "gcDurationMs": 129.2041746377945,
+      "memory": {
+        "heapBefore": 13305248,
+        "retainedHeapAfterWarmup": 17807376,
+        "retainedHeapDelta": 4502128
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 35.126,
+        "p50": 34.656,
+        "p95": 43.971,
+        "max": 50.003
+      },
+      "indexMs": {
+        "avg": 0.424,
+        "p50": 0.403,
+        "p95": 0.641,
+        "max": 1.385
+      },
+      "totalMs": {
+        "avg": 35.791,
+        "p50": 35.201,
+        "p95": 44.716,
+        "max": 50.709
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 316,
+      "gcDurationMs": 312.827498793602,
+      "memory": {
+        "heapBefore": 13302936,
+        "retainedHeapAfterWarmup": 17912992,
+        "retainedHeapDelta": 4610056
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 33.799,
+        "p50": 32.741,
+        "p95": 40.968,
+        "max": 45.635
+      },
+      "indexMs": {
+        "avg": 0.369,
+        "p50": 0.335,
+        "p95": 0.592,
+        "max": 0.866
+      },
+      "totalMs": {
+        "avg": 34.374,
+        "p50": 33.272,
+        "p95": 41.514,
+        "max": 46.333
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 316,
+      "gcDurationMs": 290.09024477005005,
+      "memory": {
+        "heapBefore": 13297848,
+        "retainedHeapAfterWarmup": 17921608,
+        "retainedHeapDelta": 4623760
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 32.641,
+        "p50": 31.539,
+        "p95": 39.457,
+        "max": 44.378
+      },
+      "indexMs": {
+        "avg": 0.371,
+        "p50": 0.345,
+        "p95": 0.564,
+        "max": 1.071
+      },
+      "totalMs": {
+        "avg": 33.189,
+        "p50": 31.994,
+        "p95": 39.983,
+        "max": 44.942
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 318,
+      "gcDurationMs": 284.41162490844727,
+      "memory": {
+        "heapBefore": 13298264,
+        "retainedHeapAfterWarmup": 17920176,
+        "retainedHeapDelta": 4621912
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 29.574,
+        "p50": 29.31,
+        "p95": 34.076,
+        "max": 37.958
+      },
+      "indexMs": {
+        "avg": 0.391,
+        "p50": 0.348,
+        "p95": 0.72,
+        "max": 0.943
+      },
+      "totalMs": {
+        "avg": 30.19,
+        "p50": 30.013,
+        "p95": 34.616,
+        "max": 38.52
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 263,
+      "gcDurationMs": 263.45617067813873,
+      "memory": {
+        "heapBefore": 13302048,
+        "retainedHeapAfterWarmup": 17915016,
+        "retainedHeapDelta": 4612968
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 28.571,
+        "p50": 28.227,
+        "p95": 32.4,
+        "max": 38.324
+      },
+      "indexMs": {
+        "avg": 0.412,
+        "p50": 0.385,
+        "p95": 0.671,
+        "max": 0.969
+      },
+      "totalMs": {
+        "avg": 29.218,
+        "p50": 28.908,
+        "p95": 33.201,
+        "max": 38.87
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 269,
+      "gcDurationMs": 260.3347920179367,
+      "memory": {
+        "heapBefore": 13294504,
+        "retainedHeapAfterWarmup": 17908568,
+        "retainedHeapDelta": 4614064
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 29.729,
+        "p50": 29.576,
+        "p95": 33.563,
+        "max": 36.427
+      },
+      "indexMs": {
+        "avg": 0.379,
+        "p50": 0.342,
+        "p95": 0.686,
+        "max": 0.866
+      },
+      "totalMs": {
+        "avg": 30.31,
+        "p50": 30.142,
+        "p95": 34.056,
+        "max": 36.938
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 269,
+      "gcDurationMs": 266.0886425971985,
+      "memory": {
+        "heapBefore": 13306944,
+        "retainedHeapAfterWarmup": 17922240,
+        "retainedHeapDelta": 4615296
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 13.77,
+        "p50": 13.449,
+        "p95": 16.872,
+        "max": 22.18
+      },
+      "indexMs": {
+        "avg": 0.418,
+        "p50": 0.375,
+        "p95": 0.692,
+        "max": 1.181
+      },
+      "totalMs": {
+        "avg": 14.336,
+        "p50": 14.009,
+        "p95": 17.555,
+        "max": 22.656
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 122,
+      "gcDurationMs": 109.33366322517395,
+      "memory": {
+        "heapBefore": 13302504,
+        "retainedHeapAfterWarmup": 17047816,
+        "retainedHeapDelta": 3745312
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.769,
+        "p50": 13.597,
+        "p95": 15.83,
+        "max": 20.053
+      },
+      "indexMs": {
+        "avg": 0.4,
+        "p50": 0.363,
+        "p95": 0.633,
+        "max": 0.996
+      },
+      "totalMs": {
+        "avg": 14.328,
+        "p50": 14.165,
+        "p95": 16.353,
+        "max": 20.6
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 123,
+      "gcDurationMs": 113.34091997146606,
+      "memory": {
+        "heapBefore": 13291400,
+        "retainedHeapAfterWarmup": 17080416,
+        "retainedHeapDelta": 3789016
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 13.389,
+        "p50": 13.284,
+        "p95": 15.24,
+        "max": 18.162
+      },
+      "indexMs": {
+        "avg": 0.384,
+        "p50": 0.35,
+        "p95": 0.621,
+        "max": 0.877
+      },
+      "totalMs": {
+        "avg": 13.926,
+        "p50": 13.765,
+        "p95": 15.763,
+        "max": 18.597
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 123,
+      "gcDurationMs": 103.92707920074463,
+      "memory": {
+        "heapBefore": 13306528,
+        "retainedHeapAfterWarmup": 17073664,
+        "retainedHeapDelta": 3767136
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 3.003,
+        "p50": 2.848,
+        "p95": 4.456,
+        "max": 5.547
+      },
+      "indexMs": {
+        "avg": 0.008,
+        "p50": 0.006,
+        "p95": 0.011,
+        "max": 0.059
+      },
+      "totalMs": {
+        "avg": 3.014,
+        "p50": 2.863,
+        "p95": 4.466,
+        "max": 5.56
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 18.151658058166504,
+      "memory": {
+        "heapBefore": 13303552,
+        "retainedHeapAfterWarmup": 19520792,
+        "retainedHeapDelta": 6217240
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 2.914,
+        "p50": 2.769,
+        "p95": 4.413,
+        "max": 7.032
+      },
+      "indexMs": {
+        "avg": 0.008,
+        "p50": 0.006,
+        "p95": 0.012,
+        "max": 0.124
+      },
+      "totalMs": {
+        "avg": 2.927,
+        "p50": 2.781,
+        "p95": 4.426,
+        "max": 7.047
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 20.77261185646057,
+      "memory": {
+        "heapBefore": 13299392,
+        "retainedHeapAfterWarmup": 19520280,
+        "retainedHeapDelta": 6220888
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 2.932,
+        "p50": 2.7,
+        "p95": 4.378,
+        "max": 5.537
+      },
+      "indexMs": {
+        "avg": 0.008,
+        "p50": 0.006,
+        "p95": 0.012,
+        "max": 0.153
+      },
+      "totalMs": {
+        "avg": 2.944,
+        "p50": 2.71,
+        "p95": 4.384,
+        "max": 5.548
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 18.684974789619446,
+      "memory": {
+        "heapBefore": 13305920,
+        "retainedHeapAfterWarmup": 19540144,
+        "retainedHeapDelta": 6234224
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 3.483,
+        "p50": 3.251,
+        "p95": 5.864,
+        "max": 7.501
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.802,
+        "p50": 3.519,
+        "p95": 6.082,
+        "max": 8.73
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.14800214767456,
+      "memory": {
+        "heapBefore": 13302704,
+        "retainedHeapAfterWarmup": 16675224,
+        "retainedHeapDelta": 3372520
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 2.873,
+        "p50": 2.884,
+        "p95": 4.781,
+        "max": 5.954
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.194,
+        "p50": 3.226,
+        "p95": 5.221,
+        "max": 6.287
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.662928462028503,
+      "memory": {
+        "heapBefore": 13299112,
+        "retainedHeapAfterWarmup": 16677016,
+        "retainedHeapDelta": 3377904
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 3.298,
+        "p50": 3.187,
+        "p95": 4.963,
+        "max": 6.335
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.647,
+        "p50": 3.548,
+        "p95": 5.529,
+        "max": 6.692
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.274335980415344,
+      "memory": {
+        "heapBefore": 13299392,
+        "retainedHeapAfterWarmup": 16675928,
+        "retainedHeapDelta": 3376536
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 25.81,
+        "p50": 25.435,
+        "p95": 30.158,
+        "max": 33.182
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 26.484,
+        "p50": 26.123,
+        "p95": 31.047,
+        "max": 33.783
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 450.15307116508484,
+      "memory": {
+        "heapBefore": 13302152,
+        "retainedHeapAfterWarmup": 21610344,
+        "retainedHeapDelta": 8308192
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 27.175,
+        "p50": 27.056,
+        "p95": 30.694,
+        "max": 33.459
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 27.877,
+        "p50": 27.88,
+        "p95": 31.464,
+        "max": 34.457
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 483.46510207653046,
+      "memory": {
+        "heapBefore": 13298640,
+        "retainedHeapAfterWarmup": 21599416,
+        "retainedHeapDelta": 8300776
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 25.526,
+        "p50": 25.341,
+        "p95": 28.765,
+        "max": 35.302
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 26.177,
+        "p50": 26.025,
+        "p95": 29.337,
+        "max": 35.988
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 446.9130699634552,
+      "memory": {
+        "heapBefore": 13305984,
+        "retainedHeapAfterWarmup": 21620424,
+        "retainedHeapDelta": 8314440
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 4.323,
+        "p50": 4.018,
+        "p95": 6.854,
+        "max": 8.868
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.451,
+        "p50": 5.162,
+        "p95": 7.692,
+        "max": 10.916
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 52.06087255477905,
+      "memory": {
+        "heapBefore": 13303136,
+        "retainedHeapAfterWarmup": 17999992,
+        "retainedHeapDelta": 4696856
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 4.288,
+        "p50": 3.989,
+        "p95": 6.694,
+        "max": 8.427
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.305,
+        "p50": 5.185,
+        "p95": 7.534,
+        "max": 11.513
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 53.46125948429108,
+      "memory": {
+        "heapBefore": 13297952,
+        "retainedHeapAfterWarmup": 17996000,
+        "retainedHeapDelta": 4698048
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 4.522,
+        "p50": 4.009,
+        "p95": 7.029,
+        "max": 8.127
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.626,
+        "p50": 5.312,
+        "p95": 7.955,
+        "max": 9.503
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 62,
+      "gcDurationMs": 50.86453318595886,
+      "memory": {
+        "heapBefore": 13305192,
+        "retainedHeapAfterWarmup": 18002408,
+        "retainedHeapDelta": 4697216
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 1,
+      "variant": "before",
+      "stepMs": {
+        "avg": 0.992,
+        "p50": 0.823,
+        "p95": 1.841,
+        "max": 4.658
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.13,
+        "p50": 0.949,
+        "p95": 2.086,
+        "max": 4.772
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 7.917335867881775,
+      "memory": {
+        "heapBefore": 13302992,
+        "retainedHeapAfterWarmup": 15085376,
+        "retainedHeapDelta": 1782384
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 1,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 0.98,
+        "p50": 0.794,
+        "p95": 1.957,
+        "max": 3.708
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.125,
+        "p50": 0.935,
+        "p95": 2.146,
+        "max": 3.809
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 8.431022644042969,
+      "memory": {
+        "heapBefore": 13299440,
+        "retainedHeapAfterWarmup": 15083048,
+        "retainedHeapDelta": 1783608
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 1,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 0.994,
+        "p50": 0.833,
+        "p95": 1.86,
+        "max": 4.005
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.134,
+        "p50": 0.93,
+        "p95": 2.07,
+        "max": 4.079
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 17,
+      "gcDurationMs": 8.551207065582275,
+      "memory": {
+        "heapBefore": 13306256,
+        "retainedHeapAfterWarmup": 15105592,
+        "retainedHeapDelta": 1799336
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 10.974,
+        "p50": 10.814,
+        "p95": 13.816,
+        "max": 19.58
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.001
+      },
+      "totalMs": {
+        "avg": 10.976,
+        "p50": 10.816,
+        "p95": 13.82,
+        "max": 19.583
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 57.83197867870331,
+      "memory": {
+        "heapBefore": 13298912,
+        "retainedHeapAfterWarmup": 37701992,
+        "retainedHeapDelta": 24403080
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 13.084,
+        "p50": 12.921,
+        "p95": 15.722,
+        "max": 17.724
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.011
+      },
+      "totalMs": {
+        "avg": 13.088,
+        "p50": 12.924,
+        "p95": 15.728,
+        "max": 17.728
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 54.7487975358963,
+      "memory": {
+        "heapBefore": 13304536,
+        "retainedHeapAfterWarmup": 37702984,
+        "retainedHeapDelta": 24398448
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 11.332,
+        "p50": 11.097,
+        "p95": 13.849,
+        "max": 17.529
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.003
+      },
+      "totalMs": {
+        "avg": 11.336,
+        "p50": 11.1,
+        "p95": 13.852,
+        "max": 17.532
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 55.447537779808044,
+      "memory": {
+        "heapBefore": 13294136,
+        "retainedHeapAfterWarmup": 37696528,
+        "retainedHeapDelta": 24402392
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.239,
+        "p50": 12.993,
+        "p95": 16.901,
+        "max": 19.108
+      },
+      "indexMs": {
+        "avg": 0.08,
+        "p50": 0.07,
+        "p95": 0.136,
+        "max": 0.441
+      },
+      "totalMs": {
+        "avg": 13.354,
+        "p50": 13.082,
+        "p95": 17.014,
+        "max": 19.536
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 54,
+      "gcDurationMs": 73.20607352256775,
+      "memory": {
+        "heapBefore": 13299456,
+        "retainedHeapAfterWarmup": 38318824,
+        "retainedHeapDelta": 25019368
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 13.134,
+        "p50": 12.941,
+        "p95": 16.299,
+        "max": 20.627
+      },
+      "indexMs": {
+        "avg": 0.083,
+        "p50": 0.074,
+        "p95": 0.128,
+        "max": 0.276
+      },
+      "totalMs": {
+        "avg": 13.24,
+        "p50": 13.052,
+        "p95": 16.399,
+        "max": 20.725
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 54,
+      "gcDurationMs": 74.65993070602417,
+      "memory": {
+        "heapBefore": 13299616,
+        "retainedHeapAfterWarmup": 38307384,
+        "retainedHeapDelta": 25007768
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 15.22,
+        "p50": 13.251,
+        "p95": 32.583,
+        "max": 39.071
+      },
+      "indexMs": {
+        "avg": 0.095,
+        "p50": 0.077,
+        "p95": 0.13,
+        "max": 1.728
+      },
+      "totalMs": {
+        "avg": 15.349,
+        "p50": 13.418,
+        "p95": 32.797,
+        "max": 39.201
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 68,
+      "gcDurationMs": 91.81952011585236,
+      "memory": {
+        "heapBefore": 13302552,
+        "retainedHeapAfterWarmup": 39721896,
+        "retainedHeapDelta": 26419344
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 23.849,
+        "p50": 23.705,
+        "p95": 28.19,
+        "max": 32.196
+      },
+      "indexMs": {
+        "avg": 0.096,
+        "p50": 0.087,
+        "p95": 0.163,
+        "max": 0.342
+      },
+      "totalMs": {
+        "avg": 23.965,
+        "p50": 23.889,
+        "p95": 28.28,
+        "max": 32.324
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 101,
+      "gcDurationMs": 251.27417242527008,
+      "memory": {
+        "heapBefore": 13292224,
+        "retainedHeapAfterWarmup": 38808472,
+        "retainedHeapDelta": 25516248
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 23.511,
+        "p50": 23.281,
+        "p95": 27.496,
+        "max": 32.329
+      },
+      "indexMs": {
+        "avg": 0.095,
+        "p50": 0.087,
+        "p95": 0.157,
+        "max": 0.24
+      },
+      "totalMs": {
+        "avg": 23.631,
+        "p50": 23.406,
+        "p95": 27.602,
+        "max": 32.444
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 102,
+      "gcDurationMs": 247.93674755096436,
+      "memory": {
+        "heapBefore": 13305672,
+        "retainedHeapAfterWarmup": 38851280,
+        "retainedHeapDelta": 25545608
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 28.321,
+        "p50": 28.306,
+        "p95": 37.116,
+        "max": 48.865
+      },
+      "indexMs": {
+        "avg": 0.129,
+        "p50": 0.093,
+        "p95": 0.214,
+        "max": 2.874
+      },
+      "totalMs": {
+        "avg": 28.479,
+        "p50": 28.435,
+        "p95": 37.43,
+        "max": 49.026
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 133,
+      "gcDurationMs": 289.78822886943817,
+      "memory": {
+        "heapBefore": 13302560,
+        "retainedHeapAfterWarmup": 39027432,
+        "retainedHeapDelta": 25724872
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 12.766,
+        "p50": 12.389,
+        "p95": 15.562,
+        "max": 18.882
+      },
+      "indexMs": {
+        "avg": 0.021,
+        "p50": 0.018,
+        "p95": 0.028,
+        "max": 0.267
+      },
+      "totalMs": {
+        "avg": 12.806,
+        "p50": 12.421,
+        "p95": 16.112,
+        "max": 18.91
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 51,
+      "gcDurationMs": 65.31018304824829,
+      "memory": {
+        "heapBefore": 13298960,
+        "retainedHeapAfterWarmup": 39011880,
+        "retainedHeapDelta": 25712920
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 14.143,
+        "p50": 13.98,
+        "p95": 17.868,
+        "max": 22.301
+      },
+      "indexMs": {
+        "avg": 0.024,
+        "p50": 0.02,
+        "p95": 0.046,
+        "max": 0.221
+      },
+      "totalMs": {
+        "avg": 14.18,
+        "p50": 14.014,
+        "p95": 17.97,
+        "max": 22.34
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 51,
+      "gcDurationMs": 69.08686232566833,
+      "memory": {
+        "heapBefore": 13306328,
+        "retainedHeapAfterWarmup": 39009240,
+        "retainedHeapDelta": 25702912
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 14.597,
+        "p50": 14.476,
+        "p95": 17.45,
+        "max": 20.006
+      },
+      "indexMs": {
+        "avg": 0.024,
+        "p50": 0.021,
+        "p95": 0.029,
+        "max": 0.146
+      },
+      "totalMs": {
+        "avg": 14.637,
+        "p50": 14.513,
+        "p95": 17.517,
+        "max": 20.047
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 49,
+      "gcDurationMs": 69.98526012897491,
+      "memory": {
+        "heapBefore": 13302008,
+        "retainedHeapAfterWarmup": 39019192,
+        "retainedHeapDelta": 25717184
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 11.178,
+        "p50": 2.96,
+        "p95": 26.875,
+        "max": 31.57
+      },
+      "indexMs": {
+        "avg": 0.169,
+        "p50": 0.15,
+        "p95": 0.314,
+        "max": 0.692
+      },
+      "totalMs": {
+        "avg": 11.493,
+        "p50": 3.404,
+        "p95": 27.329,
+        "max": 32.011
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 107,
+      "gcDurationMs": 123.66771817207336,
+      "memory": {
+        "heapBefore": 13291464,
+        "retainedHeapAfterWarmup": 17781112,
+        "retainedHeapDelta": 4489648
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 11.603,
+        "p50": 2.839,
+        "p95": 28.555,
+        "max": 32.672
+      },
+      "indexMs": {
+        "avg": 0.163,
+        "p50": 0.149,
+        "p95": 0.283,
+        "max": 0.421
+      },
+      "totalMs": {
+        "avg": 11.916,
+        "p50": 3.235,
+        "p95": 29.153,
+        "max": 33.018
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 107,
+      "gcDurationMs": 123.87216770648956,
+      "memory": {
+        "heapBefore": 13306360,
+        "retainedHeapAfterWarmup": 17798408,
+        "retainedHeapDelta": 4492048
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 11.309,
+        "p50": 2.759,
+        "p95": 27.973,
+        "max": 32.111
+      },
+      "indexMs": {
+        "avg": 0.165,
+        "p50": 0.15,
+        "p95": 0.283,
+        "max": 0.728
+      },
+      "totalMs": {
+        "avg": 11.607,
+        "p50": 3.087,
+        "p95": 28.366,
+        "max": 32.462
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 108,
+      "gcDurationMs": 117.9231139421463,
+      "memory": {
+        "heapBefore": 13302728,
+        "retainedHeapAfterWarmup": 17794168,
+        "retainedHeapDelta": 4491440
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 33.067,
+        "p50": 32.629,
+        "p95": 39.728,
+        "max": 47.968
+      },
+      "indexMs": {
+        "avg": 0.387,
+        "p50": 0.362,
+        "p95": 0.607,
+        "max": 1.251
+      },
+      "totalMs": {
+        "avg": 33.678,
+        "p50": 33.204,
+        "p95": 40.452,
+        "max": 48.634
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 316,
+      "gcDurationMs": 295.2416331768036,
+      "memory": {
+        "heapBefore": 13298856,
+        "retainedHeapAfterWarmup": 17921880,
+        "retainedHeapDelta": 4623024
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 32.922,
+        "p50": 31.906,
+        "p95": 40.793,
+        "max": 43.602
+      },
+      "indexMs": {
+        "avg": 0.362,
+        "p50": 0.334,
+        "p95": 0.581,
+        "max": 0.985
+      },
+      "totalMs": {
+        "avg": 33.487,
+        "p50": 32.394,
+        "p95": 41.381,
+        "max": 43.959
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 316,
+      "gcDurationMs": 292.4572426080704,
+      "memory": {
+        "heapBefore": 13306896,
+        "retainedHeapAfterWarmup": 17916920,
+        "retainedHeapDelta": 4610024
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 33.102,
+        "p50": 32.294,
+        "p95": 40.544,
+        "max": 42.253
+      },
+      "indexMs": {
+        "avg": 0.399,
+        "p50": 0.377,
+        "p95": 0.614,
+        "max": 0.843
+      },
+      "totalMs": {
+        "avg": 33.74,
+        "p50": 32.967,
+        "p95": 41.191,
+        "max": 42.919
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 317,
+      "gcDurationMs": 284.3105021715164,
+      "memory": {
+        "heapBefore": 13294576,
+        "retainedHeapAfterWarmup": 17911320,
+        "retainedHeapDelta": 4616744
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 28.754,
+        "p50": 28.487,
+        "p95": 31.829,
+        "max": 35.049
+      },
+      "indexMs": {
+        "avg": 0.421,
+        "p50": 0.361,
+        "p95": 0.764,
+        "max": 1.298
+      },
+      "totalMs": {
+        "avg": 29.382,
+        "p50": 29.209,
+        "p95": 32.423,
+        "max": 35.466
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 269,
+      "gcDurationMs": 265.8696265220642,
+      "memory": {
+        "heapBefore": 13298912,
+        "retainedHeapAfterWarmup": 17926104,
+        "retainedHeapDelta": 4627192
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 28.774,
+        "p50": 28.62,
+        "p95": 32.119,
+        "max": 35.884
+      },
+      "indexMs": {
+        "avg": 0.409,
+        "p50": 0.364,
+        "p95": 0.772,
+        "max": 1.137
+      },
+      "totalMs": {
+        "avg": 29.418,
+        "p50": 29.25,
+        "p95": 32.976,
+        "max": 36.714
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 269,
+      "gcDurationMs": 258.11507427692413,
+      "memory": {
+        "heapBefore": 13305888,
+        "retainedHeapAfterWarmup": 17931728,
+        "retainedHeapDelta": 4625840
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 29.393,
+        "p50": 28.98,
+        "p95": 33.032,
+        "max": 37.101
+      },
+      "indexMs": {
+        "avg": 0.426,
+        "p50": 0.38,
+        "p95": 0.746,
+        "max": 1.547
+      },
+      "totalMs": {
+        "avg": 30.041,
+        "p50": 29.774,
+        "p95": 33.932,
+        "max": 37.97
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 263,
+      "gcDurationMs": 268.9554432630539,
+      "memory": {
+        "heapBefore": 13303104,
+        "retainedHeapAfterWarmup": 17911160,
+        "retainedHeapDelta": 4608056
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.728,
+        "p50": 13.6,
+        "p95": 16.049,
+        "max": 18.917
+      },
+      "indexMs": {
+        "avg": 0.412,
+        "p50": 0.387,
+        "p95": 0.629,
+        "max": 0.904
+      },
+      "totalMs": {
+        "avg": 14.287,
+        "p50": 14.157,
+        "p95": 16.542,
+        "max": 19.498
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 123,
+      "gcDurationMs": 108.70233798027039,
+      "memory": {
+        "heapBefore": 13292200,
+        "retainedHeapAfterWarmup": 17071376,
+        "retainedHeapDelta": 3779176
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 13.769,
+        "p50": 13.667,
+        "p95": 16.168,
+        "max": 19.684
+      },
+      "indexMs": {
+        "avg": 0.395,
+        "p50": 0.361,
+        "p95": 0.634,
+        "max": 1.343
+      },
+      "totalMs": {
+        "avg": 14.297,
+        "p50": 14.157,
+        "p95": 16.612,
+        "max": 20.185
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 123,
+      "gcDurationMs": 113.88498055934906,
+      "memory": {
+        "heapBefore": 13306640,
+        "retainedHeapAfterWarmup": 17076472,
+        "retainedHeapDelta": 3769832
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 13.502,
+        "p50": 13.403,
+        "p95": 16.102,
+        "max": 18.726
+      },
+      "indexMs": {
+        "avg": 0.402,
+        "p50": 0.366,
+        "p95": 0.611,
+        "max": 1.267
+      },
+      "totalMs": {
+        "avg": 14.051,
+        "p50": 13.93,
+        "p95": 16.559,
+        "max": 19.43
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 122,
+      "gcDurationMs": 102.47545683383942,
+      "memory": {
+        "heapBefore": 13301320,
+        "retainedHeapAfterWarmup": 17062944,
+        "retainedHeapDelta": 3761624
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 3.362,
+        "p50": 3.142,
+        "p95": 4.779,
+        "max": 6.145
+      },
+      "indexMs": {
+        "avg": 0.008,
+        "p50": 0.007,
+        "p95": 0.011,
+        "max": 0.059
+      },
+      "totalMs": {
+        "avg": 3.374,
+        "p50": 3.152,
+        "p95": 4.794,
+        "max": 6.188
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 21.022327780723572,
+      "memory": {
+        "heapBefore": 13298392,
+        "retainedHeapAfterWarmup": 19514224,
+        "retainedHeapDelta": 6215832
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 3.348,
+        "p50": 3.234,
+        "p95": 4.642,
+        "max": 5.824
+      },
+      "indexMs": {
+        "avg": 0.009,
+        "p50": 0.007,
+        "p95": 0.012,
+        "max": 0.103
+      },
+      "totalMs": {
+        "avg": 3.361,
+        "p50": 3.251,
+        "p95": 4.652,
+        "max": 5.839
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 20.750795006752014,
+      "memory": {
+        "heapBefore": 13298952,
+        "retainedHeapAfterWarmup": 19526000,
+        "retainedHeapDelta": 6227048
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 3.362,
+        "p50": 3.189,
+        "p95": 4.942,
+        "max": 6.459
+      },
+      "indexMs": {
+        "avg": 0.01,
+        "p50": 0.007,
+        "p95": 0.012,
+        "max": 0.119
+      },
+      "totalMs": {
+        "avg": 3.375,
+        "p50": 3.204,
+        "p95": 4.956,
+        "max": 6.473
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 21.193750739097595,
+      "memory": {
+        "heapBefore": 13302512,
+        "retainedHeapAfterWarmup": 19525592,
+        "retainedHeapDelta": 6223080
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 3.776,
+        "p50": 3.459,
+        "p95": 6.087,
+        "max": 9.246
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 4.11,
+        "p50": 3.773,
+        "p95": 6.324,
+        "max": 9.548
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.632114052772522,
+      "memory": {
+        "heapBefore": 13298760,
+        "retainedHeapAfterWarmup": 16651032,
+        "retainedHeapDelta": 3352272
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 2.946,
+        "p50": 2.983,
+        "p95": 4.359,
+        "max": 6.126
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.223,
+        "p50": 3.258,
+        "p95": 4.804,
+        "max": 6.798
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 14.078816890716553,
+      "memory": {
+        "heapBefore": 13306760,
+        "retainedHeapAfterWarmup": 16683304,
+        "retainedHeapDelta": 3376544
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 3.618,
+        "p50": 3.457,
+        "p95": 5.599,
+        "max": 8.792
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.987,
+        "p50": 3.792,
+        "p95": 5.916,
+        "max": 9.119
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.564243078231812,
+      "memory": {
+        "heapBefore": 13294928,
+        "retainedHeapAfterWarmup": 16670792,
+        "retainedHeapDelta": 3375864
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 24.598,
+        "p50": 24.223,
+        "p95": 27.54,
+        "max": 31.015
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 25.254,
+        "p50": 24.881,
+        "p95": 28.271,
+        "max": 31.511
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 346,
+      "gcDurationMs": 427.1352379322052,
+      "memory": {
+        "heapBefore": 13299032,
+        "retainedHeapAfterWarmup": 21603080,
+        "retainedHeapDelta": 8304048
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 26.797,
+        "p50": 26.368,
+        "p95": 31.419,
+        "max": 47.722
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 27.495,
+        "p50": 26.986,
+        "p95": 31.997,
+        "max": 48.494
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 456.45042860507965,
+      "memory": {
+        "heapBefore": 13306008,
+        "retainedHeapAfterWarmup": 21608688,
+        "retainedHeapDelta": 8302680
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 25.644,
+        "p50": 25.297,
+        "p95": 30.143,
+        "max": 32.163
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 26.331,
+        "p50": 25.98,
+        "p95": 30.856,
+        "max": 32.688
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 427.30525827407837,
+      "memory": {
+        "heapBefore": 13302832,
+        "retainedHeapAfterWarmup": 21600440,
+        "retainedHeapDelta": 8297608
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 4.327,
+        "p50": 4.064,
+        "p95": 6.527,
+        "max": 8.183
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.387,
+        "p50": 5.225,
+        "p95": 7.514,
+        "max": 12.275
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 64,
+      "gcDurationMs": 53.73177719116211,
+      "memory": {
+        "heapBefore": 13299408,
+        "retainedHeapAfterWarmup": 17992184,
+        "retainedHeapDelta": 4692776
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 4.493,
+        "p50": 4.003,
+        "p95": 7.223,
+        "max": 7.888
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.624,
+        "p50": 5.435,
+        "p95": 8.114,
+        "max": 11.497
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 55.723069071769714,
+      "memory": {
+        "heapBefore": 13297632,
+        "retainedHeapAfterWarmup": 17993672,
+        "retainedHeapDelta": 4696040
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 4.491,
+        "p50": 4.122,
+        "p95": 7.094,
+        "max": 8.638
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.578,
+        "p50": 5.272,
+        "p95": 8.015,
+        "max": 12.464
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 52.27869164943695,
+      "memory": {
+        "heapBefore": 13295152,
+        "retainedHeapAfterWarmup": 17987192,
+        "retainedHeapDelta": 4692040
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 2,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 0.944,
+        "p50": 0.822,
+        "p95": 1.67,
+        "max": 3.48
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.055,
+        "p50": 0.978,
+        "p95": 1.881,
+        "max": 3.66
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 15,
+      "gcDurationMs": 7.016336917877197,
+      "memory": {
+        "heapBefore": 13297608,
+        "retainedHeapAfterWarmup": 15068536,
+        "retainedHeapDelta": 1770928
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 2,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 0.935,
+        "p50": 0.754,
+        "p95": 1.807,
+        "max": 2.644
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.079,
+        "p50": 0.93,
+        "p95": 2.111,
+        "max": 2.927
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 7.755028963088989,
+      "memory": {
+        "heapBefore": 13298384,
+        "retainedHeapAfterWarmup": 15068072,
+        "retainedHeapDelta": 1769688
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 2,
+      "variant": "before",
+      "stepMs": {
+        "avg": 0.941,
+        "p50": 0.789,
+        "p95": 1.844,
+        "max": 2.909
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.073,
+        "p50": 0.898,
+        "p95": 2.036,
+        "max": 3.123
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 7.071149110794067,
+      "memory": {
+        "heapBefore": 13295104,
+        "retainedHeapAfterWarmup": 15082416,
+        "retainedHeapDelta": 1787312
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 11.433,
+        "p50": 11.306,
+        "p95": 14.266,
+        "max": 17.11
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.003
+      },
+      "totalMs": {
+        "avg": 11.436,
+        "p50": 11.308,
+        "p95": 14.269,
+        "max": 17.114
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 55.77942979335785,
+      "memory": {
+        "heapBefore": 13306464,
+        "retainedHeapAfterWarmup": 37702992,
+        "retainedHeapDelta": 24396528
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 11.356,
+        "p50": 11.22,
+        "p95": 13.554,
+        "max": 14.293
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.002
+      },
+      "totalMs": {
+        "avg": 11.359,
+        "p50": 11.222,
+        "p95": 13.557,
+        "max": 14.309
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 57.35901069641113,
+      "memory": {
+        "heapBefore": 13301904,
+        "retainedHeapAfterWarmup": 37701944,
+        "retainedHeapDelta": 24400040
+      }
+    },
+    {
+      "name": "wide-2d-idle",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 10.786,
+        "p50": 10.578,
+        "p95": 13.052,
+        "max": 17.342
+      },
+      "indexMs": {
+        "avg": 0.001,
+        "p50": 0.001,
+        "p95": 0.001,
+        "max": 0.002
+      },
+      "totalMs": {
+        "avg": 10.789,
+        "p50": 10.581,
+        "p95": 13.054,
+        "max": 17.346
+      },
+      "bytesPerTick": 2000,
+      "gcCount": 38,
+      "gcDurationMs": 55.5894091129303,
+      "memory": {
+        "heapBefore": 13299368,
+        "retainedHeapAfterWarmup": 37706056,
+        "retainedHeapDelta": 24406688
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 12.797,
+        "p50": 12.23,
+        "p95": 16.783,
+        "max": 20.606
+      },
+      "indexMs": {
+        "avg": 0.084,
+        "p50": 0.076,
+        "p95": 0.133,
+        "max": 0.251
+      },
+      "totalMs": {
+        "avg": 12.906,
+        "p50": 12.352,
+        "p95": 16.834,
+        "max": 20.76
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 54,
+      "gcDurationMs": 69.53954243659973,
+      "memory": {
+        "heapBefore": 13306200,
+        "retainedHeapAfterWarmup": 38310976,
+        "retainedHeapDelta": 25004776
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 16.694,
+        "p50": 14.796,
+        "p95": 33.319,
+        "max": 37.785
+      },
+      "indexMs": {
+        "avg": 0.091,
+        "p50": 0.078,
+        "p95": 0.151,
+        "max": 0.352
+      },
+      "totalMs": {
+        "avg": 16.809,
+        "p50": 14.89,
+        "p95": 33.502,
+        "max": 37.887
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 68,
+      "gcDurationMs": 93.35400581359863,
+      "memory": {
+        "heapBefore": 13302336,
+        "retainedHeapAfterWarmup": 39737744,
+        "retainedHeapDelta": 26435408
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.342,
+        "p50": 13.117,
+        "p95": 16.711,
+        "max": 24.101
+      },
+      "indexMs": {
+        "avg": 0.091,
+        "p50": 0.073,
+        "p95": 0.132,
+        "max": 1.407
+      },
+      "totalMs": {
+        "avg": 13.459,
+        "p50": 13.209,
+        "p95": 16.832,
+        "max": 25.535
+      },
+      "bytesPerTick": 13777,
+      "gcCount": 54,
+      "gcDurationMs": 72.34525620937347,
+      "memory": {
+        "heapBefore": 13299520,
+        "retainedHeapAfterWarmup": 38282240,
+        "retainedHeapDelta": 24982720
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 24.858,
+        "p50": 24.277,
+        "p95": 29.983,
+        "max": 37.156
+      },
+      "indexMs": {
+        "avg": 0.129,
+        "p50": 0.094,
+        "p95": 0.22,
+        "max": 3.231
+      },
+      "totalMs": {
+        "avg": 25.016,
+        "p50": 24.508,
+        "p95": 30.083,
+        "max": 37.292
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 100,
+      "gcDurationMs": 263.229941368103,
+      "memory": {
+        "heapBefore": 13300072,
+        "retainedHeapAfterWarmup": 38848072,
+        "retainedHeapDelta": 25548000
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 26.977,
+        "p50": 27.445,
+        "p95": 32.186,
+        "max": 37.499
+      },
+      "indexMs": {
+        "avg": 0.117,
+        "p50": 0.095,
+        "p95": 0.2,
+        "max": 1.161
+      },
+      "totalMs": {
+        "avg": 27.119,
+        "p50": 27.575,
+        "p95": 32.305,
+        "max": 37.635
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 132,
+      "gcDurationMs": 293.4063535928726,
+      "memory": {
+        "heapBefore": 13302112,
+        "retainedHeapAfterWarmup": 39034888,
+        "retainedHeapDelta": 25732776
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 24.509,
+        "p50": 24.422,
+        "p95": 28.944,
+        "max": 33.311
+      },
+      "indexMs": {
+        "avg": 0.103,
+        "p50": 0.093,
+        "p95": 0.167,
+        "max": 0.361
+      },
+      "totalMs": {
+        "avg": 24.639,
+        "p50": 24.538,
+        "p95": 29.099,
+        "max": 33.442
+      },
+      "bytesPerTick": 3811,
+      "gcCount": 102,
+      "gcDurationMs": 265.412442445755,
+      "memory": {
+        "heapBefore": 13298904,
+        "retainedHeapAfterWarmup": 38819208,
+        "retainedHeapDelta": 25520304
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 12.734,
+        "p50": 12.522,
+        "p95": 15.432,
+        "max": 18.984
+      },
+      "indexMs": {
+        "avg": 0.022,
+        "p50": 0.018,
+        "p95": 0.032,
+        "max": 0.173
+      },
+      "totalMs": {
+        "avg": 12.766,
+        "p50": 12.544,
+        "p95": 15.466,
+        "max": 19.003
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 52,
+      "gcDurationMs": 68.37271571159363,
+      "memory": {
+        "heapBefore": 13299496,
+        "retainedHeapAfterWarmup": 39025696,
+        "retainedHeapDelta": 25726200
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 13.722,
+        "p50": 13.609,
+        "p95": 16.673,
+        "max": 21.631
+      },
+      "indexMs": {
+        "avg": 0.022,
+        "p50": 0.019,
+        "p95": 0.028,
+        "max": 0.156
+      },
+      "totalMs": {
+        "avg": 13.76,
+        "p50": 13.643,
+        "p95": 16.706,
+        "max": 21.662
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 50,
+      "gcDurationMs": 68.80945670604706,
+      "memory": {
+        "heapBefore": 13294480,
+        "retainedHeapAfterWarmup": 39021480,
+        "retainedHeapDelta": 25727000
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.422,
+        "p50": 13.165,
+        "p95": 17.155,
+        "max": 19.573
+      },
+      "indexMs": {
+        "avg": 0.022,
+        "p50": 0.019,
+        "p95": 0.029,
+        "max": 0.145
+      },
+      "totalMs": {
+        "avg": 13.458,
+        "p50": 13.249,
+        "p95": 17.214,
+        "max": 19.605
+      },
+      "bytesPerTick": 3154,
+      "gcCount": 51,
+      "gcDurationMs": 70.65511083602905,
+      "memory": {
+        "heapBefore": 13297096,
+        "retainedHeapAfterWarmup": 39033944,
+        "retainedHeapDelta": 25736848
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 11.575,
+        "p50": 2.921,
+        "p95": 28.442,
+        "max": 33.05
+      },
+      "indexMs": {
+        "avg": 0.156,
+        "p50": 0.141,
+        "p95": 0.283,
+        "max": 0.374
+      },
+      "totalMs": {
+        "avg": 11.863,
+        "p50": 3.123,
+        "p95": 28.793,
+        "max": 33.263
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 107,
+      "gcDurationMs": 129.11066234111786,
+      "memory": {
+        "heapBefore": 13299424,
+        "retainedHeapAfterWarmup": 17793552,
+        "retainedHeapDelta": 4494128
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 11.972,
+        "p50": 3.004,
+        "p95": 29.555,
+        "max": 32.717
+      },
+      "indexMs": {
+        "avg": 0.19,
+        "p50": 0.168,
+        "p95": 0.345,
+        "max": 1.667
+      },
+      "totalMs": {
+        "avg": 12.314,
+        "p50": 3.376,
+        "p95": 29.896,
+        "max": 33.084
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 106,
+      "gcDurationMs": 125.83363449573517,
+      "memory": {
+        "heapBefore": 13301984,
+        "retainedHeapAfterWarmup": 17795024,
+        "retainedHeapDelta": 4493040
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 11.938,
+        "p50": 3.041,
+        "p95": 29.296,
+        "max": 32.027
+      },
+      "indexMs": {
+        "avg": 0.205,
+        "p50": 0.189,
+        "p95": 0.35,
+        "max": 0.742
+      },
+      "totalMs": {
+        "avg": 12.279,
+        "p50": 3.39,
+        "p95": 29.705,
+        "max": 32.406
+      },
+      "bytesPerTick": 1901572,
+      "gcCount": 106,
+      "gcDurationMs": 124.31787073612213,
+      "memory": {
+        "heapBefore": 13299496,
+        "retainedHeapAfterWarmup": 17800520,
+        "retainedHeapDelta": 4501024
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 33.289,
+        "p50": 32.07,
+        "p95": 41.485,
+        "max": 44.382
+      },
+      "indexMs": {
+        "avg": 0.375,
+        "p50": 0.357,
+        "p95": 0.593,
+        "max": 0.726
+      },
+      "totalMs": {
+        "avg": 33.898,
+        "p50": 32.677,
+        "p95": 42.208,
+        "max": 44.931
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 318,
+      "gcDurationMs": 292.2442259788513,
+      "memory": {
+        "heapBefore": 13306600,
+        "retainedHeapAfterWarmup": 17929112,
+        "retainedHeapDelta": 4622512
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 32.739,
+        "p50": 32.756,
+        "p95": 39.409,
+        "max": 42.806
+      },
+      "indexMs": {
+        "avg": 0.369,
+        "p50": 0.337,
+        "p95": 0.573,
+        "max": 0.899
+      },
+      "totalMs": {
+        "avg": 33.283,
+        "p50": 33.327,
+        "p95": 40.128,
+        "max": 43.47
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 317,
+      "gcDurationMs": 293.87837302684784,
+      "memory": {
+        "heapBefore": 13303008,
+        "retainedHeapAfterWarmup": 17923376,
+        "retainedHeapDelta": 4620368
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 34.16,
+        "p50": 34.53,
+        "p95": 41.329,
+        "max": 45.144
+      },
+      "indexMs": {
+        "avg": 0.459,
+        "p50": 0.402,
+        "p95": 0.783,
+        "max": 1.64
+      },
+      "totalMs": {
+        "avg": 34.848,
+        "p50": 35.312,
+        "p95": 42.017,
+        "max": 45.852
+      },
+      "bytesPerTick": 1902433,
+      "gcCount": 317,
+      "gcDurationMs": 302.6226921081543,
+      "memory": {
+        "heapBefore": 13297936,
+        "retainedHeapAfterWarmup": 17923440,
+        "retainedHeapDelta": 4625504
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 29.08,
+        "p50": 28.599,
+        "p95": 33.152,
+        "max": 39.361
+      },
+      "indexMs": {
+        "avg": 0.421,
+        "p50": 0.383,
+        "p95": 0.736,
+        "max": 1.259
+      },
+      "totalMs": {
+        "avg": 29.75,
+        "p50": 29.213,
+        "p95": 33.838,
+        "max": 40.205
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 269,
+      "gcDurationMs": 278.2038667201996,
+      "memory": {
+        "heapBefore": 13306056,
+        "retainedHeapAfterWarmup": 17925512,
+        "retainedHeapDelta": 4619456
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 29.104,
+        "p50": 28.834,
+        "p95": 32.597,
+        "max": 34.493
+      },
+      "indexMs": {
+        "avg": 0.405,
+        "p50": 0.366,
+        "p95": 0.653,
+        "max": 1.126
+      },
+      "totalMs": {
+        "avg": 29.783,
+        "p50": 29.496,
+        "p95": 33.143,
+        "max": 35.594
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 263,
+      "gcDurationMs": 266.9459252357483,
+      "memory": {
+        "heapBefore": 13301784,
+        "retainedHeapAfterWarmup": 17922000,
+        "retainedHeapDelta": 4620216
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 28.98,
+        "p50": 28.775,
+        "p95": 32.677,
+        "max": 39.652
+      },
+      "indexMs": {
+        "avg": 0.429,
+        "p50": 0.392,
+        "p95": 0.725,
+        "max": 1.182
+      },
+      "totalMs": {
+        "avg": 29.589,
+        "p50": 29.364,
+        "p95": 33.104,
+        "max": 40.075
+      },
+      "bytesPerTick": 1902150,
+      "gcCount": 269,
+      "gcDurationMs": 277.7739073038101,
+      "memory": {
+        "heapBefore": 13298584,
+        "retainedHeapAfterWarmup": 17932104,
+        "retainedHeapDelta": 4633520
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 13.46,
+        "p50": 13.23,
+        "p95": 15.356,
+        "max": 21.035
+      },
+      "indexMs": {
+        "avg": 0.393,
+        "p50": 0.356,
+        "p95": 0.608,
+        "max": 1.723
+      },
+      "totalMs": {
+        "avg": 13.995,
+        "p50": 13.798,
+        "p95": 16.152,
+        "max": 21.856
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 123,
+      "gcDurationMs": 107.26130902767181,
+      "memory": {
+        "heapBefore": 13298784,
+        "retainedHeapAfterWarmup": 17066872,
+        "retainedHeapDelta": 3768088
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 13.696,
+        "p50": 13.544,
+        "p95": 16.137,
+        "max": 19.751
+      },
+      "indexMs": {
+        "avg": 0.433,
+        "p50": 0.399,
+        "p95": 0.686,
+        "max": 1.624
+      },
+      "totalMs": {
+        "avg": 14.265,
+        "p50": 14.127,
+        "p95": 16.669,
+        "max": 20.388
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 122,
+      "gcDurationMs": 111.95656728744507,
+      "memory": {
+        "heapBefore": 13301864,
+        "retainedHeapAfterWarmup": 17061640,
+        "retainedHeapDelta": 3759776
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 13.619,
+        "p50": 13.441,
+        "p95": 16.153,
+        "max": 18.932
+      },
+      "indexMs": {
+        "avg": 0.393,
+        "p50": 0.357,
+        "p95": 0.611,
+        "max": 1.062
+      },
+      "totalMs": {
+        "avg": 14.152,
+        "p50": 13.937,
+        "p95": 16.645,
+        "max": 19.427
+      },
+      "bytesPerTick": 183663,
+      "gcCount": 123,
+      "gcDurationMs": 108.46345245838165,
+      "memory": {
+        "heapBefore": 13297168,
+        "retainedHeapAfterWarmup": 17088360,
+        "retainedHeapDelta": 3791192
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 2.75,
+        "p50": 2.663,
+        "p95": 3.945,
+        "max": 4.914
+      },
+      "indexMs": {
+        "avg": 0.007,
+        "p50": 0.006,
+        "p95": 0.01,
+        "max": 0.044
+      },
+      "totalMs": {
+        "avg": 2.762,
+        "p50": 2.676,
+        "p95": 3.957,
+        "max": 4.954
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 18.532352685928345,
+      "memory": {
+        "heapBefore": 13307264,
+        "retainedHeapAfterWarmup": 19536656,
+        "retainedHeapDelta": 6229392
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 2.817,
+        "p50": 2.687,
+        "p95": 3.928,
+        "max": 6.322
+      },
+      "indexMs": {
+        "avg": 0.008,
+        "p50": 0.006,
+        "p95": 0.01,
+        "max": 0.098
+      },
+      "totalMs": {
+        "avg": 2.829,
+        "p50": 2.7,
+        "p95": 3.951,
+        "max": 6.331
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 18.547990918159485,
+      "memory": {
+        "heapBefore": 13304952,
+        "retainedHeapAfterWarmup": 19501776,
+        "retainedHeapDelta": 6196824
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 2.901,
+        "p50": 2.758,
+        "p95": 4.285,
+        "max": 5.437
+      },
+      "indexMs": {
+        "avg": 0.008,
+        "p50": 0.006,
+        "p95": 0.011,
+        "max": 0.06
+      },
+      "totalMs": {
+        "avg": 2.912,
+        "p50": 2.767,
+        "p95": 4.294,
+        "max": 5.444
+      },
+      "bytesPerTick": 1906,
+      "gcCount": 15,
+      "gcDurationMs": 18.254021525382996,
+      "memory": {
+        "heapBefore": 13290600,
+        "retainedHeapAfterWarmup": 19516496,
+        "retainedHeapDelta": 6225896
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 3.168,
+        "p50": 3.272,
+        "p95": 4.685,
+        "max": 6.035
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.499,
+        "p50": 3.554,
+        "p95": 5.081,
+        "max": 6.865
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 14.389750838279724,
+      "memory": {
+        "heapBefore": 13307288,
+        "retainedHeapAfterWarmup": 16683616,
+        "retainedHeapDelta": 3376328
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 3.403,
+        "p50": 3.309,
+        "p95": 4.599,
+        "max": 5.796
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.731,
+        "p50": 3.622,
+        "p95": 5.019,
+        "max": 6.5
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.829105496406555,
+      "memory": {
+        "heapBefore": 13302464,
+        "retainedHeapAfterWarmup": 16658024,
+        "retainedHeapDelta": 3355560
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 2.773,
+        "p50": 2.828,
+        "p95": 4.218,
+        "max": 5.798
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 3.083,
+        "p50": 3.129,
+        "p95": 4.427,
+        "max": 6.091
+      },
+      "bytesPerTick": 1901400,
+      "gcCount": 21,
+      "gcDurationMs": 15.038273811340332,
+      "memory": {
+        "heapBefore": 13298504,
+        "retainedHeapAfterWarmup": 16655352,
+        "retainedHeapDelta": 3356848
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 25.733,
+        "p50": 25.257,
+        "p95": 29.648,
+        "max": 33.96
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 26.374,
+        "p50": 25.805,
+        "p95": 30.439,
+        "max": 34.643
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 434.3505337238312,
+      "memory": {
+        "heapBefore": 13305048,
+        "retainedHeapAfterWarmup": 21606552,
+        "retainedHeapDelta": 8301504
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 25.691,
+        "p50": 25.276,
+        "p95": 29.735,
+        "max": 33.969
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 26.341,
+        "p50": 25.872,
+        "p95": 30.664,
+        "max": 34.393
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 439.6897965669632,
+      "memory": {
+        "heapBefore": 13302040,
+        "retainedHeapAfterWarmup": 21597944,
+        "retainedHeapDelta": 8295904
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 25.495,
+        "p50": 25.27,
+        "p95": 29.547,
+        "max": 31.586
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 26.178,
+        "p50": 25.929,
+        "p95": 30.191,
+        "max": 32.649
+      },
+      "bytesPerTick": 1916487,
+      "gcCount": 345,
+      "gcDurationMs": 439.8562389612198,
+      "memory": {
+        "heapBefore": 13298800,
+        "retainedHeapAfterWarmup": 21601624,
+        "retainedHeapDelta": 8302824
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 5.191,
+        "p50": 4.729,
+        "p95": 7.991,
+        "max": 14.092
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 6.462,
+        "p50": 5.909,
+        "p95": 10.886,
+        "max": 15.151
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 62.73080885410309,
+      "memory": {
+        "heapBefore": 13298472,
+        "retainedHeapAfterWarmup": 17994176,
+        "retainedHeapDelta": 4695704
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 4.512,
+        "p50": 4.279,
+        "p95": 6.82,
+        "max": 9.059
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.627,
+        "p50": 5.466,
+        "p95": 7.671,
+        "max": 10.58
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 58.200191617012024,
+      "memory": {
+        "heapBefore": 13302112,
+        "retainedHeapAfterWarmup": 18004600,
+        "retainedHeapDelta": 4702488
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 4.578,
+        "p50": 4.226,
+        "p95": 7.134,
+        "max": 9.526
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 5.731,
+        "p50": 5.378,
+        "p95": 8.003,
+        "max": 10.64
+      },
+      "bytesPerTick": 3502050,
+      "gcCount": 63,
+      "gcDurationMs": 56.09134876728058,
+      "memory": {
+        "heapBefore": 13291752,
+        "retainedHeapAfterWarmup": 18001552,
+        "retainedHeapDelta": 4709800
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 3,
+      "variant": "ch1-marker",
+      "stepMs": {
+        "avg": 0.975,
+        "p50": 0.817,
+        "p95": 2.031,
+        "max": 2.699
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.096,
+        "p50": 0.936,
+        "p95": 2.164,
+        "max": 2.933
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 7.30880868434906,
+      "memory": {
+        "heapBefore": 13306816,
+        "retainedHeapAfterWarmup": 15095584,
+        "retainedHeapDelta": 1788768
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 3,
+      "variant": "before",
+      "stepMs": {
+        "avg": 1.031,
+        "p50": 0.847,
+        "p95": 2.124,
+        "max": 2.888
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.158,
+        "p50": 0.946,
+        "p95": 2.441,
+        "max": 3.102
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 8.318790555000305,
+      "memory": {
+        "heapBefore": 13302176,
+        "retainedHeapAfterWarmup": 15081880,
+        "retainedHeapDelta": 1779704
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "repeat": 3,
+      "variant": "ch1",
+      "stepMs": {
+        "avg": 0.976,
+        "p50": 0.844,
+        "p95": 1.962,
+        "max": 3.017
+      },
+      "indexMs": {
+        "avg": 0,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "totalMs": {
+        "avg": 1.097,
+        "p50": 0.955,
+        "p95": 2.115,
+        "max": 3.113
+      },
+      "bytesPerTick": 704100,
+      "gcCount": 16,
+      "gcDurationMs": 7.927708864212036,
+      "memory": {
+        "heapBefore": 13299096,
+        "retainedHeapAfterWarmup": 15094120,
+        "retainedHeapDelta": 1795024
+      }
+    }
+  ],
+  "summary": [
+    {
+      "name": "wide-2d-idle",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 11.356,
+            "p95": 13.849
+          },
+          "indexMs": {
+            "avg": 0.001,
+            "p95": 0.001
+          },
+          "totalMs": {
+            "avg": 11.359,
+            "p95": 13.852
+          },
+          "gcCount": 38,
+          "gcMs": 57.35901069641113,
+          "bytesPerTick": 2000
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 10.786,
+            "p95": 13.235
+          },
+          "indexMs": {
+            "avg": 0.001,
+            "p95": 0.001
+          },
+          "totalMs": {
+            "avg": 10.789,
+            "p95": 13.237
+          },
+          "gcCount": 38,
+          "gcMs": 56.60082399845123,
+          "bytesPerTick": 2000
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 11.433,
+            "p95": 14.266
+          },
+          "indexMs": {
+            "avg": 0.001,
+            "p95": 0.001
+          },
+          "totalMs": {
+            "avg": 11.436,
+            "p95": 14.269
+          },
+          "gcCount": 38,
+          "gcMs": 55.77942979335785,
+          "bytesPerTick": 2000
+        }
+      }
+    },
+    {
+      "name": "wide-2d-sparse",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 15.22,
+            "p95": 32.583
+          },
+          "indexMs": {
+            "avg": 0.091,
+            "p95": 0.151
+          },
+          "totalMs": {
+            "avg": 15.349,
+            "p95": 32.797
+          },
+          "gcCount": 68,
+          "gcMs": 91.81952011585236,
+          "bytesPerTick": 13777
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 13.239,
+            "p95": 16.711
+          },
+          "indexMs": {
+            "avg": 0.08,
+            "p95": 0.132
+          },
+          "totalMs": {
+            "avg": 13.354,
+            "p95": 16.832
+          },
+          "gcCount": 54,
+          "gcMs": 73.20607352256775,
+          "bytesPerTick": 13777
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 12.797,
+            "p95": 16.299
+          },
+          "indexMs": {
+            "avg": 0.083,
+            "p95": 0.13
+          },
+          "totalMs": {
+            "avg": 12.906,
+            "p95": 16.399
+          },
+          "gcCount": 54,
+          "gcMs": 72.46486592292786,
+          "bytesPerTick": 13777
+        }
+      }
+    },
+    {
+      "name": "wide-3d-sparse",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 27.353,
+            "p95": 32.455
+          },
+          "indexMs": {
+            "avg": 0.117,
+            "p95": 0.2
+          },
+          "totalMs": {
+            "avg": 27.497,
+            "p95": 32.59
+          },
+          "gcCount": 132,
+          "gcMs": 290.6199063062668,
+          "bytesPerTick": 3811
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 24.509,
+            "p95": 28.944
+          },
+          "indexMs": {
+            "avg": 0.103,
+            "p95": 0.167
+          },
+          "totalMs": {
+            "avg": 24.639,
+            "p95": 29.099
+          },
+          "gcCount": 102,
+          "gcMs": 265.3142955303192,
+          "bytesPerTick": 3811
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 23.511,
+            "p95": 27.496
+          },
+          "indexMs": {
+            "avg": 0.102,
+            "p95": 0.189
+          },
+          "totalMs": {
+            "avg": 23.631,
+            "p95": 27.602
+          },
+          "gcCount": 100,
+          "gcMs": 249.4857804775238,
+          "bytesPerTick": 3811
+        }
+      }
+    },
+    {
+      "name": "wide-2d-tiny",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 13.722,
+            "p95": 16.673
+          },
+          "indexMs": {
+            "avg": 0.022,
+            "p95": 0.029
+          },
+          "totalMs": {
+            "avg": 13.76,
+            "p95": 16.706
+          },
+          "gcCount": 50,
+          "gcMs": 69.98526012897491,
+          "bytesPerTick": 3154
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 13.422,
+            "p95": 16.677
+          },
+          "indexMs": {
+            "avg": 0.021,
+            "p95": 0.028
+          },
+          "totalMs": {
+            "avg": 13.458,
+            "p95": 16.711
+          },
+          "gcCount": 51,
+          "gcMs": 65.89300119876862,
+          "bytesPerTick": 3154
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 13.583,
+            "p95": 16.422
+          },
+          "indexMs": {
+            "avg": 0.022,
+            "p95": 0.032
+          },
+          "totalMs": {
+            "avg": 13.616,
+            "p95": 16.449
+          },
+          "gcCount": 52,
+          "gcMs": 69.08686232566833,
+          "bytesPerTick": 3154
+        }
+      }
+    },
+    {
+      "name": "broad-2d-dense",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 11.895,
+            "p95": 29.423
+          },
+          "indexMs": {
+            "avg": 0.171,
+            "p95": 0.283
+          },
+          "totalMs": {
+            "avg": 12.198,
+            "p95": 29.635
+          },
+          "gcCount": 107,
+          "gcMs": 125.83363449573517,
+          "bytesPerTick": 1901572
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 11.938,
+            "p95": 29.296
+          },
+          "indexMs": {
+            "avg": 0.188,
+            "p95": 0.35
+          },
+          "totalMs": {
+            "avg": 12.279,
+            "p95": 29.705
+          },
+          "gcCount": 107,
+          "gcMs": 124.31787073612213,
+          "bytesPerTick": 1901572
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 11.603,
+            "p95": 28.555
+          },
+          "indexMs": {
+            "avg": 0.163,
+            "p95": 0.283
+          },
+          "totalMs": {
+            "avg": 11.916,
+            "p95": 29.153
+          },
+          "gcCount": 107,
+          "gcMs": 129.11066234111786,
+          "bytesPerTick": 1901572
+        }
+      }
+    },
+    {
+      "name": "broad-3d-dense",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 33.102,
+            "p95": 40.544
+          },
+          "indexMs": {
+            "avg": 0.399,
+            "p95": 0.614
+          },
+          "totalMs": {
+            "avg": 33.74,
+            "p95": 41.191
+          },
+          "gcCount": 317,
+          "gcMs": 293.87837302684784,
+          "bytesPerTick": 1902433
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 33.799,
+            "p95": 40.968
+          },
+          "indexMs": {
+            "avg": 0.387,
+            "p95": 0.607
+          },
+          "totalMs": {
+            "avg": 34.374,
+            "p95": 41.514
+          },
+          "gcCount": 316,
+          "gcMs": 295.2416331768036,
+          "bytesPerTick": 1902433
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 32.922,
+            "p95": 40.793
+          },
+          "indexMs": {
+            "avg": 0.371,
+            "p95": 0.581
+          },
+          "totalMs": {
+            "avg": 33.487,
+            "p95": 41.381
+          },
+          "gcCount": 318,
+          "gcMs": 292.2442259788513,
+          "bytesPerTick": 1902433
+        }
+      }
+    },
+    {
+      "name": "crossing-2d-dense",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 29.393,
+            "p95": 33.032
+          },
+          "indexMs": {
+            "avg": 0.405,
+            "p95": 0.72
+          },
+          "totalMs": {
+            "avg": 30.041,
+            "p95": 33.932
+          },
+          "gcCount": 263,
+          "gcMs": 266.9459252357483,
+          "bytesPerTick": 1902150
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 28.754,
+            "p95": 32.4
+          },
+          "indexMs": {
+            "avg": 0.421,
+            "p95": 0.725
+          },
+          "totalMs": {
+            "avg": 29.382,
+            "p95": 33.104
+          },
+          "gcCount": 269,
+          "gcMs": 265.8696265220642,
+          "bytesPerTick": 1902150
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 29.08,
+            "p95": 33.152
+          },
+          "indexMs": {
+            "avg": 0.409,
+            "p95": 0.736
+          },
+          "totalMs": {
+            "avg": 29.75,
+            "p95": 33.838
+          },
+          "gcCount": 269,
+          "gcMs": 266.0886425971985,
+          "bytesPerTick": 1902150
+        }
+      }
+    },
+    {
+      "name": "multi-2d-dense",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 13.696,
+            "p95": 16.137
+          },
+          "indexMs": {
+            "avg": 0.418,
+            "p95": 0.686
+          },
+          "totalMs": {
+            "avg": 14.265,
+            "p95": 16.669
+          },
+          "gcCount": 122,
+          "gcMs": 109.33366322517395,
+          "bytesPerTick": 183663
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 13.728,
+            "p95": 16.049
+          },
+          "indexMs": {
+            "avg": 0.4,
+            "p95": 0.629
+          },
+          "totalMs": {
+            "avg": 14.287,
+            "p95": 16.542
+          },
+          "gcCount": 123,
+          "gcMs": 108.70233798027039,
+          "bytesPerTick": 183663
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 13.46,
+            "p95": 15.356
+          },
+          "indexMs": {
+            "avg": 0.393,
+            "p95": 0.621
+          },
+          "totalMs": {
+            "avg": 13.995,
+            "p95": 16.152
+          },
+          "gcCount": 123,
+          "gcMs": 107.26130902767181,
+          "bytesPerTick": 183663
+        }
+      }
+    },
+    {
+      "name": "hierarchy-2d-sparse",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 3.003,
+            "p95": 4.456
+          },
+          "indexMs": {
+            "avg": 0.008,
+            "p95": 0.011
+          },
+          "totalMs": {
+            "avg": 3.014,
+            "p95": 4.466
+          },
+          "gcCount": 15,
+          "gcMs": 18.547990918159485,
+          "bytesPerTick": 1906
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 2.914,
+            "p95": 4.413
+          },
+          "indexMs": {
+            "avg": 0.008,
+            "p95": 0.011
+          },
+          "totalMs": {
+            "avg": 2.927,
+            "p95": 4.426
+          },
+          "gcCount": 15,
+          "gcMs": 20.77261185646057,
+          "bytesPerTick": 1906
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 2.932,
+            "p95": 4.378
+          },
+          "indexMs": {
+            "avg": 0.008,
+            "p95": 0.012
+          },
+          "totalMs": {
+            "avg": 2.944,
+            "p95": 4.384
+          },
+          "gcCount": 15,
+          "gcMs": 18.684974789619446,
+          "bytesPerTick": 1906
+        }
+      }
+    },
+    {
+      "name": "manual-2d-crossing",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 3.483,
+            "p95": 5.599
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 3.802,
+            "p95": 5.916
+          },
+          "gcCount": 21,
+          "gcMs": 15.564243078231812,
+          "bytesPerTick": 1901400
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 2.873,
+            "p95": 4.781
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 3.194,
+            "p95": 5.221
+          },
+          "gcCount": 21,
+          "gcMs": 15.632114052772522,
+          "bytesPerTick": 1901400
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 3.168,
+            "p95": 4.685
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 3.499,
+            "p95": 5.081
+          },
+          "gcCount": 21,
+          "gcMs": 14.389750838279724,
+          "bytesPerTick": 1901400
+        }
+      }
+    },
+    {
+      "name": "manual-3d-churn",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 25.691,
+            "p95": 30.143
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 26.341,
+            "p95": 30.856
+          },
+          "gcCount": 345,
+          "gcMs": 439.6897965669632,
+          "bytesPerTick": 1916487
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 25.495,
+            "p95": 29.547
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 26.178,
+            "p95": 30.191
+          },
+          "gcCount": 345,
+          "gcMs": 439.8562389612198,
+          "bytesPerTick": 1916487
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 25.733,
+            "p95": 29.648
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 26.374,
+            "p95": 30.439
+          },
+          "gcCount": 345,
+          "gcMs": 446.9130699634552,
+          "bytesPerTick": 1916487
+        }
+      }
+    },
+    {
+      "name": "ecs-2d-crossing",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 4.491,
+            "p95": 6.854
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 5.578,
+            "p95": 7.692
+          },
+          "gcCount": 63,
+          "gcMs": 52.27869164943695,
+          "bytesPerTick": 3502050
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 4.327,
+            "p95": 6.694
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 5.387,
+            "p95": 7.534
+          },
+          "gcCount": 63,
+          "gcMs": 53.73177719116211,
+          "bytesPerTick": 3502050
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 4.522,
+            "p95": 7.223
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 5.626,
+            "p95": 8.114
+          },
+          "gcCount": 63,
+          "gcMs": 55.723069071769714,
+          "bytesPerTick": 3502050
+        }
+      }
+    },
+    {
+      "name": "ecs-clump-dense",
+      "variants": {
+        "before": {
+          "stepMs": {
+            "avg": 0.992,
+            "p95": 1.844
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 1.13,
+            "p95": 2.086
+          },
+          "gcCount": 16,
+          "gcMs": 7.917335867881775,
+          "bytesPerTick": 704100
+        },
+        "ch1": {
+          "stepMs": {
+            "avg": 0.976,
+            "p95": 1.957
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 1.097,
+            "p95": 2.115
+          },
+          "gcCount": 16,
+          "gcMs": 7.927708864212036,
+          "bytesPerTick": 704100
+        },
+        "ch1-marker": {
+          "stepMs": {
+            "avg": 0.975,
+            "p95": 1.86
+          },
+          "indexMs": {
+            "avg": 0,
+            "p95": 0
+          },
+          "totalMs": {
+            "avg": 1.096,
+            "p95": 2.111
+          },
+          "gcCount": 16,
+          "gcMs": 7.755028963088989,
+          "bytesPerTick": 704100
+        }
+      }
+    }
+  ],
+  "archive": "nengi-rc-notes/stable-release-review/scratch/channel-locality-implementation",
+  "harnessWrapper": {
+    "path": "nengi-rc-notes/cell-membership-binding-performance/run-case.cjs",
+    "sha256": "bd289ca3459f3c027765806a3e950c3b9688e3f097ac1dd4405a9dae5599d100"
+  },
+  "selectedVariant": "ch1",
+  "guardDecision": "Not retained: modest sparse automatic gains but mixed controls versus CH-1 alone; no clear general benefit.",
+  "verification": {
+    "selectedVariant": "ch1",
+    "snapshotCases": 80,
+    "packetHashesEqual": true,
+    "decodedStateHashesEqual": true,
+    "visibility": [
+      {
+        "dimensions": 2,
+        "stages": 12,
+        "wireSha256": "852fa9127f116c70ffb9eebdd8b03f46f9dd25752b4aa7a54c6c6a140c382137",
+        "decodedSha256": "f3c98b5f98163146af7a307026cc727009f0e3f97546385b48289be93e967045",
+        "before": [
+          {
+            "label": "initial",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "idle",
+            "reconciledUsers": []
+          },
+          {
+            "label": "distant crossing and local child property edit",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "distant root addition",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "distant root removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child addition",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "same-key cell recreation via movement",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "hidden substitute",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "cell identity replaced without hierarchy edits",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "unsubscribe",
+            "reconciledUsers": []
+          },
+          {
+            "label": "resubscribe with changed state",
+            "reconciledUsers": [
+              0
+            ]
+          }
+        ],
+        "after": [
+          {
+            "label": "initial",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "idle",
+            "reconciledUsers": []
+          },
+          {
+            "label": "distant crossing and local child property edit",
+            "reconciledUsers": [
+              1
+            ]
+          },
+          {
+            "label": "distant root addition",
+            "reconciledUsers": [
+              1
+            ]
+          },
+          {
+            "label": "distant root removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child addition",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "same-key cell recreation via movement",
+            "reconciledUsers": [
+              0
+            ]
+          },
+          {
+            "label": "hidden substitute",
+            "reconciledUsers": []
+          },
+          {
+            "label": "cell identity replaced without hierarchy edits",
+            "reconciledUsers": [
+              0
+            ]
+          },
+          {
+            "label": "unsubscribe",
+            "reconciledUsers": []
+          },
+          {
+            "label": "resubscribe with changed state",
+            "reconciledUsers": [
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "dimensions": 3,
+        "stages": 12,
+        "wireSha256": "c4ccd5158cb98cad274ebd6ae0822475a7697b3233e8dd353a4805b2b6265e70",
+        "decodedSha256": "f3c98b5f98163146af7a307026cc727009f0e3f97546385b48289be93e967045",
+        "before": [
+          {
+            "label": "initial",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "idle",
+            "reconciledUsers": []
+          },
+          {
+            "label": "distant crossing and local child property edit",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "distant root addition",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "distant root removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child addition",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "same-key cell recreation via movement",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "hidden substitute",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "cell identity replaced without hierarchy edits",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "unsubscribe",
+            "reconciledUsers": []
+          },
+          {
+            "label": "resubscribe with changed state",
+            "reconciledUsers": [
+              0
+            ]
+          }
+        ],
+        "after": [
+          {
+            "label": "initial",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "idle",
+            "reconciledUsers": []
+          },
+          {
+            "label": "distant crossing and local child property edit",
+            "reconciledUsers": [
+              1
+            ]
+          },
+          {
+            "label": "distant root addition",
+            "reconciledUsers": [
+              1
+            ]
+          },
+          {
+            "label": "distant root removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child addition",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "nested child removal",
+            "reconciledUsers": [
+              0,
+              1
+            ]
+          },
+          {
+            "label": "same-key cell recreation via movement",
+            "reconciledUsers": [
+              0
+            ]
+          },
+          {
+            "label": "hidden substitute",
+            "reconciledUsers": []
+          },
+          {
+            "label": "cell identity replaced without hierarchy edits",
+            "reconciledUsers": [
+              0
+            ]
+          },
+          {
+            "label": "unsubscribe",
+            "reconciledUsers": []
+          },
+          {
+            "label": "resubscribe with changed state",
+            "reconciledUsers": [
+              0
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "coreSuites": 64,
+    "coreTests": 903,
+    "typecheck": true,
+    "lint": true,
+    "build": true,
+    "negativeControl": "Both same-cell replacement tests fail when per-cell counters are restored without the global signature/gates.",
+    "regressionSourceSha256": "a8818658b172b4267b8cb86528c63ffd3e5d39d9a55d0cb782d572013726c5ce",
+    "docs": true,
+    "diffWhitespaceCheck": true
+  }
+}

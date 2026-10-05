@@ -1,8 +1,11 @@
 import { IEntity } from '../common/IEntity'
+import { assertBinaryWriteSize } from '../binary/assertBinaryWriteSize'
 import { ChannelType, createChannelHeader, hasSchemaBackedChannelHeader, mergeChannelHeaderData } from '../common/ChannelHeader'
 import { SnapshotChannel } from '../binary/snapshot/SnapshotPlan'
 import { NQueue } from '../NQueue'
 import { Client } from './Client'
+import type { RequestOptions } from './Client'
+import { ClientConnectionError, ClientDisconnectInfo } from './ClientConnection'
 import { Snapshot } from './Snapshot'
 import { writeMessage } from '../binary/message/writeMessage'
 import { connectionAttemptSchema } from '../common/schemas/connectAttemptSchema'
@@ -49,6 +52,7 @@ import { readSnapshotHeader } from '../binary/snapshot/snapshotHeader'
 import { getLocalTime } from './time'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 import type { PredictionOperationOptions } from './prediction/Predictor'
+import { PredictionOperationKind, PredictionOperationStatus } from './prediction/PredictionLog'
 
 const MAX_REQUESTS_PER_FRAME = 255
 const MAX_ENGINE_MESSAGES_PER_SECTION = 255
@@ -65,20 +69,11 @@ type ClientRequest<Response = any> = {
     endpointId: number
     requestId: number
     payload: EndpointPayload
-    callback: (response: Response) => any
     resolve: (response: Response) => void
     reject: (reason: any) => void
     timeout: ReturnType<typeof setTimeout> | null
     key?: string
     promise: Promise<Response>
-}
-
-type RequestOptions<Response = any> = {
-    timeoutMs?: number,
-    key?: string,
-    policy?: RequestPolicy,
-    callback?: (response: Response) => any,
-    prediction?: PredictionOperationOptions<Response>
 }
 
 export type CommandTimingOptions = {
@@ -112,7 +107,9 @@ export type InterpolationDelayReportOptions = {
 }
 
 type HandshakeResponse = {
+    denied?: boolean
     accepted: boolean
+    clientData?: unknown
     reason?: any
 }
 
@@ -143,27 +140,47 @@ type OutboundRollback = {
 }
 
 export class ClientNetwork {
+    /** @internal */
     client: Client
-    store: EntityStore
+    readonly store: EntityStore
+    /** @internal */
     entityNTypes: Map<number, number>
-    frames: Frame[] = []
+    private frameHistory: Frame[] = []
+
+    /** Recent processed frames. Read-only views; use drainFrames/processNextFrame to consume arrivals. */
+    get frames(): readonly Frame[] {
+        return this.frameHistory
+    }
+
+    /** @internal */
+    set frames(value: Frame[]) {
+        this.frameHistory = value
+    }
+    /** @internal */
     pendingFrames: PendingServerFrame[] = []
-    latestFrame: Frame | null = null
+    private observedLatestFrame: Frame | null = null
+    /** @internal */
     outbound = new Outbound()
+    /** @internal */
     requestId = 1
+    /** @internal */
     requestQueue = new NQueue<ClientRequest>()
+    /** @internal */
     requests = new Map<number, ClientRequest>()
     requestTimeoutMs = 10000
+    /** @internal */
     requestBacklogActive = false
+    /** @internal */
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
-    commandFrameNumber = 1 // monotonic public command-frame number
+    private observedCommandFrameNumber = 1 // monotonic public command-frame number
+    /** @internal */
     frameTick = 1 // incremented each frame that comes from server
     maxFrameHistory = 240
-    latency = 0
-    roundTripMs = 0
-    serverTimeOffsetMs = 0
-    serverTimeSyncSamples = 0
-    interpolationDelayMs = 0
+    private observedLatency = 0
+    private observedRoundTripMs = 0
+    private observedServerTimeOffsetMs = 0
+    private observedServerTimeSyncSamples = 0
+    private observedInterpolationDelayMs = 0
     interpolationDelayReportIntervalMs = 500
     interpolationDelayReportEpsilonMs = 1
     private lastReportedInterpolationDelayMs = Number.NaN
@@ -173,32 +190,118 @@ export class ClientNetwork {
     private pendingPongs: PendingPong[] = []
     private pendingTypeDeletes = new Set<number>()
 
-    onDisconnect: (reason: any, event?: any) => void = (reason: any, event?: any) => {
-        this.pendingPongs = []
+    private sessionEnded = false
+    private lastSentCommandFrameNumber = 0
+    private lastSentAtMs = 0
+    private watchedPredictionFrameNumber = 0
+    private watchedPredictionSinceMs = 0
+    private predictionWarningReported = false
+
+    get latestFrame(): Frame | null {
+        return this.observedLatestFrame
+    }
+
+    /** @internal */
+    set latestFrame(value: Frame | null) {
+        this.observedLatestFrame = value
+    }
+
+    get commandFrameNumber(): number {
+        return this.observedCommandFrameNumber
+    }
+
+    /** @internal */
+    set commandFrameNumber(value: number) {
+        this.observedCommandFrameNumber = value
+    }
+
+    get latency(): number {
+        return this.observedLatency
+    }
+
+    /** @internal */
+    set latency(value: number) {
+        this.observedLatency = value
+    }
+
+    get roundTripMs(): number {
+        return this.observedRoundTripMs
+    }
+
+    /** @internal */
+    set roundTripMs(value: number) {
+        this.observedRoundTripMs = value
+    }
+
+    get serverTimeOffsetMs(): number {
+        return this.observedServerTimeOffsetMs
+    }
+
+    /** @internal */
+    set serverTimeOffsetMs(value: number) {
+        this.observedServerTimeOffsetMs = value
+    }
+
+    get serverTimeSyncSamples(): number {
+        return this.observedServerTimeSyncSamples
+    }
+
+    /** @internal */
+    set serverTimeSyncSamples(value: number) {
+        this.observedServerTimeSyncSamples = value
+    }
+
+    get interpolationDelayMs(): number {
+        return this.observedInterpolationDelayMs
+    }
+
+    /** @internal */
+    set interpolationDelayMs(value: number) {
+        this.observedInterpolationDelayMs = value
+    }
+
+    /** Logical teardown preserves the last applied state, never queued work. */
+    /** @internal */
+    endSession(info: ClientDisconnectInfo) {
+        this.sessionEnded = true
+        this.pendingFrames.length = 0
+        this.pendingPongs.length = 0
+        this.pendingTypeDeletes.clear()
+        this.pendingOutboundRollback = null
+        this.outbound.flush()
+        this.requestQueue.clear()
+        this.requestBacklogActive = false
         this.serverTimeOffsetMs = 0
         this.serverTimeSyncSamples = 0
         this.roundTripMs = 0
         this.latency = 0
-        this.rejectPendingRequests(new RequestError('Disconnected before request completed.', 'DISCONNECTED', {
-            payload: reason
-        }))
-        this.client.disconnectHandler(reason, event)
+        this.client.predictor.cancelSession()
+        const error = new RequestError('Disconnected before the request completed; its server outcome is unknown.', 'DISCONNECTED', {
+            payload: info
+        })
+        // Promise settlement invokes no user code synchronously. Do not turn
+        // transport cancellation into a prediction's authoritative rejection.
+        for (const request of this.requests.values()) {
+            if (request.timeout !== null) clearTimeout(request.timeout)
+            request.timeout = null
+            request.reject(error)
+        }
+        this.requests.clear()
     }
-    onMalformedSnapshot: (error: unknown) => void = (error: unknown) => {
-        this.onSocketError(error)
-    }
-    onSocketError: (event: any) => void = (event: any) => {
-        this.client.websocketErrorHandler(event)
-    }
+
     onRequestBacklog: (info: RequestBacklogInfo) => void = (info: RequestBacklogInfo) => {
         console.warn(
             `nengi request backlog: ${info.remaining} requests remain queued after sending ${info.sent} of ${info.queued} for command frame ${info.frame}.`
         )
     }
 
-    constructor(client: Client) {
+    /** @internal */
+    constructor(client: Client, private readonly predictionWarningAfterMs: number | null = 2000, entityHistory = true) {
+        if (predictionWarningAfterMs !== null && (!Number.isFinite(predictionWarningAfterMs) || predictionWarningAfterMs <= 0)) {
+            throw new RangeError('predictionWarningAfterMs must be a positive finite duration in milliseconds, or null.')
+        }
         this.client = client
-        this.store = new EntityStore(client.context)
+        this.store = new EntityStore(client.context, entityHistory)
         this.entityNTypes = new Map()
         this.outbound.tick = this.commandFrameNumber
     }
@@ -207,20 +310,24 @@ export class ClientNetwork {
         return this.client.now ? this.client.now() : getLocalTime()
     }
 
+    /** @internal */
     incrementCommandFrameNumber() {
         this.commandFrameNumber++
     }
 
+    /** @internal */
     addEngineCommand(command: any) {
         this.outbound.addEngineCommand(command)
     }
 
+    /** @internal */
     addCommand(command: any) {
-        this.outbound.addCommand(command)
+        return this.outbound.addCommand(command)
     }
 
+    /** @internal */
     addCommandWithTiming(command: any, options: CommandTimingOptions = {}) {
-        this.outbound.addCommandWithTiming(command, {
+        return this.outbound.addCommandWithTiming(command, {
             clientTimeMs: options.inputTimeMs ?? this.nowMs(),
             renderDelayMs: options.renderDelayMs ?? 0,
             viewTick: options.viewTick ?? -1,
@@ -228,6 +335,7 @@ export class ClientNetwork {
         })
     }
 
+    /** @internal */
     reportInterpolationDelay(delayMs: number, options: InterpolationDelayReportOptions = {}) {
         if (!Number.isFinite(delayMs)) {
             return false
@@ -260,25 +368,70 @@ export class ClientNetwork {
         return true
     }
 
+    /** @internal */
     predictCommand(command: any, options: PredictionOperationOptions = {}) {
         const tick = this.commandFrameNumber
         this.addCommand(command)
         return this.client.predictor.addCommand?.(command, tick, options)
     }
 
+    /** @internal */
     predictCommandWithTiming(command: any, predictionOptions: PredictionOperationOptions = {}, timingOptions: CommandTimingOptions = {}) {
         const tick = this.commandFrameNumber
         this.addCommandWithTiming(command, timingOptions)
         return this.client.predictor.addCommand?.(command, tick, predictionOptions)
     }
 
+    /** @internal */
     predictState(payload: any, options: PredictionOperationOptions = {}) {
         return this.client.predictor.addState?.(payload, this.commandFrameNumber, options)
     }
 
+    /** @internal */
     flush() {
+        if (this.pendingOutboundRollback && this.predictionWarningAfterMs !== null && !this.predictionWarningReported) {
+            // Only a successful application send makes this batch eligible for a warning.
+            this.lastSentCommandFrameNumber = this.pendingOutboundRollback.commandFrameNumber
+            this.lastSentAtMs = this.nowMs()
+        }
         this.pendingOutboundRollback = null
         this.outbound.flush()
+    }
+
+    private checkPredictionConfirmation(receivedAtMs: number, confirmedCommandFrameNumber: number) {
+        if (this.predictionWarningAfterMs === null || this.predictionWarningReported || this.lastSentCommandFrameNumber === 0) return
+        if (confirmedCommandFrameNumber >= this.lastSentCommandFrameNumber || this.client.predictor.log.operations.size === 0) {
+            this.watchedPredictionFrameNumber = 0
+            return
+        }
+
+        let pendingFrameNumber = 0
+        // Inspect the existing log without allocating a second history or pending array.
+        for (const operation of this.client.predictor.log.operations.values()) {
+            if (operation.status === PredictionOperationStatus.Pending &&
+                operation.kind !== PredictionOperationKind.Request &&
+                operation.commandFrameNumber <= this.lastSentCommandFrameNumber) {
+                pendingFrameNumber = operation.commandFrameNumber
+                break
+            }
+        }
+
+        if (pendingFrameNumber !== this.watchedPredictionFrameNumber) {
+            this.watchedPredictionFrameNumber = pendingFrameNumber
+            // Older queued snapshots must not age a prediction that was just sent.
+            this.watchedPredictionSinceMs = Math.max(receivedAtMs, this.lastSentAtMs)
+            return
+        }
+        if (pendingFrameNumber === 0 || receivedAtMs - this.watchedPredictionSinceMs < this.predictionWarningAfterMs) return
+
+        this.predictionWarningReported = true
+        console.warn(
+            `nengi prediction: command frame ${pendingFrameNumber} remains unconfirmed while snapshots arrive ` +
+            `(last confirmed: ${confirmedCommandFrameNumber}). Check that the server calls user.confirmCommandsThrough(...) ` +
+            'after handling all input through that batch and before instance.step(). ' +
+            'For intentionally deferred simulation, adjust ClientOptions.predictionWarningAfterMs or set it to null. ' +
+            'This warning does not confirm or discard predictions.'
+        )
     }
 
     private recordServerClockSample(serverTimeMs: number, clientReceiveTimeMs: number, roundTripMs: number) {
@@ -295,30 +448,41 @@ export class ClientNetwork {
         this.serverTimeSyncSamples++
     }
 
+    /** @internal */
     request<Request = any, Response = any>(
         endpoint: Endpoint<Request, Response>,
         payload: Request,
-        callbackOrOptions?: ((response: Response) => any) | RequestOptions<Response>
+        options: RequestOptions<Response> = {}
     ): Promise<Response> {
-        const options = typeof callbackOrOptions === 'function' ? { callback: callbackOrOptions } : (callbackOrOptions || {})
+        if (typeof options !== 'object' || options === null || 'callback' in options) {
+            throw new TypeError('Client.request accepts an options object and returns a Promise. Use await or then/catch instead of a callback.')
+        }
+        if (this.sessionEnded) throw new ClientConnectionError('INVALID_STATE', 'This session has ended.')
         const endpointDefinition = getEndpointDefinition(endpoint)
         const endpointId = getEndpointId(endpoint)
         const policy = options.policy ?? RequestPolicy.Allow
-        if (options.key && policy === RequestPolicy.Dedupe) {
+        if (options.key !== undefined && policy === RequestPolicy.Dedupe) {
             const existing = this.getPendingRequestByKey<Response>(options.key)
             if (existing) {
                 return existing.promise
             }
         }
-        if (options.key && policy === RequestPolicy.Replace) {
-            const existing = this.getPendingRequestByKey(options.key)
-            if (existing) {
+        // Prepare the new payload before cancelling any older queued intent.
+        const encodedPayload = createEndpointPayload(payload, endpointDefinition?.requestSchema)
+        if (this.sessionEnded) throw new ClientConnectionError('INVALID_STATE', 'This session has ended.')
+        if (options.key !== undefined && policy === RequestPolicy.ReplaceQueued) {
+            const queued = this.requestQueue.arr.filter(request => request.key === options.key)
+            for (const existing of queued) {
+                // Prediction reconciliation can flush or disconnect synchronously.
+                if (!this.requestQueue.arr.includes(existing)) continue
                 this.rejectRequest(existing, new RequestError('Request replaced.', 'REPLACED', {
                     requestId: existing.requestId,
                     endpointId: existing.endpointId
                 }))
             }
         }
+        // Rejecting a replaced prediction can synchronously end the session.
+        if (this.sessionEnded) throw new ClientConnectionError('INVALID_STATE', 'This session has ended.')
         const requestId = this.nextRequestId()
         let resolveRequest!: (response: Response) => void
         let rejectRequest!: (reason: any) => void
@@ -331,18 +495,16 @@ export class ClientNetwork {
             endpoint: endpointDefinition,
             endpointId,
             requestId,
-            payload: createEndpointPayload(payload, endpointDefinition?.requestSchema),
-            callback: (response: Response) => {
-                if (options.callback) {
-                    options.callback(response)
-                }
-            },
+            payload: encodedPayload,
             resolve: resolveRequest,
             reject: rejectRequest,
             timeout: null,
             key: options.key,
             promise
         }
+
+        // Payload getters/toJSON are application code as well.
+        if (this.sessionEnded) throw new ClientConnectionError('INVALID_STATE', 'This session has ended.')
 
         const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs
         if (timeoutMs > 0) {
@@ -362,6 +524,7 @@ export class ClientNetwork {
         return promise
     }
 
+    /** @internal */
     nextRequestId(): number {
         if (this.requests.size >= MAX_UINT32) {
             throw new Error('No request ids are available.')
@@ -386,11 +549,16 @@ export class ClientNetwork {
         return id
     }
 
+    /** @internal */
     getPendingRequestByKey<Response = any>(key: string): ClientRequest<Response> | undefined {
-        return Array.from(this.requests.values()).find(request => request.key === key) as ClientRequest<Response> | undefined
+        for (const request of this.requests.values()) {
+            if (request.key === key) return request as ClientRequest<Response>
+        }
     }
 
+    /** @internal */
     rejectRequest(request: ClientRequest, reason: any) {
+        if (this.requests.get(request.requestId) !== request) return
         if (request.timeout) {
             clearTimeout(request.timeout)
             request.timeout = null
@@ -403,21 +571,23 @@ export class ClientNetwork {
         if (this.requestQueue.length === 0) {
             this.requestBacklogActive = false
         }
-        this.client.predictor.rejectRequest?.(request.requestId, reason, this.latestFrame || undefined, this.store)
         request.reject(reason)
+        this.client.predictor.rejectRequest?.(request.requestId, reason, this.latestFrame || undefined, this.store)
     }
 
+    /** @internal */
     resolveRequest(request: ClientRequest, response: any) {
+        if (this.requests.get(request.requestId) !== request) return
         if (request.timeout) {
             clearTimeout(request.timeout)
             request.timeout = null
         }
         this.requests.delete(request.requestId)
-        this.client.predictor.resolveRequest?.(request.requestId, response, this.latestFrame || undefined, this.store)
         request.resolve(response)
-        request.callback(response)
+        this.client.predictor.resolveRequest?.(request.requestId, response, this.latestFrame || undefined, this.store)
     }
 
+    /** @internal */
     rejectPendingRequests(reason: any) {
         Array.from(this.requests.values()).forEach(request => {
             this.rejectRequest(request, reason)
@@ -437,6 +607,7 @@ export class ClientNetwork {
     }
 
     processNextFrame(): Frame | null {
+        if (this.sessionEnded) return null
         const pending = this.pendingFrames.shift()
         if (!pending) {
             return null
@@ -464,18 +635,19 @@ export class ClientNetwork {
             this.pendingTypeDeletes.clear()
         }
         this.frameTick++
-        this.frames.push(frame)
+        this.frameHistory.push(frame)
         while (this.frames.length > this.maxFrameHistory) {
-            this.frames.shift()
+            this.frameHistory.shift()
         }
-        if (this.frames.length > 0) {
+        if (this.store.historyEnabled && this.frames.length > 0) {
             this.store.history.pruneBefore(this.frames[0].tick)
         }
         this.latestFrame = frame
 
         this.client.predictor.resolveFrame?.(frame, this.store)
+        if (this.sessionEnded) return frame
         this.client.predictor.cleanUp(frame.confirmedCommandFrameNumber)
-        this.outbound.confirmCommands(pending.snapshot.confirmedCommandFrameNumber)
+        this.checkPredictionConfirmation(pending.receivedAtMs, frame.confirmedCommandFrameNumber)
 
         pending.pendingResponses.forEach(pendingResponse => {
             if (pendingResponse.status === ResponseStatus.Ok) {
@@ -492,7 +664,9 @@ export class ClientNetwork {
         return this.pendingFrames.length
     }
 
+    /** @internal */
     queueSnapshot(snapshot: Snapshot, receivedAtMs = this.nowMs()) {
+        if (this.sessionEnded) return
         this.pendingFrames.push({
             snapshot,
             receivedAtMs,
@@ -515,11 +689,13 @@ export class ClientNetwork {
         }
     }
 
+    /** @internal */
     getRequestsForNextFrame(): ClientRequest[] {
         const start = Math.max(0, this.requestQueue.arr.length - MAX_REQUESTS_PER_FRAME)
         return this.requestQueue.arr.slice(start).reverse()
     }
 
+    /** @internal */
     markRequestsSent(requests: ClientRequest[]) {
         requests.forEach(request => {
             const index = this.requestQueue.arr.indexOf(request)
@@ -529,6 +705,7 @@ export class ClientNetwork {
         })
     }
 
+    /** @internal */
     reportRequestBacklog(info: RequestBacklogInfo) {
         if (info.remaining === 0) {
             this.requestBacklogActive = false
@@ -540,6 +717,7 @@ export class ClientNetwork {
         }
     }
 
+    /** @internal */
     createHandshake<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(handshake: any = {}, binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
         const handshakeMessage = {
             ntype: EngineMessage.ConnectionAttempt,
@@ -553,9 +731,11 @@ export class ClientNetwork {
         dw.writeUInt8(BinarySection.EngineMessages)
         dw.writeUInt8(1)
         writeMessage(handshakeMessage, connectionAttemptSchema, dw)
+        assertBinaryWriteSize(dw, handshakeByteLength + 2, 'Connection attempt')
         return dw.payload
     }
 
+    /** @internal */
     readHandshakeResponse(reader: IBinaryReader): HandshakeResponse {
         try {
             const section = reader.readUInt8()
@@ -567,10 +747,13 @@ export class ClientNetwork {
             }
 
             let accepted = false
+            let clientData: unknown
+            let protocol = this.protocol
             const count = reader.readUInt8()
             for (let i = 0; i < count; i++) {
                 const engineMessage: any = readEngineMessage(reader, this.client.context)
                 if (engineMessage.ntype === EngineMessage.ConnectionAccepted) {
+                    if (accepted) throw new Error('Duplicate connection acceptance.')
                     if (engineMessage.wireProtocolVersion !== WIRE_PROTOCOL_VERSION) {
                         return {
                             accepted: false,
@@ -580,23 +763,29 @@ export class ClientNetwork {
                             )
                         }
                     }
+                    clientData = engineMessage.clientData === '' ? undefined : JSON.parse(engineMessage.clientData)
                     accepted = true
                     continue
                 }
                 if (engineMessage.ntype === EngineMessage.Protocol) {
-                    this.setProtocol(engineMessage.nidType, engineMessage.ntypeType)
+                    assertNetworkIdType(engineMessage.nidType)
+                    assertNetworkIdType(engineMessage.ntypeType)
+                    protocol = { nidType: engineMessage.nidType, ntypeType: engineMessage.ntypeType }
                     continue
                 }
                 if (engineMessage.ntype === EngineMessage.ConnectionDenied) {
                     return {
                         accepted: false,
+                        denied: true,
                         reason: JSON.parse(reader.readString())
                     }
                 }
             }
 
+            if (reader.offset !== reader.byteLength) throw new Error('Unexpected data after the connection response.')
             if (accepted) {
-                return { accepted: true }
+                this.protocol = protocol
+                return { accepted: true, clientData }
             }
 
             return {
@@ -611,12 +800,14 @@ export class ClientNetwork {
         }
     }
 
+    /** @internal */
     setProtocol(nidType: number, ntypeType: number) {
         assertNetworkIdType(nidType)
         assertNetworkIdType(ntypeType)
         this.protocol = { nidType, ntypeType }
     }
 
+    /** @internal */
     createOutbound<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(binary: BinaryAdapter<InboundPayload, OutboundPayload>): OutboundPayload {
         this.pendingOutboundRollback = this.createOutboundRollback()
         const commandFrameNumber = this.commandFrameNumber
@@ -653,6 +844,9 @@ export class ClientNetwork {
         const { outboundEngineCommands, outboundCommands } = this.outbound.getCurrentFrame()
         const queuedRequests = this.requestQueue.length
         const requests = this.getRequestsForNextFrame()
+        // Reserve the selected batch before calling binary/application code.
+        // It cannot be replaced while being encoded; rollback restores eligibility.
+        if (requests.length > 0) this.markRequestsSent(requests)
 
         if (outboundEngineCommands.length > MAX_CLIENT_ENGINE_MESSAGES_PER_PACKET) {
             throw new Error('Too many client engine messages in one packet; flush more frequently.')
@@ -735,9 +929,9 @@ export class ClientNetwork {
                 dw.writeUInt32(countEndpointPayload(request.payload))
                 writeEndpointPayload(request.payload, dw)
             })
-            this.markRequestsSent(requests)
         }
 
+        assertBinaryWriteSize(dw, bytes, 'Client outbound')
         this.reportRequestBacklog({
             queued: queuedRequests,
             sent: requests.length,
@@ -751,8 +945,10 @@ export class ClientNetwork {
         }
 
 
-        this.incrementCommandFrameNumber()
-        this.outbound.tick = this.commandFrameNumber
+        if (!this.sessionEnded) {
+            this.incrementCommandFrameNumber()
+            this.outbound.tick = this.commandFrameNumber
+        }
         return dw.payload
     }
 
@@ -761,6 +957,7 @@ export class ClientNetwork {
      * adapter send succeeds, so a transport error leaves the Pongs available to
      * the next control or application flush.
      */
+    /** @internal */
     flushPongs<InboundPayload extends BinaryPayload, OutboundPayload extends BinaryPayload>(
         binary: BinaryAdapter<InboundPayload, OutboundPayload>,
         send: (payload: OutboundPayload) => void
@@ -793,6 +990,7 @@ export class ClientNetwork {
                 )
             }
 
+            assertBinaryWriteSize(dw, bytes, 'Pongs')
             send(dw.payload)
             this.pendingPongs.splice(0, pendingPongs.length)
             sent += pendingPongs.length
@@ -800,6 +998,7 @@ export class ClientNetwork {
         return sent
     }
 
+    /** @internal */
     createOutboundRollback(): OutboundRollback {
         return {
             commandFrameNumber: this.commandFrameNumber,
@@ -813,6 +1012,7 @@ export class ClientNetwork {
         }
     }
 
+    /** @internal */
     rollbackOutbound() {
         const rollback = this.pendingOutboundRollback
         if (!rollback) {
@@ -824,39 +1024,21 @@ export class ClientNetwork {
         this.outbound.outboundEngineCommands = cloneCommandMap(rollback.outboundEngineCommands)
         this.outbound.outboundCommands = cloneCommandMap(rollback.outboundCommands)
         this.outbound.outboundCommandTiming = cloneCommandMap(rollback.outboundCommandTiming)
-        this.requestQueue.arr = rollback.requestQueue.slice()
+        const originalRequests = new Set(rollback.requestQueue)
+        const stillPending = (request: ClientRequest) => this.requests.get(request.requestId) === request
+        // Keep newly queued intent and omit requests rejected during encoding.
+        this.requestQueue.arr = this.requestQueue.arr.filter(request => !originalRequests.has(request) && stillPending(request))
+            .concat(rollback.requestQueue.filter(stillPending))
         this.requestBacklogActive = rollback.requestBacklogActive
         this.pendingPongs = rollback.pendingPongs.slice()
         this.pendingOutboundRollback = null
         return true
     }
 
+    /** Decode only. Client owns liveness, automatic Pongs and fatal failures. */
+    /** @internal */
     readSnapshot(dr: IBinaryReader) {
-        const pendingPongCount = this.pendingPongs.length
-        try {
-            this.readSnapshotUnsafe(dr)
-            if (this.pendingPongs.length > pendingPongCount) {
-                try {
-                    this.client.adapter?.flushPongs?.()
-                } catch (error) {
-                    this.onSocketError(error)
-                }
-            }
-        } catch (err) {
-            try {
-                this.onMalformedSnapshot(err)
-            } catch (observerError) {
-                // Diagnostics must not prevent the fatal transport cleanup.
-            }
-            try {
-                this.client.disconnect({ reason: 'malformed_snapshot' })
-            } catch (disconnectError) {
-                // The transport may already be closed or otherwise unusable.
-            }
-        }
-    }
-
-    readSnapshotUnsafe(dr: IBinaryReader) {
+        if (this.sessionEnded) return
         const receivedAtMs = this.nowMs()
         const serverTimeMs = readSnapshotHeader(dr)
         if (!Number.isFinite(serverTimeMs)) {
@@ -916,7 +1098,7 @@ export class ClientNetwork {
                 for (let i = 0; i < count; i++) {
                     const engineMessage: any = readEngineMessage(dr, this.client.context)
                     if (engineMessage.ntype === EngineMessage.ConnectionTerminated) {
-                        this.onDisconnect(engineMessage.reason)
+                        throw new ClientConnectionError('REMOTE_CLOSE', 'The server ended the session.', { detail: engineMessage.reason })
                     }
                     if (engineMessage.ntype === EngineMessage.CommandFrameNumber) {
                         snapshot.confirmedCommandFrameNumber = engineMessage.commandFrameNumber
@@ -1014,16 +1196,13 @@ export class ClientNetwork {
                 for (let i = 0; i < count; i++) {
                     const channelId = readNetworkId(this.protocol.nidType, dr)
                     const propCount = dr.readUInt32()
-                    const changes = []
+                    const changes: any[] = []
                     for (let j = 0; j < propCount; j++) {
                         changes.push(readDiff(dr, this.client.context, this.entityNTypes, this.protocol.nidType))
                     }
                     const groupCount = dr.readUInt32()
                     for (let j = 0; j < groupCount; j++) {
-                        const diffs = readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType)
-                        for (let k = 0; k < diffs.length; k++) {
-                            changes.push(diffs[k])
-                        }
+                        readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType, changes)
                     }
                     snapshot.channelHeaderUpdates!.push({
                         channelId,
@@ -1092,10 +1271,7 @@ export class ClientNetwork {
                 const count = dr.readUInt32()
                 const output = target().updateEntities
                 for (let i = 0; i < count; i++) {
-                    const diffs = readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType)
-                    for (let j = 0; j < diffs.length; j++) {
-                        output.push(diffs[j])
-                    }
+                    readUpdateGroup(dr, this.client.context, this.entityNTypes, this.protocol.nidType, output)
                 }
                 break
             }

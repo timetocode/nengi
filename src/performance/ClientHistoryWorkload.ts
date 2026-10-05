@@ -5,14 +5,20 @@ import { ChannelType, createChannelHeader } from '../common/ChannelHeader'
 import { Client } from '../client/Client'
 import { EntityHistory } from '../client/EntityHistory'
 import { FixedStepInterpolator } from '../client/FixedStepInterpolator'
+import { InterpolationOutput } from '../client/InterpolationOutput'
 import { Snapshot } from '../client/Snapshot'
 
 export type HistoryScenario = 'stationary' | 'sparse' | 'dense' | 'churn' | 'ecs' | 'selective'
+export type HistoryValueShape = 'scalar' | 'mutable'
 export type HistoryProfileOptions = {
     scenario: HistoryScenario
     phase: 'prune' | 'sample'
+    valueShape?: HistoryValueShape
+    sampling?: 'allocate' | 'reuse'
+    selection?: 'stable' | 'rotating'
     entities?: number
     historyFrames?: number
+    entityHistory?: boolean
     warmup?: number
     iterations?: number
     collectGarbage?: () => void
@@ -23,8 +29,10 @@ export type HistoryProfileOptions = {
 // and sampling. All data comes through the real EntityStore frame application.
 class ProfileAdapter {
     binary: any
-    connect() { return Promise.resolve({ accepted: true }) }
-    flush() { /* No outbound work in this profile. */ }
+    readonly clientAdapterVersion = 2 as const
+    open() {}
+    send() {}
+    close() {}
 }
 
 function distribution(values: number[]) {
@@ -48,6 +56,12 @@ function indexStats(history: EntityHistory) {
 
 export function runClientHistoryProfile(options: HistoryProfileOptions) {
     const { scenario, phase } = options
+    const valueShape = options.valueShape ?? 'scalar'
+    const sampling = options.sampling ?? 'allocate'
+    const selection = options.selection ?? 'stable'
+    const entityHistory = options.entityHistory ?? true
+    if (phase === 'sample' && !entityHistory) throw new Error('Sampling requires entity history.')
+    const mutable = valueShape === 'mutable'
     const population = options.entities ?? (scenario === 'dense' || scenario === 'ecs' ? 10000 : 50000)
     const historyFrames = options.historyFrames ?? 240
     const warmup = options.warmup ?? 60
@@ -61,13 +75,24 @@ export function runClientHistoryProfile(options: HistoryProfileOptions) {
         x: { type: Binary.Float64, interp: true },
         y: { type: Binary.Float64, interp: true },
         health: Binary.UInt16,
-        label: Binary.String
+        label: Binary.String,
+        ...(mutable ? {
+            position: { type: Binary.Vector3, interp: true },
+            bytes: Binary.UInt8Array
+        } : {})
     }))
-    const client = new Client(context, ProfileAdapter, 20)
+    const client = new Client(context, ProfileAdapter, 20, undefined, { entityHistory })
     client.network.maxFrameHistory = historyFrames
     const history = client.network.store.history
-    const interpolator = new FixedStepInterpolator(client)
-    const entity = (nid: number, tick: number) => ({ nid, ntype: 1, x: tick, y: nid, health: 100, label: 'state' })
+    const interpolator = phase === 'sample' ? new FixedStepInterpolator(client) : null
+    const mutableValues = (nid: number, tick: number) => ({
+        position: { x: tick, y: nid, z: tick + nid },
+        bytes: new Uint8Array(64).fill(tick % 256)
+    })
+    const entity = (nid: number, tick: number) => ({
+        nid, ntype: 1, x: tick, y: nid, health: 100, label: 'state',
+        ...(mutable ? mutableValues(nid, tick) : {})
+    })
     const rootId = (i: number) => 100 + i * (components + 1)
     const componentId = (i: number, component: number) => rootId(i) + component + 1
     const costs: number[] = []
@@ -108,6 +133,13 @@ export function runClientHistoryProfile(options: HistoryProfileOptions) {
                 for (let component = 0; component < components; component++) {
                     const nid = ecs ? componentId(index, component) : rootId(index)
                     channel.updateEntities.push({ nid, prop: 'x', value: tick }, { nid, prop: 'y', value: tick + nid })
+                    if (mutable) {
+                        const values = mutableValues(nid, tick)
+                        channel.updateEntities.push(
+                            { nid, prop: 'position', value: values.position },
+                            { nid, prop: 'bytes', value: values.bytes }
+                        )
+                    }
                 }
             }
         }
@@ -135,16 +167,26 @@ export function runClientHistoryProfile(options: HistoryProfileOptions) {
         for (let i = 1; i <= iterations; i++) apply(warmupFrames + i)
     } else {
         const selected = Array.from({ length: Math.min(500, population) }, (_, i) => ecs ? componentId(i, 0) : rootId(i))
+        const output = new InterpolationOutput()
         // Three render samples per server frame: 60 Hz rendering, 20 Hz receive.
         // Fixed history lets sampling cost stay separate from frame application.
         const sample = (i: number) => {
-            interpolator.resetTimeline()
+            if (selection === 'rotating') {
+                for (let j = 0; j < selected.length; j++) {
+                    const index = (i * 50 + j) % population
+                    selected[j] = ecs ? componentId(index, 0) : rootId(index)
+                }
+            }
+            interpolator!.resetTimeline()
             const now = warmupFrames * 50
-            interpolator.getSampleDiagnostics(100, now)
+            interpolator!.getSampleDiagnostics(100, now)
             const start = performance.now()
-            const result = scenario === 'selective'
-                ? interpolator.sampleEntities(selected, 100, now + (i % 3) * (1000 / 60))
-                : interpolator.sample(100, now + (i % 3) * (1000 / 60))
+            const sampleTime = now + (i % 3) * (1000 / 60)
+            const result = sampling === 'reuse'
+                ? interpolator!.sampleEntitiesInto(scenario === 'selective' ? selected : history.timelines.keys(), output, 100, sampleTime)
+                : scenario === 'selective'
+                    ? interpolator!.sampleEntities(selected, 100, sampleTime)
+                    : interpolator!.sample(100, sampleTime)
             checksum += result.entities.size
             return performance.now() - start
         }
@@ -156,7 +198,7 @@ export function runClientHistoryProfile(options: HistoryProfileOptions) {
     options.collectGarbage?.()
     const retainedHeapAfter = options.heapUsed?.() ?? null
     return {
-        scenario, phase, population, components, fraction, historyFrames, warmup, iterations,
+        scenario, phase, valueShape, sampling, selection, population, components, fraction, historyFrames, entityHistory, warmup, iterations,
         serverHz: 20, renderHz: 60, elapsedMs: distribution(costs),
         pruneMs: pruneCosts.length ? distribution(pruneCosts) : null,
         history: history.getStats(), expirationIndex: indexStats(history),

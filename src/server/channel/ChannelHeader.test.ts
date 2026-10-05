@@ -45,7 +45,7 @@ function createUser(instance: Instance) {
     return user
 }
 
-function createClientNetwork(context: Context) {
+function createClientNetwork(context: Context, entityHistory = true) {
     const client = {
         context,
         serverTickRate: 20,
@@ -57,7 +57,7 @@ function createClientNetwork(context: Context) {
         },
         network: undefined as unknown as ClientNetwork
     }
-    const network = new ClientNetwork(client as any)
+    const network = new ClientNetwork(client as any, undefined, entityHistory)
     client.network = network
     return network
 }
@@ -79,6 +79,65 @@ function createEntity(ntype = NType.Entity) {
 }
 
 describe('channel headers', () => {
+    it.each([true, false])('applies physics stamps with their publication, including header-only frames (entityHistory=%s)', entityHistory => {
+        const context = createContext()
+        context.register(3, defineEntitySchema({
+            physicsTick: Binary.UInt32,
+            substeps: Binary.UInt8,
+            $options: { updateGroups: { clock: ['physicsTick', 'substeps'] } }
+        }))
+        const motionSchema = defineEntitySchema({
+            x: Binary.Float64,
+            y: Binary.Float64,
+            $options: { updateGroups: { pose: ['x', 'y'] } }
+        })
+        context.register(4, motionSchema)
+        const instance = new Instance(context)
+        const user = createUser(instance)
+        instance.connectedUsers.set(user.id, user)
+        const network = createClientNetwork(context, entityHistory)
+        const header = { nid: 0, ntype: 3, physicsTick: 10, substeps: 1 }
+        const channel = new ManualChannel(instance.localState, { header })
+        channel.subscribe(user)
+        const body = channel.addEntity({ nid: 0, ntype: 4, x: 0, y: 0 })
+        const motion = channel.createEntityWriter(4, motionSchema)
+        const publish = () => {
+            channel.syncHeader()
+            instance.step()
+            network.readSnapshot(testBinaryAdapter.createReader(lastSentBuffer(user)))
+        }
+
+        publish()
+        header.physicsTick = 11
+        publish() // No entity changes.
+        header.physicsTick = 14
+        header.substeps = 3
+        motion.groups.pose(body, 44, 55)
+        publish()
+        publish() // No header or entity changes.
+
+        const checkpoints = []
+        for (const expected of [
+            { physicsTick: 10, substeps: 1, x: 0, y: 0, headerUpdates: 0, updates: 0 },
+            { physicsTick: 11, substeps: 1, x: 0, y: 0, headerUpdates: 1, updates: 0 },
+            { physicsTick: 14, substeps: 3, x: 44, y: 55, headerUpdates: 1, updates: 2 },
+            { physicsTick: 14, substeps: 3, x: 44, y: 55, headerUpdates: 0, updates: 0 }
+        ]) {
+            const frame = network.processNextFrame()!
+            const stamp = network.store.getChannelHeaderById(channel.nid)!
+            const state = network.store.get(body.nid)!
+            const checkpoint = { physicsTick: stamp.physicsTick, substeps: stamp.substeps, x: state.x, y: state.y }
+            expect({
+                ...checkpoint,
+                headerUpdates: frame.channelHeaderUpdates.length,
+                updates: frame.channels.reduce((count, channel) => count + channel.updateEntities.length, 0)
+            }).toEqual(expected)
+            checkpoints.push(checkpoint)
+        }
+        expect(checkpoints[0]).toEqual({ physicsTick: 10, substeps: 1, x: 0, y: 0 })
+        expect(network.processNextFrame()).toBeNull()
+    })
+
     const cases: Array<{
         name: string
         setup(instance: Instance, user: User, header: any): number[]
@@ -175,7 +234,7 @@ describe('channel headers', () => {
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const header = { ...createEntity(), label: name }
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
 
         const nids = setup(instance, user, header)
 

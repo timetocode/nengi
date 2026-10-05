@@ -2,6 +2,7 @@ import { IEntity } from '../common/IEntity'
 import { Client } from './Client'
 import { Frame } from './Frame'
 import { sampleEntityTimelines } from './entityTimeline'
+import type { InterpolationOutput } from './InterpolationOutput'
 import {
     AdaptiveDelayPolicy,
     InterpolationDelayPolicy,
@@ -73,6 +74,9 @@ export class FixedStepInterpolator {
     private playbackCursor: PlaybackCursor
 
     constructor(client: Client, options: FixedStepInterpolatorOptions = {}) {
+        if (!client.network.store.historyEnabled) {
+            throw new Error('nengi interpolation requires entity history. Create the Client with entityHistory enabled (the default).')
+        }
         this.client = client
         const delayOptions = resolveInterpolationDelayPolicyOptions(options, this.tickMs)
         const playbackOptions = resolvePlaybackCursorOptions(options)
@@ -276,16 +280,7 @@ export class FixedStepInterpolator {
             }
         }
 
-        const frameA = diagnostics.frameA
-        const frameB = diagnostics.frameB
-        const entities = sampleEntityTimelines(
-            this.client.network.store.history.timelines,
-            frameA.tick,
-            frameB.tick,
-            frameA === frameB
-                ? (_nid, entityA) => this.cloneEntity(entityA)
-                : (nid, entityA, entityB) => this.interpolateEntityForFrame(nid, entityA, entityB, frameB, diagnostics.alpha)
-        )
+        const entities = this.getEntitiesWithinBounds(undefined, diagnostics.frameA, diagnostics.frameB, diagnostics.alpha)
 
         return {
             ...diagnostics,
@@ -307,6 +302,23 @@ export class FixedStepInterpolator {
             ...diagnostics,
             entities
         }
+    }
+
+    /** Overwrites caller-owned presentation storage and returns that same buffer. */
+    sampleEntitiesInto(nids: Iterable<number>, output: InterpolationOutput, interpDelay: number, now?: number): InterpolationOutput {
+        const diagnostics = this.getSampleDiagnostics(interpDelay, now)
+        const frameA = diagnostics.frameA
+        const frameB = diagnostics.frameB
+        output.update(
+            diagnostics,
+            this.client.context,
+            this.client.network.store.history.timelines,
+            nids,
+            frameA === frameB
+                ? (_nid, entityA, _entityB, target) => this.cloneEntity(entityA, target)
+                : (nid, entityA, entityB, target) => this.interpolateEntityForFrame(nid, entityA, entityB, frameB!, diagnostics.alpha, target)
+        )
+        return output
     }
 
     getEntity(nid: number, interpDelay: number, now?: number): IEntity | null {
@@ -336,25 +348,16 @@ export class FixedStepInterpolator {
         return this.getEntitiesWithinBounds(nids, bounds.frameA, bounds.frameB, bounds.alpha)
     }
 
-    private getEntitiesWithinBounds(nids: Iterable<number>, frameA: Frame, frameB: Frame, alpha: number) {
-        const entities = new Map<number, IEntity>()
-
-        for (const nid of nids) {
-            const entityA = this.getEntityRefAtFrame(nid, frameA)
-            if (!entityA) {
-                continue
-            }
-
-            if (frameA === frameB) {
-                entities.set(nid, this.cloneEntity(entityA))
-                continue
-            }
-
-            const entityB = this.getEntityRefAtFrame(nid, frameB)
-            entities.set(nid, this.interpolateEntityForFrame(nid, entityA, entityB, frameB, alpha))
-        }
-
-        return entities
+    private getEntitiesWithinBounds(nids: Iterable<number> | undefined, frameA: Frame, frameB: Frame, alpha: number) {
+        return sampleEntityTimelines(
+            this.client.network.store.history.timelines,
+            frameA.tick,
+            frameB.tick,
+            frameA === frameB
+                ? (_nid, entityA) => this.cloneEntity(entityA)
+                : (nid, entityA, entityB) => this.interpolateEntityForFrame(nid, entityA, entityB, frameB, alpha),
+            nids
+        )
     }
 
     getAllEntities(interpDelay: number, now?: number): Map<number, IEntity> {
@@ -369,7 +372,7 @@ export class FixedStepInterpolator {
         return sample as InterpolatedState
     }
 
-    private findFrameAIndex(frames: Frame[], targetTick: number): number {
+    private findFrameAIndex(frames: readonly Frame[], targetTick: number): number {
         let frameAIndex = -1
         for (let i = 0; i < frames.length; i++) {
             const frame = frames[i]
@@ -386,51 +389,51 @@ export class FixedStepInterpolator {
         return this.client.network.store.history.getEntityAtTickRef(nid, targetFrame.tick)
     }
 
-    private interpolateEntity(entityA: IEntity, entityB: IEntity | null, alpha: number): IEntity {
-        const interpolated = this.cloneEntity(entityA)
+    private interpolateEntity(entityA: IEntity, entityB: IEntity | null, alpha: number, target?: IEntity): IEntity {
         if (!entityB) {
-            return interpolated
+            return this.cloneEntity(entityA, target)
         }
 
+        const interpolated: IEntity = target?.ntype === entityA.ntype ? target : {
+            nid: entityA.nid,
+            ntype: entityA.ntype
+        }
+        interpolated.nid = entityA.nid
         const schema = this.client.context.getSchema(entityA.ntype)
-        schema.keys.forEach(propSpec => {
+        for (let i = 0; i < schema.keys.length; i++) {
+            const propSpec = schema.keys[i]
             const prop = propSpec.prop
             if (!(prop in entityB)) {
-                return
-            }
-            if (propSpec.interp) {
+                interpolated[prop] = propSpec.binary.clone(entityA[prop])
+            } else if (propSpec.interp) {
                 interpolated[prop] = propSpec.binary.interp(entityA[prop], entityB[prop], alpha)
             } else {
-                interpolated[prop] = this.cloneProp(entityA.ntype, prop, entityB[prop])
+                interpolated[prop] = propSpec.binary.clone(entityB[prop])
             }
-        })
+        }
 
         return interpolated
     }
 
-    private interpolateEntityForFrame(nid: number, entityA: IEntity, entityB: IEntity | null, frameB: Frame, alpha: number): IEntity {
+    private interpolateEntityForFrame(nid: number, entityA: IEntity, entityB: IEntity | null, frameB: Frame, alpha: number, target?: IEntity): IEntity {
         if (entityB && frameB.skipInterpolationNids.has(nid)) {
-            return this.cloneEntity(entityB)
+            return this.cloneEntity(entityB, target)
         }
-        return this.interpolateEntity(entityA, entityB, alpha)
+        return this.interpolateEntity(entityA, entityB, alpha, target)
     }
 
-    private cloneEntity(entity: IEntity): IEntity {
-        const clone: IEntity = {
+    private cloneEntity(entity: IEntity, target?: IEntity): IEntity {
+        const clone: IEntity = target?.ntype === entity.ntype ? target : {
             nid: entity.nid,
             ntype: entity.ntype
         }
+        clone.nid = entity.nid
         const schema = this.client.context.getSchema(entity.ntype)
-        schema.keys.forEach(propSpec => {
-            clone[propSpec.prop] = this.cloneProp(entity.ntype, propSpec.prop, entity[propSpec.prop])
-        })
+        for (let i = 0; i < schema.keys.length; i++) {
+            const propSpec = schema.keys[i]
+            clone[propSpec.prop] = propSpec.binary.clone(entity[propSpec.prop])
+        }
         return clone
-    }
-
-    private cloneProp(ntype: number, prop: string, value: any) {
-        const schema = this.client.context.getSchema(ntype)
-        const propSpec = schema.props[prop]
-        return propSpec.binary.clone(value)
     }
 }
 

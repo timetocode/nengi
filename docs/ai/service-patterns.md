@@ -32,28 +32,22 @@ cycle is:
 4. Read durable state and external resources through explicit dependencies.
 5. Apply the accepted state transition.
 6. Emit entity, channel, message, and response changes.
-7. Confirm completed command input with `user.confirmCommandsThrough(K)`.
-8. Call `instance.step()` at the snapshot boundary.
-9. Flush transport output and metrics.
+7. Call `instance.step()` to build and send snapshots.
+8. Record application metrics.
 
 Keep that network step on a regular cadence even when the service has no state
 changes to publish. Nengi evaluates connection deadlines and emits Pings at the
 step boundary; an event-driven service that steps only after mutations cannot
 provide heartbeat liveness.
 
-Command confirmation is explicit even when the service has no prediction.
-After a synchronous full drain and simulation, confirm through each user's
-`lastReceivedCommandFrameNumber`. For deferred commands, retain their batch
-numbers and confirm only the prefix whose authoritative work is finished.
-Unconfirmed commands remain in client history. Request-only services do not
-need command confirmation for their responses, state updates or liveness.
 Use requests for work that must wait on external resources, and complete it
 through a response or a later application event. See the
-[command confirmation contract](./networking-primitives.md#command-payloads-and-sequencing).
+[request lifecycle](./networking-primitives.md).
 
-The service may run this cycle after each event or on a short scheduled cadence.
-Choose one policy and document it. The important property is that no adapter
-callback directly mutates unrelated domain state outside the cycle.
+Use a scheduled cadence even during idle periods. If the service also steps in
+response to events, keep its heartbeat schedule and snapshot-rate assumptions
+explicit. Adapter callbacks should not directly mutate unrelated domain state
+outside the chosen cycle.
 
 ## Requests and asynchronous work
 
@@ -78,7 +72,7 @@ ordering rule.
 
 For server-originating information, prefer a message, an entity update, or a
 channel header change. If the client must acknowledge an action, define that
-acknowledgment as an application message or as a subsequent client request with
+acknowledgment as an application command or a subsequent client request with
 an explicit correlation id. This keeps the protocol vocabulary aligned with
 the direction of the existing request/response API.
 

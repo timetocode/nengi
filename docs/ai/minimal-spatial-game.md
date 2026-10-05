@@ -1,191 +1,79 @@
-# Minimal Spatial Game
+# Minimal spatial game
 
-This is a canonical shape for a small 2D browser game with a server-authoritative
-world, `Channel2D`, client commands, and interpolated remote entities.
+Start with the complete [shared room starter](./getting-started.md). Its `Channel`
+is appropriate while every subscriber sees every player. When visibility should
+follow each player's position, make the following changes to its `game.ts`.
+These are the spatial-specific differences; retain its connection handling,
+command validation, schemas and client lifecycle.
 
-For package installation and adapter selection, use [adapters.md](./adapters.md).
-This file only describes the nengi gameplay shape.
+## Create a spatial channel
 
-## Server
-
-Create one spatial world channel:
-
-```ts
-const instance = new Instance(context)
-const world = new Channel2D(instance.localState, 100, { name: 'world' })
-```
-
-On connect, create a player, add it to the world, and subscribe the user with a
-view:
+Replace the `Channel` import and construction with:
 
 ```ts
-function createView(player: PlayerEntity) {
-    return { x: player.x, y: player.y, halfWidth: 800, halfHeight: 600 }
-}
+import { Channel2D } from 'nengi'
 
-function spawnPlayer(user: User) {
-    const player = createPlayer(100, 100)
-    world.addEntity(player)
-    world.subscribe(user, createView(player))
-    playersByUser.set(user.id, player)
+const room = new Channel2D(instance.localState, 100, { name: 'room' })
+
+function viewFor(player: Player) {
+    return { x: player.x, y: player.y, halfWidth: 200, halfHeight: 150 }
 }
 ```
 
-Handle movement commands with a command router:
+The cell size is 100 world units. The view is a rectangle centered on the player;
+its dimensions are visibility bounds, not the browser viewport size.
+
+On connection, replace the plain subscription with:
 
 ```ts
-const commands = new CommandRouter()
-const speedPerCommand = 10
+room.subscribe(event.user, viewFor(entity))
+```
 
-commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
-    const player = playersByUser.get(user.id)
-    if (!player) {
-        return
+## Update membership when moving
+
+Replace the starter's movement loop with:
+
+```ts
+for (const [userId, { entity, target }] of players) {
+    const next = moveTowards(entity, target, SPEED / SERVER_TICK_RATE)
+    if (next.x === entity.x && next.y === entity.y) continue
+
+    entity.x = next.x
+    entity.y = next.y
+    room.moveEntity(entity)
+
+    const user = instance.users.get(userId)
+    if (user?.connectionState === UserConnectionState.Open) {
+        room.updateView(user, viewFor(entity))
     }
-
-    player.x += command.inputX * speedPerCommand
-    player.y += command.inputY * speedPerCommand
-
-    world.moveEntity(player)
-    world.updateView(user, createView(player))
-})
-```
-
-Process network events and step the instance:
-
-```ts
-while (!instance.queue.isEmpty()) {
-    const event = instance.queue.next()
-
-    if (event.type === NetworkEvent.UserConnected) {
-        spawnPlayer(event.user)
-    }
-
-    if (event.type === NetworkEvent.UserDisconnected) {
-        despawnPlayer(event.user)
-    }
-
-    commands.process(event)
-}
-
-instance.processRequests()
-for (const user of instance.users.values()) {
-    user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
-}
-instance.step()
-```
-
-For automatic spatial channels, call `moveEntity(entity)` after a spatial
-entity moves. Call `updateView(user, view)` when the user's interest area moves.
-
-## Client
-
-Create a client, interpolator, and local presentation records:
-
-```ts
-import type { Frame } from 'nengi'
-
-const client = new Client(context, WebSocketClientAdapter, serverTickRate)
-const interpolator = new AdaptiveInterpolator(client)
-const sprites = new Map<number, Sprite>()
-await client.connect('ws://localhost:8079')
-```
-
-Create and destroy local presentation from frame facts:
-
-```ts
-function applyFrame(frame: Frame) {
-    frame.channels.forEach(channel => {
-        channel.messages.forEach(message => {
-            if (message.ntype === NType.Impact) {
-                spawnImpactEffect(message.x, message.y)
-            }
-        })
-
-        channel.createEntities.forEach(entity => {
-            if (entity.ntype === NType.Player) {
-                sprites.set(entity.nid, createPlayerSprite(entity as PlayerEntity))
-            }
-        })
-
-        channel.deletedEntities.forEach(deleted => {
-            sprites.get(deleted.nid)?.destroy()
-            sprites.delete(deleted.nid)
-        })
-    })
 }
 ```
 
-If the server tells the client which player it controls, keep that nid out of
-interpolated rendering and drive it with local prediction:
+Automatic property diffing observes `x` and `y`. `moveEntity` separately updates
+cell membership and visibility; `updateView` moves the observer's interest area.
+Use both at the corresponding mutation boundary. See
+[spatial channels](./spatial-channels.md) for 3D, projected planes and manual writes.
 
-```ts
-let controlledNid: number | null = null
-```
+## Keep the client lifecycle
 
-Each render frame. This loop sends commands at a fixed 30 Hz command rate
-even if the renderer runs faster or slower:
+The starter's channel name remains `room`, so its client routing stays valid.
+Entering another player's view produces a create; leaving it produces a delete
+for that observer even though the entity still exists on the server. Do not
+interpret every disappearance as death or destruction.
 
-```ts
-const COMMAND_INTERVAL_MS = 1000 / 30
-let commandAccumulatorMs = 0
+The non-predicting client interpolates all visible players, including its own.
+A fixed-size world view is enough to test culling: connect two tabs and move
+apart. For a larger world, adjust the starter's room bounds and add a camera.
+Network visibility and camera rendering are separate decisions.
 
-function frame(dtMs: number) {
-    for (const frame of client.network.drainFrames()) {
-        applyFrame(frame)
-        frame.messages.forEach(message => {
-            if (message.ntype === NType.YouArePlayer) {
-                controlledNid = message.nid
-            }
-        })
-    }
-
-    const interpolatedNids = Array.from(sprites.keys()).filter(nid => nid !== controlledNid)
-    const sample = interpolator.sampleEntities(interpolatedNids, 100)
-    sample.entities.forEach(entity => {
-        const sprite = sprites.get(entity.nid)
-        if (sprite) {
-            sprite.x = entity.x
-            sprite.y = entity.y
-        }
-    })
-
-    commandAccumulatorMs += dtMs
-    while (commandAccumulatorMs >= COMMAND_INTERVAL_MS) {
-        commandAccumulatorMs -= COMMAND_INTERVAL_MS
-        client.addCommand({
-            ntype: NType.MoveCommand,
-            inputX,
-            inputY
-        })
-    }
-    client.flush()
-}
-```
-
-`maxFrames` chunks catch-up work but does not skip frames. If pending frames
-grow too high, rebuild the session with a fresh Client rather than skipping
-delta snapshots; see [connection lifetime](./client-state.md#connection-lifetime).
-
-Keep command cadence explicit. A fixed server step per command is fine if the
-client sends commands at a fixed command rate. If the client sends commands from
-`requestAnimationFrame`, a 144 Hz client can otherwise move more often than a
-30 Hz client.
-
-The movement command payload only needs the gameplay input. Nengi already
-associates sent commands with the current numeric `commandFrameNumber`, exposes
-that number to server command handlers, and confirms processed command frames
-back on `frame.confirmedCommandFrameNumber`. See
-[networking-primitives.md](./networking-primitives.md#command-payloads-and-sequencing)
-for the prediction and sequencing shape.
-
-If the local player should be predicted, also read
-[real-time movement prediction](./realtime-movement-prediction.md). The minimal
-version above sends commands but does not show the full replay/reconciliation
-pattern.
+Do not introduce a fixed distance per received command unless the application's
+input timing contract justifies it and the server enforces the corresponding
+budget. The starter uses destination commands and server-driven movement. For
+instant direct controls, use the [action prediction model](./realtime-movement-prediction.md)
+with matching command durations on both peers instead.
 
 ## Gameplay queries
 
-`Channel2D` is network visibility. It is not a gameplay query engine. The
-server still needs game-specific logic for gathering range, attack arcs, nearest
-campfire, placement collision, and similar simulation rules.
+`Channel2D` defines network visibility. It is not a gameplay query engine. The
+server still needs logic for range, attack arcs, gathering, collision and
+permission checks. Being visible does not authorize an interaction.

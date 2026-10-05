@@ -30,10 +30,11 @@ export function sampleEntityTimelines(
     timelines: Map<number, EntityTimeline>,
     tickA: number,
     tickB: number,
-    sample: (nid: number, entityA: IEntity, entityB: IEntity | null) => IEntity
+    sample: (nid: number, entityA: IEntity, entityB: IEntity | null) => IEntity,
+    nids?: Iterable<number>,
+    entities = new Map<number, IEntity>()
 ) {
-    const entities = new Map<number, IEntity>()
-    timelines.forEach((timeline, nid) => {
+    const sampleTimeline = (timeline: EntityTimeline, nid: number) => {
         const index = findRecordIndex(timeline, tickA)
         if (index === -1) {
             return
@@ -47,6 +48,14 @@ export function sampleEntityTimelines(
         const next = timeline.records[index + 1]
         const recordB = next && next.tick <= tickB ? next : recordA
         entities.set(nid, sample(nid, recordA.entity, recordB.deleted ? null : recordB.entity))
-    })
+    }
+    if (nids === undefined) {
+        timelines.forEach(sampleTimeline)
+    } else {
+        for (const nid of nids) {
+            const timeline = timelines.get(nid)
+            if (timeline) sampleTimeline(timeline, nid)
+        }
+    }
     return entities
 }

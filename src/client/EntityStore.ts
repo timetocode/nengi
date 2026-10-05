@@ -12,7 +12,7 @@ function cloneEntity(entity: IEntity): IEntity {
 }
 
 type ApplyState = {
-    changedNids: Set<number>
+    changedNids: Set<number> | undefined
 }
 
 export class EntityStore {
@@ -31,7 +31,7 @@ export class EntityStore {
      */
     history: EntityHistory
 
-    constructor(context: Context) {
+    constructor(context: Context, readonly historyEnabled = true) {
         this.context = context
         this.history = new EntityHistory(context)
     }
@@ -99,7 +99,7 @@ export class EntityStore {
         }))
         const channelFramesById = new Map<number, ChannelFrame>()
         frameChannels.forEach(channel => channelFramesById.set(channel.channelId, channel))
-        const changedNids = new Set<number>()
+        const changedNids = this.historyEnabled ? new Set<number>() : undefined
 
         channelCloses.forEach(close => {
             const previous = this.requireChannelHeader(close.channelId)
@@ -136,7 +136,7 @@ export class EntityStore {
             })
         })
 
-        changedNids.forEach(nid => {
+        changedNids?.forEach(nid => {
             const entity = this.entities.get(nid)
             if (entity) {
                 this.history.recordState(tick, entity)
@@ -214,7 +214,7 @@ export class EntityStore {
         const clone = cloneEntity(stored)
         frame.createEntities.push(clone)
         frame.ecsCreateComponents.push(cloneEntity(stored))
-        state.changedNids.add(stored.nid)
+        state.changedNids?.add(stored.nid)
     }
 
     private createEntity(channelId: number, entity: IEntity, frame: ChannelFrame, state: ApplyState) {
@@ -224,7 +224,7 @@ export class EntityStore {
         this.ntypes.set(stored.nid, stored.ntype)
         this.entityChannels.set(stored.nid, channelId)
         frame.createEntities.push(cloneEntity(stored))
-        state.changedNids.add(stored.nid)
+        state.changedNids?.add(stored.nid)
     }
 
     private updateEntity(channelId: number, update: any, frame: ChannelFrame, state: ApplyState) {
@@ -250,7 +250,7 @@ export class EntityStore {
             value
         }
         frame.updateEntities.push(applied)
-        state.changedNids.add(update.nid)
+        state.changedNids?.add(update.nid)
     }
 
     private deleteEntity(channelId: number, nid: number, frame: ChannelFrame, state: ApplyState, tick: number) {
@@ -274,7 +274,7 @@ export class EntityStore {
         }
         frame.deleteEntities.push(nid)
         frame.deletedEntities.push(deleted)
-        this.history.recordDelete(tick, nid)
+        if (this.historyEnabled) this.history.recordDelete(tick, nid)
     }
 
     private deleteEcsEntity(channelId: number, pid: number, frame: ChannelFrame, state: ApplyState, tick: number) {
@@ -290,7 +290,7 @@ export class EntityStore {
         this.ecsEntities.delete(pid)
         this.entityChannels.delete(pid)
         frame.ecsDeleteEntities.push(pid)
-        this.history.recordDelete(tick, pid)
+        if (this.historyEnabled) this.history.recordDelete(tick, pid)
     }
 
     private assertNoTopLevelEntityCrud(snapshot: Snapshot) {
@@ -358,11 +358,11 @@ export class EntityStore {
                     this.entities.delete(componentNid)
                     this.ecsComponentParent.delete(componentNid)
                     purged.push(componentNid)
-                    this.history.recordDelete(tick, componentNid)
+                    if (this.historyEnabled) this.history.recordDelete(tick, componentNid)
                 })
                 this.ecsComponentsByParent.delete(nid)
             }
-            this.history.recordDelete(tick, nid)
+            if (this.historyEnabled) this.history.recordDelete(tick, nid)
         }
         return purged
     }

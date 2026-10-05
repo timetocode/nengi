@@ -1,8 +1,10 @@
+import { assertBinaryWriteSize } from '../assertBinaryWriteSize'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
+import { ProtocolConfig } from '../../common/binary/Protocol'
 import { countSnapshotBytes } from './countSnapshotBytes'
 import { writeSnapshot } from './writeSnapshot'
-import { createEmptySnapshotPlan } from './SnapshotPlan'
+import { createEmptySnapshotPlan, EMPTY_SNAPSHOT_PLAN } from './SnapshotPlan'
 import { CellFragmentChannel, isManualCellFragmentChannel, ManualCellFragmentChannel } from './channelModes'
 import { CellEntityFragment } from './cellEntityFragments'
 import {
@@ -17,8 +19,7 @@ import {
     writeManualUpdates
 } from './manualUpdates'
 
-export function getCellCreateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string): CellEntityFragment {
-    const protocol = instance.network.getProtocol()
+export function getCellCreateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, protocol = instance.network.getProtocol()): CellEntityFragment {
     const key = `${instance.tick}:${channel.nid}:cell:create:${cellKey}:${channel.getCellVersion(cellKey)}:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedCreateFragments.get(key)
     if (cached) {
@@ -50,6 +51,7 @@ export function getCellCreateFragment(user: User, instance: Instance, channel: C
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Cell entity creates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -69,8 +71,7 @@ export function getCellCreateFragment(user: User, instance: Instance, channel: C
     return fragment
 }
 
-export function getCellDeleteFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, nids: number[]): CellEntityFragment {
-    const protocol = instance.network.getProtocol()
+export function getCellDeleteFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, nids: readonly number[], protocol = instance.network.getProtocol()): CellEntityFragment {
     const nidSignature = nids.join(',')
     const key = `${instance.tick}:${channel.nid}:cell:delete:${cellKey}:${nidSignature}:${protocol.nidType}`
     const cached = instance.network.sharedDeleteFragments.get(key)
@@ -84,8 +85,7 @@ export function getCellDeleteFragment(user: User, instance: Instance, channel: C
     let countMs = 0
     let writeStart = 0
     let writeMs = 0
-    const plan = createEmptySnapshotPlan()
-    plan.deleteEntities = nids
+    const plan = { ...EMPTY_SNAPSHOT_PLAN, deleteEntities: nids }
     if (measure) {
         countStart = performance.now()
     }
@@ -96,6 +96,7 @@ export function getCellDeleteFragment(user: User, instance: Instance, channel: C
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Cell entity deletes')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -120,14 +121,29 @@ export function getManualSpatialCellUpdateFragment(
     instance: Instance,
     channel: ManualCellFragmentChannel,
     cellKey: string,
-    includeNids = true
+    includeNids = true,
+    protocol: ProtocolConfig = instance.network.getProtocol()
 ): CellEntityFragment {
+    // A prepared plan is discarded by writes, structural changes and cleanup,
+    // and is rebuilt for hierarchy changes. Its cache can precede live filtering.
+    // Custom channel implementations without that lifetime keep the uncached path.
+    const prepared = channel.prepareVisibilityPlan?.(instance.tick)
+    const cache = prepared ? (prepared.cellUpdateFragments ??= new Map<string, CellEntityFragment>()) : undefined
+    const key = `${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
+    const cached = cache?.get(key)
+    if (cached) {
+        instance.network.recordSharedFragmentHit()
+        return cached
+    }
+
     const cellNids = collectNidsForRoots(instance, channel.getCellEntities(cellKey))
     const cellLog = channel.getManualCellUpdateLog(cellKey)
     const log = cellLog ? filterManualCellUpdateLog(cellLog, cellNids) : null
     if (!log || (log.manualPropNids.length === 0 && log.manualGroupNids.length === 0)) {
-        return {
-            payload: user.networkAdapter.binary.createWriter(0).payload,
+        const writer = user.networkAdapter.binary.createWriter(0)
+        assertBinaryWriteSize(writer, 0, 'Empty manual cell updates')
+        const fragment: CellEntityFragment = {
+            payload: writer.payload,
             bytes: 0,
             nids: new Set<number>(),
             creates: 0,
@@ -136,14 +152,8 @@ export function getManualSpatialCellUpdateFragment(
             updateGroups: 0,
             groupedUpdateProps: 0
         }
-    }
-
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:manual-cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
-    const cached = instance.network.sharedUpdateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        return cached as CellEntityFragment
+        cache?.set(key, fragment)
+        return fragment
     }
 
     const measure = instance.network.snapshotPerformanceEnabled
@@ -162,6 +172,7 @@ export function getManualSpatialCellUpdateFragment(
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeManualUpdates(log, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Manual cell updates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -174,9 +185,9 @@ export function getManualSpatialCellUpdateFragment(
         deletes: 0,
         updateProps: log.manualPropNids.length,
         updateGroups: log.manualGroupNids.length,
-        groupedUpdateProps: countManualGroupedProps(log)
+        groupedUpdateProps: measure ? countManualGroupedProps(log) : 0
     }
-    instance.network.sharedUpdateFragments.set(key, fragment)
+    cache?.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
     return fragment
 }
@@ -232,12 +243,11 @@ function filterManualCellUpdateLog(log: ManualUpdateLog, liveNids: Set<number>):
     return filtered
 }
 
-export function getCellUpdateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, includeNids = true): CellEntityFragment {
+export function getCellUpdateFragment(user: User, instance: Instance, channel: CellFragmentChannel, cellKey: string, includeNids = true, protocol = instance.network.getProtocol()): CellEntityFragment {
     if (isManualCellFragmentChannel(channel)) {
-        return getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids)
+        return getManualSpatialCellUpdateFragment(user, instance, channel, cellKey, includeNids, protocol)
     }
 
-    const protocol = instance.network.getProtocol()
     const key = `${instance.tick}:${channel.nid}:cell:update:${cellKey}:${includeNids ? 'nids' : 'steady'}:${protocol.nidType}:${protocol.ntypeType}`
     const cached = instance.network.sharedUpdateFragments.get(key)
     if (cached) {
@@ -269,6 +279,7 @@ export function getCellUpdateFragment(user: User, instance: Instance, channel: C
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Cell entity updates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -281,7 +292,7 @@ export function getCellUpdateFragment(user: User, instance: Instance, channel: C
         deletes: 0,
         updateProps: plan.updateEntities.length,
         updateGroups: plan.updateEntityGroups.length,
-        groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0)
+        groupedUpdateProps: measure ? plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0) : 0
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs, countMs, writeMs, bytes })

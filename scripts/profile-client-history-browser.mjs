@@ -14,9 +14,18 @@ if (!chromium) throw new Error('Set PROFILE_CHROMIUM_PATH to a local Chromium ex
 const sourceRoot = path.resolve(process.env.PROFILE_SOURCE_ROOT ?? root)
 const scenario = process.env.PROFILE_SCENARIO ?? 'sparse'
 const phase = process.env.PROFILE_PHASE ?? 'prune'
+const valueShape = process.env.PROFILE_VALUE_SHAPE ?? 'scalar'
+const sampling = process.env.PROFILE_SAMPLING ?? 'allocate'
+const selection = process.env.PROFILE_SELECTION ?? 'stable'
 if (!['stationary', 'sparse', 'dense', 'churn', 'ecs', 'selective'].includes(scenario) || !['prune', 'sample'].includes(phase)) {
     throw new Error('Invalid PROFILE_SCENARIO or PROFILE_PHASE.')
 }
+if (!['scalar', 'mutable'].includes(valueShape)) {
+    throw new Error('Expected PROFILE_VALUE_SHAPE scalar|mutable.')
+}
+if (!['allocate', 'reuse'].includes(sampling)) throw new Error('Expected PROFILE_SAMPLING allocate|reuse.')
+if (!['stable', 'rotating'].includes(selection)) throw new Error('Expected PROFILE_SELECTION stable|rotating.')
+if (selection === 'rotating' && scenario !== 'selective') throw new Error('Rotating selection requires PROFILE_SCENARIO=selective.')
 function positiveInteger(name) {
     if (process.env[name] === undefined) return undefined
     const value = Number(process.env[name])
@@ -24,7 +33,7 @@ function positiveInteger(name) {
     return value
 }
 const options = {
-    scenario, phase,
+    scenario, phase, valueShape, sampling, selection,
     entities: positiveInteger('PROFILE_ENTITIES'),
     historyFrames: positiveInteger('PROFILE_HISTORY_FRAMES'),
     warmup: positiveInteger('PROFILE_WARMUP'),
@@ -95,5 +104,6 @@ try {
         browser.kill()
         await new Promise(resolve => browser.once('exit', resolve))
     }
-    fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    // Let pending browser shutdown callbacks run between cleanup retries.
+    await fs.promises.rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 }

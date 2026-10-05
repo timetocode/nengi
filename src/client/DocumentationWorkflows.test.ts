@@ -29,15 +29,34 @@ function documentedHandler<TArg = Frame>(doc: string, name: string, occurrence: 
     return new Function(...Object.keys(scope), `${javascript}\nreturn ${name}`)(...Object.values(scope)) as (arg: TArg) => void
 }
 
+test('the plain client renders everyone unless local prediction owns one player', () => {
+    const sprites = new Map([[10, { x: 0, y: 0 }], [20, { x: 0, y: 0 }]])
+    const states = new Map([[10, { nid: 10, x: 30, y: 40 }], [20, { nid: 20, x: 50, y: 60 }]])
+    const render = documentedHandler<number | undefined>('plain-channels.md', 'render', 0, {
+        sprites, controlledNid: 10,
+        interpolator: {
+            sampleEntities: (nids: Iterable<number>) => ({
+                entities: new Map(Array.from(nids, nid => [nid, states.get(nid)]))
+            })
+        }
+    })
+    render(undefined)
+    expect(sprites.get(10)).toEqual({ x: 30, y: 40 })
+    expect(sprites.get(20)).toEqual({ x: 50, y: 60 })
+    sprites.set(10, { x: 80, y: 90 })
+    render(10)
+    expect(sprites.get(10)).toEqual({ x: 80, y: 90 })
+})
+
 test('the canonical movement loop predicts each render duration and discards paused input time', () => {
     const predict = jest.fn()
     const clearHeldInput = jest.fn()
     const document = { hidden: false }
     const render = documentedHandler<number>('canonical-snippets.md', 'renderFrame', 0, {
         document, clearHeldInput,
-        client: { network: { processNextFrame: () => undefined }, flush: () => {} },
+        client: { connectionState: 'connected', network: { processNextFrame: () => undefined }, flush: () => {} },
         movementPrediction: { predict, reconcile: () => {} },
-        readMoveCommand: () => ({ dx: 1 }), predictedPlayer: {},
+        readMoveCommand: () => ({ dx: 1 }), predictedPlayer: {}, controlledNid: 10,
         applyNetworkFrame: () => {}, renderLocalPlayer: () => {}, render: () => {}
     })
     for (const dt of [7, 19, 11]) render(dt)

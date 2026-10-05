@@ -1,3 +1,5 @@
+import { HISTORIAN_INDEX_ENTRIES_PER_SAMPLE, historianCellSize, historianCellSpan } from './historianGrid'
+
 export type HistorianValue = boolean | number | string
 
 export type Historian2DSpatialIndexOptions = 'none' | {
@@ -102,9 +104,10 @@ export class Historian2D {
     constructor(options: Historian2DOptions) {
         this.retentionMs = Math.max(0, options.retentionMs)
         if (options.spatialIndex && options.spatialIndex !== 'none') {
+            if (options.spatialIndex.type !== 'grid') throw new Error('Historian spatialIndex must be none or a grid configuration.')
             this.spatialIndex = {
                 type: 'grid',
-                cellSize: Math.max(1, options.spatialIndex.cellSize)
+                cellSize: historianCellSize(options.spatialIndex.cellSize)
             }
         }
     }
@@ -463,6 +466,7 @@ export class Historian2D {
         }
         const cellSize = this.spatialIndex.cellSize
         const cells = new Map<string, HistorianSpatialSample2D[]>()
+        let remainingEntries = samples.length * HISTORIAN_INDEX_ENTRIES_PER_SAMPLE
         for (let i = 0; i < samples.length; i++) {
             const sample = samples[i]
             const bounds = this.getSampleBounds(sample)
@@ -470,6 +474,9 @@ export class Historian2D {
             const maxCellX = Math.floor(bounds.maxX / cellSize)
             const minCellY = Math.floor(bounds.minY / cellSize)
             const maxCellY = Math.floor(bounds.maxY / cellSize)
+            const entries = historianCellSpan(minCellX, maxCellX) * historianCellSpan(minCellY, maxCellY)
+            if (entries > remainingEntries) return null
+            remainingEntries -= entries
             for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
                 for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
                     const key = `${cellX},${cellY}`
@@ -500,6 +507,8 @@ export class Historian2D {
         const maxCellX = Math.floor(bounds.maxX / cellSize)
         const minCellY = Math.floor(bounds.minY / cellSize)
         const maxCellY = Math.floor(bounds.maxY / cellSize)
+        const cellCount = historianCellSpan(minCellX, maxCellX) * historianCellSpan(minCellY, maxCellY)
+        if (cellCount > frame.sampleList.length) return frame.sampleList
         const results: HistorianSpatialSample2D[] = []
         const seen = new Set<number>()
 

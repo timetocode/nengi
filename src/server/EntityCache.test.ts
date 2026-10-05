@@ -3,6 +3,34 @@ import { defineEntitySchema } from '../common/binary/schema/defineSchema'
 import { EntityCache } from './EntityCache'
 
 describe('EntityCache', () => {
+    it.each([false, true])('keeps empty and retained changed diffs independent across ticks, grouped=%s', grouped => {
+        const schema = defineEntitySchema({
+            position: Binary.Vector2,
+            label: Binary.String,
+            ...(grouped ? { $options: { updateGroups: { state: ['position', 'label'] } } } : {})
+        })
+        const entity = { nid: 1, ntype: 1, position: { x: 1, y: 2 }, label: 'a' }
+        const cache = new EntityCache()
+        cache.cacheify(1, entity, schema)
+        cache.createCachesForTick(1)
+        const empty = cache.getAndDiffGrouped(1, entity, schema)
+        expect(() => (empty.changes as any[]).push({})).toThrow()
+        expect(() => (empty.groups as any[]).push({})).toThrow()
+
+        entity.position.x = 10
+        cache.createCachesForTick(2)
+        const changed = cache.getAndDiffGrouped(2, entity, schema)
+        const value = grouped ? changed.groups[0].values[0] : changed.changes[0].value
+        expect(value).toEqual({ x: 10, y: 2 })
+        cache.createCachesForTick(3)
+        expect(cache.getAndDiffGrouped(3, entity, schema)).toBe(empty)
+        entity.position.x = 20
+        cache.createCachesForTick(4)
+        cache.getAndDiffGrouped(4, entity, schema)
+        expect(value).toEqual({ x: 10, y: 2 })
+        expect(empty).toEqual({ changes: [], groups: [] })
+    })
+
     it('detects in-place typed-array edits and keeps the emitted diff stable until the next tick', () => {
         const schema = defineEntitySchema({ bytes: Binary.UInt8Array })
         const entity = { nid: 1, ntype: 1, bytes: new Uint8Array([7]) }

@@ -1,7 +1,7 @@
 import { Instance } from '../../server/Instance'
 import { BinaryPayload } from '../../common/binary/BinaryAdapter'
 import { byteSizeOfNetworkType, ProtocolConfig } from '../../common/binary/Protocol'
-import { createEmptySnapshotPlan } from './SnapshotPlan'
+import { EMPTY_SNAPSHOT_PLAN } from './SnapshotPlan'
 import { createSnapshotChunk, createSnapshotPlanChunk, SnapshotChunk } from './SnapshotChunk'
 import { writeChannelScope } from './writeSnapshot'
 import { writePayload } from './snapshotPayload'
@@ -40,8 +40,7 @@ export function createSharedMessageFragmentChunk(instance: Instance, messageFrag
 }
 
 export function createProtocolPreludeChunk(instance: Instance, protocol: ProtocolConfig) {
-    const plan = createEmptySnapshotPlan()
-    plan.engineMessages = [instance.network.createProtocolEngineMessage()]
+    const plan = { ...EMPTY_SNAPSHOT_PLAN, engineMessages: [instance.network.createProtocolEngineMessage(protocol)] }
     return createSnapshotPlanChunk('ProtocolPrelude', plan, instance.context, protocol)
 }
 

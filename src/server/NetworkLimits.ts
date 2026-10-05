@@ -5,6 +5,8 @@ export const DEFAULT_NETWORK_LIMITS = Object.freeze({
     maxConnections: 4096,
     maxPendingConnections: 256,
     maxPacketBytes: 64 * 1024,
+    // Complete incoming packets before acceptance, including wire metadata.
+    maxHandshakeBytes: 8 * 1024,
     packetsPerSecond: 1024,
     packetBurst: 2048,
     bytesPerSecond: 128 * 1024,

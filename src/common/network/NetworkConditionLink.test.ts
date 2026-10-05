@@ -3,6 +3,7 @@ import {
     NetworkConditionTimerDriver,
     NetworkDelayModel
 } from './NetworkConditionLink'
+import { BinaryPayload } from '../binary/BinaryAdapter'
 
 describe('NetworkConditionLink', () => {
     it('reproduces seeded asymmetric jitter independently by direction', () => {
@@ -78,24 +79,80 @@ describe('NetworkConditionLink', () => {
         expect(link.status(30).clientToServer.queued).toBe(0)
     })
 
-    it('copies delayed binary payloads when they are enqueued', () => {
-        let nowMs = 0
-        const link = new NetworkConditionLink(
-            { seed: 2, clientToServer: { latencyMs: 10 } },
-            { now: () => nowMs }
-        )
-        const source = new Uint8Array([1, 2, 3])
-        let received: Uint8Array | undefined
+    describe.each(['clientToServer', 'serverToClient'] as const)('%s payload ownership', direction => {
+        const payloads: [string, () => BinaryPayload][] = [
+            ['ArrayBuffer', () => new Uint8Array([18, 52]).buffer],
+            ['DataView', () => new DataView(new Uint8Array([0, 18, 52, 255]).buffer, 1, 2)],
+            ['Buffer', () => Buffer.from([0, 18, 52, 255]).subarray(1, 3)],
+            ['Uint8Array', () => new Uint8Array([0, 18, 52, 255]).subarray(1, 3)],
+            ['Uint8ClampedArray', () => new Uint8ClampedArray([0, 18, 52, 255]).subarray(1, 3)],
+            ['Int8Array', () => new Int8Array([0, -1, 127, 0]).subarray(1, 3)],
+            ['Uint16Array', () => new Uint16Array([0, 0x1234, 0xffff, 0]).subarray(1, 3)],
+            ['Int16Array', () => new Int16Array([0, -1234, 32767, 0]).subarray(1, 3)],
+            ['Uint32Array', () => new Uint32Array([0, 0x12345678, 0xffffffff, 0]).subarray(1, 3)],
+            ['Int32Array', () => new Int32Array([0, -12345678, 0x7fffffff, 0]).subarray(1, 3)],
+            ['Float32Array', () => new Float32Array([0, 1.5, -2.75, 0]).subarray(1, 3)],
+            ['Float64Array', () => new Float64Array([0, Math.PI, -0, 0]).subarray(1, 3)],
+            ['BigInt64Array', () => new BigInt64Array([BigInt(0), BigInt(-123), BigInt('9223372036854775807'), BigInt(0)]).subarray(1, 3)],
+            ['BigUint64Array', () => new BigUint64Array([BigInt(0), BigInt(123), BigInt('18446744073709551615'), BigInt(0)]).subarray(1, 3)],
+            ['empty view', () => new Uint16Array([1, 2]).subarray(1, 1)],
+            ['NaN bit pattern', () => new Float32Array(new Uint32Array([0x7fc01234]).buffer)]
+        ]
 
-        link.sendClientToServer(source, payload => {
-            received = payload
+        it.each(payloads)('owns the exact byte window and type of %s', (_name, createPayload) => {
+            let nowMs = 0
+            const link = new NetworkConditionLink(
+                { seed: 2, [direction]: { latencyMs: 10 } },
+                { now: () => nowMs }
+            )
+            const source = createPayload()
+            const expectedBytes = Array.from(payloadBytes(source))
+            const received: BinaryPayload[] = []
+            const deliver = (payload: BinaryPayload) => received.push(payload)
+
+            if (direction === 'clientToServer') link.sendClientToServer(source, deliver)
+            else link.sendServerToClient(source, deliver)
+            payloadBytes(source).fill(255)
+            expect(received).toHaveLength(0)
+            nowMs = 10
+            expect(link.advance()).toBe(1)
+
+            const copy = received[0]
+            expect(copy).not.toBe(source)
+            expect(copy.constructor).toBe(source.constructor)
+            expect(copy.byteLength).toBe(source.byteLength)
+            expect(Array.from(payloadBytes(copy))).toEqual(expectedBytes)
+            if ('length' in source && 'length' in copy) expect(copy.length).toBe(source.length)
         })
-        source[0] = 99
-        nowMs = 10
-        link.advance()
 
-        expect(received).toEqual(new Uint8Array([1, 2, 3]))
-        expect(received).not.toBe(source)
+        it('leaves pending deliveries and scheduling status intact when a copy fails', () => {
+            let nowMs = 0
+            const timers = new FakeTimers(() => nowMs)
+            const delays = [20, 100, 0]
+            const link = new NetworkConditionLink(
+                { seed: 2, [direction]: { model: { sample: () => ({ delayMs: delays.shift()! }) } } },
+                { now: () => nowMs, timers }
+            )
+            const received: number[] = []
+            const send = (payload: Uint8Array) => direction === 'clientToServer'
+                ? link.sendClientToServer(payload, value => received.push(value[0]))
+                : link.sendServerToClient(payload, value => received.push(value[0]))
+
+            expect(send(new Uint8Array([1]))).toBe(20)
+            const beforeFailure = link.status()
+            const detached = new Uint8Array([2])
+            structuredClone(detached.buffer, { transfer: [detached.buffer] })
+            expect(() => send(detached)).toThrow('detached')
+            expect(link.status()).toEqual(beforeFailure)
+            expect(timers.pending()).toBe(1)
+
+            expect(send(new Uint8Array([3]))).toBe(20)
+            nowMs = 20
+            timers.runDue()
+            expect(received).toEqual([1, 3])
+            expect(link.status()[direction]).toMatchObject({ queued: 0, enqueued: 2, delivered: 2 })
+            expect(timers.pending()).toBe(0)
+        })
     })
 
     it('preserves queued release times when conditions are reconfigured', () => {
@@ -169,6 +226,12 @@ describe('NetworkConditionLink', () => {
         expect(() => link.advance()).toThrow('cannot move backwards')
     })
 })
+
+function payloadBytes(payload: BinaryPayload) {
+    return payload instanceof ArrayBuffer
+        ? new Uint8Array(payload)
+        : new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
+}
 
 function sampledSchedule(seed: number) {
     let nowMs = 0

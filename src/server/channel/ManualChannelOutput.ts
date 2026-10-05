@@ -1,4 +1,5 @@
 import { ProtocolConfig } from '../../common/binary/Protocol'
+import { assertBinaryWriteSize } from '../../binary/assertBinaryWriteSize'
 import { Instance } from '../Instance'
 import { User } from '../User'
 import { createEmptySnapshotPlan, SnapshotPlan } from '../../binary/snapshot/SnapshotPlan'
@@ -24,7 +25,7 @@ import {
     ChannelSnapshotOutput,
     createChunkedChannelSnapshotOutput
 } from './ChannelSnapshotOutput'
-import { ManualChannel } from './ManualChannel'
+import { ManualChannel, ManualChannelSnapshotVisibility } from './ManualChannel'
 
 function hasManualChannelCrud(plan: SnapshotPlan) {
     return plan.createEntities.length > 0 || plan.deleteEntities.length > 0
@@ -39,10 +40,13 @@ function hasPlanContent(plan: SnapshotPlan) {
         plan.interpolatedMessages.length > 0
 }
 
-function addManualUpdates(plan: SnapshotPlan, instance: Instance, channel: ManualChannel, visibleUpdates: Set<number>) {
+function addManualUpdates(plan: SnapshotPlan, instance: Instance, channel: ManualChannel, visibility: ManualChannelSnapshotVisibility) {
+    const previousVisibleSet = visibility.previousVisibleSet
+    if (!previousVisibleSet) return
+
     for (let i = 0; i < channel.manualPropNids.length; i++) {
         const nid = channel.manualPropNids[i]
-        if (!visibleUpdates.has(nid)) {
+        if (!previousVisibleSet.has(nid) || !visibility.visibleSet.has(nid)) {
             continue
         }
         const entity = instance.localState.getByNid(nid)
@@ -60,7 +64,7 @@ function addManualUpdates(plan: SnapshotPlan, instance: Instance, channel: Manua
 
     for (let i = 0; i < channel.manualGroupNids.length; i++) {
         const nid = channel.manualGroupNids[i]
-        if (!visibleUpdates.has(nid)) {
+        if (!previousVisibleSet.has(nid) || !visibility.visibleSet.has(nid)) {
             continue
         }
         const entity = instance.localState.getByNid(nid)
@@ -106,6 +110,7 @@ function getManualUpdateChannelFragment(user: User, instance: Instance, channel:
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeManualUpdates(channel, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Manual channel updates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -115,7 +120,7 @@ function getManualUpdateChannelFragment(user: User, instance: Instance, channel:
         bytes,
         updateProps: channel.manualPropNids.length,
         updateGroups: channel.manualGroupNids.length,
-        groupedUpdateProps: countManualGroupedProps(channel)
+        groupedUpdateProps: measure ? countManualGroupedProps(channel) : 0
     }
     instance.network.sharedUpdateFragments.set(key, fragment)
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
@@ -130,15 +135,22 @@ export function createManualChannelOutput(
 ): ChannelSnapshotOutput {
     const visibility = channel.collectSnapshotVisibility(user)
     coalesceManualUpdateLog(channel)
-    const plan = createEmptySnapshotPlan()
-    for (let i = 0; i < visibility.toCreate.length; i++) {
-        addRegularCreate(plan, instance, visibility.toCreate[i])
+    const needsPlan = visibility.toCreate.length > 0 || visibility.toDelete.length > 0 ||
+        channel.broadcastMessages.length > 0 || channel.interpolatedBroadcastMessages.length > 0 ||
+        user.scopedMessageQueue.length > 0 || user.scopedInterpolatedMessageQueue.length > 0
+    const plan = needsPlan ? createEmptySnapshotPlan() : null
+    if (plan) {
+        for (let i = 0; i < visibility.toCreate.length; i++) {
+            addRegularCreate(plan, instance, visibility.toCreate[i])
+        }
+        for (let i = 0; i < visibility.toDelete.length; i++) {
+            plan.deleteEntities.push(visibility.toDelete[i])
+        }
+        addChannelMessages(plan, user, channel, true)
     }
-    plan.deleteEntities = visibility.toDelete
-    addChannelMessages(plan, user, channel, true)
-    const writeManualLogDirectly = !hasManualChannelCrud(plan)
-    if (!writeManualLogDirectly) {
-        addManualUpdates(plan, instance, channel, new Set(visibility.toUpdate))
+    const writeManualLogDirectly = !plan || !hasManualChannelCrud(plan)
+    if (plan && !writeManualLogDirectly) {
+        addManualUpdates(plan, instance, channel, visibility)
     }
     const fragment = writeManualLogDirectly &&
         instance.network.sharedUpdateFragmentsEnabled &&
@@ -149,7 +161,7 @@ export function createManualChannelOutput(
     const chunks: SnapshotChunk[] = [
         createChannelScopeChunk(channel.nid, protocol)
     ]
-    if (hasPlanContent(plan)) {
+    if (plan && hasPlanContent(plan)) {
         chunks.push(createSnapshotPlanChunk('ManualChannelMessages', plan, instance.context, protocol))
     }
     if (fragment) {
@@ -163,19 +175,19 @@ export function createManualChannelOutput(
     return createChunkedChannelSnapshotOutput({
         channelId: channel.nid,
         chunks,
-        stats: {
-            creates: plan.createEntities.length,
+        stats: instance.network.snapshotPerformanceEnabled ? {
+            creates: plan?.createEntities.length ?? 0,
             updateProps: fragment ? fragment.updateProps :
-                writeManualLogDirectly ? channel.manualPropNids.length : plan.updateEntities.length,
+                writeManualLogDirectly ? channel.manualPropNids.length : plan!.updateEntities.length,
             updateGroups: fragment ? fragment.updateGroups :
-                writeManualLogDirectly ? channel.manualGroupNids.length : plan.updateEntityGroups.length,
+                writeManualLogDirectly ? channel.manualGroupNids.length : plan!.updateEntityGroups.length,
             groupedUpdateProps: fragment ? fragment.groupedUpdateProps :
                 writeManualLogDirectly ? countManualGroupedProps(channel) :
-                    plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
-            deletes: plan.deleteEntities.length,
-            messages: countPlanMessages(plan),
+                    plan!.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0),
+            deletes: plan?.deleteEntities.length ?? 0,
+            messages: plan ? countPlanMessages(plan) : 0,
             usedSharedFragments: !!fragment
-        },
+        } : null,
         commit() {
             channel.rememberSnapshotVisibility(user.id, visibility)
         }

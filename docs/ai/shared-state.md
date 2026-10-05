@@ -20,6 +20,58 @@ Use "nengi schema" and "nengi context" in public docs and generated code. If a
 project team says "n schema" or "n context" informally, treat that as shorthand
 for the same thing.
 
+## Custom binary types
+
+Prefer built-in `Binary` values when they fit. For a custom encoding, reserve a
+stable numeric ID at or above `CUSTOM_BINARY_TYPE_START` (1024). Lower IDs belong
+to nengi, including currently unused IDs. Allocate custom IDs centrally in your
+shared protocol code so independent features cannot accidentally claim the same
+number.
+
+Register each ID once at module initialization, before creating schemas or
+connections. Registration is shared by every Context using that loaded copy of
+nengi; it is not per client, connection or Context. A second registration throws,
+even for the same specification. It cannot replace an existing type.
+
+```ts
+// shared/binary-types.ts
+import { CUSTOM_BINARY_TYPE_START, declareBinaryType } from 'nengi'
+
+export const CustomAmount = declareBinaryType<number>(CUSTOM_BINARY_TYPE_START, {
+    write: (value, writer) => writer.writeFloat64(value),
+    read: reader => reader.readFloat64(),
+    byteSize: () => 8,
+    compare: (a, b) => a === b
+})
+```
+
+Use the returned value in a schema like any built-in Binary value. Both programs
+must load the same ID definitions and encoding behavior. Schema fingerprints
+compare type IDs; they do not compare JavaScript implementations.
+
+`write`, `read`, `byteSize` and `compare` are required functions. Optional `pre`,
+`post`, `interp` and `clone` hooks must also be functions when supplied. Setup
+validation cannot prove that byte counts match writes or that an encoding is
+correct. Invalid registration leaves the ID available for a corrected definition.
+
+The default clone preserves identity, which is appropriate for immutable values.
+Mutable custom values need a `clone` that returns independent data for history
+reads and sampling. A custom `interp` must honor the same ownership contract.
+These setup checks add no per-value validation to serialization's hot path.
+
+## String values
+
+`Binary.String` uses a byte-length prefix and UTF-8 data. Valid Unicode characters,
+including a leading U+FEFF character, are preserved by both official binary backends.
+An unpaired UTF-16 surrogate, such as half an emoji left by a string slice, arrives
+as the replacement character U+FFFD (`�`). JavaScript string length counts UTF-16
+code units, not UTF-8 bytes; let nengi count the encoded size.
+
+This applies to schema-backed entities, components, messages, commands and endpoint
+payloads. JSON payloads retain JSON's own escaping rules. Choose application text
+validation and truncation deliberately; UTF-8 encoding does not enforce display-name
+rules or text length limits.
+
 ## Plain replicated objects
 
 For ordinary channels, the replicated object is the network entity. Put the
@@ -154,6 +206,30 @@ creates `TransformNet` or lower-level writers for the channel it authors. Use
 `mutate` when the binding should assign component fields and emit the matching
 network mutation. Use `writer` only when code deliberately manages assignment
 itself and wants to append the network mutation separately.
+
+## Interpolated angles
+
+Ordinary `Binary.Float32` and `Binary.Float64` use linear interpolation. For a
+wrapped angle in radians, use `Binary.Rotation32` (Float32 on the wire) or
+`Binary.Rotation` (Float64 on the wire), and enable interpolation on the property:
+
+```ts
+const OrientationSchema = defineEntitySchema({
+    yaw: { type: Binary.Rotation, interp: true },
+    pitch: { type: Binary.Float64, interp: true }
+})
+```
+
+The rotation types follow the short angular path across the zero/full-turn
+boundary. Here, pitch is constrained to an interval without wrapping,
+so ordinary linear interpolation is appropriate. Use the rotation types when
+nengi samples the orientation; game-owned interpolation may choose its own
+representation. There is no need to send sine/cosine components solely to make a
+wrapped scalar angle interpolate correctly.
+
+Choosing an interpolation type does not change the prediction contract. Retain
+the original command values and use matching wire precision for the simulation;
+an interpolated display angle is presentation state.
 
 ## Messages, commands, and requests
 

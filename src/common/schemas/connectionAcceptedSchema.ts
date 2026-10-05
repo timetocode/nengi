@@ -3,4 +3,5 @@ import { Binary } from '../binary/Binary'
 
 export const connectionAcceptedSchema = defineMessageSchema({
     wireProtocolVersion: Binary.UInt16,
+    clientData: Binary.String,
 })

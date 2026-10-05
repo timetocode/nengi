@@ -57,7 +57,7 @@ describe('InstanceNetwork', () => {
                 return testBinaryAdapter.createWriter(bytes)
             }
         }
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         ;(user.networkAdapter.send as jest.Mock).mockImplementation((_user, payload) => {
             const sentAtMs = nowMs
             expect(user.lastPingSentAtMs).toBe(sentAtMs)
@@ -168,7 +168,7 @@ describe('InstanceNetwork', () => {
             pongTimeoutMs: 3000
         })
         const user = createOpenUser(instance)
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
 
         instance.step()
         expect(user.lastPingSentAtMs).toBe(0)
@@ -517,9 +517,11 @@ describe('InstanceNetwork', () => {
         const user = createOpenUser(instance)
         user.connectionState = UserConnectionState.OpenPreHandshake
         instance.onConnect = async handshake => ({
-            accountId: 'account-7',
-            characterId: handshake.characterId,
-            isAdmin: true
+            serverData: {
+                accountId: 'account-7',
+                characterId: handshake.characterId,
+                isAdmin: true
+            }
         })
 
         await instance.network.onHandshake(user, {
@@ -542,7 +544,13 @@ describe('InstanceNetwork', () => {
         const instance = new Instance(new Context())
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
 
-        await instance.onConnect({
+        const user = new User(undefined, {
+            binary: testBinaryAdapter,
+            send: jest.fn(),
+            disconnect: jest.fn()
+        } as any)
+        instance.network.onOpen(user)
+        await instance.network.onHandshake(user, {
             token: 'secret-token',
             characterId: 'knight'
         })
@@ -556,7 +564,7 @@ describe('InstanceNetwork', () => {
     it('treats a second handshake from an open user as a disconnecting protocol violation', async () => {
         const instance = new Instance(new Context())
         const user = createOpenUser(instance)
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
         instance.onConnect = async () => true
 
         await instance.network.onHandshake(user, {})
@@ -594,7 +602,7 @@ describe('InstanceNetwork', () => {
         const user = createOpenUser(instance)
         const channel = new Channel(instance.localState)
         const spatialChannel = new EcsChannel2D(instance.localState, 100)
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
 
         channel.subscribe(user)
         spatialChannel.subscribe(user, {
@@ -644,7 +652,7 @@ describe('InstanceNetwork', () => {
         for (let i = 1; i <= 1000; i++) {
             const user = createOpenUser(instance)
             user.id = i
-            instance.users.set(user.id, user)
+            instance.connectedUsers.set(user.id, user)
             channel.subscribe(user)
             spatialChannel.subscribe(user, {
                 x: i % 100,
@@ -737,8 +745,8 @@ describe('InstanceNetwork', () => {
         const clearBroadcastMessages = jest.fn()
         const clearSnapshotDeltas = jest.fn()
         instance.onSnapshotSendError = onSnapshotSendError
-        instance.users.set(failedUser.id, failedUser)
-        instance.users.set(goodUser.id, goodUser)
+        instance.connectedUsers.set(failedUser.id, failedUser)
+        instance.connectedUsers.set(goodUser.id, goodUser)
         instance.localState.channels.add({
             clearBroadcastMessages,
             clearSnapshotDeltas
@@ -774,7 +782,7 @@ describe('InstanceNetwork', () => {
         const instance = new Instance(context)
         const user = createOpenUser(instance)
         const clientNetwork = createClientNetwork(context)
-        instance.users.set(user.id, user)
+        instance.connectedUsers.set(user.id, user)
 
         instance.step()
 
@@ -799,8 +807,8 @@ describe('InstanceNetwork', () => {
         const context = new Context()
         const instance = new Instance(context, { now: () => nowMs })
         const user = createOpenUser(instance)
-        const clientNetwork = createClientNetwork(context)
-        instance.users.set(user.id, user)
+        const clientNetwork = createClientNetwork(context, () => nowMs - 900)
+        instance.connectedUsers.set(user.id, user)
 
         instance.step()
         const send = user.networkAdapter.send as jest.Mock

@@ -37,7 +37,7 @@ describe('snapshot performance workloads', () => {
             }
             instance.step()
             for (let i = 0; i < clients.length; i++) {
-                clients[i].readSnapshotUnsafe(testBinaryAdapter.createReader(payloads.get(users[i].id)!))
+                clients[i].readSnapshot(testBinaryAdapter.createReader(payloads.get(users[i].id)!))
                 expect(clients[i].processNextFrame()).toBeDefined()
                 expect(new Set(clients[i].store.entities.keys())).toEqual(liveNids)
                 expect(new Set(clients[i].store.ecsEntities.keys())).toEqual(new Set(channel.rootNids))

@@ -12,12 +12,11 @@ describe.each([false, true])('decoder lifecycle (ECS=%s)', useEcs => {
             context.register(2, defineEntitySchema({ label: Binary.String }))
             const instance = new Instance(context)
             instance.onConnect = async () => true
-            const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+            const adapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
             const socket = adapter.createMockConnect()
             const client = new Client(context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
             const errors: unknown[] = []
-            client.setWebsocketErrorHandler(error => errors.push(error))
-            client.setDisconnectHandler(() => {})
+            client.setDisconnectHandler(info => errors.push(info))
             await client.connect(socket.clientSocket)
             try {
                 const user = Array.from(instance.users.values())[0]
@@ -79,12 +78,11 @@ test.each(['entity', 'channel'])('queued %s replacement can reuse IDs with a dif
     context.register(3, defineEntitySchema({ y: Binary.UInt8 }))
     const instance = new Instance(context)
     instance.onConnect = async () => true
-    const adapter = new LocalInstanceAdapter(instance.network, { binary: testBinaryAdapter })
+    const adapter = new LocalInstanceAdapter(instance.adapterHost, { binary: testBinaryAdapter })
     const socket = adapter.createMockConnect()
     const client = new Client(context, LocalClientAdapter, 20, { binary: testBinaryAdapter })
     const errors: unknown[] = []
-    client.setWebsocketErrorHandler(error => errors.push(error))
-    client.setDisconnectHandler(() => {})
+    client.setDisconnectHandler(info => errors.push(info))
     await client.connect(socket.clientSocket)
     try {
         const user = Array.from(instance.users.values())[0]

@@ -33,7 +33,12 @@ export function updateNObject(source: IEntity, target: IEntity, nschema: Schema)
 
 export type EntityChange = { nid: number, nschema: Schema, prop: string, value: any }
 export type EntityUpdateGroup = { nid: number, nschema: Schema, group: SchemaUpdateGroup, values: any[] }
-export type EntityDiffResult = { changes: EntityChange[], groups: EntityUpdateGroup[] }
+export type EntityDiffResult = { readonly changes: readonly EntityChange[], readonly groups: readonly EntityUpdateGroup[] }
+
+const NO_CHANGES: readonly EntityChange[] = Object.freeze([])
+const NO_GROUPS: readonly EntityUpdateGroup[] = Object.freeze([])
+// Diff results are read-only inputs to all subscribers in this tick.
+const NO_DIFF: EntityDiffResult = Object.freeze({ changes: NO_CHANGES, groups: NO_GROUPS })
 
 function emitUpdateGroup(
     current: IEntity,
@@ -75,19 +80,20 @@ function allGroupPropsChanged(current: IEntity, previous: IEntity, group: Schema
  * @param nschema
  * @returns
  */
-export function compareAndUpdateNObject(current: IEntity, previous: IEntity, nschema: Schema) {
-    const entityChanges: EntityChange[] = []
+export function compareAndUpdateNObject(current: IEntity, previous: IEntity, nschema: Schema): readonly EntityChange[] {
+    let entityChanges: EntityChange[] | undefined
 
     for (let i = 0; i < nschema.keys.length; i++) {
         const { prop, binary } = nschema.keys[i]
         const oldValue = previous[prop]
         const value = current[prop]
         if (!binary.compare(oldValue, value)) {
+            entityChanges ??= []
             entityChanges.push({ nid: current.nid, nschema, prop, value: binary.clone(value) })
             previous[prop] = binary.clone(value)
         }
     }
-    return entityChanges
+    return entityChanges ?? NO_CHANGES
 }
 
 /**
@@ -100,14 +106,12 @@ export function compareAndUpdateNObject(current: IEntity, previous: IEntity, nsc
  */
 export function compareAndUpdateNObjectGrouped(current: IEntity, previous: IEntity, nschema: Schema): EntityDiffResult {
     if (nschema.updateGroups.length === 0) {
-        return {
-            changes: compareAndUpdateNObject(current, previous, nschema),
-            groups: []
-        }
+        const changes = compareAndUpdateNObject(current, previous, nschema)
+        return changes.length === 0 ? NO_DIFF : { changes, groups: NO_GROUPS }
     }
 
-    const changes: EntityChange[] = []
-    const groups: EntityUpdateGroup[] = []
+    let changes: EntityChange[] | undefined
+    let groups: EntityUpdateGroup[] | undefined
     const generation = ++nschema.updateGroupGeneration
 
     for (let i = 0; i < nschema.keys.length; i++) {
@@ -125,14 +129,15 @@ export function compareAndUpdateNObjectGrouped(current: IEntity, previous: IEnti
         }
 
         if (group && group.mode === 'any') {
-            emitUpdateGroup(current, previous, nschema, group, generation, groups)
+            emitUpdateGroup(current, previous, nschema, group, generation, groups ??= [])
         } else if (group && group.mode === 'full' && allGroupPropsChanged(current, previous, group)) {
-            emitUpdateGroup(current, previous, nschema, group, generation, groups)
+            emitUpdateGroup(current, previous, nschema, group, generation, groups ??= [])
         } else {
+            changes ??= []
             changes.push({ nid: current.nid, nschema, prop, value: binary.clone(value) })
             previous[prop] = binary.clone(value)
         }
     }
 
-    return { changes, groups }
+    return changes || groups ? { changes: changes ?? NO_CHANGES, groups: groups ?? NO_GROUPS } : NO_DIFF
 }

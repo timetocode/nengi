@@ -65,6 +65,46 @@ function actorState() {
 }
 
 describe('ECS channel binding', () => {
+    it.each(['plain', '2d', '3d'] as const)('%s mutators restore values on rejected emission and validate targets', mode => {
+        const context = createContext()
+        const world = new EcsWorld()
+        const channel = mode === 'plain' ? new EcsChannel(new LocalState()) :
+            mode === '2d' ? new EcsChannel2D(new LocalState(), 100) : new EcsChannel3D(new LocalState(), 100)
+        const binding = bindEcsChannel(world, channel, { context })
+        const network = binding.component(Transform)
+        const pid = binding.createEntity()
+        const component = 'addSpatial' in network ? network.addSpatial(pid, transformState()) : network.add(pid, transformState())
+        const prop = jest.spyOn(channel, 'appendBoundComponentProp').mockImplementation(() => {
+            expect(component.x).toBe(150)
+            throw new Error('rejected prop')
+        })
+        expect(() => network.mutate.props.x(component, 150)).toThrow('rejected prop')
+        expect(component.x).toBe(0)
+        prop.mockRestore()
+
+        const group = jest.spyOn(channel, 'appendBoundComponentGroup').mockImplementation(() => {
+            expect([component.x, component.y, component.rotation]).toEqual([150, 250, 1.5])
+            throw new Error('rejected group')
+        })
+        expect(() => network.mutate.groups.pose(component, 150, 250, 1.5)).toThrow('rejected group')
+        expect([component.x, component.y, component.rotation]).toEqual([0, 0, 0])
+        group.mockRestore()
+
+        expect(() => network.mutate.props.x({ ...component }, 1)).toThrow('not owned by this channel binding')
+        expect(() => network.mutate.groups.pose({ ...component }, 1, 2, 3)).toThrow('not owned by this channel binding')
+        network.mutate.props.x(component, 150)
+        expect(component.x).toBe(150)
+        network.mutate.groups.pose(component, 250, 350, 2)
+        expect([component.x, component.y, component.rotation]).toEqual([250, 350, 2])
+        if (channel instanceof EcsChannel) {
+            expect(channel.manualPropValues).toEqual([150])
+            expect(channel.manualGroupValues).toEqual([250, 350, 2])
+        } else {
+            const log = channel.getManualCellUpdateLog(mode === '2d' ? '2:3' : '2:3:0')!
+            expect(log.manualGroupValues).toEqual([250, 350, 2])
+        }
+    })
+
     it('keeps world roots, network roots, and local components separate', () => {
         const context = createContext()
         const world = new EcsWorld()

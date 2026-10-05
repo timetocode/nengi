@@ -65,59 +65,197 @@ export function getCommandViewTimeMs(timing: CommandTimingEstimate | undefined, 
 }
 
 export class User {
-    id = 0
+    private observedId = 0
+    /** @internal */
     socket: any
+    /** @internal */
     instance: Instance | null = null
+    /** @internal */
     networkAdapter: IServerNetworkAdapter<any, any, any>
+    /** @internal */
     network: InstanceNetwork | null = null
-    remoteAddress: string | null = null
-    openedAtMs: number | null = null
-    connectionState = UserConnectionState.NULL
+    private observedRemoteAddress: string | null = null
+    private observedOpenedAtMs: number | null = null
+    private observedConnectionState = UserConnectionState.NULL
+    /** @internal */
     subscriptions = new Map<number, IChannel>()
+    /** @internal */
     engineMessageQueue: any[] = []
+    /** @internal */
     messageQueue: any[] = []
+    /** @internal */
     interpolatedMessageQueue: any[] = []
+    /** @internal */
     scopedMessageQueue: { channelId: number, message: any }[] = []
+    /** @internal */
     scopedInterpolatedMessageQueue: { channelId: number, message: any }[] = []
+    /** @internal */
     responseQueue: SnapshotResponse[] = []
     /** Engine accounting; consume server queues through next/dequeue/removeWhere/clear. */
+    /** @internal */
     queuedCommandCount = 0
+    /** @internal */
     queuedRequestCount = 0
+    /** @internal */
     queuedInputBytes = 0
+    /** @internal */
     queuedResponseBytes = 0
+    /** @internal */
     inboundRateTimeMs: number | null = null
+    /** @internal */
     inboundPacketTokens = 0
+    /** @internal */
     inboundByteTokens = 0
+    /** @internal */
     protocol: ProtocolConfig = { ...DEFAULT_PROTOCOL }
+    /** @internal */
     knownChannelIds: Set<number> = new Set()
+    /** @internal */
     knownChannelHeaderVersions: Map<number, number> = new Map()
     private pendingChannelOpens: Set<number> = new Set()
     private pendingChannelCloses: Set<number> = new Set()
+    /** @internal */
     lastSentInstanceTick = 0
-    lastReceivedCommandFrameNumber = 0
+    private observedLastReceivedCommandFrameNumber = 0
     private confirmedCommandFrameNumber = 0
+    /** @internal */
     nextPingId = 1
+    /** @internal */
     lastSentPingId = 0
-    latency = 0
+    private observedLatency = 0
+    /** @internal */
     lastPingSentAtMs: number | null = null
+    /** @internal */
     firstUnansweredPingSentAtMs: number | null = null
+    /** @internal */
     lastPongReceivedAtMs: number | null = null
+    /** @internal */
     pendingPings = new Map<number, { serverTimeMs: number, sentAtMs: number }>()
+    /** @internal */
     recentLatencies: number[] = []
+    /** @internal */
     latencySamples = 3
-    roundTripMs = 0
-    oneWayMs = 0
+    private observedRoundTripMs = 0
+    private observedOneWayMs = 0
+    /** @internal */
     minRoundTripMs = Number.POSITIVE_INFINITY
-    clockOffsetMs = 0
-    clockSyncSamples = 0
-    interpolationDelayMs = 0
+    private observedClockOffsetMs = 0
+    private observedClockSyncSamples = 0
+    private observedInterpolationDelayMs = 0
+    /** @internal */
     lastInterpolationDelayTimeMs = 0
 
+    /** @internal */
     constructor(socket: any, networkAdapter: IServerNetworkAdapter<any, any, any>) {
         this.socket = socket
         this.networkAdapter = networkAdapter
     }
 
+    get id(): number {
+        return this.observedId
+    }
+
+    /** @internal */
+    set id(value: number) {
+        this.observedId = value
+    }
+
+    get remoteAddress(): string | null {
+        return this.observedRemoteAddress
+    }
+
+    /** @internal */
+    set remoteAddress(value: string | null) {
+        this.observedRemoteAddress = value
+    }
+
+    get openedAtMs(): number | null {
+        return this.observedOpenedAtMs
+    }
+
+    /** @internal */
+    set openedAtMs(value: number | null) {
+        this.observedOpenedAtMs = value
+    }
+
+    get connectionState(): UserConnectionState {
+        return this.observedConnectionState
+    }
+
+    /** @internal */
+    set connectionState(value: UserConnectionState) {
+        this.observedConnectionState = value
+    }
+
+    get lastReceivedCommandFrameNumber(): number {
+        return this.observedLastReceivedCommandFrameNumber
+    }
+
+    /** @internal */
+    set lastReceivedCommandFrameNumber(value: number) {
+        this.observedLastReceivedCommandFrameNumber = value
+    }
+
+    get latency(): number {
+        return this.observedLatency
+    }
+
+    /** @internal */
+    set latency(value: number) {
+        this.observedLatency = value
+    }
+
+    get roundTripMs(): number {
+        return this.observedRoundTripMs
+    }
+
+    /** @internal */
+    set roundTripMs(value: number) {
+        this.observedRoundTripMs = value
+    }
+
+    get oneWayMs(): number {
+        return this.observedOneWayMs
+    }
+
+    /** @internal */
+    set oneWayMs(value: number) {
+        this.observedOneWayMs = value
+    }
+
+    get clockOffsetMs(): number {
+        return this.observedClockOffsetMs
+    }
+
+    /** @internal */
+    set clockOffsetMs(value: number) {
+        this.observedClockOffsetMs = value
+    }
+
+    get clockSyncSamples(): number {
+        return this.observedClockSyncSamples
+    }
+
+    /** @internal */
+    set clockSyncSamples(value: number) {
+        this.observedClockSyncSamples = value
+    }
+
+    get interpolationDelayMs(): number {
+        return this.observedInterpolationDelayMs
+    }
+
+    /** @internal */
+    set interpolationDelayMs(value: number) {
+        this.observedInterpolationDelayMs = value
+    }
+
+    /** @internal Transport observation exposed through ServerConnection. */
+    get isClosed() {
+        return this.connectionState === UserConnectionState.Closed
+    }
+
+    /** @internal */
     nextPing() {
         const pingId = this.nextPingId
         this.nextPingId++
@@ -128,10 +266,12 @@ export class User {
         return pingId
     }
 
+    /** @internal */
     shouldSendPing(nowMs: number, intervalMs: number) {
         return this.lastPingSentAtMs === null || nowMs - this.lastPingSentAtMs >= intervalMs
     }
 
+    /** @internal */
     recordPingSent(pingId: number, serverTimeMs: number, sentAtMs: number) {
         this.pendingPings.set(pingId, { serverTimeMs, sentAtMs })
         this.lastPingSentAtMs = sentAtMs
@@ -150,6 +290,7 @@ export class User {
         }
     }
 
+    /** @internal */
     hasPongTimedOut(nowMs: number, timeoutMs: number) {
         const lastActivityAtMs = this.lastPongReceivedAtMs ?? this.firstUnansweredPingSentAtMs
         if (lastActivityAtMs === null) {
@@ -158,6 +299,7 @@ export class User {
         return nowMs - lastActivityAtMs >= timeoutMs
     }
 
+    /** @internal */
     receiveCommandFrameNumber(commandFrameNumber: number) {
         if (!Number.isSafeInteger(commandFrameNumber) || commandFrameNumber <= 0 || commandFrameNumber > 0xffffffff) {
             return this.lastReceivedCommandFrameNumber
@@ -181,8 +323,8 @@ export class User {
      * receiving or routing a batch does not confirm it. An older completion is
      * harmless, but must not be used to skip unfinished earlier input.
      *
-     * Games without prediction also confirm commands to release client history.
-     * Request responses have their own completion mechanism.
+     * Games without command/state prediction need no confirmation call unless
+     * they use this completion boundary themselves. Requests resolve by response.
      */
     confirmCommandsThrough(commandFrameNumber: number) {
         if (!Number.isSafeInteger(commandFrameNumber) || commandFrameNumber < 0 ||
@@ -193,6 +335,7 @@ export class User {
         return this.confirmedCommandFrameNumber
     }
 
+    /** @internal */
     recordClockSyncPong(
         pong: { pingId: number, clientReceiveTimeMs: number, clientSendTimeMs: number },
         serverReceiveTimeMs: number
@@ -286,6 +429,7 @@ export class User {
         }
     }
 
+    /** @internal */
     recordInterpolationDelay(delayMs: number, serverReceivedTimeMs: number) {
         if (!Number.isFinite(delayMs)) {
             return false
@@ -295,6 +439,7 @@ export class User {
         return true
     }
 
+    /** @internal */
     subscribe(channel: IChannel) {
         const alreadySubscribed = this.subscriptions.has(channel.nid)
         this.subscriptions.set(channel.nid, channel)
@@ -310,6 +455,7 @@ export class User {
         }
     }
 
+    /** @internal */
     unsubscribe(channel: IChannel) {
         if (this.subscriptions.get(channel.nid) !== channel) {
             return
@@ -324,6 +470,7 @@ export class User {
         this.knownChannelHeaderVersions.delete(channel.nid)
     }
 
+    /** @internal */
     queueEngineMessage(engineMessage: any) {
         this.engineMessageQueue.push(engineMessage)
     }
@@ -348,26 +495,31 @@ export class User {
         this.scopedInterpolatedMessageQueue.push({ channelId, message })
     }
 
+    /** @internal */
     hasPendingChannelOpens() {
         return this.pendingChannelOpens.size > 0
     }
 
+    /** @internal */
     consumePendingChannelOpens() {
         const opens = Array.from(this.pendingChannelOpens)
         this.pendingChannelOpens.clear()
         return opens
     }
 
+    /** @internal */
     hasPendingChannelCloses() {
         return this.pendingChannelCloses.size > 0
     }
 
+    /** @internal */
     consumePendingChannelCloses() {
         const deletes = Array.from(this.pendingChannelCloses)
         this.pendingChannelCloses.clear()
         return deletes
     }
 
+    /** @internal */
     send(buffer: BinaryPayload) {
         this.networkAdapter.send(this, buffer)
     }

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
+        <title>nengi · Shared room</title>
+    </head>
+    <body>
+        <main>
+            <header>
+                <div>
+                    <p class="eyebrow">nengi starter</p>
+                    <h1>Shared room</h1>
+                </div>
+                <button id="connection" type="button">Connect</button>
+            </header>
+            <p id="status" role="status">Connect, then click inside the room to move.</p>
+            <div id="room" aria-label="Shared multiplayer room"></div>
+            <footer>
+                <span id="count">0 players</span>
+                <span>Open a second tab to meet another player.</span>
+            </footer>
+        </main>
+        <script type="module" src="/client.ts"></script>
+    </body>
+</html>

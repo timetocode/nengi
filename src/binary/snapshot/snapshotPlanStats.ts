@@ -1,6 +1,6 @@
-import { SnapshotPlan } from './SnapshotPlan'
+import { ReadonlySnapshotPlan } from './SnapshotPlan'
 
-type PlannedSnapshot = SnapshotPlan | { plan: SnapshotPlan }
+type PlannedSnapshot = ReadonlySnapshotPlan | { plan: ReadonlySnapshotPlan }
 
 function getChannelSnapshot(plan: PlannedSnapshot) {
     return 'plan' in plan ? plan.plan : plan
@@ -51,7 +51,7 @@ export function sumPlanGroupedUpdateProps(plans: PlannedSnapshot[]) {
     return props
 }
 
-export function countPlanMessages(plan: SnapshotPlan) {
+export function countPlanMessages(plan: ReadonlySnapshotPlan) {
     return plan.messages.length + plan.interpolatedMessages.length
 }
 

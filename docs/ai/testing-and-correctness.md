@@ -44,8 +44,16 @@ client. A maintained bot is useful even when it is not a load generator: it can
 connect, drain frames, perform a normal action, observe the authoritative result,
 and disconnect in a repeatable smoke scenario.
 
+Share the game's existing session/receive/prediction code with the bot where it
+is independent of rendering. Supply the Node transport at session construction.
+For reconnect exercises, create a fresh Client after each established session
+and verify the same character's authoritative inventory after reconnecting.
+Use temporary saves and a separate server for repeatable lifecycle checks.
+A few visible bots demonstrate multiplayer behavior; capacity claims need a
+declared workload, server measurements, and a separate accounting of bot costs.
+
 Use `nengi-ws-client-adapter` with `nengi-buffers` for live Node bots, and keep
-their versions exactly aligned with `nengi`. Use the local adapters for fast,
+compatible versions according to their declared core ranges. Use the local adapters for fast,
 deterministic bot populations that do not need socket pressure. The bot should
 read frames as well as send commands; otherwise it cannot expose missing
 visibility, incorrect frame application, response failures, or stale lifecycle
@@ -95,6 +103,12 @@ For each replicated state path, assert both state and wire-visible facts:
 Drain client frames and assert creates, updates, deletes, messages, channel
 opens, and channel closes. Do not assert only against a server object; a bug can
 leave server memory correct while the snapshot or client frame is wrong.
+
+If a snapshot step fails, assert terminal failure and application teardown rather
+than expecting a later successful step to repair the same session. Test custom
+binary writers for exact byte counts at fragment and packet boundaries. A final
+packet can have the correct length while containing a malformed cached fragment.
+See [snapshot step failures](./operations.md#snapshot-step-failures).
 
 ## ECS binding invariants
 

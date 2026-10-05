@@ -5,8 +5,8 @@ nengi flow without relying on another project. They are intentionally small. Use
 them to orient server/client wiring, then keep the actual game code shaped by
 the game's model.
 
-Do not treat this file as a game template. Prefer the topic documents when you
-need detail:
+For a complete runnable application, use [getting started](./getting-started.md).
+These are topic fragments with game-owned helpers, not standalone files:
 
 - [plain-channels.md](./plain-channels.md) for ordinary replicated objects
 - [ecs-channels.md](./ecs-channels.md) for nengi ECS channels
@@ -19,9 +19,10 @@ need detail:
 
 Use the handshake for server authorization and session selection. Omit the
 second `connect` argument when the game has no connection setup data. When a
-handshake payload is present, the returned payload is server-side context for
-`NetworkEvent.UserConnected`; client bootstrap still uses normal messages,
-channel headers, or replicated state.
+handshake payload is present, validate it before accepting. Return `serverData`
+for local context on `NetworkEvent.UserConnected` and optional public `clientData`
+for the client's `connect()` result. Replicated gameplay state still arrives in
+snapshots after acceptance.
 
 ```ts
 // client
@@ -34,18 +35,27 @@ await client.connect('ws://localhost:8079', {
 
 ```ts
 // server
-instance.onConnect = async handshake => {
-    const session = await verifySessionToken(handshake.token)
+instance.onConnect = async (handshake, { signal }) => {
+    const session = await verifySessionToken(handshake.token, { signal })
+    signal.throwIfAborted()
     if (!session) {
         return false
     }
     return {
-        accountId: session.accountId,
-        characterId: handshake.characterId,
-        isAdmin: session.roles.includes('admin')
+        serverData: {
+            accountId: session.accountId,
+            characterId: handshake.characterId,
+            isAdmin: session.roles.includes('admin')
+        }
     }
 }
 ```
+
+Return `true` when no setup data is needed, or `false` to deny. Only `clientData`
+is serialized; omitting it makes `connect()` resolve with `undefined`.
+The application helper must support the signal to cancel its I/O. When setup
+reserves resources, follow [setup ownership](./networking-primitives.md#cancellation-and-setup-ownership)
+so failure after the handler returns also releases them.
 
 ## Plain spatial server and client
 
@@ -92,7 +102,8 @@ export const YouArePlayerSchema = defineMessageSchema({
 
 ```ts
 // server/main.ts
-import { Channel2D, CommandRouter, Instance, NetworkEvent, User } from 'nengi'
+import { Channel2D, CommandRouter, Instance, NetworkEvent, UserConnectionState } from 'nengi'
+import type { User } from 'nengi'
 
 const instance = new Instance(context)
 const world = new Channel2D(instance.localState, 64, { name: 'world' })
@@ -126,7 +137,7 @@ function tick() {
     while (!instance.queue.isEmpty()) {
         const event = instance.queue.next()
         if (event.type === NetworkEvent.UserConnected) {
-            spawnPlayer(event.user)
+            if (event.user.connectionState === UserConnectionState.Open) spawnPlayer(event.user)
         } else if (event.type === NetworkEvent.UserDisconnected) {
             const player = playersByUser.get(event.user.id)
             if (player) {
@@ -139,9 +150,6 @@ function tick() {
     }
 
     instance.processRequests()
-    for (const user of instance.users.values()) {
-        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
-    }
     instance.step()
 }
 ```
@@ -191,8 +199,12 @@ channel routing, ECS application, and resource cleanup.
 ## Predicted movement loop
 
 The client code below uses `client`, `controlledNid`, `applyNetworkFrame`, and
-`render` from the plain client above, plus game-owned prediction state and input.
-Replace its basic animation loop with the prediction loop shown here.
+`render` from the [plain client](./plain-channels.md#canonical-small-client),
+plus game-owned prediction state and input.
+Replace its basic animation loop with the prediction loop shown here. This
+variant extends the shared `MoveCommand` type and schema with `dtMs: number` /
+`Binary.Float64`; both peers use that same schema. `MoveState` contains `x` and
+`y`, matching the player schema above.
 
 For fast local movement, the server and client must share the deterministic part
 of player-authored movement. If the server resolves wall collision while
@@ -234,16 +246,15 @@ const movementPrediction = new CommandReplayPrediction({
     getLocal: () => predictedPlayer,
     createReplayState: authority => ({
         x: authority.x,
-        y: authority.y,
-        vx: authority.vx,
-        vy: authority.vy
+        y: authority.y
     }),
     applyCommand: (state, command) => applyPredictedMove(state, command),
     applyReplayState: (local, replayState) => Object.assign(local, replayState),
-    affectedProps: ['x', 'y', 'vx', 'vy']
+    affectedProps: ['x', 'y']
 })
 
 function renderFrame(dtMs: number) {
+    if (client.connectionState !== 'connected') return
     let frame
     while ((frame = client.network.processNextFrame())) {
         applyNetworkFrame(frame)
@@ -257,13 +268,15 @@ function renderFrame(dtMs: number) {
     }
 
     renderLocalPlayer(predictedPlayer)
-    render()
+    render(controlledNid) // The local player was rendered from prediction above.
     client.flush()
 }
 ```
 
 Do not put a custom sequence number in the command payload. Nengi records command
-ordering with `commandFrameNumber` and confirms it through snapshots.
+ordering with `commandFrameNumber`. For this prediction loop, the server must
+explicitly confirm completed input before its snapshot; use the
+[prediction server loop](./realtime-movement-prediction.md#shared-command-simulation).
 
 Here `dtMs` is milliseconds and `clearHeldInput()` clears application-owned input.
 The 100 ms cutoff discards input time after a stall. Clear input and reset the

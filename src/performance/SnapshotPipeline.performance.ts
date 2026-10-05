@@ -83,9 +83,14 @@ const SCENARIOS = new Set<ScenarioName>([
     'channel-churn'
 ])
 
-type SuiteName = 'spatial-fanout'
+type SuiteName = 'spatial-fanout' | 'plain-fanout'
 
 const SUITES: Record<SuiteName, ScenarioName[]> = {
+    'plain-fanout': [
+        'shared-npcs',
+        'manual-channel',
+        'ecs-channel'
+    ],
     'spatial-fanout': [
         'channel-2d',
         'manual-channel-2d',
@@ -208,6 +213,7 @@ type ScenarioConfig = {
 }
 
 class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
+    readonly serverAdapterVersion = 1 as const
     network: any
     binary: BinaryAdapter<Buffer, Buffer> = {
         createReader(buffer: BinaryPayload) {
@@ -231,6 +237,10 @@ class CountingAdapter implements IServerNetworkAdapter<Buffer, Buffer> {
     }
 
     disconnect(): void {
+    }
+
+    shutdown(): Promise<void> {
+        return Promise.resolve()
     }
 }
 
@@ -596,7 +606,7 @@ function createUser(instance: Instance, id: number, adapter: CountingAdapter) {
     const user = new User(undefined, adapter as any)
     user.id = id
     user.instance = instance
-    instance.users.set(user.id, user)
+    instance.connectedUsers.set(user.id, user)
     return user
 }
 
@@ -790,6 +800,20 @@ function setupManualChannel(instance: Instance, users: User[], entities: TestEnt
     }
 }
 
+function churnManualSpatialRoots(instance: Instance, channel: ManualChannel2D | ManualChannel3D, entities: TestEntity[], config: ScenarioConfig) {
+    // Every removed root has survived a snapshot, including the first warmup tick.
+    if (instance.tick === 0 || config.churn === 0) return
+    const count = Math.min(config.churn, entities.length)
+    for (let i = 0; i < count; i++) {
+        const index = (instance.tick * count + i) % entities.length
+        const previous = entities[index]
+        const replacement = { ...previous, nid: 0 }
+        channel.removeEntity(previous)
+        channel.addEntity(replacement)
+        entities[index] = replacement
+    }
+}
+
 function setupManualChannel2D(instance: Instance, users: User[], entities: TestEntity[], config: ScenarioConfig) {
     const channel = new ManualChannel2D(instance.localState, config.cellSize, {
         queryPadding: config.queryPadding,
@@ -832,6 +856,7 @@ function setupManualChannel2D(instance: Instance, users: User[], entities: TestE
                 transform(entity, x, y, z, rot)
             }
         }
+        churnManualSpatialRoots(instance, channel, entities, config)
     }
 }
 
@@ -876,6 +901,7 @@ function setupManualChannel3D(instance: Instance, users: User[], entities: TestE
                 transform(entity, x, y, z, rot)
             }
         }
+        churnManualSpatialRoots(instance, channel, entities, config)
     }
 }
 
@@ -1050,8 +1076,14 @@ function setupEcsChannelChurn(instance: Instance, users: User[], bundles: EcsBun
         addBundle(liveBundles[i])
     }
     subscribeAll(channel, users)
+    let initialSnapshotPending = true
 
     return () => {
+        // Give the initial roots their first snapshot before measuring removals.
+        if (initialSnapshotPending) {
+            initialSnapshotPending = false
+            return
+        }
         const churn = Math.min(config.churn, liveBundles.length)
         for (let i = 0; i < churn; i++) {
             const index = cursor++ % liveBundles.length

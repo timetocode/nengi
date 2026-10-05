@@ -34,7 +34,8 @@ enum ResponseStatus {
 enum RequestPolicy {
     Allow = 1,
     Dedupe = 2,
-    Replace = 3
+    /** Supersede matching requests still in the outbound queue; sent requests retain their outcomes. */
+    ReplaceQueued = 3
 }
 
 class RequestError extends Error {

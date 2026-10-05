@@ -1,0 +1,85 @@
+:root {
+    font-family: system-ui, sans-serif;
+    color: #f4f1e9;
+    background: #182627;
+    color-scheme: dark;
+}
+
+body {
+    margin: 0;
+}
+
+main {
+    max-width: 800px;
+    padding: 32px 20px;
+    margin: 0 auto;
+}
+
+header, footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+.eyebrow {
+    color: #b3d7bc;
+    margin: 0 0 4px;
+}
+
+button {
+    background: #b3d7bc;
+    color: #182627;
+    border: 0;
+    border-radius: 6px;
+    padding: 12px 20px;
+    font: inherit;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.6;
+}
+
+#room {
+    position: relative;
+    aspect-ratio: 8 / 5;
+    overflow: hidden;
+    background-color: #243838;
+    background-image: radial-gradient(#415452 1px, transparent 1px);
+    background-size: 25px 25px;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px #415452;
+    touch-action: manipulation;
+    cursor: crosshair;
+}
+
+.player {
+    position: absolute;
+    width: 4%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    font-size: clamp(9px, 2vw, 12px);
+    font-weight: 700;
+    color: #182627;
+    pointer-events: none;
+}
+
+.is-you {
+    outline: 2px solid #f4f1e9;
+    outline-offset: 3px;
+}
+
+footer {
+    margin-top: 16px;
+    color: #b5c5bf;
+    font-size: 0.875rem;
+}

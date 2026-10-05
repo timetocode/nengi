@@ -23,7 +23,7 @@ snapshot bytes
     -> ClientNetwork and EntityStore
     -> ordered Frame facts
     -> ECS or presentation state
-    -> prediction and interpolation
+    -> optional prediction and interpolation
     -> render and send commands
 ```
 
@@ -59,7 +59,7 @@ important property is that its owner, inputs, outputs, and mutation point are
 obvious. A useful shape is:
 
 ```ts
-type MoveInput = { x: number; y: number }
+type MoveInput = { x: number, y: number }
 
 function applyMove(state: PlayerState, input: MoveInput, dt: number): void {
     const direction = normalize(input.x, input.y)
@@ -93,30 +93,54 @@ For networked ECS state, `bindEcsChannel` is a projection boundary. The
 selected roots, components, and channel records aligned. Local-only components
 can remain in the world without being added to the binding.
 
+## Shared snapshot rate
+
+The third argument to `new Client(context, Adapter, serverTickRate)` is the
+expected frequency of server snapshots: the number of `instance.step()` calls
+per second. It is not the render rate, command rate, or a separate physics rate.
+Interpolation uses it to interpret snapshot spacing. A mismatched value can
+produce uneven movement even on a healthy connection.
+
+Define it once in shared setup and import it in both programs:
+
+```ts
+// shared/network-config.ts
+export const SERVER_TICK_RATE = 20
+```
+
+The client snippets in this manual import that setting. The server should
+schedule its snapshot-producing cycle with `1000 / SERVER_TICK_RATE`
+milliseconds between calls. A physics system may run more often; emit snapshots
+at the rate supplied to Client. Changing the snapshot cadence requires updating
+both programs' configuration.
+
 ## Server cycle
 
 For a game server, choose one application tick and make its stages visible. A
 canonical cycle is:
 
-1. Drain lifecycle and input events from the instance queue.
-2. Validate connection state, command shape, ownership, and sequence policy.
-3. Process a bounded batch of requests at the documented request boundary.
-4. Apply commands in a defined order.
-5. Run authoritative simulation systems with an explicit `dt`.
-6. Apply channel view and spatial membership changes.
-7. Emit manual or ECS mutations that correspond to state changes.
-8. Explicitly confirm each user's completed input with `user.confirmCommandsThrough(K)`.
-9. Call `instance.step()` to create the snapshot boundary and timestamp it in
-   the server's monotonic time domain.
-10. Let the adapter flush the resulting bytes.
+1. Drain lifecycle and input events from the instance queue. Validate inputs and
+   apply commands in order while routing them when using direct command integration.
+2. Process a bounded batch of requests if the application has request handlers.
+3. Run any remaining authoritative systems with their explicit time step.
+4. Update spatial membership and views, and emit manual/ECS writes at the
+   corresponding mutation boundaries.
+5. If using command/state prediction, confirm each user's completed input with
+   `user.confirmCommandsThrough(K)`.
+6. Call `instance.step()` to timestamp, build and send the resulting snapshots.
+
+This does not require buffering input for a later physics step. For direct
+action movement, integrate the recorded command duration in the command handler.
+A target-based movement game or shared physics simulation can choose a different
+integration boundary; document that choice and its replay implications.
 
 The exact stage order can differ when the game requires it. The order must be
 deliberate and stable. In particular, do not let adapter callbacks, promise
 continuations, or arbitrary module registration decide when gameplay state
 changes.
 
-Confirmation is always application-controlled. In the synchronous model, fully
-drain input, complete simulation and confirm through each user's
+When using command/state prediction, confirmation is application-controlled.
+In the synchronous model, fully drain input, complete simulation and confirm through each user's
 `lastReceivedCommandFrameNumber` before producing the snapshot. This includes
 deliberately rejected input and empty flushes. A handler that only moves input
 to another queue has not finished that input.
@@ -126,9 +150,9 @@ complete prefix actually integrated. Receipt and routing do not confirm input;
 snapshots can continue while a batch is pending. Do not use the latest received
 number as a completion boundary after yielding or while earlier work is queued.
 The game must keep authoritative predicted state aligned with its confirmation
-boundary. The [command contract](./networking-primitives.md#command-payloads-and-sequencing)
-also applies to games without prediction, because confirmation releases retained
-client commands. Requests have a separate response mechanism.
+boundary. Games using ordinary commands need no confirmation call. Requests,
+including optimistic request predictions, have a separate response mechanism.
+See the [command contract](./networking-primitives.md#command-payloads-and-sequencing).
 
 `instance.processRequests(limit)` is an application stage, not a replacement
 for the game loop. Keep its location and limit visible. A request handler can
@@ -143,8 +167,11 @@ The client should expose its order just as clearly:
 
 1. Drain all queued frames in arrival order.
 2. Apply network frame facts to presentation or the client ECS world.
-3. Update prediction from raw authoritative state and pending commands.
-4. Sample interpolation for entities that are not locally predicted.
+3. If predicting, reconcile after each applied frame from raw authoritative
+   state, then apply new local input. Use `processNextFrame()` to interleave
+   reconciliation with frame application.
+4. Sample interpolation for all entities without local prediction. This includes
+   the controlled player in a non-predicting game.
 5. Render and run presentation effects.
 6. Send commands at their deliberate cadence.
 7. Call `client.flush()`.
@@ -181,7 +208,7 @@ client-local presentation state; it is not an authoritative server-time clock.
 ## Mutation ledger
 
 For generated templates, use readable modules, four-space
-indentation and one statement per line. Keep the tick/render shell visible as an
+indentation, no semicolons and one statement per line. Keep the tick/render shell visible as an
 ordered sequence of systems. Simulation functions operate on supplied state and
 inputs; clocks, network sends and rendering belong at explicit boundaries.
 Follow the chosen renderer's scene/object model instead of hiding gameplay in

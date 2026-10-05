@@ -6,7 +6,8 @@ interface IBinaryWriter<Payload extends BinaryPayload = BinaryPayload> {
     // static create(byteLength): IBinaryWriter
     buffer: Payload
     payload: Payload
-    offset?: number
+    /** Bytes written relative to payload. createWriter(size) starts at zero. */
+    offset: number
     writeUInt8(value: number): void
     writeInt8(value: number): void
     writeUInt16(value: number): void

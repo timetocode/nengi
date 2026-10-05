@@ -8,7 +8,7 @@ import countEntity from '../entity/countEntity'
 import countDiff from '../entity/countDiff'
 import countUpdateGroup from '../entity/countUpdateGroup'
 import countMessage from '../message/count'
-import { SnapshotPlan } from './SnapshotPlan'
+import { ReadonlySnapshotPlan } from './SnapshotPlan'
 import { hasSchemaBackedChannelHeader } from '../../common/ChannelHeader'
 
 const SECTION_BYTES = 1
@@ -17,7 +17,7 @@ const UINT32_COUNT_BYTES = 4
 const UINT32_BYTES = 4
 const RESPONSE_STATUS_BYTES = 1
 
-function countChannelOpens(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+function countChannelOpens(plan: ReadonlySnapshotPlan, context: Context, protocol: ProtocolConfig) {
     if (plan.channelOpens.length === 0) {
         return 0
     }
@@ -37,7 +37,7 @@ function countChannelOpens(plan: SnapshotPlan, context: Context, protocol: Proto
     return bytes
 }
 
-export function countChannelHeaderUpdateSection(updates: SnapshotPlan['channelHeaderUpdates'], protocol: ProtocolConfig) {
+export function countChannelHeaderUpdateSection(updates: ReadonlySnapshotPlan['channelHeaderUpdates'], protocol: ProtocolConfig) {
     if (updates.length === 0) {
         return 0
     }
@@ -59,11 +59,11 @@ export function countChannelHeaderUpdateSection(updates: SnapshotPlan['channelHe
     return bytes
 }
 
-function countChannelHeaderUpdates(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countChannelHeaderUpdates(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     return countChannelHeaderUpdateSection(plan.channelHeaderUpdates, protocol)
 }
 
-function countChannelCloses(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countChannelCloses(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     if (plan.channelCloses.length === 0) {
         return 0
     }
@@ -72,7 +72,7 @@ function countChannelCloses(plan: SnapshotPlan, protocol: ProtocolConfig) {
         (plan.channelCloses.length * byteSizeOfNetworkType(protocol.nidType))
 }
 
-function countSkipInterpolation(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countSkipInterpolation(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     if (plan.skipInterpolationNids.length === 0) {
         return 0
     }
@@ -81,7 +81,7 @@ function countSkipInterpolation(plan: SnapshotPlan, protocol: ProtocolConfig) {
         (plan.skipInterpolationNids.length * byteSizeOfNetworkType(protocol.nidType))
 }
 
-function countEngineMessages(plan: SnapshotPlan, context: Context) {
+function countEngineMessages(plan: ReadonlySnapshotPlan, context: Context) {
     if (plan.engineMessages.length === 0) {
         return 0
     }
@@ -95,7 +95,7 @@ function countEngineMessages(plan: SnapshotPlan, context: Context) {
     return bytes
 }
 
-export function countMessageSection(messages: any[], context: Context, protocol: ProtocolConfig) {
+export function countMessageSection(messages: readonly any[], context: Context, protocol: ProtocolConfig) {
     if (messages.length === 0) {
         return 0
     }
@@ -109,15 +109,15 @@ export function countMessageSection(messages: any[], context: Context, protocol:
     return bytes
 }
 
-function countMessages(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+function countMessages(plan: ReadonlySnapshotPlan, context: Context, protocol: ProtocolConfig) {
     return countMessageSection(plan.messages, context, protocol)
 }
 
-function countInterpolatedMessages(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+function countInterpolatedMessages(plan: ReadonlySnapshotPlan, context: Context, protocol: ProtocolConfig) {
     return countMessageSection(plan.interpolatedMessages, context, protocol)
 }
 
-function countResponses(plan: SnapshotPlan) {
+function countResponses(plan: ReadonlySnapshotPlan) {
     if (plan.responses.length === 0) {
         return 0
     }
@@ -132,7 +132,7 @@ function countResponses(plan: SnapshotPlan) {
     return bytes
 }
 
-function countCreateEntities(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+function countCreateEntities(plan: ReadonlySnapshotPlan, context: Context, protocol: ProtocolConfig) {
     if (plan.createEntities.length === 0) {
         return 0
     }
@@ -146,7 +146,7 @@ function countCreateEntities(plan: SnapshotPlan, context: Context, protocol: Pro
     return bytes
 }
 
-export function countNetworkIdSection(ids: number[], protocol: ProtocolConfig) {
+export function countNetworkIdSection(ids: readonly number[], protocol: ProtocolConfig) {
     if (ids.length === 0) {
         return 0
     }
@@ -154,11 +154,11 @@ export function countNetworkIdSection(ids: number[], protocol: ProtocolConfig) {
     return SECTION_BYTES + UINT32_COUNT_BYTES + (ids.length * byteSizeOfNetworkType(protocol.nidType))
 }
 
-function countEcsCreateEntities(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countEcsCreateEntities(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     return countNetworkIdSection(plan.ecsCreateEntities, protocol)
 }
 
-export function countEcsCreateComponentSection(components: IEntity[], context: Context, protocol: ProtocolConfig) {
+export function countEcsCreateComponentSection(components: readonly IEntity[], context: Context, protocol: ProtocolConfig) {
     if (components.length === 0) {
         return 0
     }
@@ -173,15 +173,15 @@ export function countEcsCreateComponentSection(components: IEntity[], context: C
     return bytes
 }
 
-function countEcsCreateComponents(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig) {
+function countEcsCreateComponents(plan: ReadonlySnapshotPlan, context: Context, protocol: ProtocolConfig) {
     return countEcsCreateComponentSection(plan.ecsCreateComponents, context, protocol)
 }
 
-function countEcsDeleteEntities(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countEcsDeleteEntities(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     return countNetworkIdSection(plan.ecsDeleteEntities, protocol)
 }
 
-function countUpdateEntities(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countUpdateEntities(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     if (plan.updateEntities.length === 0) {
         return 0
     }
@@ -194,7 +194,7 @@ function countUpdateEntities(plan: SnapshotPlan, protocol: ProtocolConfig) {
     return bytes
 }
 
-function countUpdateEntityGroups(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countUpdateEntityGroups(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     if (plan.updateEntityGroups.length === 0) {
         return 0
     }
@@ -206,11 +206,11 @@ function countUpdateEntityGroups(plan: SnapshotPlan, protocol: ProtocolConfig) {
     return bytes
 }
 
-function countDeleteEntities(plan: SnapshotPlan, protocol: ProtocolConfig) {
+function countDeleteEntities(plan: ReadonlySnapshotPlan, protocol: ProtocolConfig) {
     return countNetworkIdSection(plan.deleteEntities, protocol)
 }
 
-export function countSnapshotBytes(plan: SnapshotPlan, context: Context, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
+export function countSnapshotBytes(plan: ReadonlySnapshotPlan, context: Context, protocol: ProtocolConfig = DEFAULT_PROTOCOL) {
     return countEngineMessages(plan, context) +
         countMessages(plan, context, protocol) +
         countInterpolatedMessages(plan, context, protocol) +

@@ -1,0 +1,510 @@
+{
+  "date": "2026-09-20T23:46:23.534Z",
+  "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+  "node": "v22.17.1",
+  "os": "6.6.87.2-microsoft-standard-WSL2",
+  "hashes": {
+    "before": {
+      "src/server/channel/ManualChannel2D.ts": "bd9cc87091a6dbf8b874901bfe4b46d500bdb9117b7eedbf6cce51304ce6978d",
+      "src/server/channel/ManualChannel3D.ts": "a3f68ddbb4fbd58e9ffaa7850b059dbd2610650e6afa4b615ed5762539967a33",
+      "src/performance/SnapshotPipeline.performance.ts": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031"
+    },
+    "after": {
+      "src/server/channel/ManualChannel2D.ts": "30217defee78d186ded053235603146f9c76e191a7fc7fd7eea1c5919545068b",
+      "src/server/channel/ManualChannel3D.ts": "fb53937dc72018b17375d8808903f33aadbff49cd8a88056b1136383461891d4",
+      "src/performance/SnapshotPipeline.performance.ts": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031"
+    }
+  },
+  "note": "48 sequential fresh-process trials, three repeats with rotated order, official buffer backend, controlled clock, unisolated host",
+  "summary": [
+    {
+      "name": "sparse-2d",
+      "bytesPerTick": 2080,
+      "config": {
+        "scenario": "manual-channel-2d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.001,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "sparse-2d"
+      },
+      "before": {
+        "totalMs": 0.437,
+        "stepMs": 0.432,
+        "preStepMs": 0.005,
+        "p95TotalMs": 0.699,
+        "meanRepeats": [
+          0.437,
+          0.412,
+          0.482
+        ]
+      },
+      "after": {
+        "totalMs": 0.359,
+        "stepMs": 0.353,
+        "preStepMs": 0.006,
+        "p95TotalMs": 0.649,
+        "meanRepeats": [
+          0.359,
+          0.357,
+          0.389
+        ]
+      }
+    },
+    {
+      "name": "sparse-3d",
+      "bytesPerTick": 2080,
+      "config": {
+        "scenario": "manual-channel-3d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.001,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "sparse-3d"
+      },
+      "before": {
+        "totalMs": 0.455,
+        "stepMs": 0.45,
+        "preStepMs": 0.005,
+        "p95TotalMs": 0.731,
+        "meanRepeats": [
+          0.456,
+          0.455,
+          0.444
+        ]
+      },
+      "after": {
+        "totalMs": 0.376,
+        "stepMs": 0.37,
+        "preStepMs": 0.005,
+        "p95TotalMs": 0.638,
+        "meanRepeats": [
+          0.353,
+          0.376,
+          0.386
+        ]
+      }
+    },
+    {
+      "name": "dense-2d",
+      "bytesPerTick": 1557040,
+      "config": {
+        "scenario": "manual-channel-2d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 1,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "dense-2d"
+      },
+      "before": {
+        "totalMs": 3.926,
+        "stepMs": 3.296,
+        "preStepMs": 0.63,
+        "p95TotalMs": 5.406,
+        "meanRepeats": [
+          4.132,
+          3.926,
+          3.862
+        ]
+      },
+      "after": {
+        "totalMs": 3.874,
+        "stepMs": 3.18,
+        "preStepMs": 0.66,
+        "p95TotalMs": 5.395,
+        "meanRepeats": [
+          3.365,
+          3.908,
+          3.874
+        ]
+      }
+    },
+    {
+      "name": "idle-3d",
+      "bytesPerTick": 400,
+      "config": {
+        "scenario": "manual-channel-3d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "idle-3d"
+      },
+      "before": {
+        "totalMs": 0.258,
+        "stepMs": 0.258,
+        "preStepMs": 0.001,
+        "p95TotalMs": 0.509,
+        "meanRepeats": [
+          0.279,
+          0.242,
+          0.258
+        ]
+      },
+      "after": {
+        "totalMs": 0.246,
+        "stepMs": 0.245,
+        "preStepMs": 0.001,
+        "p95TotalMs": 0.458,
+        "meanRepeats": [
+          0.255,
+          0.246,
+          0.231
+        ]
+      }
+    },
+    {
+      "name": "churn-2d",
+      "bytesPerTick": 23423,
+      "config": {
+        "scenario": "manual-channel-2d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 32,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.001,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "churn-2d"
+      },
+      "before": {
+        "totalMs": 16.176,
+        "stepMs": 16.018,
+        "preStepMs": 0.157,
+        "p95TotalMs": 18.687,
+        "meanRepeats": [
+          16.176,
+          16.607,
+          15.722
+        ]
+      },
+      "after": {
+        "totalMs": 16.299,
+        "stepMs": 16.141,
+        "preStepMs": 0.158,
+        "p95TotalMs": 18.424,
+        "meanRepeats": [
+          15.625,
+          16.299,
+          16.41
+        ]
+      }
+    },
+    {
+      "name": "crossing-3d",
+      "bytesPerTick": 155980,
+      "config": {
+        "scenario": "manual-channel-3d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 400,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "cell-crossing",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.1,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "crossing-3d"
+      },
+      "before": {
+        "totalMs": 0.746,
+        "stepMs": 0.703,
+        "preStepMs": 0.045,
+        "p95TotalMs": 1.372,
+        "meanRepeats": [
+          0.692,
+          0.746,
+          0.801
+        ]
+      },
+      "after": {
+        "totalMs": 0.632,
+        "stepMs": 0.588,
+        "preStepMs": 0.045,
+        "p95TotalMs": 1.153,
+        "meanRepeats": [
+          0.616,
+          0.661,
+          0.632
+        ]
+      }
+    },
+    {
+      "name": "wide-tree",
+      "bytesPerTick": 2080,
+      "config": {
+        "scenario": "parent-child-manual-channel-2d",
+        "users": 20,
+        "entities": 2,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 2048,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.001,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "wide-tree"
+      },
+      "before": {
+        "totalMs": 0.599,
+        "stepMs": 0.592,
+        "preStepMs": 0.007,
+        "p95TotalMs": 1.003,
+        "meanRepeats": [
+          0.599,
+          0.617,
+          0.575
+        ]
+      },
+      "after": {
+        "totalMs": 0.278,
+        "stepMs": 0.272,
+        "preStepMs": 0.006,
+        "p95TotalMs": 0.555,
+        "meanRepeats": [
+          0.278,
+          0.296,
+          0.263
+        ]
+      }
+    },
+    {
+      "name": "direct-2d",
+      "bytesPerTick": 2112,
+      "config": {
+        "scenario": "manual-channel-2d",
+        "users": 20,
+        "entities": 4096,
+        "visible": 1000,
+        "ticks": 180,
+        "warmup": 40,
+        "sharedUpdates": false,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 512,
+        "viewHalf": 1024,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "single-cell",
+        "spatialPlane": "xy",
+        "worldSize": 128,
+        "clusters": 8,
+        "moveFraction": 0.001,
+        "queryPadding": 0,
+        "fragmentCellLimit": 16,
+        "stableFragmentCellLimit": 64,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "name": "direct-2d"
+      },
+      "before": {
+        "totalMs": 0.582,
+        "stepMs": 0.577,
+        "preStepMs": 0.005,
+        "p95TotalMs": 0.894,
+        "meanRepeats": [
+          0.582,
+          0.6,
+          0.573
+        ]
+      },
+      "after": {
+        "totalMs": 0.592,
+        "stepMs": 0.586,
+        "preStepMs": 0.005,
+        "p95TotalMs": 1.023,
+        "meanRepeats": [
+          0.578,
+          0.592,
+          0.604
+        ]
+      }
+    }
+  ],
+  "packetParity": [
+    {
+      "scenario": "manual-channel-2d",
+      "sharedUpdates": false,
+      "frames": 450,
+      "bytes": 25813,
+      "sha256": "882bac07ff8090cfc631c3601ae45d7cbdc52341ee42582a53325742450bfdb6"
+    },
+    {
+      "scenario": "manual-channel-2d",
+      "sharedUpdates": true,
+      "frames": 450,
+      "bytes": 25813,
+      "sha256": "882bac07ff8090cfc631c3601ae45d7cbdc52341ee42582a53325742450bfdb6"
+    },
+    {
+      "scenario": "manual-channel-3d",
+      "sharedUpdates": false,
+      "frames": 450,
+      "bytes": 25852,
+      "sha256": "db70b669141295c19c83853ca118512490b9bb95927ecbeb9dcbf0ce4599f86d"
+    },
+    {
+      "scenario": "manual-channel-3d",
+      "sharedUpdates": true,
+      "frames": 450,
+      "bytes": 25852,
+      "sha256": "db70b669141295c19c83853ca118512490b9bb95927ecbeb9dcbf0ce4599f86d"
+    }
+  ],
+  "validation": {
+    "tests": 812,
+    "suites": 62,
+    "typecheck": true,
+    "lint": true,
+    "build": true
+  },
+  "scope": "Only reuse a retained, read-only membership Set when existing 2D/3D manual channel logic has proved membership unchanged. No public API or wire changes. Before source is the dirty working source at the start of 2026-09-20 follow-up, not HEAD.",
+  "baseGitHead": "d78047ca62bf801af58e48f4b0ebb15065612d88",
+  "startingStatus": "Dirty working tree; frozen at nengi-rc-notes/stable-manual-visibility/before-core. See initial-status.txt and before-source-manifest.json there.",
+  "beforeSourceManifestSha256": "a807fca98d6ce7316e4a89dfab1ea6ed35caf03d454ae5d34b1827899585be93"
+}

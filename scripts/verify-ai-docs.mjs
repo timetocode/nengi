@@ -1,6 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
+import { validateFamily } from './package-policy.mjs'
+import { checkPublicDocs } from './check-public-docs.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const docsDir = path.join(root, 'docs', 'ai')
@@ -26,16 +29,7 @@ const adapterPackages = [
 ]
 const errors = []
 
-for (const relative of adapterPackages) {
-    const packagePath = path.resolve(root, relative)
-    const packageJson = readJson(packagePath)
-    if (packageJson.version !== corePackage.version) {
-        errors.push(`${relative} version ${packageJson.version} does not match nengi ${corePackage.version}`)
-    }
-    if (packageJson.peerDependencies?.nengi && packageJson.peerDependencies.nengi !== corePackage.version) {
-        errors.push(`${relative} peer dependency does not exactly match nengi ${corePackage.version}`)
-    }
-}
+errors.push(...validateFamily([corePackage, ...adapterPackages.map(relative => readJson(path.resolve(root, relative)))]))
 
 const rootReadme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
 const aiReadme = read('docs/ai/README.md')
@@ -85,16 +79,12 @@ const markdownFiles = fs.readdirSync(docsDir)
 if (fs.existsSync(path.join(docsDir, 'local-prototype.md'))) {
     errors.push('published AI docs unexpectedly include the removed local prototype guide')
 }
-const publishedGuidance = [rootReadme, ...markdownFiles.map(file => fs.readFileSync(path.join(docsDir, file), 'utf8'))]
-for (const content of publishedGuidance) {
-    if (/\bexamples?\b/i.test(content)) {
-        errors.push('published guidance mentions unsupported repository examples')
-        break
-    }
-}
-if (corePackage.files?.some(file => /examples?/i.test(file))) {
-    errors.push('package files unexpectedly include an examples path')
-}
+const [packed] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], {
+    cwd: root, encoding: 'utf8', shell: process.platform === 'win32'
+}))
+const publishedFiles = new Set(packed.files.map(file => file.path))
+const markdown = new Map([...publishedFiles].filter(file => file.endsWith('.md')).map(file => [file, read(file)]))
+errors.push(...checkPublicDocs(publishedFiles, markdown))
 for (const declaration of [
     'build/server/channel/EcsChannel.d.ts',
     'build/server/channel/EcsChannel2D.d.ts',
@@ -127,15 +117,6 @@ for (const required of ['InstanceOptions', 'ClientOptions', 'TimeSource', 'WIRE_
 for (const required of ['UserConnectionDenied', 'UserDisconnected', 'instance.step()']) {
     if (!timing.includes(required)) {
         errors.push(`timing docs are missing ${required}`)
-    }
-}
-
-const markdown = [aiReadme, ...markdownFiles.map(file => fs.readFileSync(path.join(docsDir, file), 'utf8'))]
-const relativeLinks = markdown.flatMap(content => [...content.matchAll(/\]\(\.(\/[^)#]+)(?:#[^)]+)?\)/g)].map(match => match[1]))
-for (const relative of relativeLinks) {
-    const target = path.resolve(docsDir, relative.slice(1))
-    if (!fs.existsSync(target)) {
-        errors.push(`AI docs link points to missing file ${relative}`)
     }
 }
 

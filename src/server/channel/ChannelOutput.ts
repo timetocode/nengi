@@ -52,7 +52,9 @@ function addVisibilityPlan(plan: SnapshotPlan, instance: Instance, visibility: C
             addRegularUpdate(plan, instance, visibility.toUpdate[i])
         }
     }
-    plan.deleteEntities = visibility.toDelete
+    for (let i = 0; i < visibility.toDelete.length; i++) {
+        plan.deleteEntities.push(visibility.toDelete[i])
+    }
 }
 
 function canUseSharedDelta(channel: Channel, visibility: ChannelSnapshotVisibility) {
@@ -117,7 +119,7 @@ export function createChannelOutput(
     return createChunkedChannelSnapshotOutput({
         channelId: channel.nid,
         chunks,
-        stats: {
+        stats: instance.network.snapshotPerformanceEnabled ? {
             creates: plan.createEntities.length + countEntityDeltaFragmentCreates(deltaFragments),
             updateProps: plan.updateEntities.length + (updateFragment?.updateProps || 0),
             updateGroups: plan.updateEntityGroups.length + (updateFragment?.updateGroups || 0),
@@ -126,7 +128,7 @@ export function createChannelOutput(
             deletes: plan.deleteEntities.length + countEntityDeltaFragmentDeletes(deltaFragments),
             messages: countPlanMessages(plan) + sumSharedMessageFragmentMessages(messageFragments),
             usedSharedFragments: !!updateFragment || deltaBytes > 0 || messageFragments.length > 0
-        },
+        } : null,
         commit() {
             channel.rememberChannelSnapshotVisibility(user.id, visibility)
         }

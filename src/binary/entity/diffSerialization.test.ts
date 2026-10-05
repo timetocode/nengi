@@ -6,13 +6,13 @@ import readUpdateGroup from './readUpdateGroup'
 import writeDiff from './writeDiff'
 import writeUpdateGroup from './writeUpdateGroup'
 import { Binary } from '../../common/binary/Binary'
-import { declareBinaryType } from '../../common/binary/BinaryExt'
+import { declareBinaryType, CUSTOM_BINARY_TYPE_START } from '../../common/binary/BinaryExt'
 import { defineEntitySchema } from '../../common/binary/schema/defineSchema'
 import { EntityUpdateGroup } from '../../common/binary/schema/util'
 import { Context } from '../../common/Context'
 import { TestBufferReader, TestBufferWriter } from '../../testSupport/BufferBinary'
 
-const CustomBinary = 200 as Binary
+const CustomBinary = (CUSTOM_BINARY_TYPE_START + 200) as Binary
 
 declareBinaryType(CustomBinary, {
     write: (value: string, writer) => writer.writeString(value.toLowerCase()),
@@ -103,7 +103,8 @@ describe('entity diff serialization', () => {
         }
 
         const byteLength = countUpdateGroup(update)
-        const writer = TestBufferWriter.create(byteLength)
+        const writer = TestBufferWriter.create(byteLength * 2)
+        writeUpdateGroup(update, writer)
         writeUpdateGroup(update, writer)
         const reader = new TestBufferReader(writer.payload)
 
@@ -111,5 +112,15 @@ describe('entity diff serialization', () => {
             { nid: 42, prop: 'code', value: 'READY' },
             { nid: 42, prop: 'other', value: 'GO' }
         ])
+        const prefix = { nid: 7, prop: 'existing', value: 'unchanged' }
+        const output = [prefix]
+        expect(readUpdateGroup(reader, context, ntypes, Binary.UInt8, output)).toBe(output)
+        expect(output).toEqual([
+            prefix,
+            { nid: 42, prop: 'code', value: 'READY' },
+            { nid: 42, prop: 'other', value: 'GO' }
+        ])
+        expect(output[0]).toBe(prefix)
+        expect(reader.offset).toBe(byteLength * 2)
     })
 })

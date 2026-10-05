@@ -1,0 +1,2070 @@
+{
+  "date": "2026-09-25",
+  "machine": "AMD Ryzen 7 7800X3D, WSL2, 16 logical CPUs",
+  "runtime": "Node v22.17.1",
+  "comparison": "State immediately before public API/server adapter contract changes versus this change. Isolated source copies, identical snapshot driver, fresh sequential processes, three repeats with rotated order. No other tests or benchmarks run concurrently by this task.",
+  "scope": "Snapshot production excludes socket transport; history uses synthetic decoded snapshots. This is a regression comparison, not evidence of a speedup. Runtime changes are observation accessors, a transport connection factory, and returning command indexes. Declaration hiding creates no packet wrapper, freeze or deep copy.",
+  "counters": "Snapshot bytes and update/create/delete counts match; history checksums, retained record counts and expiration metadata match.",
+  "summary": [
+    {
+      "workload": "ecs-clump",
+      "metric": "stepMs",
+      "before": {
+        "p50": 2.764,
+        "p95": 7.153
+      },
+      "after": {
+        "p50": 2.765,
+        "p95": 6.197
+      }
+    },
+    {
+      "workload": "ecs-sparse",
+      "metric": "stepMs",
+      "before": {
+        "p50": 0.499,
+        "p95": 1.275
+      },
+      "after": {
+        "p50": 0.522,
+        "p95": 1.258
+      }
+    },
+    {
+      "workload": "automatic",
+      "metric": "stepMs",
+      "before": {
+        "p50": 5.711,
+        "p95": 8.824
+      },
+      "after": {
+        "p50": 5.38,
+        "p95": 8.674
+      }
+    },
+    {
+      "workload": "history-prune",
+      "metric": "elapsedMs",
+      "before": {
+        "p50": 0.4220700000000761,
+        "p95": 0.977435000000014
+      },
+      "after": {
+        "p50": 0.40852700000004916,
+        "p95": 1.0340509999999767
+      }
+    },
+    {
+      "workload": "history-sample",
+      "metric": "elapsedMs",
+      "before": {
+        "p50": 21.397609999999986,
+        "p95": 27.22057700000005
+      },
+      "after": {
+        "p50": 19.33733200000006,
+        "p95": 24.65184500000032
+      }
+    }
+  ],
+  "repeats": [
+    {
+      "scenario": "ecs-clump",
+      "variant": "before",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel-clump"
+      },
+      "result": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "networkedEntities": 1400,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "single-cell",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 3.683,
+          "p50": 3.039,
+          "p95": 7.262,
+          "max": 14.097
+        },
+        "preStepMs": {
+          "avg": 0.175,
+          "p50": 0.107,
+          "p95": 0.703,
+          "max": 3.314
+        },
+        "totalMs": {
+          "avg": 3.859,
+          "p50": 3.228,
+          "p95": 7.536,
+          "max": 14.237
+        },
+        "bytesPerSnapshot": 12291,
+        "bytesPerTick": 4301859,
+        "collectMsPerSnapshot": 0.004,
+        "countMsPerSnapshot": 0.003,
+        "writeMsPerSnapshot": 0.003,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 209400,
+        "sharedFragmentCopyMsPerSnapshot": 0.002,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1050,
+        "groupedPropsPerSnapshot": 3500,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-clump",
+      "variant": "after",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel-clump"
+      },
+      "result": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "networkedEntities": 1400,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "single-cell",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 3.628,
+          "p50": 2.942,
+          "p95": 7.2,
+          "max": 13.641
+        },
+        "preStepMs": {
+          "avg": 0.168,
+          "p50": 0.103,
+          "p95": 0.366,
+          "max": 2.525
+        },
+        "totalMs": {
+          "avg": 3.795,
+          "p50": 3.108,
+          "p95": 7.295,
+          "max": 13.773
+        },
+        "bytesPerSnapshot": 12291,
+        "bytesPerTick": 4301859,
+        "collectMsPerSnapshot": 0.004,
+        "countMsPerSnapshot": 0.003,
+        "writeMsPerSnapshot": 0.003,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 209400,
+        "sharedFragmentCopyMsPerSnapshot": 0.002,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1050,
+        "groupedPropsPerSnapshot": 3500,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-sparse",
+      "variant": "before",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel",
+        "PROFILE_USERS": "100",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_MOVE_FRACTION": "0.01",
+        "PROFILE_SHARED_UPDATES": "1"
+      },
+      "result": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "networkedEntities": 40000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 0.659,
+          "p50": 0.546,
+          "p95": 1.188,
+          "max": 5
+        },
+        "preStepMs": {
+          "avg": 0.049,
+          "p50": 0.028,
+          "p95": 0.085,
+          "max": 0.905
+        },
+        "totalMs": {
+          "avg": 0.709,
+          "p50": 0.581,
+          "p95": 1.374,
+          "max": 5.034
+        },
+        "bytesPerSnapshot": 3541,
+        "bytesPerTick": 354100,
+        "collectMsPerSnapshot": 0.002,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.002,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 59400,
+        "sharedFragmentCopyMsPerSnapshot": 0.001,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 300,
+        "groupedPropsPerSnapshot": 1000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-sparse",
+      "variant": "after",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel",
+        "PROFILE_USERS": "100",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_MOVE_FRACTION": "0.01",
+        "PROFILE_SHARED_UPDATES": "1"
+      },
+      "result": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "networkedEntities": 40000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 0.691,
+          "p50": 0.573,
+          "p95": 1.258,
+          "max": 4.999
+        },
+        "preStepMs": {
+          "avg": 0.046,
+          "p50": 0.028,
+          "p95": 0.058,
+          "max": 0.976
+        },
+        "totalMs": {
+          "avg": 0.737,
+          "p50": 0.614,
+          "p95": 1.433,
+          "max": 5.037
+        },
+        "bytesPerSnapshot": 3541,
+        "bytesPerTick": 354100,
+        "collectMsPerSnapshot": 0.002,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.002,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 59400,
+        "sharedFragmentCopyMsPerSnapshot": 0.001,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 300,
+        "groupedPropsPerSnapshot": 1000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "automatic",
+      "variant": "before",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "shared-npcs",
+        "PROFILE_USERS": "20",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_SHARED_UPDATES": "0"
+      },
+      "result": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 1000,
+        "networkedEntities": 1000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": false,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 6.067,
+          "p50": 5.711,
+          "p95": 8.824,
+          "max": 11.332
+        },
+        "preStepMs": {
+          "avg": 0.035,
+          "p50": 0.028,
+          "p95": 0.058,
+          "max": 0.313
+        },
+        "totalMs": {
+          "avg": 6.103,
+          "p50": 5.742,
+          "p95": 8.857,
+          "max": 11.361
+        },
+        "bytesPerSnapshot": 19025,
+        "bytesPerTick": 380501,
+        "collectMsPerSnapshot": 0.19,
+        "countMsPerSnapshot": 0.006,
+        "writeMsPerSnapshot": 0.103,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1000,
+        "groupedPropsPerSnapshot": 4000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "automatic",
+      "variant": "after",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "shared-npcs",
+        "PROFILE_USERS": "20",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_SHARED_UPDATES": "0"
+      },
+      "result": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 1000,
+        "networkedEntities": 1000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": false,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 5.832,
+          "p50": 5.38,
+          "p95": 8.926,
+          "max": 12.605
+        },
+        "preStepMs": {
+          "avg": 0.035,
+          "p50": 0.028,
+          "p95": 0.054,
+          "max": 0.238
+        },
+        "totalMs": {
+          "avg": 5.866,
+          "p50": 5.414,
+          "p95": 8.952,
+          "max": 12.633
+        },
+        "bytesPerSnapshot": 19025,
+        "bytesPerTick": 380501,
+        "collectMsPerSnapshot": 0.185,
+        "countMsPerSnapshot": 0.005,
+        "writeMsPerSnapshot": 0.098,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1000,
+        "groupedPropsPerSnapshot": 4000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "history-prune",
+      "variant": "before",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "prune",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.4401379999999335,
+          "p95": 1.1378919999999653,
+          "p99": 1.6561439999999266,
+          "max": 3.4269180000000006
+        },
+        "pruneMs": {
+          "p50": 0.05153600000005554,
+          "p95": 0.15884000000005472,
+          "p99": 0.259192999999982,
+          "max": 0.2877330000000029
+        },
+        "history": {
+          "timelines": 50000,
+          "records": 289500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83814024,
+        "heapBeforeFinalGc": 120649824,
+        "retainedHeapAfter": 97531696,
+        "checksum": 115440
+      }
+    },
+    {
+      "scenario": "history-prune",
+      "variant": "after",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "prune",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.40852700000004916,
+          "p95": 0.9089529999999968,
+          "p99": 1.912600999999995,
+          "max": 2.5264989999999443
+        },
+        "pruneMs": {
+          "p50": 0.04898200000002362,
+          "p95": 0.1440860000000157,
+          "p99": 0.2198399999999765,
+          "max": 0.4729419999999891
+        },
+        "history": {
+          "timelines": 50000,
+          "records": 289500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83844744,
+        "heapBeforeFinalGc": 120440720,
+        "retainedHeapAfter": 97546496,
+        "checksum": 115440
+      }
+    },
+    {
+      "scenario": "history-sample",
+      "variant": "before",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "sample",
+        "PROFILE_SAMPLING": "reuse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "sampling": "reuse",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 18.567974999999933,
+          "p95": 24.020438000000013,
+          "p99": 29.4160609999999,
+          "max": 49.25966900000003
+        },
+        "pruneMs": null,
+        "history": {
+          "timelines": 50000,
+          "records": 199500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83567600,
+        "heapBeforeFinalGc": 96265104,
+        "retainedHeapAfter": 95771048,
+        "checksum": 12045150
+      }
+    },
+    {
+      "scenario": "history-sample",
+      "variant": "after",
+      "repeat": 1,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "sample",
+        "PROFILE_SAMPLING": "reuse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "sampling": "reuse",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 19.33733200000006,
+          "p95": 24.65184500000032,
+          "p99": 28.096787999999833,
+          "max": 30.342896999999994
+        },
+        "pruneMs": null,
+        "history": {
+          "timelines": 50000,
+          "records": 199500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83597344,
+        "heapBeforeFinalGc": 96295744,
+        "retainedHeapAfter": 95801736,
+        "checksum": 12045150
+      }
+    },
+    {
+      "scenario": "ecs-clump",
+      "variant": "after",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel-clump"
+      },
+      "result": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "networkedEntities": 1400,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "single-cell",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 3.264,
+          "p50": 2.636,
+          "p95": 6.197,
+          "max": 11.246
+        },
+        "preStepMs": {
+          "avg": 0.144,
+          "p50": 0.098,
+          "p95": 0.274,
+          "max": 2.908
+        },
+        "totalMs": {
+          "avg": 3.408,
+          "p50": 2.792,
+          "p95": 6.39,
+          "max": 11.364
+        },
+        "bytesPerSnapshot": 12291,
+        "bytesPerTick": 4301859,
+        "collectMsPerSnapshot": 0.003,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.003,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 209400,
+        "sharedFragmentCopyMsPerSnapshot": 0.002,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1050,
+        "groupedPropsPerSnapshot": 3500,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-clump",
+      "variant": "before",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel-clump"
+      },
+      "result": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "networkedEntities": 1400,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "single-cell",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 3.429,
+          "p50": 2.764,
+          "p95": 6.816,
+          "max": 12.105
+        },
+        "preStepMs": {
+          "avg": 0.165,
+          "p50": 0.098,
+          "p95": 0.381,
+          "max": 3.31
+        },
+        "totalMs": {
+          "avg": 3.594,
+          "p50": 2.901,
+          "p95": 7.21,
+          "max": 12.195
+        },
+        "bytesPerSnapshot": 12291,
+        "bytesPerTick": 4301859,
+        "collectMsPerSnapshot": 0.003,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.003,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 209400,
+        "sharedFragmentCopyMsPerSnapshot": 0.002,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1050,
+        "groupedPropsPerSnapshot": 3500,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-sparse",
+      "variant": "after",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel",
+        "PROFILE_USERS": "100",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_MOVE_FRACTION": "0.01",
+        "PROFILE_SHARED_UPDATES": "1"
+      },
+      "result": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "networkedEntities": 40000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 0.62,
+          "p50": 0.483,
+          "p95": 1.257,
+          "max": 3.846
+        },
+        "preStepMs": {
+          "avg": 0.031,
+          "p50": 0.023,
+          "p95": 0.042,
+          "max": 0.646
+        },
+        "totalMs": {
+          "avg": 0.652,
+          "p50": 0.507,
+          "p95": 1.374,
+          "max": 3.882
+        },
+        "bytesPerSnapshot": 3541,
+        "bytesPerTick": 354100,
+        "collectMsPerSnapshot": 0.002,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.001,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 59400,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 300,
+        "groupedPropsPerSnapshot": 1000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-sparse",
+      "variant": "before",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel",
+        "PROFILE_USERS": "100",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_MOVE_FRACTION": "0.01",
+        "PROFILE_SHARED_UPDATES": "1"
+      },
+      "result": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "networkedEntities": 40000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 0.635,
+          "p50": 0.499,
+          "p95": 1.275,
+          "max": 3.521
+        },
+        "preStepMs": {
+          "avg": 0.035,
+          "p50": 0.027,
+          "p95": 0.049,
+          "max": 0.803
+        },
+        "totalMs": {
+          "avg": 0.67,
+          "p50": 0.527,
+          "p95": 1.336,
+          "max": 3.554
+        },
+        "bytesPerSnapshot": 3541,
+        "bytesPerTick": 354100,
+        "collectMsPerSnapshot": 0.002,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.001,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 59400,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 300,
+        "groupedPropsPerSnapshot": 1000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "automatic",
+      "variant": "after",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "shared-npcs",
+        "PROFILE_USERS": "20",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_SHARED_UPDATES": "0"
+      },
+      "result": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 1000,
+        "networkedEntities": 1000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": false,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 5.849,
+          "p50": 5.537,
+          "p95": 8.674,
+          "max": 11.051
+        },
+        "preStepMs": {
+          "avg": 0.039,
+          "p50": 0.028,
+          "p95": 0.061,
+          "max": 1.954
+        },
+        "totalMs": {
+          "avg": 5.888,
+          "p50": 5.58,
+          "p95": 8.701,
+          "max": 11.1
+        },
+        "bytesPerSnapshot": 19025,
+        "bytesPerTick": 380501,
+        "collectMsPerSnapshot": 0.181,
+        "countMsPerSnapshot": 0.007,
+        "writeMsPerSnapshot": 0.101,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1000,
+        "groupedPropsPerSnapshot": 4000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "automatic",
+      "variant": "before",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "shared-npcs",
+        "PROFILE_USERS": "20",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_SHARED_UPDATES": "0"
+      },
+      "result": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 1000,
+        "networkedEntities": 1000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": false,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 5.639,
+          "p50": 5.322,
+          "p95": 8.025,
+          "max": 10.701
+        },
+        "preStepMs": {
+          "avg": 0.033,
+          "p50": 0.027,
+          "p95": 0.054,
+          "max": 0.192
+        },
+        "totalMs": {
+          "avg": 5.671,
+          "p50": 5.36,
+          "p95": 8.056,
+          "max": 10.728
+        },
+        "bytesPerSnapshot": 19025,
+        "bytesPerTick": 380501,
+        "collectMsPerSnapshot": 0.182,
+        "countMsPerSnapshot": 0.004,
+        "writeMsPerSnapshot": 0.093,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1000,
+        "groupedPropsPerSnapshot": 4000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "history-prune",
+      "variant": "after",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "prune",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.47784599999999955,
+          "p95": 1.0416010000000142,
+          "p99": 1.969344000000092,
+          "max": 3.4914380000000165
+        },
+        "pruneMs": {
+          "p50": 0.05937499999993179,
+          "p95": 0.14669099999991886,
+          "p99": 0.2699479999999994,
+          "max": 1.215673000000038
+        },
+        "history": {
+          "timelines": 50000,
+          "records": 289500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83593872,
+        "heapBeforeFinalGc": 120247992,
+        "retainedHeapAfter": 97295408,
+        "checksum": 115440
+      }
+    },
+    {
+      "scenario": "history-prune",
+      "variant": "before",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "prune",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.39037499999994907,
+          "p95": 0.7327149999999847,
+          "p99": 1.0347869999999375,
+          "max": 2.8990119999999706
+        },
+        "pruneMs": {
+          "p50": 0.04741100000001097,
+          "p95": 0.13568899999995665,
+          "p99": 0.20026399999994737,
+          "max": 0.20105100000000675
+        },
+        "history": {
+          "timelines": 50000,
+          "records": 289500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83583224,
+        "heapBeforeFinalGc": 120217048,
+        "retainedHeapAfter": 97284888,
+        "checksum": 115440
+      }
+    },
+    {
+      "scenario": "history-sample",
+      "variant": "after",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "sample",
+        "PROFILE_SAMPLING": "reuse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "sampling": "reuse",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 17.627935999999863,
+          "p95": 23.014326999999867,
+          "p99": 28.25975699999981,
+          "max": 37.770948999999746
+        },
+        "pruneMs": null,
+        "history": {
+          "timelines": 50000,
+          "records": 199500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83593224,
+        "heapBeforeFinalGc": 96291696,
+        "retainedHeapAfter": 95797688,
+        "checksum": 12045150
+      }
+    },
+    {
+      "scenario": "history-sample",
+      "variant": "before",
+      "repeat": 2,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "sample",
+        "PROFILE_SAMPLING": "reuse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "sampling": "reuse",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 21.96404900000016,
+          "p95": 28.476677000000564,
+          "p99": 31.57128300000022,
+          "max": 36.28611799999999
+        },
+        "pruneMs": null,
+        "history": {
+          "timelines": 50000,
+          "records": 199500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83583072,
+        "heapBeforeFinalGc": 96273608,
+        "retainedHeapAfter": 95779552,
+        "checksum": 12045150
+      }
+    },
+    {
+      "scenario": "ecs-clump",
+      "variant": "before",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel-clump"
+      },
+      "result": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "networkedEntities": 1400,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "single-cell",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 3.445,
+          "p50": 2.755,
+          "p95": 7.153,
+          "max": 15.718
+        },
+        "preStepMs": {
+          "avg": 0.157,
+          "p50": 0.1,
+          "p95": 0.237,
+          "max": 4.48
+        },
+        "totalMs": {
+          "avg": 3.601,
+          "p50": 2.93,
+          "p95": 7.299,
+          "max": 15.808
+        },
+        "bytesPerSnapshot": 12291,
+        "bytesPerTick": 4301859,
+        "collectMsPerSnapshot": 0.003,
+        "countMsPerSnapshot": 0.003,
+        "writeMsPerSnapshot": 0.003,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 209400,
+        "sharedFragmentCopyMsPerSnapshot": 0.002,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1050,
+        "groupedPropsPerSnapshot": 3500,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-clump",
+      "variant": "after",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel-clump"
+      },
+      "result": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "networkedEntities": 1400,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "single-cell",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 3.205,
+          "p50": 2.765,
+          "p95": 5.959,
+          "max": 12.235
+        },
+        "preStepMs": {
+          "avg": 0.166,
+          "p50": 0.1,
+          "p95": 0.468,
+          "max": 2.789
+        },
+        "totalMs": {
+          "avg": 3.371,
+          "p50": 2.923,
+          "p95": 6.23,
+          "max": 12.33
+        },
+        "bytesPerSnapshot": 12291,
+        "bytesPerTick": 4301859,
+        "collectMsPerSnapshot": 0.003,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.002,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 209400,
+        "sharedFragmentCopyMsPerSnapshot": 0.001,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1050,
+        "groupedPropsPerSnapshot": 3500,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-sparse",
+      "variant": "before",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel",
+        "PROFILE_USERS": "100",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_MOVE_FRACTION": "0.01",
+        "PROFILE_SHARED_UPDATES": "1"
+      },
+      "result": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "networkedEntities": 40000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 0.628,
+          "p50": 0.496,
+          "p95": 1.284,
+          "max": 4.068
+        },
+        "preStepMs": {
+          "avg": 0.031,
+          "p50": 0.023,
+          "p95": 0.044,
+          "max": 0.91
+        },
+        "totalMs": {
+          "avg": 0.659,
+          "p50": 0.522,
+          "p95": 1.318,
+          "max": 4.133
+        },
+        "bytesPerSnapshot": 3541,
+        "bytesPerTick": 354100,
+        "collectMsPerSnapshot": 0.002,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.002,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 59400,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 300,
+        "groupedPropsPerSnapshot": 1000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "ecs-sparse",
+      "variant": "after",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "ecs-channel",
+        "PROFILE_USERS": "100",
+        "PROFILE_ENTITIES": "10000",
+        "PROFILE_MOVE_FRACTION": "0.01",
+        "PROFILE_SHARED_UPDATES": "1"
+      },
+      "result": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "networkedEntities": 40000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": true,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 0.677,
+          "p50": 0.522,
+          "p95": 1.361,
+          "max": 5.963
+        },
+        "preStepMs": {
+          "avg": 0.031,
+          "p50": 0.023,
+          "p95": 0.047,
+          "max": 0.57
+        },
+        "totalMs": {
+          "avg": 0.708,
+          "p50": 0.546,
+          "p95": 1.413,
+          "max": 6.031
+        },
+        "bytesPerSnapshot": 3541,
+        "bytesPerTick": 354100,
+        "collectMsPerSnapshot": 0.002,
+        "countMsPerSnapshot": 0.002,
+        "writeMsPerSnapshot": 0.002,
+        "sharedFragmentBuilds": 600,
+        "sharedFragmentHits": 59400,
+        "sharedFragmentCopyMsPerSnapshot": 0.001,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 300,
+        "groupedPropsPerSnapshot": 1000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "automatic",
+      "variant": "before",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "shared-npcs",
+        "PROFILE_USERS": "20",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_SHARED_UPDATES": "0"
+      },
+      "result": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 1000,
+        "networkedEntities": 1000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": false,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 6.26,
+          "p50": 5.978,
+          "p95": 9.016,
+          "max": 12.65
+        },
+        "preStepMs": {
+          "avg": 0.035,
+          "p50": 0.028,
+          "p95": 0.056,
+          "max": 0.302
+        },
+        "totalMs": {
+          "avg": 6.295,
+          "p50": 6.027,
+          "p95": 9.045,
+          "max": 12.708
+        },
+        "bytesPerSnapshot": 19025,
+        "bytesPerTick": 380501,
+        "collectMsPerSnapshot": 0.192,
+        "countMsPerSnapshot": 0.012,
+        "writeMsPerSnapshot": 0.106,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1000,
+        "groupedPropsPerSnapshot": 4000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "automatic",
+      "variant": "after",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_WARMUP": "200",
+        "PROFILE_TICKS": "600",
+        "PROFILE_OUTPUT": "summary",
+        "PROFILE_SCENARIO": "shared-npcs",
+        "PROFILE_USERS": "20",
+        "PROFILE_ENTITIES": "1000",
+        "PROFILE_SHARED_UPDATES": "0"
+      },
+      "result": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 1000,
+        "networkedEntities": 1000,
+        "ticks": 600,
+        "warmup": 200,
+        "sharedUpdates": false,
+        "manualEmitMode": "group4",
+        "spatialDistribution": "default",
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "stepMs": {
+          "avg": 5.614,
+          "p50": 5.289,
+          "p95": 8.248,
+          "max": 11.713
+        },
+        "preStepMs": {
+          "avg": 0.034,
+          "p50": 0.028,
+          "p95": 0.055,
+          "max": 0.215
+        },
+        "totalMs": {
+          "avg": 5.649,
+          "p50": 5.32,
+          "p95": 8.275,
+          "max": 11.761
+        },
+        "bytesPerSnapshot": 19025,
+        "bytesPerTick": 380501,
+        "collectMsPerSnapshot": 0.178,
+        "countMsPerSnapshot": 0.004,
+        "writeMsPerSnapshot": 0.095,
+        "sharedFragmentBuilds": 0,
+        "sharedFragmentHits": 0,
+        "sharedFragmentCopyMsPerSnapshot": 0,
+        "updatePropsPerSnapshot": 0,
+        "updateGroupsPerSnapshot": 1000,
+        "groupedPropsPerSnapshot": 4000,
+        "createsPerSnapshot": 0,
+        "deletesPerSnapshot": 0
+      }
+    },
+    {
+      "scenario": "history-prune",
+      "variant": "before",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "prune",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.4220700000000761,
+          "p95": 0.977435000000014,
+          "p99": 2.167511999999988,
+          "max": 3.169448999999986
+        },
+        "pruneMs": {
+          "p50": 0.048071000000049935,
+          "p95": 0.13134000000002288,
+          "p99": 0.3249980000000505,
+          "max": 2.0141949999999724
+        },
+        "history": {
+          "timelines": 50000,
+          "records": 289500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83583848,
+        "heapBeforeFinalGc": 120203160,
+        "retainedHeapAfter": 97285448,
+        "checksum": 115440
+      }
+    },
+    {
+      "scenario": "history-prune",
+      "variant": "after",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "prune",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "prune",
+        "valueShape": "scalar",
+        "sampling": "allocate",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 0.3893550000000232,
+          "p95": 1.0340509999999767,
+          "p99": 2.1053269999999884,
+          "max": 3.135812000000101
+        },
+        "pruneMs": {
+          "p50": 0.04844299999990653,
+          "p95": 0.12353800000005322,
+          "p99": 0.234154999999987,
+          "max": 0.3011749999999438
+        },
+        "history": {
+          "timelines": 50000,
+          "records": 289500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83577920,
+        "heapBeforeFinalGc": 120435200,
+        "retainedHeapAfter": 97295688,
+        "checksum": 115440
+      }
+    },
+    {
+      "scenario": "history-sample",
+      "variant": "before",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "sample",
+        "PROFILE_SAMPLING": "reuse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "sampling": "reuse",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 21.397609999999986,
+          "p95": 27.22057700000005,
+          "p99": 30.14388000000008,
+          "max": 32.607258
+        },
+        "pruneMs": null,
+        "history": {
+          "timelines": 50000,
+          "records": 199500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83567008,
+        "heapBeforeFinalGc": 96258120,
+        "retainedHeapAfter": 95764112,
+        "checksum": 12045150
+      }
+    },
+    {
+      "scenario": "history-sample",
+      "variant": "after",
+      "repeat": 3,
+      "settings": {
+        "PROFILE_SCENARIO": "sparse",
+        "PROFILE_PHASE": "sample",
+        "PROFILE_SAMPLING": "reuse",
+        "PROFILE_ENTITIES": "50000",
+        "PROFILE_HISTORY_FRAMES": "240",
+        "PROFILE_WARMUP": "60",
+        "PROFILE_ITERATIONS": "180"
+      },
+      "result": {
+        "runtime": "v22.17.1",
+        "explicitGc": true,
+        "scenario": "sparse",
+        "phase": "sample",
+        "valueShape": "scalar",
+        "sampling": "reuse",
+        "selection": "stable",
+        "population": 50000,
+        "components": 1,
+        "fraction": 0.01,
+        "historyFrames": 240,
+        "warmup": 60,
+        "iterations": 180,
+        "serverHz": 20,
+        "renderHz": 60,
+        "elapsedMs": {
+          "p50": 21.63198199999988,
+          "p95": 27.98185999999987,
+          "p99": 30.96694100000059,
+          "max": 32.762643000000025
+        },
+        "pruneMs": null,
+        "history": {
+          "timelines": 50000,
+          "records": 199500,
+          "retainedRecords": 170000
+        },
+        "expirationIndex": {
+          "frames": 240,
+          "ids": 120000
+        },
+        "retainedHeapBefore": 83593776,
+        "heapBeforeFinalGc": 96323888,
+        "retainedHeapAfter": 95797976,
+        "checksum": 12045150
+      }
+    }
+  ],
+  "sourceHashes": {
+    "before": {
+      "NQueue.ts": "953942c5de61268888aba579ba567a748f20723f54785752e59470146a61cbb2",
+      "binary/BinaryDiagnosticError.ts": "72e7a03f05bd40b7f1595263d03cd5bda13c9b91858feaeb26dfa2a024429e4d",
+      "binary/assertBinaryWriteSize.ts": "a50b1174cb89a4d0c373fbef68c57057bb08613acb50e4d9752f0be9325ab84f",
+      "binary/endpoint/EndpointPayload.ts": "66c21a0c9002ff4180eedd8f300661ea590ef68b00d4e77cf3067b268cb5f487",
+      "binary/entity/countDiff.ts": "b2c444391ce676ab018b50f0dd034d614bc935051819d8e34997b1198480dce8",
+      "binary/entity/countEntity.ts": "a6031d3abe5ff9474397b09183b7a90a9d3db99fb442be6f79246ff66e67ae3f",
+      "binary/entity/countUpdateGroup.ts": "a53d23317b890270f66efee14c1de441d3a157f1edc8ee1b99cc812787c77be4",
+      "binary/entity/readDiff.ts": "e1754f334c40343ed062dc01b1ef9f29ebc53a22087cc9a8ef0c9cf3bed08919",
+      "binary/entity/readEntity.ts": "c4c11f7375e82362b6087b229b2f50d1a3d0e2ba20b599a85cf5ae41ecedd7f0",
+      "binary/entity/readUpdateGroup.ts": "1f45f14b753d7b004744c01cd13bd78e77f0ee197207b6a12bbd89bd52113088",
+      "binary/entity/writeDiff.ts": "4c0e709781c96feea15fc48dfc343f76c6ade7b844cfc128d5325ea433ca954f",
+      "binary/entity/writeEntity.ts": "903370543d4c9a713e542a5d86439c9b16b49a050ed71fbaa5c960e3412df2a8",
+      "binary/entity/writeUpdateGroup.ts": "89edba7bae2b1318b852eb0be45f7faac382e53f47264d677a2c4e9c6befb2c5",
+      "binary/message/count.ts": "dfb303db797d30ecb984139b3ce9fc567ace60ce80e1a24e6b22a19bf29de4da",
+      "binary/message/readEngineMessage.ts": "6d625300d31cf664e1abee141b20f226c3e77b05a7298dfd33900f8732a7cf6e",
+      "binary/message/readMessage.ts": "ef90a7639f9025f059382c9802df264f4c323dc3e5d461b22818bbab58e402b3",
+      "binary/message/writeMessage.ts": "0b54a20a44a7e97dfee028ddf630a07204534b3fe233e58886cfb0af6857bbf4",
+      "binary/snapshot/SnapshotChunk.ts": "a29f8c54544b19a3d591f5f57d79182dc42fe4d694e38ba70725f9452bd7da44",
+      "binary/snapshot/SnapshotPlan.ts": "72bc50e940042e84af1c8028c5bd500e1e9fffe899609c717aa030e55411ca98",
+      "binary/snapshot/cellEntityFragments.ts": "582a3731d18000fe4a424440231c5c32a71ee041f20876d741668431e55d1086",
+      "binary/snapshot/cellFragmentBuilders.ts": "2b887fce9b5e9090b573259ad11a8ccfe8eaeb69b4c28eb2a4094d80ad567cf5",
+      "binary/snapshot/channelHeaders.ts": "d2c4802e44bec468ae16b024b794efb95e000ea410428825fd2824c54357c138",
+      "binary/snapshot/channelMessages.ts": "fc710d696cd9c2626fd785b22d1fda797124a363af3f2a235d0eef9fb1a2de2e",
+      "binary/snapshot/channelModes.ts": "f79d56bd24d74ff6d206038b0c0ab3d2d7147194ce0e28c736cbbbd05718c960",
+      "binary/snapshot/commitSnapshotPlan.ts": "a83bfa96857623cfaeb928faee96dc5927f5008dac715c1e93433a95e20c4076",
+      "binary/snapshot/countSnapshotBytes.ts": "ba29f41bfb1ac9fb3f0ef57112be0991c8f39f364fc4a1de4f7470c9dd1d5316",
+      "binary/snapshot/createSnapshotBuffer.ts": "a78c93dc7052e611f8a19dc2d98d6e3f7169d6319bbc64e429ff7076377a9ceb",
+      "binary/snapshot/ecsSnapshotCrud.ts": "48259469eb65276936875300325dd1c82dbb4522649f6df71fb77cf1f6ae35a1",
+      "binary/snapshot/entitySnapshotPlans.ts": "32dc4b840b7d80aa34f9fa3fd82bdb95a2de8df13568fd221636fb733d275f68",
+      "binary/snapshot/manualUpdates.ts": "d57c40955de24553d85037057a60c212800be29c531a87be1a72c890b6c0bf2c",
+      "binary/snapshot/messageFragments.ts": "59768bce76110ab59bfcacc549d4b3b806117107b9a30800cef2b3921d7e594c",
+      "binary/snapshot/sharedEntityFragments.ts": "13d9df9c75ad90e92b38cb7380ef74977bd303f76ffad1ea7aceeece8cbdc75a",
+      "binary/snapshot/snapshotChunkBuilders.ts": "82ca52f192786f827b462d71655b4eb6f1e68798e8148ef93ce85e63efffe53b",
+      "binary/snapshot/snapshotEnvelope.ts": "ac9a84b13187ab330a38a6117f0ec995c5658cd57abd8a0c5b75ea2942569886",
+      "binary/snapshot/snapshotHeader.ts": "b71ce5b25e8928587a61d0aa9e386c3844b498e8a77ff2b7e1f4b80e9192cfd9",
+      "binary/snapshot/snapshotPayload.ts": "e605c706b71fa33065c0761286c6f66ebf0dda9414b7de91b83b2a29d9f2e590",
+      "binary/snapshot/snapshotPlanStats.ts": "74de4b89ac38942be8c4e2e95c33f8bed2b951298dff6f0c4d7d109450b361f5",
+      "binary/snapshot/writeSnapshot.ts": "6de11a0a7ca4a941bb75acb0e1bfc8de979a2683e271e97c73ffc4bb9333438e",
+      "client/Client.ts": "aa199f25d7b46a4562cf19f10a0439b7512231d0c01bcf0af98a33e9468175e3",
+      "client/ClientConnection.ts": "4baa878214ecc4cb207d7ae25a27cb96dbef9bcf9ec2685c47c446672a99c20e",
+      "client/ClientNetwork.ts": "eed8e8755dc85b2b59c34bf89cd663ab0e77755fc16c34d2c22683106fce3429",
+      "client/EntityHistory.ts": "2b00ef23e0eff9ee4ac66dce5a010bc8362b8151b1adc59ed849f9ba409b2012",
+      "client/EntityStore.ts": "42385a2b31fd9d9cff10526214612de087a30f6392dc90468e238859fc829170",
+      "client/FixedStepInterpolator.ts": "21d2e8608e68bc7e1f7283e21c689a9351d8c691663b2ffbf343fbe3961687b8",
+      "client/Frame.ts": "aa2118880bbd3c14c1e5ca5f3a0c7ee53549d14cd04962b593c071c731316419",
+      "client/InterpolationDelayPolicy.ts": "8d63bd80f32cdf02b783214676b976f57df6f09723967ab56b8cbe4b902b9a7b",
+      "client/InterpolationOutput.ts": "5fb7f8ba8a1e7b7f1cddc497aa8077f1bb3b1f015b3186fb4fe9d65d18bb1401",
+      "client/InterpolationTestHarness.ts": "8fae7625eb59e1fa3f614762b37bb78708b3c9c18ab7a23b7d325654b329d075",
+      "client/Outbound.ts": "c67e65ee030607c3b8c8fcf6aff6a94a54a53bccd21f94a381e8df6e0ae6af97",
+      "client/PlaybackCursor.ts": "b9a9543a47ba5261f086898c0c6268d0ddec172b3935567f41e2e0f5a2538990",
+      "client/Snapshot.ts": "85edaaa3c67b9d4f82b070069065e5cebb8d597df9223d34af862559d3c6d97c",
+      "client/adapter/IClientNetworkAdapter.ts": "99fa5b51abd7812590569b77aea25ed3a3ad83ae2d0b5672651a5b47fba667e6",
+      "client/entityTimeline.ts": "9ba5ec4a8d2d4aae3e126d77a780992d6a7c15c737c3e13a608436555a9ab636",
+      "client/prediction/CommandReplayPrediction.ts": "1820681d648d89d357680e31b795b94ec86b5cf87a70d25276fb808f9fb2e419",
+      "client/prediction/PredictionLog.ts": "b45fc767f6b363eda7c9b4170637edda8b0e0861142c067b52b15227b63fff3a",
+      "client/prediction/Predictor.ts": "87a4cf87ac6ff5577fdabfe5b3123debb0a16bad78a7bd16239fa94734780b1d",
+      "client/prediction/StateReplayPrediction.ts": "95b1a0b5a93aa602a38637ae0ef778aea8a59904015c700606c20f198500d1b4",
+      "client/time.ts": "a5b765df1bf1e4df926ed82fcb6cd41cd64cbb2affdbfc6e90048c1ebc0b0ca1",
+      "common/ChannelHeader.ts": "4371ba84519bf7bf0143a42d90bd754d7a7aa2ef45dd7d93749ba1eb3346388c",
+      "common/Context.ts": "c6670b000ef77559ba1c74c3c38726884f5587c5541bda6e3df0558d1f32f375",
+      "common/Endpoint.ts": "504da477eed1def118e6834e9d6f94eb0dcb0bd5658fc1bacf489813ca1d1269",
+      "common/EngineMessage.ts": "2ba7fe53db947fa25d8ea3c9889faf9559bab057171e93f52569b1e5b16631c2",
+      "common/I2DSpatialEntity.ts": "0b34aa172019e613375a315a4381af2bf945ce4b34282f80c88dc8e184f9a67e",
+      "common/I3DSpatialEntity.ts": "e76c48e3862809b299aa1efd478f93c2867cf9d65c964598a4cc0332fab33b5a",
+      "common/IEntity.ts": "44c15b731f331a37794944a1c135346f619dc1e091f2bc6dfb055ee210b5f553",
+      "common/binary/Binary.ts": "249605978efa5e787956d88bb25213292d08643fe39bb9db909e31b39f881b8b",
+      "common/binary/BinaryAdapter.ts": "3db431ecbb6acfe6425df1ce69421f007d8f07206b8b7fa705d6e9fc8846ee8a",
+      "common/binary/BinaryExt.ts": "8327ca8aabd2129efae2ad6786d129f7bc71d25e3ec5b48b38e7d31029e26c03",
+      "common/binary/BinarySection.ts": "1019c40aa6c35a69ef900bfdad0dc4be5df2e258fc96771ff016145e65cc7f4d",
+      "common/binary/IBinaryReader.ts": "2294e9d421b7087e26b6246959698e341f1b2ed05cbef98c291891ed632ae36a",
+      "common/binary/IBinaryWriter.ts": "548b81bf2c5ba035a68a1e79d16ea569cf9326bea49f36b2ca60add270656962",
+      "common/binary/NetworkEvent.ts": "09e5a185675d24fdd1f7fae1a5b6a6eceee97e4c62a2197276c8ec8a8584e44e",
+      "common/binary/Protocol.ts": "6edccf3b8504f41ed6211d6a4c015a4a0b72d33f8196d5d0840bf8b2a7f671ad",
+      "common/binary/schema/Schema.ts": "da0cde88623069df9615333f33b3ae104f0c70e4eb52defe75c23671adb4a57b",
+      "common/binary/schema/SchemaDefinition.ts": "0e3297309c6fe5a711b0ccade474ec0eb7290fe9c840c473c4503c00309ece21",
+      "common/binary/schema/defineSchema.ts": "eb076fec02aeedfebb05486517286daa2c1695d970764ba698c27c31538e96a7",
+      "common/binary/schema/schemaFingerprint.ts": "f6ebdb8b7704cd0a2c583ee52470f7d18d22c66c10351db84fda8d217396a426",
+      "common/binary/schema/util.ts": "93a2c74e0d19470387ac2d71cac06a99669ac77ee88a99d93ed36127e170e0d4",
+      "common/network/NetworkConditionLink.ts": "5e36dfc4e4da13f83966b8d84f6893caa55f224e424697f679d8e137bca43a11",
+      "common/schemas/channelAddEntitySchema.ts": "8fdfd555879a8521aaaa4c20d5bdafaab47d5c528167c5f2735d1cde0fd29acc",
+      "common/schemas/commandFrameNumberSchema.ts": "e2cf63ee93c71f06a010846f93fb3c0e891445b387138e62b83227f768960e90",
+      "common/schemas/commandTimingSchema.ts": "6346e5ba860fcad5782f18d4affaea5f12bc4fd91fff8c3008d55dbb2102d445",
+      "common/schemas/connectAttemptSchema.ts": "6a882d1c0621056c81916f645d75b7e02ae5f4eaca0222f2398e64e7dbc854f1",
+      "common/schemas/connectionAcceptedSchema.ts": "e49b308c4b8740fdd7c9b0ff88fbd31081759438a13938923a0873b1feda0eb5",
+      "common/schemas/connectionDeniedSchema.ts": "929a881ea0a30684cac382c74e8ebbd1f44008dd0ccd39dfc2c70188bf885f00",
+      "common/schemas/connectionTerminatedSchema.ts": "73cafc39cafcf271f5f0c28b0a7bc9f35b5f18c45b7aafefb3d83e4ed8b25abf",
+      "common/schemas/interpolationDelaySchema.ts": "4d54554a63fbc55aa219b451108839ea4acc5dc13bb5089fc89588c88550f436",
+      "common/schemas/pingSchema.ts": "181c204f5b324f74d9d42adfbf6f5f5855cf149b6e1264295f77d6321f627ccf",
+      "common/schemas/pongSchema.ts": "72456b1d645145a26df8dba3dcc4b045383d4c4246b121e863f04b27b3b30117",
+      "common/schemas/protocolSchema.ts": "db6649fbca7afe1cfa396fd09f9ebd782be53be0a87b7d3a8138726e5918d094",
+      "common/time.ts": "a6929786da602a0c8f417f9e500dbc21ad3166febc00ffda76ab90a7c6fb568a",
+      "ecs/EcsWorld.ts": "82d7a1ae5c2df8042d7da55b45cf47d84f0a88348e04bab1b07c8fd6f7a4a003",
+      "ecs/applyEcsChannelFrame.ts": "c093ae37eaf138230b5e4854a26cac97db3eada1340d86948ac3d2263fa5e094",
+      "index.ts": "1702683e0ac8ec0ee4809b3e5c9fd1c7870477f169aefff1c2d2c5c5a9af4e2b",
+      "performance/ClientHistory.performance.ts": "2dcf831a39fe00e89e65d94aabc643fbf957d1142801e8f0767fe872e166b1cb",
+      "performance/ClientHistoryWorkload.ts": "c002e33c051c124831d080dee4e7df726051bb2500cc0bca7499024a90c45f6c",
+      "performance/EcsBinding.performance.ts": "916c94faca69a197df3b2cf929a00ff50a63e7e09564bb72d484b9dee5dda70c",
+      "performance/EntityTree.performance.ts": "5c7b15a03e34cbb4c17829a27110a0b20273a698ef473581633ccc035428a0ab",
+      "performance/Historian.performance.ts": "972976371fd587645c033763b0a9879f58d7c9efbbd6bf05a93ce40f1928be0d",
+      "performance/SnapshotPipeline.performance.ts": "76fbb42b97085871595754f32c8aa0a024eb5cb9fb28abcd5525493ac6971814",
+      "server/CommandRouter.ts": "4962e6740f1d5811646d8d1e44eb7b249558b02ae959a5f6d17dbdd84ae86e8c",
+      "server/EntityCache.ts": "b80ef1b9fcd6dd08604e922b4cb539e98ea16a3fed4f7201ab56c7fc1fb3fd7c",
+      "server/Historian2D.ts": "c0f1b302f7db27d45b1c227b00377afeb6f9677bdf909dc67ee7be3cbdf87c7e",
+      "server/Historian3D.ts": "e866b7cd51079e81ac2f05925d94621bdb6dbada7d165f9db3fe24ba5b0a1c08",
+      "server/IdPool.ts": "9a3ca4856bdb42fef33cc23b6b9c28d725fb1a266f7dcfb8bc3b8a155eb7394f",
+      "server/Instance.ts": "1b61b724d6d59c4564dff301435dc33476f417d072706c403c816ad0dae6caca",
+      "server/InstanceNetwork.ts": "ac86cdc181527a399f4576a07fb10768ef1f11c2d827b6dc38372344d3ffc7d1",
+      "server/LocalState.ts": "07f16fd73b84fbb97e85fcf63c7ddb64f6f32e1b6053e6f3f6938dbc13fc5ebb",
+      "server/NDictionary.ts": "57e565593d245886ed147215d33091bdb84790698e549d15257dcf2798fbc212",
+      "server/NetworkLimits.ts": "f82e4f6c50aeda87466526de90697289ecf8d219150e432f2095ca1f043aff4a",
+      "server/PublicPathSmoother2D.ts": "047142fef0b90565ee4f64e98621305e8b876365e275de686c7c9e45f203b463",
+      "server/PublicPathSmoother3D.ts": "93e1499acfce63cb04a325a21bf7f592af2cf7e5905cea837632b35fe7870205",
+      "server/User.ts": "5112a0d098450949e34957af05817e3a71f8a50203d147d11429efc6c36bda8d",
+      "server/adapter/IServerNetworkAdapter.ts": "e4e5800ccc75d3ed83336be5536e070e0f3d6c0df990d74a291199b79c4422d0",
+      "server/adapter/MockAdapter.ts": "1757adb34dce2c0d0948583abea6d3f5912c065ae8e156ceb52a6176a93796b5",
+      "server/channel/AABB2D.ts": "d0b30845edcbbe7d988e0a3c905a9518887ca38e850b8d92dae770dfe005d4a4",
+      "server/channel/AABB3D.ts": "058d9ddb929a8cc1eb3a4cb1fbc1a218fc666a36ccf062ee710d34dc6609f418",
+      "server/channel/CellFragmentChannelOutput.ts": "c098c1559a284df74e09bcda2e548036ddeac45aa2990311c7d00124d8521a0c",
+      "server/channel/Channel.ts": "b12f96f29b9782339d93451cb0761542374c71f4a6d2053baf1b01e9feabb726",
+      "server/channel/Channel2D.ts": "17a584be5158a81b1f47d0a57a1d527b6ab36457c8d184590d54bf261d376dc6",
+      "server/channel/Channel3D.ts": "39ad636ef2d0c9e06345bebba60a4a57fd53485329b34afe82b4dc72f1706587",
+      "server/channel/ChannelOutput.ts": "b9851900bf8f585dabef6b804af1a119475219e46f0c5464ebe7f780f2ec9089",
+      "server/channel/ChannelSnapshotOutput.ts": "ac33b0d84daf82bb23b741a71833b84de635491ba5f34468d90136a583e0ccb7",
+      "server/channel/ChannelVisibilityCache.ts": "c84a51ca9a58cb1b15ed37d8d17fa13c180b989151260d0f01571584f32f1099",
+      "server/channel/EcsChannel.ts": "28bf2c402278238129fc605342e1cbab1aa8f556670fe2e57ccce056f1663592",
+      "server/channel/EcsChannel2D.ts": "8f92c597ec96991f7483e24ff8d7a3d6d11da7f47bad9e21902800a1fe67a4f7",
+      "server/channel/EcsChannel3D.ts": "a64f85996ba13a8e3f3de5db5af8fac49178f1e5ef4735d542294287700cdd05",
+      "server/channel/EcsChannelBinding.ts": "00f0bf4d05c359867e3e18b41a100bfbc3e5f2dedcf664b142a653958fd71182",
+      "server/channel/EcsChannelOutput.ts": "323bdf29a7301d342284d6826ae500156e860d8faf1d84ed37deae9780b2bc3e",
+      "server/channel/EcsChannelSnapshot.ts": "ec12dee9a460501170793c92168ee3ec03158b2c67fba1424e187fb099f04863",
+      "server/channel/EcsSpatialEntityStore.ts": "023e28943a505c27013e003548620d16eefbd25e2b6c37f7e5d2f712110b0f41",
+      "server/channel/EcsSpatialManualLog.ts": "0d3cf569acf88b26517e29617f323f5d67112138c4d92c7a1836e891af56f3fd",
+      "server/channel/IChannel.ts": "df6ace7913c21f5245b2de93ab95fead9395e2c560a73dc3f917c2c17b6a5799",
+      "server/channel/ManualChannel.ts": "376cc78d0ebb496a91b4b731f188e8098955b92ebc1a53205b9e51c9026b1fcd",
+      "server/channel/ManualChannel2D.ts": "f9b6699b34391c5eebb6f36fbd18c439e94cef50977dc56aa6f02c7dcc8234db",
+      "server/channel/ManualChannel3D.ts": "4b5ff7a0a373d4032a55cebfd46a65e594645db72017f482b3de9cc0177a52f2",
+      "server/channel/ManualChannelOutput.ts": "29dc5b46c2c628b3c135f795477577a3feebc204a17f5de9ea21ce17560f4c9e",
+      "server/channel/Point2D.ts": "5c636084a41f3fa3ffe8d78b98cf53965ed3fe6d4005d121e1e73f6ed5b1100d",
+      "server/channel/Point3D.ts": "0ce8474acaf2c3594a3d4a63794c3bc234184408af36cd64bc901cd6924ae2ba",
+      "server/channel/SpatialGrid.ts": "6bf7f604f6a9e72065e7a10fee9e3086d5047d99c3227ad7b92afde5932483ad",
+      "server/channel/SpatialView.ts": "b11e22fbe2a489b673ac7d647a9afa64bf6fc80e32c179372714c0f98e0adf1b",
+      "server/historianGrid.ts": "e91ee234450d41c9533c04eca21c01380ca1787d0381254c8341e06bd1000df4",
+      "testSupport/BufferBinary.ts": "0cc0d69a07bea076ef6f900ba8326c59d907c54c82784ef446d95b87978afc14",
+      "testSupport/ClientTransport.ts": "88975cce6c15fca5eed272f1e0427b6c6a341a106c0d74549d6547f28a0dd29b"
+    },
+    "after": {
+      "NQueue.ts": "b95369f46e18780ec8a29de4e1cbdd368d77d5a373e836bfb04d4f2a21207ccc",
+      "binary/BinaryDiagnosticError.ts": "72e7a03f05bd40b7f1595263d03cd5bda13c9b91858feaeb26dfa2a024429e4d",
+      "binary/assertBinaryWriteSize.ts": "a50b1174cb89a4d0c373fbef68c57057bb08613acb50e4d9752f0be9325ab84f",
+      "binary/endpoint/EndpointPayload.ts": "66c21a0c9002ff4180eedd8f300661ea590ef68b00d4e77cf3067b268cb5f487",
+      "binary/entity/countDiff.ts": "b2c444391ce676ab018b50f0dd034d614bc935051819d8e34997b1198480dce8",
+      "binary/entity/countEntity.ts": "a6031d3abe5ff9474397b09183b7a90a9d3db99fb442be6f79246ff66e67ae3f",
+      "binary/entity/countUpdateGroup.ts": "a53d23317b890270f66efee14c1de441d3a157f1edc8ee1b99cc812787c77be4",
+      "binary/entity/readDiff.ts": "e1754f334c40343ed062dc01b1ef9f29ebc53a22087cc9a8ef0c9cf3bed08919",
+      "binary/entity/readEntity.ts": "c4c11f7375e82362b6087b229b2f50d1a3d0e2ba20b599a85cf5ae41ecedd7f0",
+      "binary/entity/readUpdateGroup.ts": "1f45f14b753d7b004744c01cd13bd78e77f0ee197207b6a12bbd89bd52113088",
+      "binary/entity/writeDiff.ts": "4c0e709781c96feea15fc48dfc343f76c6ade7b844cfc128d5325ea433ca954f",
+      "binary/entity/writeEntity.ts": "903370543d4c9a713e542a5d86439c9b16b49a050ed71fbaa5c960e3412df2a8",
+      "binary/entity/writeUpdateGroup.ts": "89edba7bae2b1318b852eb0be45f7faac382e53f47264d677a2c4e9c6befb2c5",
+      "binary/message/count.ts": "dfb303db797d30ecb984139b3ce9fc567ace60ce80e1a24e6b22a19bf29de4da",
+      "binary/message/readEngineMessage.ts": "6d625300d31cf664e1abee141b20f226c3e77b05a7298dfd33900f8732a7cf6e",
+      "binary/message/readMessage.ts": "ef90a7639f9025f059382c9802df264f4c323dc3e5d461b22818bbab58e402b3",
+      "binary/message/writeMessage.ts": "0b54a20a44a7e97dfee028ddf630a07204534b3fe233e58886cfb0af6857bbf4",
+      "binary/snapshot/SnapshotChunk.ts": "a29f8c54544b19a3d591f5f57d79182dc42fe4d694e38ba70725f9452bd7da44",
+      "binary/snapshot/SnapshotPlan.ts": "72bc50e940042e84af1c8028c5bd500e1e9fffe899609c717aa030e55411ca98",
+      "binary/snapshot/cellEntityFragments.ts": "582a3731d18000fe4a424440231c5c32a71ee041f20876d741668431e55d1086",
+      "binary/snapshot/cellFragmentBuilders.ts": "2b887fce9b5e9090b573259ad11a8ccfe8eaeb69b4c28eb2a4094d80ad567cf5",
+      "binary/snapshot/channelHeaders.ts": "d2c4802e44bec468ae16b024b794efb95e000ea410428825fd2824c54357c138",
+      "binary/snapshot/channelMessages.ts": "fc710d696cd9c2626fd785b22d1fda797124a363af3f2a235d0eef9fb1a2de2e",
+      "binary/snapshot/channelModes.ts": "f79d56bd24d74ff6d206038b0c0ab3d2d7147194ce0e28c736cbbbd05718c960",
+      "binary/snapshot/commitSnapshotPlan.ts": "a83bfa96857623cfaeb928faee96dc5927f5008dac715c1e93433a95e20c4076",
+      "binary/snapshot/countSnapshotBytes.ts": "ba29f41bfb1ac9fb3f0ef57112be0991c8f39f364fc4a1de4f7470c9dd1d5316",
+      "binary/snapshot/createSnapshotBuffer.ts": "a78c93dc7052e611f8a19dc2d98d6e3f7169d6319bbc64e429ff7076377a9ceb",
+      "binary/snapshot/ecsSnapshotCrud.ts": "48259469eb65276936875300325dd1c82dbb4522649f6df71fb77cf1f6ae35a1",
+      "binary/snapshot/entitySnapshotPlans.ts": "32dc4b840b7d80aa34f9fa3fd82bdb95a2de8df13568fd221636fb733d275f68",
+      "binary/snapshot/manualUpdates.ts": "d57c40955de24553d85037057a60c212800be29c531a87be1a72c890b6c0bf2c",
+      "binary/snapshot/messageFragments.ts": "59768bce76110ab59bfcacc549d4b3b806117107b9a30800cef2b3921d7e594c",
+      "binary/snapshot/sharedEntityFragments.ts": "13d9df9c75ad90e92b38cb7380ef74977bd303f76ffad1ea7aceeece8cbdc75a",
+      "binary/snapshot/snapshotChunkBuilders.ts": "82ca52f192786f827b462d71655b4eb6f1e68798e8148ef93ce85e63efffe53b",
+      "binary/snapshot/snapshotEnvelope.ts": "ac9a84b13187ab330a38a6117f0ec995c5658cd57abd8a0c5b75ea2942569886",
+      "binary/snapshot/snapshotHeader.ts": "b71ce5b25e8928587a61d0aa9e386c3844b498e8a77ff2b7e1f4b80e9192cfd9",
+      "binary/snapshot/snapshotPayload.ts": "e605c706b71fa33065c0761286c6f66ebf0dda9414b7de91b83b2a29d9f2e590",
+      "binary/snapshot/snapshotPlanStats.ts": "74de4b89ac38942be8c4e2e95c33f8bed2b951298dff6f0c4d7d109450b361f5",
+      "binary/snapshot/writeSnapshot.ts": "6de11a0a7ca4a941bb75acb0e1bfc8de979a2683e271e97c73ffc4bb9333438e",
+      "client/Client.ts": "c0e62889d2dc84f4860e9fb4d60342570e6ed7d131f34e420fe7791dd61c0409",
+      "client/ClientConnection.ts": "4baa878214ecc4cb207d7ae25a27cb96dbef9bcf9ec2685c47c446672a99c20e",
+      "client/ClientNetwork.ts": "4a5f3c331eb909fce68bd843a8d9f349736b9a77c20e57fb2fe56b2dc57bb909",
+      "client/EntityHistory.ts": "2b00ef23e0eff9ee4ac66dce5a010bc8362b8151b1adc59ed849f9ba409b2012",
+      "client/EntityStore.ts": "42385a2b31fd9d9cff10526214612de087a30f6392dc90468e238859fc829170",
+      "client/FixedStepInterpolator.ts": "69fd7782a8db438c7d4c50044f63ec1ea145e5484179326dd76b5ced4c3ff245",
+      "client/Frame.ts": "aa2118880bbd3c14c1e5ca5f3a0c7ee53549d14cd04962b593c071c731316419",
+      "client/InterpolationDelayPolicy.ts": "b9318c48647891f4bfb7ce5e10a07ca683b33d3cea18dad2bda17a9489c8e2ff",
+      "client/InterpolationOutput.ts": "5fb7f8ba8a1e7b7f1cddc497aa8077f1bb3b1f015b3186fb4fe9d65d18bb1401",
+      "client/InterpolationTestHarness.ts": "4017202b30b1cc1e4d995fc3ebbf793eb0703ec067bb61c26431f443cef4b1f4",
+      "client/Outbound.ts": "fddc791c1d61316f4deda200c7f372f7d0d62f270065c4bdbad5ff28a22f18de",
+      "client/PlaybackCursor.ts": "b9a9543a47ba5261f086898c0c6268d0ddec172b3935567f41e2e0f5a2538990",
+      "client/Snapshot.ts": "85edaaa3c67b9d4f82b070069065e5cebb8d597df9223d34af862559d3c6d97c",
+      "client/adapter/IClientNetworkAdapter.ts": "99fa5b51abd7812590569b77aea25ed3a3ad83ae2d0b5672651a5b47fba667e6",
+      "client/entityTimeline.ts": "9ba5ec4a8d2d4aae3e126d77a780992d6a7c15c737c3e13a608436555a9ab636",
+      "client/prediction/CommandReplayPrediction.ts": "1820681d648d89d357680e31b795b94ec86b5cf87a70d25276fb808f9fb2e419",
+      "client/prediction/PredictionLog.ts": "b45fc767f6b363eda7c9b4170637edda8b0e0861142c067b52b15227b63fff3a",
+      "client/prediction/Predictor.ts": "87a4cf87ac6ff5577fdabfe5b3123debb0a16bad78a7bd16239fa94734780b1d",
+      "client/prediction/StateReplayPrediction.ts": "95b1a0b5a93aa602a38637ae0ef778aea8a59904015c700606c20f198500d1b4",
+      "client/time.ts": "a5b765df1bf1e4df926ed82fcb6cd41cd64cbb2affdbfc6e90048c1ebc0b0ca1",
+      "common/ChannelHeader.ts": "4371ba84519bf7bf0143a42d90bd754d7a7aa2ef45dd7d93749ba1eb3346388c",
+      "common/Context.ts": "c6670b000ef77559ba1c74c3c38726884f5587c5541bda6e3df0558d1f32f375",
+      "common/Endpoint.ts": "504da477eed1def118e6834e9d6f94eb0dcb0bd5658fc1bacf489813ca1d1269",
+      "common/EngineMessage.ts": "2ba7fe53db947fa25d8ea3c9889faf9559bab057171e93f52569b1e5b16631c2",
+      "common/I2DSpatialEntity.ts": "0b34aa172019e613375a315a4381af2bf945ce4b34282f80c88dc8e184f9a67e",
+      "common/I3DSpatialEntity.ts": "e76c48e3862809b299aa1efd478f93c2867cf9d65c964598a4cc0332fab33b5a",
+      "common/IEntity.ts": "44c15b731f331a37794944a1c135346f619dc1e091f2bc6dfb055ee210b5f553",
+      "common/binary/Binary.ts": "249605978efa5e787956d88bb25213292d08643fe39bb9db909e31b39f881b8b",
+      "common/binary/BinaryAdapter.ts": "3db431ecbb6acfe6425df1ce69421f007d8f07206b8b7fa705d6e9fc8846ee8a",
+      "common/binary/BinaryExt.ts": "8327ca8aabd2129efae2ad6786d129f7bc71d25e3ec5b48b38e7d31029e26c03",
+      "common/binary/BinarySection.ts": "1019c40aa6c35a69ef900bfdad0dc4be5df2e258fc96771ff016145e65cc7f4d",
+      "common/binary/IBinaryReader.ts": "2294e9d421b7087e26b6246959698e341f1b2ed05cbef98c291891ed632ae36a",
+      "common/binary/IBinaryWriter.ts": "548b81bf2c5ba035a68a1e79d16ea569cf9326bea49f36b2ca60add270656962",
+      "common/binary/NetworkEvent.ts": "09e5a185675d24fdd1f7fae1a5b6a6eceee97e4c62a2197276c8ec8a8584e44e",
+      "common/binary/Protocol.ts": "6edccf3b8504f41ed6211d6a4c015a4a0b72d33f8196d5d0840bf8b2a7f671ad",
+      "common/binary/schema/Schema.ts": "da0cde88623069df9615333f33b3ae104f0c70e4eb52defe75c23671adb4a57b",
+      "common/binary/schema/SchemaDefinition.ts": "0e3297309c6fe5a711b0ccade474ec0eb7290fe9c840c473c4503c00309ece21",
+      "common/binary/schema/defineSchema.ts": "eb076fec02aeedfebb05486517286daa2c1695d970764ba698c27c31538e96a7",
+      "common/binary/schema/schemaFingerprint.ts": "f6ebdb8b7704cd0a2c583ee52470f7d18d22c66c10351db84fda8d217396a426",
+      "common/binary/schema/util.ts": "93a2c74e0d19470387ac2d71cac06a99669ac77ee88a99d93ed36127e170e0d4",
+      "common/network/NetworkConditionLink.ts": "5e36dfc4e4da13f83966b8d84f6893caa55f224e424697f679d8e137bca43a11",
+      "common/schemas/channelAddEntitySchema.ts": "8fdfd555879a8521aaaa4c20d5bdafaab47d5c528167c5f2735d1cde0fd29acc",
+      "common/schemas/commandFrameNumberSchema.ts": "e2cf63ee93c71f06a010846f93fb3c0e891445b387138e62b83227f768960e90",
+      "common/schemas/commandTimingSchema.ts": "6346e5ba860fcad5782f18d4affaea5f12bc4fd91fff8c3008d55dbb2102d445",
+      "common/schemas/connectAttemptSchema.ts": "6a882d1c0621056c81916f645d75b7e02ae5f4eaca0222f2398e64e7dbc854f1",
+      "common/schemas/connectionAcceptedSchema.ts": "e49b308c4b8740fdd7c9b0ff88fbd31081759438a13938923a0873b1feda0eb5",
+      "common/schemas/connectionDeniedSchema.ts": "929a881ea0a30684cac382c74e8ebbd1f44008dd0ccd39dfc2c70188bf885f00",
+      "common/schemas/connectionTerminatedSchema.ts": "73cafc39cafcf271f5f0c28b0a7bc9f35b5f18c45b7aafefb3d83e4ed8b25abf",
+      "common/schemas/interpolationDelaySchema.ts": "4d54554a63fbc55aa219b451108839ea4acc5dc13bb5089fc89588c88550f436",
+      "common/schemas/pingSchema.ts": "181c204f5b324f74d9d42adfbf6f5f5855cf149b6e1264295f77d6321f627ccf",
+      "common/schemas/pongSchema.ts": "72456b1d645145a26df8dba3dcc4b045383d4c4246b121e863f04b27b3b30117",
+      "common/schemas/protocolSchema.ts": "db6649fbca7afe1cfa396fd09f9ebd782be53be0a87b7d3a8138726e5918d094",
+      "common/time.ts": "a6929786da602a0c8f417f9e500dbc21ad3166febc00ffda76ab90a7c6fb568a",
+      "ecs/EcsWorld.ts": "82d7a1ae5c2df8042d7da55b45cf47d84f0a88348e04bab1b07c8fd6f7a4a003",
+      "ecs/applyEcsChannelFrame.ts": "c093ae37eaf138230b5e4854a26cac97db3eada1340d86948ac3d2263fa5e094",
+      "index.ts": "32689894bfb92cc533f3ecfa65cdf23645ca8d2a7cd3af1c44d8fc7305a707d2",
+      "performance/ClientHistory.performance.ts": "2dcf831a39fe00e89e65d94aabc643fbf957d1142801e8f0767fe872e166b1cb",
+      "performance/ClientHistoryWorkload.ts": "c002e33c051c124831d080dee4e7df726051bb2500cc0bca7499024a90c45f6c",
+      "performance/EcsBinding.performance.ts": "916c94faca69a197df3b2cf929a00ff50a63e7e09564bb72d484b9dee5dda70c",
+      "performance/EntityTree.performance.ts": "5c7b15a03e34cbb4c17829a27110a0b20273a698ef473581633ccc035428a0ab",
+      "performance/Historian.performance.ts": "972976371fd587645c033763b0a9879f58d7c9efbbd6bf05a93ce40f1928be0d",
+      "performance/SnapshotPipeline.performance.ts": "76fbb42b97085871595754f32c8aa0a024eb5cb9fb28abcd5525493ac6971814",
+      "server/CommandRouter.ts": "4962e6740f1d5811646d8d1e44eb7b249558b02ae959a5f6d17dbdd84ae86e8c",
+      "server/EntityCache.ts": "b80ef1b9fcd6dd08604e922b4cb539e98ea16a3fed4f7201ab56c7fc1fb3fd7c",
+      "server/Historian2D.ts": "c0f1b302f7db27d45b1c227b00377afeb6f9677bdf909dc67ee7be3cbdf87c7e",
+      "server/Historian3D.ts": "e866b7cd51079e81ac2f05925d94621bdb6dbada7d165f9db3fe24ba5b0a1c08",
+      "server/IdPool.ts": "9a3ca4856bdb42fef33cc23b6b9c28d725fb1a266f7dcfb8bc3b8a155eb7394f",
+      "server/Instance.ts": "632a1e486677bbac45abd6461c44270263e5fbe7986051f6ca1189e972c7b34b",
+      "server/InstanceNetwork.ts": "ba547c71d3dff94387990da06ae2335ace31bd379e9e9f99c162c84d7481a322",
+      "server/LocalState.ts": "07f16fd73b84fbb97e85fcf63c7ddb64f6f32e1b6053e6f3f6938dbc13fc5ebb",
+      "server/NDictionary.ts": "57e565593d245886ed147215d33091bdb84790698e549d15257dcf2798fbc212",
+      "server/NetworkLimits.ts": "f82e4f6c50aeda87466526de90697289ecf8d219150e432f2095ca1f043aff4a",
+      "server/PublicPathSmoother2D.ts": "047142fef0b90565ee4f64e98621305e8b876365e275de686c7c9e45f203b463",
+      "server/PublicPathSmoother3D.ts": "93e1499acfce63cb04a325a21bf7f592af2cf7e5905cea837632b35fe7870205",
+      "server/User.ts": "71d9ef89dce01832a97830280193ac20509eb7594d232ed3981b2f1d6fe9a5e3",
+      "server/adapter/IServerNetworkAdapter.ts": "4ba19cd4effa3dc4af219ebb15fda41958c69b007d8ea9b9b5fa2518fb2afa7c",
+      "server/adapter/MockAdapter.ts": "7c1777ac6262a4139536180dc4a15b962e6603dfa989e8eac8d8d4b6c5b0cffd",
+      "server/channel/AABB2D.ts": "d0b30845edcbbe7d988e0a3c905a9518887ca38e850b8d92dae770dfe005d4a4",
+      "server/channel/AABB3D.ts": "058d9ddb929a8cc1eb3a4cb1fbc1a218fc666a36ccf062ee710d34dc6609f418",
+      "server/channel/CellFragmentChannelOutput.ts": "c098c1559a284df74e09bcda2e548036ddeac45aa2990311c7d00124d8521a0c",
+      "server/channel/Channel.ts": "b12f96f29b9782339d93451cb0761542374c71f4a6d2053baf1b01e9feabb726",
+      "server/channel/Channel2D.ts": "17a584be5158a81b1f47d0a57a1d527b6ab36457c8d184590d54bf261d376dc6",
+      "server/channel/Channel3D.ts": "39ad636ef2d0c9e06345bebba60a4a57fd53485329b34afe82b4dc72f1706587",
+      "server/channel/ChannelOutput.ts": "b9851900bf8f585dabef6b804af1a119475219e46f0c5464ebe7f780f2ec9089",
+      "server/channel/ChannelSnapshotOutput.ts": "ac33b0d84daf82bb23b741a71833b84de635491ba5f34468d90136a583e0ccb7",
+      "server/channel/ChannelVisibilityCache.ts": "c84a51ca9a58cb1b15ed37d8d17fa13c180b989151260d0f01571584f32f1099",
+      "server/channel/EcsChannel.ts": "28bf2c402278238129fc605342e1cbab1aa8f556670fe2e57ccce056f1663592",
+      "server/channel/EcsChannel2D.ts": "8f92c597ec96991f7483e24ff8d7a3d6d11da7f47bad9e21902800a1fe67a4f7",
+      "server/channel/EcsChannel3D.ts": "a64f85996ba13a8e3f3de5db5af8fac49178f1e5ef4735d542294287700cdd05",
+      "server/channel/EcsChannelBinding.ts": "00f0bf4d05c359867e3e18b41a100bfbc3e5f2dedcf664b142a653958fd71182",
+      "server/channel/EcsChannelOutput.ts": "323bdf29a7301d342284d6826ae500156e860d8faf1d84ed37deae9780b2bc3e",
+      "server/channel/EcsChannelSnapshot.ts": "ec12dee9a460501170793c92168ee3ec03158b2c67fba1424e187fb099f04863",
+      "server/channel/EcsSpatialEntityStore.ts": "023e28943a505c27013e003548620d16eefbd25e2b6c37f7e5d2f712110b0f41",
+      "server/channel/EcsSpatialManualLog.ts": "0d3cf569acf88b26517e29617f323f5d67112138c4d92c7a1836e891af56f3fd",
+      "server/channel/IChannel.ts": "df6ace7913c21f5245b2de93ab95fead9395e2c560a73dc3f917c2c17b6a5799",
+      "server/channel/ManualChannel.ts": "376cc78d0ebb496a91b4b731f188e8098955b92ebc1a53205b9e51c9026b1fcd",
+      "server/channel/ManualChannel2D.ts": "f9b6699b34391c5eebb6f36fbd18c439e94cef50977dc56aa6f02c7dcc8234db",
+      "server/channel/ManualChannel3D.ts": "4b5ff7a0a373d4032a55cebfd46a65e594645db72017f482b3de9cc0177a52f2",
+      "server/channel/ManualChannelOutput.ts": "29dc5b46c2c628b3c135f795477577a3feebc204a17f5de9ea21ce17560f4c9e",
+      "server/channel/Point2D.ts": "5c636084a41f3fa3ffe8d78b98cf53965ed3fe6d4005d121e1e73f6ed5b1100d",
+      "server/channel/Point3D.ts": "0ce8474acaf2c3594a3d4a63794c3bc234184408af36cd64bc901cd6924ae2ba",
+      "server/channel/SpatialGrid.ts": "6bf7f604f6a9e72065e7a10fee9e3086d5047d99c3227ad7b92afde5932483ad",
+      "server/channel/SpatialView.ts": "b11e22fbe2a489b673ac7d647a9afa64bf6fc80e32c179372714c0f98e0adf1b",
+      "server/historianGrid.ts": "e91ee234450d41c9533c04eca21c01380ca1787d0381254c8341e06bd1000df4",
+      "testSupport/BufferBinary.ts": "0cc0d69a07bea076ef6f900ba8326c59d907c54c82784ef446d95b87978afc14",
+      "testSupport/ClientTransport.ts": "88975cce6c15fca5eed272f1e0427b6c6a341a106c0d74549d6547f28a0dd29b"
+    }
+  }
+}

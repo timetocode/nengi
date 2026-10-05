@@ -229,6 +229,47 @@ describe('LocalState', () => {
         expect(localState.collectEntityTree(parent.nid, [])).toEqual([parent.nid, secondChild.nid])
     })
 
+    it('refreshes ancestor trees while retaining unchanged sibling caches and previous tree values', () => {
+        const state = new LocalState()
+        const root = { nid: 0, ntype: 1 }
+        const left = { nid: 0, ntype: 2 }
+        const right = { nid: 0, ntype: 2 }
+        const leaf = { nid: 0, ntype: 3 }
+        state.registerEntity(root, 123)
+        state.addChild(root, left)
+        state.addChild(root, right)
+        state.addChild(left, leaf)
+
+        const before = state.getEntityTree(root.nid)
+        const beforeDeletes = state.getEntityTreeDeletes(root.nid)
+        const rightTree = state.getEntityTree(right.nid)
+        const rightDeletes = state.getEntityTreeDeletes(right.nid)
+        const leafTree = state.getEntityTree(leaf.nid)
+        state.getEntityTree(left.nid)
+        state.getEntityTreeDeletes(left.nid)
+        const version = state.entityTreeVersion
+
+        const added = { nid: 0, ntype: 3 }
+        state.addChild(left, added)
+
+        expect(state.entityTreeVersion).toBe(version + 1)
+        expect(state.getEntityTree(root.nid)).toEqual([root.nid, left.nid, leaf.nid, added.nid, right.nid])
+        expect(state.getEntityTree(left.nid)).toEqual([left.nid, leaf.nid, added.nid])
+        expect(state.getEntityTreeDeletes(root.nid)).toEqual([leaf.nid, added.nid, left.nid, right.nid, root.nid])
+        expect(state.getEntityTreeDeletes(left.nid)).toEqual([leaf.nid, added.nid, left.nid])
+        expect(state.getEntityTree(right.nid)).toBe(rightTree)
+        expect(state.getEntityTreeDeletes(right.nid)).toBe(rightDeletes)
+        expect(state.getEntityTree(leaf.nid)).toBe(leafTree)
+        expect(before).toEqual([root.nid, left.nid, leaf.nid, right.nid])
+        expect(beforeDeletes).toEqual([leaf.nid, left.nid, right.nid, root.nid])
+
+        state.removeChild(left, added)
+        expect(state.getEntityTree(root.nid)).toEqual(before)
+        expect(state.getEntityTreeDeletes(root.nid)).toEqual(beforeDeletes)
+        expect(state.getEntityTree(right.nid)).toBe(rightTree)
+        expect(state.getEntityTreeDeletes(right.nid)).toBe(rightDeletes)
+    })
+
 
 
     it('stays UInt8 by recycling released ids after the UInt8 range has wrapped', () => {

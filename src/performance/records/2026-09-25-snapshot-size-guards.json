@@ -1,0 +1,1652 @@
+{
+  "date": "2026-09-25",
+  "purpose": "Cost of allocation-boundary byte-count/payload-length guards and terminal snapshot-step failure handling, against the pending Next RC immediately before this change.",
+  "machine": {
+    "started": "2026-09-25T22:36:15.318371+00:00",
+    "node": "v22.17.1",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "note": "Sequential fresh processes, alternating variants. Existing development services left running. No CPU pinning. Snapshot metrics disabled in timing runs."
+  },
+  "method": {
+    "main": {
+      "repeats": 3,
+      "warmupTicks": 200,
+      "measuredTicks": 600,
+      "order": "Fresh sequential processes, alternating before/after order per workload and repeat",
+      "metric": "Median of per-run mean/p50/p95 Instance.step milliseconds"
+    },
+    "focused": {
+      "repeats": 3,
+      "warmupTicks": 600,
+      "measuredTicks": 1500,
+      "purpose": "Investigate initial direct-ECS slowdowns"
+    },
+    "ablation": {
+      "settings": {
+        "scenario": "ecs-channel",
+        "users": 20,
+        "entities": 1000,
+        "moveFraction": 1,
+        "sharedUpdates": false,
+        "warmup": 600,
+        "ticks": 1500
+      },
+      "cpu": 1,
+      "sampledCpuUsage": {
+        "0": 0.05208333333333337,
+        "1": 0.020000000000000018,
+        "2": 0.03960396039603964,
+        "3": 0.06000000000000005,
+        "4": 0.12745098039215685,
+        "5": 0.12,
+        "6": 0.04040404040404044,
+        "7": 0.020000000000000018,
+        "8": 0.06000000000000005,
+        "9": 0.040000000000000036,
+        "10": 0.08999999999999997,
+        "11": 0.030303030303030276,
+        "12": 0.07920792079207917,
+        "13": 0.030303030303030276,
+        "14": 0.05102040816326525,
+        "15": 0.02020202020202022
+      },
+      "note": "Pinned to the least busy logical CPU in a one-second observation; host is not isolated."
+    },
+    "backend": "Official nengi-buffers writer, identical compiled source in all runs",
+    "metrics": false,
+    "clock": "Controlled network time: 1000 + instance.tick milliseconds",
+    "excluded": "Application mutation/index work, sockets, client processing and rendering",
+    "limits": "Development host, not isolated. No game capacity claim or exact zero-cost claim. One longer unpinned dense comparison was 7.94% slower; the pinned isolated comparison was 0.52% slower. Retain both."
+  },
+  "mainSummary": [
+    {
+      "case": "ecs-idle",
+      "settings": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "moveFraction": 0,
+        "sharedUpdates": false
+      },
+      "before": {
+        "avg": 0.267,
+        "p50": 0.235,
+        "p95": 0.448
+      },
+      "after": {
+        "avg": 0.273,
+        "p50": 0.243,
+        "p95": 0.432
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000,
+      "meanChangePercent": 2.2471910112359605
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "settings": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "moveFraction": 0.01,
+        "sharedUpdates": false
+      },
+      "before": {
+        "avg": 3.155,
+        "p50": 3.05,
+        "p95": 3.825
+      },
+      "after": {
+        "avg": 3.267,
+        "p50": 3.16,
+        "p95": 4.007
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000,
+      "meanChangePercent": 3.5499207606973116
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "settings": {
+        "scenario": "ecs-channel",
+        "users": 100,
+        "entities": 10000,
+        "moveFraction": 0.01,
+        "sharedUpdates": true
+      },
+      "before": {
+        "avg": 0.422,
+        "p50": 0.367,
+        "p95": 0.691
+      },
+      "after": {
+        "avg": 0.424,
+        "p50": 0.374,
+        "p95": 0.692
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000,
+      "meanChangePercent": 0.4739336492890933
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "settings": {
+        "scenario": "shared-npcs",
+        "users": 20,
+        "entities": 10000,
+        "moveFraction": 0.01,
+        "sharedUpdates": true
+      },
+      "before": {
+        "avg": 3.081,
+        "p50": 3.051,
+        "p95": 3.845
+      },
+      "after": {
+        "avg": 3.086,
+        "p50": 3.037,
+        "p95": 3.811
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000,
+      "meanChangePercent": 0.1622849724115527
+    },
+    {
+      "case": "ecs-dense-direct",
+      "settings": {
+        "scenario": "ecs-channel",
+        "users": 20,
+        "entities": 1000,
+        "moveFraction": 1,
+        "sharedUpdates": false
+      },
+      "before": {
+        "avg": 5.684,
+        "p50": 5.561,
+        "p95": 6.739
+      },
+      "after": {
+        "avg": 5.864,
+        "p50": 5.829,
+        "p95": 6.857
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000,
+      "meanChangePercent": 3.166783954961283
+    },
+    {
+      "case": "manual-spatial-idle",
+      "settings": {
+        "scenario": "manual-channel-2d",
+        "users": 50,
+        "entities": 2000,
+        "moveFraction": 0,
+        "sharedUpdates": true
+      },
+      "before": {
+        "avg": 0.226,
+        "p50": 0.197,
+        "p95": 0.39
+      },
+      "after": {
+        "avg": 0.225,
+        "p50": 0.195,
+        "p95": 0.404
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000,
+      "meanChangePercent": -0.4424778761061954
+    },
+    {
+      "case": "ecs-clump",
+      "settings": {
+        "scenario": "ecs-channel-clump",
+        "users": 350,
+        "entities": 350,
+        "moveFraction": 1,
+        "sharedUpdates": true
+      },
+      "before": {
+        "avg": 2.321,
+        "p50": 1.864,
+        "p95": 4.788
+      },
+      "after": {
+        "avg": 2.29,
+        "p50": 1.828,
+        "p95": 4.594
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000,
+      "meanChangePercent": -1.3356311934511034
+    },
+    {
+      "case": "many-cells",
+      "settings": {
+        "scenario": "channel-2d",
+        "users": 20,
+        "entities": 4000,
+        "moveFraction": 0.05,
+        "sharedUpdates": true,
+        "spatialDistribution": "homogeneous",
+        "cellSize": 50,
+        "worldSize": 1000,
+        "viewHalf": 250,
+        "fragmentCellLimit": 256,
+        "stableFragmentCellLimit": 256
+      },
+      "before": {
+        "avg": 3.905,
+        "p50": 3.907,
+        "p95": 5.619
+      },
+      "after": {
+        "avg": 3.912,
+        "p50": 3.879,
+        "p95": 5.633
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000,
+      "meanChangePercent": 0.17925736235595569
+    },
+    {
+      "case": "manual-many-cells",
+      "settings": {
+        "scenario": "manual-channel-2d",
+        "users": 20,
+        "entities": 4000,
+        "moveFraction": 0.05,
+        "sharedUpdates": true,
+        "spatialDistribution": "homogeneous",
+        "cellSize": 50,
+        "worldSize": 1000,
+        "viewHalf": 250,
+        "fragmentCellLimit": 256,
+        "stableFragmentCellLimit": 256
+      },
+      "before": {
+        "avg": 1.01,
+        "p50": 0.974,
+        "p95": 2.255
+      },
+      "after": {
+        "avg": 1.005,
+        "p50": 0.977,
+        "p95": 2.222
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000,
+      "meanChangePercent": -0.4950495049505066
+    },
+    {
+      "case": "create-delete-churn",
+      "settings": {
+        "scenario": "channel-churn",
+        "users": 30,
+        "entities": 1000,
+        "churn": 100,
+        "children": 2,
+        "sharedUpdates": true,
+        "moveFraction": 1
+      },
+      "before": {
+        "avg": 1.384,
+        "p50": 1.271,
+        "p95": 2.013
+      },
+      "after": {
+        "avg": 1.39,
+        "p50": 1.257,
+        "p95": 2.097
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000,
+      "meanChangePercent": 0.43352601156070314
+    }
+  ],
+  "mainRuns": [
+    {
+      "case": "ecs-idle",
+      "variant": "before",
+      "repeat": 1,
+      "file": "ecs-idle-before-1.json",
+      "stepMs": {
+        "avg": 0.267,
+        "p50": 0.238,
+        "p95": 0.422,
+        "max": 0.786
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-idle",
+      "variant": "after",
+      "repeat": 1,
+      "file": "ecs-idle-after-1.json",
+      "stepMs": {
+        "avg": 0.265,
+        "p50": 0.234,
+        "p95": 0.396,
+        "max": 1.102
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "after",
+      "repeat": 1,
+      "file": "ecs-sparse-direct-after-1.json",
+      "stepMs": {
+        "avg": 3.228,
+        "p50": 3.16,
+        "p95": 3.887,
+        "max": 6.803
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "before",
+      "repeat": 1,
+      "file": "ecs-sparse-direct-before-1.json",
+      "stepMs": {
+        "avg": 3.107,
+        "p50": 3.052,
+        "p95": 3.666,
+        "max": 6.71
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "variant": "before",
+      "repeat": 1,
+      "file": "ecs-sparse-shared-before-1.json",
+      "stepMs": {
+        "avg": 0.422,
+        "p50": 0.367,
+        "p95": 0.739,
+        "max": 1.509
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "variant": "after",
+      "repeat": 1,
+      "file": "ecs-sparse-shared-after-1.json",
+      "stepMs": {
+        "avg": 0.455,
+        "p50": 0.389,
+        "p95": 0.743,
+        "max": 1.488
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "variant": "after",
+      "repeat": 1,
+      "file": "automatic-sparse-shared-after-1.json",
+      "stepMs": {
+        "avg": 3.245,
+        "p50": 3.187,
+        "p95": 3.948,
+        "max": 5.438
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "variant": "before",
+      "repeat": 1,
+      "file": "automatic-sparse-shared-before-1.json",
+      "stepMs": {
+        "avg": 3.143,
+        "p50": 3.072,
+        "p95": 3.882,
+        "max": 5.057
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "before",
+      "repeat": 1,
+      "file": "ecs-dense-direct-before-1.json",
+      "stepMs": {
+        "avg": 5.621,
+        "p50": 5.549,
+        "p95": 6.465,
+        "max": 9.796
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "after",
+      "repeat": 1,
+      "file": "ecs-dense-direct-after-1.json",
+      "stepMs": {
+        "avg": 5.699,
+        "p50": 5.55,
+        "p95": 6.857,
+        "max": 11.174
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000
+    },
+    {
+      "case": "manual-spatial-idle",
+      "variant": "after",
+      "repeat": 1,
+      "file": "manual-spatial-idle-after-1.json",
+      "stepMs": {
+        "avg": 0.225,
+        "p50": 0.196,
+        "p95": 0.404,
+        "max": 0.865
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000
+    },
+    {
+      "case": "manual-spatial-idle",
+      "variant": "before",
+      "repeat": 1,
+      "file": "manual-spatial-idle-before-1.json",
+      "stepMs": {
+        "avg": 0.222,
+        "p50": 0.193,
+        "p95": 0.39,
+        "max": 0.696
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000
+    },
+    {
+      "case": "ecs-clump",
+      "variant": "before",
+      "repeat": 1,
+      "file": "ecs-clump-before-1.json",
+      "stepMs": {
+        "avg": 2.309,
+        "p50": 1.864,
+        "p95": 4.8,
+        "max": 9.77
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000
+    },
+    {
+      "case": "ecs-clump",
+      "variant": "after",
+      "repeat": 1,
+      "file": "ecs-clump-after-1.json",
+      "stepMs": {
+        "avg": 2.29,
+        "p50": 1.828,
+        "p95": 4.594,
+        "max": 10.091
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000
+    },
+    {
+      "case": "many-cells",
+      "variant": "after",
+      "repeat": 1,
+      "file": "many-cells-after-1.json",
+      "stepMs": {
+        "avg": 3.912,
+        "p50": 3.879,
+        "p95": 5.633,
+        "max": 9.4
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000
+    },
+    {
+      "case": "many-cells",
+      "variant": "before",
+      "repeat": 1,
+      "file": "many-cells-before-1.json",
+      "stepMs": {
+        "avg": 3.94,
+        "p50": 3.973,
+        "p95": 5.643,
+        "max": 6.62
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000
+    },
+    {
+      "case": "manual-many-cells",
+      "variant": "before",
+      "repeat": 1,
+      "file": "manual-many-cells-before-1.json",
+      "stepMs": {
+        "avg": 1.003,
+        "p50": 0.974,
+        "p95": 2.255,
+        "max": 3.775
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000
+    },
+    {
+      "case": "manual-many-cells",
+      "variant": "after",
+      "repeat": 1,
+      "file": "manual-many-cells-after-1.json",
+      "stepMs": {
+        "avg": 1.005,
+        "p50": 0.977,
+        "p95": 2.222,
+        "max": 3.523
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000
+    },
+    {
+      "case": "create-delete-churn",
+      "variant": "after",
+      "repeat": 1,
+      "file": "create-delete-churn-after-1.json",
+      "stepMs": {
+        "avg": 1.43,
+        "p50": 1.324,
+        "p95": 2.097,
+        "max": 8.877
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000
+    },
+    {
+      "case": "create-delete-churn",
+      "variant": "before",
+      "repeat": 1,
+      "file": "create-delete-churn-before-1.json",
+      "stepMs": {
+        "avg": 1.384,
+        "p50": 1.271,
+        "p95": 2.013,
+        "max": 9.711
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000
+    },
+    {
+      "case": "ecs-idle",
+      "variant": "after",
+      "repeat": 2,
+      "file": "ecs-idle-after-2.json",
+      "stepMs": {
+        "avg": 0.273,
+        "p50": 0.243,
+        "p95": 0.432,
+        "max": 0.963
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-idle",
+      "variant": "before",
+      "repeat": 2,
+      "file": "ecs-idle-before-2.json",
+      "stepMs": {
+        "avg": 0.268,
+        "p50": 0.235,
+        "p95": 0.448,
+        "max": 0.815
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "before",
+      "repeat": 2,
+      "file": "ecs-sparse-direct-before-2.json",
+      "stepMs": {
+        "avg": 3.155,
+        "p50": 3.042,
+        "p95": 3.825,
+        "max": 6.413
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "after",
+      "repeat": 2,
+      "file": "ecs-sparse-direct-after-2.json",
+      "stepMs": {
+        "avg": 3.304,
+        "p50": 3.207,
+        "p95": 4.007,
+        "max": 6.659
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "variant": "after",
+      "repeat": 2,
+      "file": "ecs-sparse-shared-after-2.json",
+      "stepMs": {
+        "avg": 0.423,
+        "p50": 0.363,
+        "p95": 0.692,
+        "max": 1.234
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "variant": "before",
+      "repeat": 2,
+      "file": "ecs-sparse-shared-before-2.json",
+      "stepMs": {
+        "avg": 0.414,
+        "p50": 0.366,
+        "p95": 0.642,
+        "max": 1.376
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "variant": "before",
+      "repeat": 2,
+      "file": "automatic-sparse-shared-before-2.json",
+      "stepMs": {
+        "avg": 3.081,
+        "p50": 3.051,
+        "p95": 3.783,
+        "max": 5.06
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "variant": "after",
+      "repeat": 2,
+      "file": "automatic-sparse-shared-after-2.json",
+      "stepMs": {
+        "avg": 3.086,
+        "p50": 3.037,
+        "p95": 3.811,
+        "max": 5.095
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "after",
+      "repeat": 2,
+      "file": "ecs-dense-direct-after-2.json",
+      "stepMs": {
+        "avg": 5.864,
+        "p50": 5.829,
+        "p95": 6.722,
+        "max": 9.92
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "before",
+      "repeat": 2,
+      "file": "ecs-dense-direct-before-2.json",
+      "stepMs": {
+        "avg": 5.684,
+        "p50": 5.561,
+        "p95": 6.739,
+        "max": 9.467
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000
+    },
+    {
+      "case": "manual-spatial-idle",
+      "variant": "before",
+      "repeat": 2,
+      "file": "manual-spatial-idle-before-2.json",
+      "stepMs": {
+        "avg": 0.226,
+        "p50": 0.197,
+        "p95": 0.4,
+        "max": 0.795
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000
+    },
+    {
+      "case": "manual-spatial-idle",
+      "variant": "after",
+      "repeat": 2,
+      "file": "manual-spatial-idle-after-2.json",
+      "stepMs": {
+        "avg": 0.229,
+        "p50": 0.195,
+        "p95": 0.409,
+        "max": 0.756
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000
+    },
+    {
+      "case": "ecs-clump",
+      "variant": "after",
+      "repeat": 2,
+      "file": "ecs-clump-after-2.json",
+      "stepMs": {
+        "avg": 2.293,
+        "p50": 1.834,
+        "p95": 4.764,
+        "max": 11.633
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000
+    },
+    {
+      "case": "ecs-clump",
+      "variant": "before",
+      "repeat": 2,
+      "file": "ecs-clump-before-2.json",
+      "stepMs": {
+        "avg": 2.321,
+        "p50": 1.863,
+        "p95": 4.622,
+        "max": 8.46
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000
+    },
+    {
+      "case": "many-cells",
+      "variant": "before",
+      "repeat": 2,
+      "file": "many-cells-before-2.json",
+      "stepMs": {
+        "avg": 3.905,
+        "p50": 3.907,
+        "p95": 5.528,
+        "max": 7.65
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000
+    },
+    {
+      "case": "many-cells",
+      "variant": "after",
+      "repeat": 2,
+      "file": "many-cells-after-2.json",
+      "stepMs": {
+        "avg": 3.961,
+        "p50": 3.986,
+        "p95": 5.682,
+        "max": 8.495
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000
+    },
+    {
+      "case": "manual-many-cells",
+      "variant": "after",
+      "repeat": 2,
+      "file": "manual-many-cells-after-2.json",
+      "stepMs": {
+        "avg": 0.989,
+        "p50": 0.955,
+        "p95": 2.09,
+        "max": 4.005
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000
+    },
+    {
+      "case": "manual-many-cells",
+      "variant": "before",
+      "repeat": 2,
+      "file": "manual-many-cells-before-2.json",
+      "stepMs": {
+        "avg": 1.021,
+        "p50": 0.975,
+        "p95": 2.428,
+        "max": 3.842
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000
+    },
+    {
+      "case": "create-delete-churn",
+      "variant": "before",
+      "repeat": 2,
+      "file": "create-delete-churn-before-2.json",
+      "stepMs": {
+        "avg": 1.457,
+        "p50": 1.313,
+        "p95": 2.24,
+        "max": 9.469
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000
+    },
+    {
+      "case": "create-delete-churn",
+      "variant": "after",
+      "repeat": 2,
+      "file": "create-delete-churn-after-2.json",
+      "stepMs": {
+        "avg": 1.356,
+        "p50": 1.253,
+        "p95": 1.967,
+        "max": 9.684
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000
+    },
+    {
+      "case": "ecs-idle",
+      "variant": "before",
+      "repeat": 3,
+      "file": "ecs-idle-before-3.json",
+      "stepMs": {
+        "avg": 0.26,
+        "p50": 0.231,
+        "p95": 0.46,
+        "max": 0.749
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-idle",
+      "variant": "after",
+      "repeat": 3,
+      "file": "ecs-idle-after-3.json",
+      "stepMs": {
+        "avg": 0.302,
+        "p50": 0.246,
+        "p95": 0.52,
+        "max": 1.182
+      },
+      "bytesPerTick": 2000,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "after",
+      "repeat": 3,
+      "file": "ecs-sparse-direct-after-3.json",
+      "stepMs": {
+        "avg": 3.267,
+        "p50": 3.133,
+        "p95": 4.116,
+        "max": 7.711
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "before",
+      "repeat": 3,
+      "file": "ecs-sparse-direct-before-3.json",
+      "stepMs": {
+        "avg": 3.163,
+        "p50": 3.05,
+        "p95": 3.932,
+        "max": 6.463
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "variant": "before",
+      "repeat": 3,
+      "file": "ecs-sparse-shared-before-3.json",
+      "stepMs": {
+        "avg": 0.427,
+        "p50": 0.379,
+        "p95": 0.691,
+        "max": 1.461
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "ecs-sparse-shared",
+      "variant": "after",
+      "repeat": 3,
+      "file": "ecs-sparse-shared-after-3.json",
+      "stepMs": {
+        "avg": 0.424,
+        "p50": 0.374,
+        "p95": 0.69,
+        "max": 1.425
+      },
+      "bytesPerTick": 354100,
+      "sends": 60000
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "variant": "after",
+      "repeat": 3,
+      "file": "automatic-sparse-shared-after-3.json",
+      "stepMs": {
+        "avg": 3.069,
+        "p50": 3.024,
+        "p95": 3.798,
+        "max": 5.401
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000
+    },
+    {
+      "case": "automatic-sparse-shared",
+      "variant": "before",
+      "repeat": 3,
+      "file": "automatic-sparse-shared-before-3.json",
+      "stepMs": {
+        "avg": 3.027,
+        "p50": 2.971,
+        "p95": 3.845,
+        "max": 6.005
+      },
+      "bytesPerTick": 38500,
+      "sends": 12000
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "before",
+      "repeat": 3,
+      "file": "ecs-dense-direct-before-3.json",
+      "stepMs": {
+        "avg": 6.384,
+        "p50": 6.328,
+        "p95": 7.363,
+        "max": 9.658
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "after",
+      "repeat": 3,
+      "file": "ecs-dense-direct-after-3.json",
+      "stepMs": {
+        "avg": 6.178,
+        "p50": 6.092,
+        "p95": 7.148,
+        "max": 12.351
+      },
+      "bytesPerTick": 700820,
+      "sends": 12000
+    },
+    {
+      "case": "manual-spatial-idle",
+      "variant": "after",
+      "repeat": 3,
+      "file": "manual-spatial-idle-after-3.json",
+      "stepMs": {
+        "avg": 0.22,
+        "p50": 0.193,
+        "p95": 0.36,
+        "max": 0.766
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000
+    },
+    {
+      "case": "manual-spatial-idle",
+      "variant": "before",
+      "repeat": 3,
+      "file": "manual-spatial-idle-before-3.json",
+      "stepMs": {
+        "avg": 0.227,
+        "p50": 0.197,
+        "p95": 0.355,
+        "max": 0.717
+      },
+      "bytesPerTick": 1000,
+      "sends": 30000
+    },
+    {
+      "case": "ecs-clump",
+      "variant": "before",
+      "repeat": 3,
+      "file": "ecs-clump-before-3.json",
+      "stepMs": {
+        "avg": 2.431,
+        "p50": 1.925,
+        "p95": 4.788,
+        "max": 12.842
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000
+    },
+    {
+      "case": "ecs-clump",
+      "variant": "after",
+      "repeat": 3,
+      "file": "ecs-clump-after-3.json",
+      "stepMs": {
+        "avg": 2.222,
+        "p50": 1.818,
+        "p95": 4.329,
+        "max": 8.08
+      },
+      "bytesPerTick": 4301850,
+      "sends": 210000
+    },
+    {
+      "case": "many-cells",
+      "variant": "after",
+      "repeat": 3,
+      "file": "many-cells-after-3.json",
+      "stepMs": {
+        "avg": 3.864,
+        "p50": 3.872,
+        "p95": 5.556,
+        "max": 7.567
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000
+    },
+    {
+      "case": "many-cells",
+      "variant": "before",
+      "repeat": 3,
+      "file": "many-cells-before-3.json",
+      "stepMs": {
+        "avg": 3.896,
+        "p50": 3.903,
+        "p95": 5.619,
+        "max": 7.992
+      },
+      "bytesPerTick": 13721,
+      "sends": 12000
+    },
+    {
+      "case": "manual-many-cells",
+      "variant": "before",
+      "repeat": 3,
+      "file": "manual-many-cells-before-3.json",
+      "stepMs": {
+        "avg": 1.01,
+        "p50": 0.974,
+        "p95": 2.163,
+        "max": 3.771
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000
+    },
+    {
+      "case": "manual-many-cells",
+      "variant": "after",
+      "repeat": 3,
+      "file": "manual-many-cells-after-3.json",
+      "stepMs": {
+        "avg": 1.019,
+        "p50": 0.984,
+        "p95": 2.222,
+        "max": 3.568
+      },
+      "bytesPerTick": 13414,
+      "sends": 12000
+    },
+    {
+      "case": "create-delete-churn",
+      "variant": "after",
+      "repeat": 3,
+      "file": "create-delete-churn-after-3.json",
+      "stepMs": {
+        "avg": 1.39,
+        "p50": 1.257,
+        "p95": 2.148,
+        "max": 8.111
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000
+    },
+    {
+      "case": "create-delete-churn",
+      "variant": "before",
+      "repeat": 3,
+      "file": "create-delete-churn-before-3.json",
+      "stepMs": {
+        "avg": 1.342,
+        "p50": 1.246,
+        "p95": 1.808,
+        "max": 2.829
+      },
+      "bytesPerTick": 297990,
+      "sends": 18000
+    }
+  ],
+  "focusedSummary": [
+    {
+      "case": "ecs-sparse-direct",
+      "warmup": 600,
+      "ticks": 1500,
+      "before": {
+        "avg": 3.201,
+        "p50": 3.106,
+        "p95": 3.932
+      },
+      "after": {
+        "avg": 3.144,
+        "p50": 3.059,
+        "p95": 3.752
+      },
+      "meanChangePercent": -1.7806935332708496
+    },
+    {
+      "case": "ecs-dense-direct",
+      "warmup": 600,
+      "ticks": 1500,
+      "before": {
+        "avg": 5.879,
+        "p50": 5.737,
+        "p95": 6.935
+      },
+      "after": {
+        "avg": 6.346,
+        "p50": 6.195,
+        "p95": 7.593
+      },
+      "meanChangePercent": 7.943527810852191
+    }
+  ],
+  "focusedRuns": [
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "before",
+      "repeat": 1,
+      "file": "focused-ecs-sparse-direct-before-1.json",
+      "stepMs": {
+        "avg": 3.187,
+        "p50": 3.106,
+        "p95": 3.808,
+        "max": 6.557
+      }
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "after",
+      "repeat": 1,
+      "file": "focused-ecs-sparse-direct-after-1.json",
+      "stepMs": {
+        "avg": 3.144,
+        "p50": 3.059,
+        "p95": 3.752,
+        "max": 6.095
+      }
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "before",
+      "repeat": 1,
+      "file": "focused-ecs-dense-direct-before-1.json",
+      "stepMs": {
+        "avg": 6.123,
+        "p50": 6.072,
+        "p95": 7.195,
+        "max": 11.019
+      }
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "after",
+      "repeat": 1,
+      "file": "focused-ecs-dense-direct-after-1.json",
+      "stepMs": {
+        "avg": 6.184,
+        "p50": 6.057,
+        "p95": 7.359,
+        "max": 12.327
+      }
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "after",
+      "repeat": 2,
+      "file": "focused-ecs-sparse-direct-after-2.json",
+      "stepMs": {
+        "avg": 3.048,
+        "p50": 2.975,
+        "p95": 3.573,
+        "max": 6.575
+      }
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "before",
+      "repeat": 2,
+      "file": "focused-ecs-sparse-direct-before-2.json",
+      "stepMs": {
+        "avg": 3.239,
+        "p50": 3.111,
+        "p95": 4.037,
+        "max": 6.966
+      }
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "after",
+      "repeat": 2,
+      "file": "focused-ecs-dense-direct-after-2.json",
+      "stepMs": {
+        "avg": 6.346,
+        "p50": 6.216,
+        "p95": 7.593,
+        "max": 14.275
+      }
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "before",
+      "repeat": 2,
+      "file": "focused-ecs-dense-direct-before-2.json",
+      "stepMs": {
+        "avg": 5.73,
+        "p50": 5.661,
+        "p95": 6.681,
+        "max": 9.899
+      }
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "before",
+      "repeat": 3,
+      "file": "focused-ecs-sparse-direct-before-3.json",
+      "stepMs": {
+        "avg": 3.201,
+        "p50": 3.087,
+        "p95": 3.932,
+        "max": 6.273
+      }
+    },
+    {
+      "case": "ecs-sparse-direct",
+      "variant": "after",
+      "repeat": 3,
+      "file": "focused-ecs-sparse-direct-after-3.json",
+      "stepMs": {
+        "avg": 3.304,
+        "p50": 3.172,
+        "p95": 4.132,
+        "max": 7.268
+      }
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "before",
+      "repeat": 3,
+      "file": "focused-ecs-dense-direct-before-3.json",
+      "stepMs": {
+        "avg": 5.879,
+        "p50": 5.737,
+        "p95": 6.935,
+        "max": 12.011
+      }
+    },
+    {
+      "case": "ecs-dense-direct",
+      "variant": "after",
+      "repeat": 3,
+      "file": "focused-ecs-dense-direct-after-3.json",
+      "stepMs": {
+        "avg": 6.357,
+        "p50": 6.195,
+        "p95": 7.713,
+        "max": 13.945
+      }
+    }
+  ],
+  "ablationSummary": {
+    "before": {
+      "avg": 5.977,
+      "p50": 5.845,
+      "p95": 7.109
+    },
+    "after": {
+      "avg": 6.008,
+      "p50": 5.864,
+      "p95": 7.211
+    },
+    "guards-only": {
+      "avg": 5.896,
+      "p50": 5.766,
+      "p95": 6.829
+    },
+    "failure-only": {
+      "avg": 5.993,
+      "p50": 5.875,
+      "p95": 7.077
+    }
+  },
+  "ablationRuns": [
+    {
+      "variant": "before",
+      "repeat": 1,
+      "file": "ablation-before-1.json",
+      "stepMs": {
+        "avg": 5.887,
+        "p50": 5.703,
+        "p95": 7.109,
+        "max": 20.693
+      }
+    },
+    {
+      "variant": "after",
+      "repeat": 1,
+      "file": "ablation-after-1.json",
+      "stepMs": {
+        "avg": 5.806,
+        "p50": 5.661,
+        "p95": 6.843,
+        "max": 19.162
+      }
+    },
+    {
+      "variant": "guards-only",
+      "repeat": 1,
+      "file": "ablation-guards-only-1.json",
+      "stepMs": {
+        "avg": 5.852,
+        "p50": 5.724,
+        "p95": 6.822,
+        "max": 17.472
+      }
+    },
+    {
+      "variant": "failure-only",
+      "repeat": 1,
+      "file": "ablation-failure-only-1.json",
+      "stepMs": {
+        "avg": 5.925,
+        "p50": 5.812,
+        "p95": 6.813,
+        "max": 16.917
+      }
+    },
+    {
+      "variant": "after",
+      "repeat": 2,
+      "file": "ablation-after-2.json",
+      "stepMs": {
+        "avg": 6.008,
+        "p50": 5.864,
+        "p95": 7.211,
+        "max": 15.335
+      }
+    },
+    {
+      "variant": "guards-only",
+      "repeat": 2,
+      "file": "ablation-guards-only-2.json",
+      "stepMs": {
+        "avg": 5.896,
+        "p50": 5.766,
+        "p95": 6.829,
+        "max": 18.851
+      }
+    },
+    {
+      "variant": "failure-only",
+      "repeat": 2,
+      "file": "ablation-failure-only-2.json",
+      "stepMs": {
+        "avg": 5.993,
+        "p50": 5.875,
+        "p95": 7.077,
+        "max": 18.321
+      }
+    },
+    {
+      "variant": "before",
+      "repeat": 2,
+      "file": "ablation-before-2.json",
+      "stepMs": {
+        "avg": 5.977,
+        "p50": 5.845,
+        "p95": 6.967,
+        "max": 23.261
+      }
+    },
+    {
+      "variant": "guards-only",
+      "repeat": 3,
+      "file": "ablation-guards-only-3.json",
+      "stepMs": {
+        "avg": 5.961,
+        "p50": 5.815,
+        "p95": 7.068,
+        "max": 21.868
+      }
+    },
+    {
+      "variant": "failure-only",
+      "repeat": 3,
+      "file": "ablation-failure-only-3.json",
+      "stepMs": {
+        "avg": 6.166,
+        "p50": 5.975,
+        "p95": 7.526,
+        "max": 20.802
+      }
+    },
+    {
+      "variant": "before",
+      "repeat": 3,
+      "file": "ablation-before-3.json",
+      "stepMs": {
+        "avg": 6.299,
+        "p50": 6.049,
+        "p95": 8.293,
+        "max": 26.382
+      }
+    },
+    {
+      "variant": "after",
+      "repeat": 3,
+      "file": "ablation-after-3.json",
+      "stepMs": {
+        "avg": 6.226,
+        "p50": 6.092,
+        "p95": 7.601,
+        "max": 17.947
+      }
+    }
+  ],
+  "allocationProbes": [
+    {
+      "case": "many-cells",
+      "config": {
+        "scenario": "channel-2d",
+        "users": 20,
+        "entities": 4000,
+        "visible": 1000,
+        "ticks": 30,
+        "warmup": 20,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 250,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "homogeneous",
+        "spatialPlane": "xy",
+        "worldSize": 1000,
+        "clusters": 8,
+        "moveFraction": 0.05,
+        "queryPadding": 0,
+        "fragmentCellLimit": 256,
+        "stableFragmentCellLimit": 256,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "metrics": true
+      },
+      "allocationsPerTick": 532,
+      "fragmentBuilds": 15360,
+      "fragmentHits": 38934,
+      "note": "Separate metrics-enabled probe; timing is not part of the comparison."
+    },
+    {
+      "case": "manual-many-cells",
+      "config": {
+        "scenario": "manual-channel-2d",
+        "users": 20,
+        "entities": 4000,
+        "visible": 1000,
+        "ticks": 30,
+        "warmup": 20,
+        "sharedUpdates": true,
+        "groups": true,
+        "nidStart": 1,
+        "cellSize": 50,
+        "viewHalf": 250,
+        "churn": 0,
+        "ecsChurn": "none",
+        "ecsChurnOrder": "after-writes",
+        "ecsMaterialize": false,
+        "children": 0,
+        "spatialDistribution": "homogeneous",
+        "spatialPlane": "xy",
+        "worldSize": 1000,
+        "clusters": 8,
+        "moveFraction": 0.05,
+        "queryPadding": 0,
+        "fragmentCellLimit": 256,
+        "stableFragmentCellLimit": 256,
+        "manualEmitMode": "group4",
+        "entityShape": "standard",
+        "spatialViewShape": "aabb",
+        "metrics": true
+      },
+      "allocationsPerTick": 32.1,
+      "fragmentBuilds": 363,
+      "fragmentHits": 17,
+      "note": "Separate metrics-enabled probe; timing is not part of the comparison."
+    }
+  ],
+  "source": {
+    "baselineHead": "d78047ca62bf801af58e48f4b0ebb15065612d88",
+    "baselineHadUncommittedChanges": true,
+    "productionChanges": {
+      "src/binary/BinaryDiagnosticError.ts": {
+        "before": "d1f702e11cd59f98b51311750d8a1e50a968bafe19287a62d667144f3bbf9fa4",
+        "after": "72e7a03f05bd40b7f1595263d03cd5bda13c9b91858feaeb26dfa2a024429e4d"
+      },
+      "src/binary/assertBinaryWriteSize.ts": {
+        "before": null,
+        "after": "a50b1174cb89a4d0c373fbef68c57057bb08613acb50e4d9752f0be9325ab84f"
+      },
+      "src/binary/snapshot/cellFragmentBuilders.ts": {
+        "before": "b684fda8738f5f4ecebdbfd343ad1083e420fd3ecf6a65fda1bf9ab5b5bb2f1b",
+        "after": "2b887fce9b5e9090b573259ad11a8ccfe8eaeb69b4c28eb2a4094d80ad567cf5"
+      },
+      "src/binary/snapshot/createSnapshotBuffer.ts": {
+        "before": "cdb6522fed4f6c960e2595a140627853a557fd225503ad9eb7342f8880976db7",
+        "after": "a78c93dc7052e611f8a19dc2d98d6e3f7169d6319bbc64e429ff7076377a9ceb"
+      },
+      "src/binary/snapshot/manualUpdates.ts": {
+        "before": "5507d78871c793a7d1c075fa3fd7feb148968f3a0868d3d996d45b9197063467",
+        "after": "d57c40955de24553d85037057a60c212800be29c531a87be1a72c890b6c0bf2c"
+      },
+      "src/binary/snapshot/messageFragments.ts": {
+        "before": "003d3e19d121e37b1076418de3259e98b811cf40ff8093497fec9ad73ed7cec4",
+        "after": "59768bce76110ab59bfcacc549d4b3b806117107b9a30800cef2b3921d7e594c"
+      },
+      "src/binary/snapshot/sharedEntityFragments.ts": {
+        "before": "35438a17d85cb30f0177bfff7eaca4abd55644460bc5d0b3007dd1d36253957d",
+        "after": "13d9df9c75ad90e92b38cb7380ef74977bd303f76ffad1ea7aceeece8cbdc75a"
+      },
+      "src/client/ClientNetwork.ts": {
+        "before": "e273606d8410fda69c180e0cf9cf95a3d0ecaae67ae2c414abf1009db8db2321",
+        "after": "6c249a9700a590c519e264fb715835cd459b23487de02d55ee9df84c8f1d74c2"
+      },
+      "src/common/binary/BinaryAdapter.ts": {
+        "before": "abb760710d8a9b66697464cf886ebbe3cd7521a3d24933dd01e359e48b630d4f",
+        "after": "3db431ecbb6acfe6425df1ce69421f007d8f07206b8b7fa705d6e9fc8846ee8a"
+      },
+      "src/common/binary/IBinaryWriter.ts": {
+        "before": "90b1e76b3eef074c87709ac17bb85090bf64ac5b6a7c9488007725e232151202",
+        "after": "548b81bf2c5ba035a68a1e79d16ea569cf9326bea49f36b2ca60add270656962"
+      },
+      "src/server/Instance.ts": {
+        "before": "4677063e4ac6eb2a5d874019a856b8403636074b2fb645c33da721123f87ac0e",
+        "after": "06dd888a88a41f86e32f90219d385685220e9182e971d73d998175c414d58123"
+      },
+      "src/server/InstanceNetwork.ts": {
+        "before": "4f536d400c23d7b903276546b65bdd907d607efba64fa1fb90925552d73779e4",
+        "after": "1531f6fba343c4b410e5434c8109e93a6efdd3534c19512e19e88119b6801dba"
+      },
+      "src/server/channel/CellFragmentChannelOutput.ts": {
+        "before": "af55159b1c29922a5be981ca6338ecd5df743d37e1daaa5a4827a9e68e2e193b",
+        "after": "c098c1559a284df74e09bcda2e548036ddeac45aa2990311c7d00124d8521a0c"
+      },
+      "src/server/channel/ManualChannelOutput.ts": {
+        "before": "15f378391826a14ce355b633da6ca8676586fcc5932cb5b50d340330efd64ade",
+        "after": "29dc5b46c2c628b3c135f795477577a3feebc204a17f5de9ea21ce17560f4c9e"
+      }
+    },
+    "backendSha256": "040ca1dc908a0cd76738e3f52f2ce6f89b7560d37208490c360b7094c748351f",
+    "harnessSha256": "963951311367bb86d57e97fcd037c1beea728fe03d09d715a6900c23f84a1031",
+    "runnerSha256": "c296227e77723833973afa8fa3f38cae887cbb4808319e92055d13d7c68308d5",
+    "postBenchmarkEdits": {
+      "src/server/Instance.ts": {
+        "finalSha256": "71fe43cd72b576a3a41591d2f3085d2315d215ae4d0c471c2ea80562d5b767f9",
+        "change": "Comment-only lint annotation: cleanup already threw, and the first failure must remain the thrown error. Runtime statements match the measured source."
+      }
+    }
+  },
+  "evidence": "nengi-rc-notes/stable-release-review/scratch/snapshot-size-guards (unpublished companion workspace)"
+}

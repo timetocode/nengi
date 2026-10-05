@@ -10,7 +10,7 @@ import { Channel } from '../server/channel/Channel'
 import { Instance } from '../server/Instance'
 import { User, UserConnectionState } from '../server/User'
 import { testBinaryAdapter } from '../testSupport/BufferBinary'
-import { Client } from './Client'
+import { connectedTestClient } from '../testSupport/ClientTransport'
 import { ClientNetwork } from './ClientNetwork'
 import { createSchemaFingerprint } from '../common/binary/schema/schemaFingerprint'
 import { Predictor } from './prediction/Predictor'
@@ -42,23 +42,6 @@ function createClientNetwork(context: Context) {
     return network
 }
 
-class ThrowingSendAdapter {
-    binary = testBinaryAdapter
-    network: ClientNetwork
-
-    constructor(network: ClientNetwork) {
-        this.network = network
-    }
-
-    connect() {
-        return Promise.resolve({ accepted: true })
-    }
-
-    flush() {
-        this.network.createOutbound(this.binary)
-        throw new Error('send failed')
-    }
-}
 
 function setPreHandshake(user: User) {
     user.connectionState = UserConnectionState.OpenPreHandshake
@@ -76,6 +59,18 @@ function deliverRequestAndResponse(instance: Instance, user: User, clientNetwork
 }
 
 describe('request/response', () => {
+    it('does not retain protocol changes from an incomplete handshake', () => {
+        const network = createClientNetwork(new Context())
+        const original = { ...network.protocol }
+        const response = network.readHandshakeResponse(testBinaryAdapter.createReader(Buffer.from([
+            BinarySection.EngineMessages, 2,
+            EngineMessage.Protocol, Binary.UInt32, Binary.UInt32,
+            EngineMessage.ConnectionDenied // truncated denial after otherwise valid protocol metadata
+        ])))
+        expect(response.accepted).toBe(false)
+        expect(network.protocol).toEqual(original)
+    })
+
     it('receives protocol id widths during the connection handshake', async () => {
         const context = new Context()
         context.register(300, defineMessageSchema({
@@ -143,7 +138,11 @@ describe('request/response', () => {
         const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
 
         expect(response.accepted).toBe(false)
-        expect(response.reason.message).toContain('Schema fingerprint mismatch')
+        expect(response.reason).toEqual({
+            reason: 'schema_fingerprint_mismatch',
+            serverFingerprint: createSchemaFingerprint(serverContext),
+            clientFingerprint: createSchemaFingerprint(clientContext)
+        })
     })
 
     it('denies missing schema fingerprints when required', async () => {
@@ -164,7 +163,10 @@ describe('request/response', () => {
         const response = clientNetwork.readHandshakeResponse(testBinaryAdapter.createReader(handshakeBuffer))
 
         expect(response.accepted).toBe(false)
-        expect(response.reason.message).toContain('Schema fingerprint required')
+        expect(response.reason).toEqual({
+            reason: 'schema_fingerprint_required',
+            serverFingerprint: createSchemaFingerprint(context)
+        })
     })
 
     it('accepts handshakes without schema fingerprints when not required', async () => {
@@ -314,13 +316,13 @@ describe('request/response', () => {
         })
     })
 
-    it('reconciles request prediction before callback and promise observers run', async () => {
+    it('reconciles request prediction before promise observers run', async () => {
         const context = new Context()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
         const localSwitch = { open: false }
-        const callbackStates: boolean[] = []
+        const observedStates: boolean[] = []
 
         const setSwitch = defineEndpoint<
             { nid: number, open: boolean },
@@ -356,10 +358,10 @@ describe('request/response', () => {
                         localSwitch.open = response!.open
                     }
                 }
-            },
-            callback: () => {
-                callbackStates.push(localSwitch.open)
             }
+        }).then(value => {
+            observedStates.push(localSwitch.open)
+            return value
         })
 
         expect(localSwitch.open).toBe(true)
@@ -369,29 +371,25 @@ describe('request/response', () => {
             accepted: false,
             open: false
         })
-        expect(callbackStates).toEqual([false])
+        expect(observedStates).toEqual([false])
         expect(localSwitch.open).toBe(false)
         expect(clientNetwork.client.predictor.log.getPendingRequests()).toEqual([])
     })
 
-    it('supports send-style handlers and client callbacks', async () => {
+    it('supports send-style handlers and client promises', async () => {
         const context = new Context()
         const instance = new Instance(context)
         const user = createUser(instance)
         const clientNetwork = createClientNetwork(context)
-        let callbackResponse: any
 
         instance.respond(3, ({ body }, send) => {
             send({ ok: body.ok })
         })
 
-        const response = clientNetwork.request(3, { ok: true }, value => {
-            callbackResponse = value
-        })
+        const response = clientNetwork.request(3, { ok: true })
         deliverRequestAndResponse(instance, user, clientNetwork)
 
         await expect(response).resolves.toEqual({ ok: true })
-        expect(callbackResponse).toEqual({ ok: true })
     })
 
     it('resolves expected validation failures as normal responses', async () => {
@@ -479,12 +477,12 @@ describe('request/response', () => {
             }
         })
 
-        let callbackSawInventory = false
+        let observerSawInventory = false
         const response = clientNetwork.request(openChest, { chestNid: 123 }, {
-            timeoutMs: 0,
-            callback: value => {
-                callbackSawInventory = clientNetwork.store.getChannelHeader(inventoryChannel.nid)?.nid === value.inventoryNid
-            }
+            timeoutMs: 0
+        }).then(value => {
+            observerSawInventory = clientNetwork.store.getChannelHeader(inventoryChannel.nid)?.nid === value.inventoryNid
+            return value
         })
         deliverRequestAndResponse(instance, user, clientNetwork)
 
@@ -506,7 +504,7 @@ describe('request/response', () => {
         expect(clientNetwork.store.getByChannel(inventoryChannel.nid)).toEqual([
             item
         ])
-        expect(callbackSawInventory).toBe(true)
+        expect(observerSawInventory).toBe(true)
     })
 
     it('rejects when no server endpoint is registered', async () => {
@@ -571,7 +569,7 @@ describe('request/response', () => {
         const response = clientNetwork.request(8, {}, {
             prediction: {}
         })
-        clientNetwork.onDisconnect('closed')
+        clientNetwork.endSession({ code: 'REMOTE_CLOSE', detail: 'closed' })
 
         await expect(response).rejects.toMatchObject({
             code: 'DISCONNECTED'
@@ -619,40 +617,31 @@ describe('request/response', () => {
         }).not.toThrow()
     })
 
-    it('reports malformed snapshots instead of throwing from the reader', () => {
-        const context = new Context()
-        const clientNetwork = createClientNetwork(context)
-        const onMalformedSnapshot = jest.fn()
-        clientNetwork.onMalformedSnapshot = onMalformedSnapshot
-
-        expect(() => {
-            clientNetwork.readSnapshot(testBinaryAdapter.createReader(Buffer.from([255])))
-        }).not.toThrow()
-
-        expect(onMalformedSnapshot).toHaveBeenCalledTimes(1)
-        expect(clientNetwork.client.disconnect).toHaveBeenCalledWith({ reason: 'malformed_snapshot' })
-        expect(clientNetwork.getPendingFrameCount()).toBe(0)
+    it('rejects malformed snapshots without publishing a partial frame', () => {
+        const network = createClientNetwork(new Context())
+        expect(() => network.readSnapshot(testBinaryAdapter.createReader(Buffer.from([255])))).toThrow()
+        expect(network.getPendingFrameCount()).toBe(0)
     })
 
-    it('rolls outbound state back when adapter flush fails before send completion', () => {
+    it('rolls outbound state back when serialization fails before sending', () => {
         const context = new Context()
-        context.register(1, defineMessageSchema({
-            value: Binary.UInt8
-        }))
-        const client = new Client(context, ThrowingSendAdapter, 20)
-
+        context.register(1, defineMessageSchema({ value: Binary.UInt8 }))
+        const client = connectedTestClient(context)
         const request = client.request(1, { value: 1 }, { timeoutMs: 0 })
         request.catch(() => undefined)
         client.addCommand({ ntype: 1, value: 7 })
-
-        expect(() => client.flush()).toThrow('send failed')
-
+        const createWriter = jest.spyOn(client.adapter.binary, 'createWriter').mockImplementationOnce(() => {
+            throw new Error('encoding failed')
+        })
+        expect(() => client.flush()).toThrow('encoding failed')
+        expect(client.connectionState).toBe('connected')
         expect(client.network.commandFrameNumber).toBe(1)
         expect(client.network.outbound.tick).toBe(1)
         expect(client.network.requestQueue.length).toBe(1)
         expect(client.network.requests.size).toBe(1)
-        expect(client.network.outbound.getCommands(1)).toEqual([{ ntype: 1, value: 7 }])
-        client.network.rejectPendingRequests(new Error('cleanup'))
+        expect(client.network.outbound.getCurrentFrame().outboundCommands).toEqual([{ ntype: 1, value: 7 }])
+        createWriter.mockRestore()
+        client.disconnect()
     })
 
     it('allows duplicate request keys by default', () => {
@@ -697,18 +686,18 @@ describe('request/response', () => {
         clientNetwork.rejectPendingRequests(new Error('cleanup'))
     })
 
-    it('replaces pending requests with the same key', async () => {
+    it('replaces queued requests with the same key', async () => {
         const context = new Context()
         const clientNetwork = createClientNetwork(context)
 
         const first = clientNetwork.request(12, { attempt: 1 }, {
             key: 'chest:1',
-            policy: RequestPolicy.Replace,
+            policy: RequestPolicy.ReplaceQueued,
             timeoutMs: 0
         })
         const second = clientNetwork.request(12, { attempt: 2 }, {
             key: 'chest:1',
-            policy: RequestPolicy.Replace,
+            policy: RequestPolicy.ReplaceQueued,
             timeoutMs: 0
         })
 

@@ -1,7 +1,8 @@
+import { assertBinaryWriteSize } from '../../binary/assertBinaryWriteSize'
 import { ProtocolConfig } from '../../common/binary/Protocol'
 import { Instance } from '../Instance'
 import { User } from '../User'
-import { createEmptySnapshotPlan, SnapshotPlan } from '../../binary/snapshot/SnapshotPlan'
+import { createEmptySnapshotPlan, EMPTY_SNAPSHOT_PLAN, SnapshotPlan } from '../../binary/snapshot/SnapshotPlan'
 import { createSnapshotPlanChunk, SnapshotChunk } from '../../binary/snapshot/SnapshotChunk'
 import {
     CellEntityFragment,
@@ -58,40 +59,60 @@ type ManualCellFragmentVisibilityGroup = {
     visibleCellKeys: string[]
     visibleNids: number[]
     visibleNidSet?: Set<number>
-    sharedUpdateFragment?: CellEntityFragment
+    sharedUpdateFragment?: CellEntityFragment | null
+    sharedUpdateNidType?: ProtocolConfig['nidType']
+    sharedUpdateNtypeType?: ProtocolConfig['ntypeType']
 }
 
-function collectVisibilityPlan(user: User, instance: Instance, channel: CellFragmentChannel) {
-    const manualCellFirstSnapshot = isManualCellFragmentChannel(channel) ?
-        (channel as CellFirstManualChannel).getChannelSnapshot?.(user, instance.tick) :
-        null
-    const visibility: CellFragmentVisibility = manualCellFirstSnapshot || channel.collectSnapshotVisibility(user.id)
-    const plan = createEmptySnapshotPlan()
+function collectVisibilityPlan(user: User, instance: Instance, channel: CellFragmentChannel, stableCells: boolean) {
+    let plan: SnapshotPlan | undefined
     const isManual = isManualCellFragmentChannel(channel)
-    for (let i = 0; i < visibility.toCreate.length; i++) {
-        addRegularCreate(plan, instance, visibility.toCreate[i])
-    }
-    if (!isManual) {
-        for (let i = 0; i < visibility.toUpdate.length; i++) {
-            addRegularUpdate(plan, instance, visibility.toUpdate[i])
+    let visibility: CellFragmentVisibility | undefined
+    if (!stableCells) {
+        const manualCellFirstSnapshot = isManual ?
+            (channel as CellFirstManualChannel).getChannelSnapshot?.(user, instance.tick) :
+            null
+        visibility = manualCellFirstSnapshot || channel.collectSnapshotVisibility(user.id)
+        if (visibility.toCreate.length > 0 || visibility.toDelete.length > 0 || (!isManual && visibility.toUpdate.length > 0)) {
+            plan = createEmptySnapshotPlan()
+            for (let i = 0; i < visibility.toCreate.length; i++) {
+                addRegularCreate(plan, instance, visibility.toCreate[i])
+            }
+            if (!isManual) {
+                for (let i = 0; i < visibility.toUpdate.length; i++) {
+                    addRegularUpdate(plan, instance, visibility.toUpdate[i])
+                }
+            }
+            plan.deleteEntities = visibility.toDelete
         }
     }
-    plan.deleteEntities = visibility.toDelete
-    addChannelMessages(plan, user, channel as any, instance.network.diagnosticBinaryWrites)
+    const messageChannel = channel as CellFragmentChannel & {
+        broadcastMessages?: any[]
+        interpolatedBroadcastMessages?: any[]
+    }
+    if (user.scopedMessageQueue.length > 0 || user.scopedInterpolatedMessageQueue.length > 0 ||
+        (instance.network.diagnosticBinaryWrites && messageChannel.broadcastMessages?.length) ||
+        messageChannel.interpolatedBroadcastMessages?.length) {
+        plan ??= createEmptySnapshotPlan()
+        addChannelMessages(plan, user, messageChannel, instance.network.diagnosticBinaryWrites)
+    }
     return { plan, visibility }
 }
 
-function removeCreateNidsFromPlan(plan: SnapshotPlan, nids: Set<number>) {
+function removeCreateNidsFromPlan(plan: SnapshotPlan | undefined, nids: Set<number>) {
+    if (!plan || plan.createEntities.length === 0) return
     plan.createEntities = plan.createEntities.filter(entity => !nids.has(entity.nid))
 }
 
-function removeDeleteNidsFromPlan(plan: SnapshotPlan, nids: Set<number>) {
+function removeDeleteNidsFromPlan(plan: SnapshotPlan | undefined, nids: Set<number>) {
+    if (!plan || plan.deleteEntities.length === 0) return
     plan.deleteEntities = plan.deleteEntities.filter(nid => !nids.has(nid))
 }
 
-function removeUpdateNidsFromPlan(plan: SnapshotPlan, nids: Set<number>) {
-    plan.updateEntities = plan.updateEntities.filter(update => !nids.has(update.nid))
-    plan.updateEntityGroups = plan.updateEntityGroups.filter(update => !nids.has(update.nid))
+function removeUpdateNidsFromPlan(plan: SnapshotPlan | undefined, nids: Set<number>) {
+    if (!plan) return
+    if (plan.updateEntities.length > 0) plan.updateEntities = plan.updateEntities.filter(update => !nids.has(update.nid))
+    if (plan.updateEntityGroups.length > 0) plan.updateEntityGroups = plan.updateEntityGroups.filter(update => !nids.has(update.nid))
 }
 
 function allRootsWerePreviouslyHidden(channel: CellFragmentChannel, cellKey: string, beforeVisible: Set<number>) {
@@ -104,7 +125,7 @@ function allRootsWerePreviouslyHidden(channel: CellFragmentChannel, cellKey: str
     return roots.length > 0
 }
 
-function allNidsArePlannedDeletes(nids: number[], plannedDeletes: Set<number>) {
+function allNidsArePlannedDeletes(nids: readonly number[], plannedDeletes: Set<number>) {
     if (nids.length === 0) {
         return false
     }
@@ -124,21 +145,22 @@ function getGroupVisibleNids(group: ManualCellFragmentVisibilityGroup) {
 }
 
 function mergeManualGroupUpdateLog(channel: ManualCellFragmentChannel, group: ManualCellFragmentVisibilityGroup) {
-    const visibleNids = getGroupVisibleNids(group)
-    const merged: ManualUpdateLog = {
-        manualPropNids: [],
-        manualPropSchemas: [],
-        manualPropValues: [],
-        manualGroupNids: [],
-        manualGroupSchemas: [],
-        manualGroupValueOffsets: [],
-        manualGroupValues: []
-    }
+    let merged: ManualUpdateLog | undefined
 
     for (let i = 0; i < group.visibleCellKeys.length; i++) {
         const log = channel.getManualCellUpdateLog(group.visibleCellKeys[i])
         if (!log) {
             continue
+        }
+        const visibleNids = getGroupVisibleNids(group)
+        merged ??= {
+            manualPropNids: [],
+            manualPropSchemas: [],
+            manualPropValues: [],
+            manualGroupNids: [],
+            manualGroupSchemas: [],
+            manualGroupValueOffsets: [],
+            manualGroupValues: []
         }
         for (let j = 0; j < log.manualPropNids.length; j++) {
             const nid = log.manualPropNids[j]
@@ -172,23 +194,18 @@ function getManualGroupUpdateFragment(
     user: User,
     instance: Instance,
     channel: ManualCellFragmentChannel,
-    group: ManualCellFragmentVisibilityGroup
+    group: ManualCellFragmentVisibilityGroup,
+    protocol: ProtocolConfig
 ) {
-    const protocol = instance.network.getProtocol()
-    const key = `${instance.tick}:${channel.nid}:manual-group:update:${group.cellSignature}:${protocol.nidType}:${protocol.ntypeType}`
-    if (group.sharedUpdateFragment) {
-        instance.network.recordSharedFragmentHit()
+    if (group.sharedUpdateFragment !== undefined && (!group.sharedUpdateFragment ||
+        (group.sharedUpdateNidType === protocol.nidType && group.sharedUpdateNtypeType === protocol.ntypeType))) {
+        if (group.sharedUpdateFragment) instance.network.recordSharedFragmentHit()
         return group.sharedUpdateFragment
     }
-    const cached = instance.network.sharedUpdateFragments.get(key)
-    if (cached) {
-        instance.network.recordSharedFragmentHit()
-        group.sharedUpdateFragment = cached as CellEntityFragment
-        return group.sharedUpdateFragment
-    }
-
     const log = mergeManualGroupUpdateLog(channel, group)
-    if (log.manualPropNids.length === 0 && log.manualGroupNids.length === 0) {
+    if (!log || (log.manualPropNids.length === 0 && log.manualGroupNids.length === 0)) {
+        // The group belongs to this tick. Remember absence as well as payloads.
+        group.sharedUpdateFragment = null
         return null
     }
 
@@ -208,6 +225,7 @@ function getManualGroupUpdateFragment(
     }
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeManualUpdates(log, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Manual visibility group updates')
     if (measure) {
         writeMs = performance.now() - writeStart
     }
@@ -220,10 +238,11 @@ function getManualGroupUpdateFragment(
         deletes: 0,
         updateProps: log.manualPropNids.length,
         updateGroups: log.manualGroupNids.length,
-        groupedUpdateProps: countManualGroupedProps(log)
+        groupedUpdateProps: measure ? countManualGroupedProps(log) : 0
     }
     group.sharedUpdateFragment = fragment
-    instance.network.sharedUpdateFragments.set(key, fragment)
+    group.sharedUpdateNidType = protocol.nidType
+    group.sharedUpdateNtypeType = protocol.ntypeType
     instance.network.recordSharedFragmentBuild({ collectMs: 0, countMs, writeMs, bytes })
     return fragment
 }
@@ -234,76 +253,93 @@ export function createCellFragmentChannelOutput(
     channel: CellFragmentChannel,
     protocol: ProtocolConfig
 ): ChannelSnapshotOutput {
-    const previousCellKeys = channel.getRememberedCellKeys(user.id)
-    const previousCellKeySet = new Set(previousCellKeys)
-    const { plan, visibility } = collectVisibilityPlan(user, instance, channel)
     const isManual = isManualCellFragmentChannel(channel)
-    const previousVisible = visibility.previous
-    const currentCellKeys = visibility.visibleCellKeys || channel.getVisibleCellKeys(user.id)
-    const currentCellKeySet = new Set(currentCellKeys)
+    // Membership stability does not imply unchanged properties. The existing
+    // cell fragments still diff those properties once per tick across users.
+    // Stability is per view: cell revisions cover root membership changes,
+    // and the signature also covers hierarchy edits outside the spatial grid.
+    const stableCellKeys = !isManual && !instance.network.diagnosticBinaryWrites
+        ? channel.getStableVisibleCellKeys(user.id)
+        : null
+    const { plan, visibility } = collectVisibilityPlan(user, instance, channel, stableCellKeys !== null)
     const createFragments: CellEntityFragment[] = []
     const deleteFragments: CellEntityFragment[] = []
     const updateFragments: CellEntityFragment[] = []
-    const plannedDeletes = new Set(plan.deleteEntities)
-    const manualGroupUpdateFragment = isManual &&
-        instance.network.sharedUpdateFragmentsEnabled &&
-        !instance.network.diagnosticBinaryWrites &&
-        visibility.toCreate.length === 0 &&
-        visibility.toDelete.length === 0 &&
-        visibility.group
-        ? getManualGroupUpdateFragment(user, instance, channel as ManualCellFragmentChannel, visibility.group)
-        : null
 
-    if (manualGroupUpdateFragment) {
-        updateFragments.push(manualGroupUpdateFragment)
-    } else {
-        for (let i = 0; i < currentCellKeys.length; i++) {
-            const cellKey = currentCellKeys[i]
-            if (previousCellKeySet.has(cellKey)) {
-                if (!cellMayHaveUpdates(channel, cellKey)) {
+    if (stableCellKeys) {
+        for (let i = 0; i < stableCellKeys.length; i++) {
+            const fragment = getCellUpdateFragment(user, instance, channel, stableCellKeys[i], false, protocol)
+            if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
+                updateFragments.push(fragment)
+            }
+        }
+    } else if (visibility) {
+        const useManualGroupFragment = isManual &&
+            instance.network.sharedUpdateFragmentsEnabled &&
+            !instance.network.diagnosticBinaryWrites &&
+            visibility.toCreate.length === 0 &&
+            visibility.toDelete.length === 0 &&
+            visibility.group !== undefined
+
+        if (useManualGroupFragment) {
+            const fragment = getManualGroupUpdateFragment(user, instance, channel as ManualCellFragmentChannel, visibility.group!, protocol)
+            if (fragment) updateFragments.push(fragment)
+        } else {
+            const previousCellKeys = channel.getRememberedCellKeys(user.id)
+            const previousCellKeySet = new Set(previousCellKeys)
+            const previousVisible = visibility.previous
+            const currentCellKeys = visibility.visibleCellKeys || channel.getVisibleCellKeys(user.id)
+            for (let i = 0; i < currentCellKeys.length; i++) {
+                const cellKey = currentCellKeys[i]
+                if (previousCellKeySet.has(cellKey)) {
+                    if (!cellMayHaveUpdates(channel, cellKey)) {
+                        continue
+                    }
+                    const fragment = getCellUpdateFragment(user, instance, channel, cellKey, true, protocol)
+                    if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
+                        updateFragments.push(fragment)
+                        removeUpdateNidsFromPlan(plan, fragment.nids)
+                    }
                     continue
                 }
-                const fragment = getCellUpdateFragment(user, instance, channel, cellKey)
-                if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
-                    updateFragments.push(fragment)
-                    removeUpdateNidsFromPlan(plan, fragment.nids)
+
+                if (allRootsWerePreviouslyHidden(channel, cellKey, previousVisible)) {
+                    const fragment = getCellCreateFragment(user, instance, channel, cellKey, protocol)
+                    if (fragment.creates > 0) {
+                        createFragments.push(fragment)
+                        removeCreateNidsFromPlan(plan, fragment.nids)
+                    }
+                } else if (isManualCellFragmentChannel(channel) && channel.cellHasManualUpdates(cellKey)) {
+                    const fragment = getCellUpdateFragment(user, instance, channel, cellKey, true, protocol)
+                    if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
+                        updateFragments.push(fragment)
+                    }
                 }
-                continue
             }
 
-            if (allRootsWerePreviouslyHidden(channel, cellKey, previousVisible)) {
-                const fragment = getCellCreateFragment(user, instance, channel, cellKey)
-                if (fragment.creates > 0) {
-                    createFragments.push(fragment)
-                    removeCreateNidsFromPlan(plan, fragment.nids)
+            if (plan && plan.deleteEntities.length > 0) {
+                const currentCellKeySet = new Set(currentCellKeys)
+                const plannedDeletes = new Set(plan.deleteEntities)
+                for (let i = 0; i < previousCellKeys.length; i++) {
+                    const cellKey = previousCellKeys[i]
+                    if (currentCellKeySet.has(cellKey)) continue
+                    const nids = channel.getRememberedCellNids(user.id, cellKey)
+                    if (allNidsArePlannedDeletes(nids, plannedDeletes)) {
+                        const fragment = getCellDeleteFragment(user, instance, channel, cellKey, nids, protocol)
+                        if (fragment.deletes > 0) {
+                            deleteFragments.push(fragment)
+                            removeDeleteNidsFromPlan(plan, fragment.nids)
+                        }
+                    }
                 }
-            } else if (isManualCellFragmentChannel(channel) && channel.cellHasManualUpdates(cellKey)) {
-                const fragment = getCellUpdateFragment(user, instance, channel, cellKey)
-                if (fragment.updateProps > 0 || fragment.updateGroups > 0) {
-                    updateFragments.push(fragment)
-                }
-            }
-        }
-    }
-
-    for (let i = 0; i < previousCellKeys.length; i++) {
-        const cellKey = previousCellKeys[i]
-        if (currentCellKeySet.has(cellKey)) {
-            continue
-        }
-        const nids = channel.getRememberedCellNids(user.id, cellKey)
-        if (allNidsArePlannedDeletes(nids, plannedDeletes)) {
-            const fragment = getCellDeleteFragment(user, instance, channel, cellKey, nids)
-            if (fragment.deletes > 0) {
-                deleteFragments.push(fragment)
-                removeDeleteNidsFromPlan(plan, fragment.nids)
             }
         }
     }
 
+    const outputPlan = plan || EMPTY_SNAPSHOT_PLAN
     const chunks: SnapshotChunk[] = [
         createChannelScopeChunk(channel.nid, protocol),
-        createSnapshotPlanChunk('CellFragmentChannelPlan', plan, instance.context, protocol)
+        createSnapshotPlanChunk('CellFragmentChannelPlan', outputPlan, instance.context, protocol)
     ]
     const createChunk = createCellFragmentChunk('CellFragmentCreates', instance, createFragments)
     if (createChunk) {
@@ -322,16 +358,16 @@ export function createCellFragmentChannelOutput(
     return createChunkedChannelSnapshotOutput({
         channelId: channel.nid,
         chunks,
-        stats: {
-            creates: plan.createEntities.length + sumCellFragmentCreates(createFragments),
-            updateProps: plan.updateEntities.length + sumCellFragmentUpdateProps(updateFragments),
-            updateGroups: plan.updateEntityGroups.length + sumCellFragmentUpdateGroups(updateFragments),
-            groupedUpdateProps: plan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0) +
+        stats: instance.network.snapshotPerformanceEnabled ? {
+            creates: outputPlan.createEntities.length + sumCellFragmentCreates(createFragments),
+            updateProps: outputPlan.updateEntities.length + sumCellFragmentUpdateProps(updateFragments),
+            updateGroups: outputPlan.updateEntityGroups.length + sumCellFragmentUpdateGroups(updateFragments),
+            groupedUpdateProps: outputPlan.updateEntityGroups.reduce((total, update) => total + update.group.props.length, 0) +
                 sumCellFragmentGroupedProps(updateFragments),
-            deletes: plan.deleteEntities.length + sumCellFragmentDeletes(deleteFragments),
-            messages: countPlanMessages(plan),
+            deletes: outputPlan.deleteEntities.length + sumCellFragmentDeletes(deleteFragments),
+            messages: countPlanMessages(outputPlan),
             usedSharedFragments: createFragments.length > 0 || deleteFragments.length > 0 || updateFragments.length > 0
-        },
+        } : null,
         commit() {
             channel.rememberSnapshotVisibility(user.id, visibility)
         }

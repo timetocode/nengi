@@ -1,19 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { packageNames, validateFamily, validateLockfile } from './package-policy.mjs'
 
 const coreRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const packageRoots = [
-    coreRoot,
-    path.resolve(coreRoot, '../nengi-buffers'),
-    path.resolve(coreRoot, '../nengi-dataviews'),
-    path.resolve(coreRoot, '../nengi-websocket-client-adapter'),
-    path.resolve(coreRoot, '../nengi-ws-client-adapter'),
-    path.resolve(coreRoot, '../nengi-ws-instance-adapter'),
-    path.resolve(coreRoot, '../nengi-uws-instance-adapter'),
-    path.resolve(coreRoot, '../nengi-bun-instance-adapter'),
-    path.resolve(coreRoot, '../nengi-deno-instance-adapter')
-]
+const packageRoots = packageNames.map(name => path.resolve(coreRoot, '..', name))
 const errors = []
 
 function readJson(file) {
@@ -46,49 +38,26 @@ function findFileSpecs(value, location, output) {
 }
 
 const corePackage = readJson(path.join(coreRoot, 'package.json'))
+errors.push(...validateFamily(packageRoots.map(root => readJson(path.join(root, 'package.json')))))
+const artifacts = new Map(packageRoots.map(root => {
+    const [packed] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], {
+        cwd: root, encoding: 'utf8', shell: process.platform === 'win32'
+    }))
+    if (packed.files.some(file => file.path.startsWith('scripts/'))) {
+        errors.push(`${packed.name} unexpectedly ships source-only tooling or compatibility fixtures`)
+    }
+    return [packed.name, packed]
+}))
 
 for (const packageRoot of packageRoots) {
     const packageJson = readJson(path.join(packageRoot, 'package.json'))
     const packageLock = readJson(path.join(packageRoot, 'package-lock.json'))
     const name = packageJson.name
-    const lockRoot = packageLock.packages?.['']
-
-    if (packageJson.version !== corePackage.version) {
-        errors.push(`${name} version ${packageJson.version} does not match nengi ${corePackage.version}`)
-    }
-    if (packageLock.version !== packageJson.version || lockRoot?.version !== packageJson.version) {
-        errors.push(`${name} package-lock version does not match ${packageJson.version}`)
-    }
-
-    for (const dependencyGroup of ['dependencies', 'devDependencies', 'peerDependencies']) {
-        const dependencies = packageJson[dependencyGroup] || {}
-        for (const [dependency, version] of Object.entries(dependencies)) {
-            if (dependency.startsWith('nengi') && version !== corePackage.version) {
-                errors.push(`${name} ${dependencyGroup}.${dependency} must equal ${corePackage.version}`)
-            }
-            if (dependency.startsWith('nengi') && lockRoot?.[dependencyGroup]?.[dependency] !== version) {
-                errors.push(`${name} package-lock root ${dependencyGroup}.${dependency} does not match its manifest`)
-            }
-        }
-    }
-
-    // Root declarations alone can hide an older package in the resolved tree.
-    for (const [location, entry] of Object.entries(packageLock.packages || {})) {
-        const dependency = location.split('/').at(-1)
-        if (!location || !dependency.startsWith('nengi')) continue
-        if (entry.version !== corePackage.version) {
-            errors.push(`${name} locks ${dependency}@${entry.version}, expected ${corePackage.version}`)
-        }
-        const expectedUrl = `https://registry.npmjs.org/${dependency}/-/${dependency}-${corePackage.version}.tgz`
-        if (entry.resolved !== expectedUrl || !entry.integrity?.startsWith('sha512-')) {
-            errors.push(`${name} ${location} needs the release registry URL and artifact integrity`)
-        }
-        for (const group of ['dependencies', 'peerDependencies']) {
-            for (const [child, version] of Object.entries(entry[group] || {})) {
-                if (child.startsWith('nengi') && version !== corePackage.version) {
-                    errors.push(`${name} ${location}.${group}.${child} must equal ${corePackage.version}`)
-                }
-            }
+    errors.push(...validateLockfile(packageJson, packageLock))
+    for (const [location, entry] of Object.entries(packageLock.packages ?? {})) {
+        const artifact = artifacts.get(location.split('/').at(-1))
+        if (artifact && entry.version === artifact.version && entry.integrity !== artifact.integrity) {
+            errors.push(`${name} ${location} integrity differs from the staged artifact; run npm run release:locks after changing shipped files`)
         }
     }
 
@@ -135,4 +104,4 @@ if (errors.length > 0) {
     process.exit(1)
 }
 
-console.log(`Release inputs verified for nengi ${corePackage.version}: ${packageRoots.length} aligned packages.`)
+console.log(`Release inputs verified for nengi ${corePackage.version}: ${packageRoots.length} independently versioned packages.`)

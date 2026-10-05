@@ -14,6 +14,9 @@ See [shared-state.md](./shared-state.md) for the recommended file shape. For
 plain channels, the replicated object is the network entity: it has `nid`,
 `ntype`, schema properties, and a registered nengi schema.
 
+For a complete copy-and-run project, start with the [shared room starter](./getting-started.md).
+The fragments below show how to adapt that flow to a spatial game.
+
 ## Canonical small server
 
 Assume `NType`, schemas, and factory functions such as `createPlayer` and
@@ -27,8 +30,9 @@ import {
     CommandRouter,
     Instance,
     NetworkEvent,
-    User
+    UserConnectionState
 } from 'nengi'
+import type { User } from 'nengi'
 
 const context = createContext()
 const instance = new Instance(context)
@@ -69,8 +73,9 @@ commands.on<MoveCommand>(NType.MoveCommand, ({ user, command }) => {
         return
     }
 
-    player.x += command.inputX * 10
-    player.y += command.inputY * 10
+    // Game helper: validates direction and duration, bounds total input time,
+    // then applies the same movement step used by any local prediction.
+    if (!validateAndApplyMove(player, command)) return
 
     // Automatic spatial channels still need to learn when an entity moves so
     // nengi can update cell membership and visibility.
@@ -82,7 +87,7 @@ function tick() {
     while (!instance.queue.isEmpty()) {
         const event = instance.queue.next()
         if (event.type === NetworkEvent.UserConnected) {
-            spawnPlayer(event.user)
+            if (event.user.connectionState === UserConnectionState.Open) spawnPlayer(event.user)
         } else if (event.type === NetworkEvent.UserDisconnected) {
             removePlayer(event.user)
         } else {
@@ -91,9 +96,6 @@ function tick() {
     }
 
     instance.processRequests()
-    for (const user of instance.users.values()) {
-        user.confirmCommandsThrough(user.lastReceivedCommandFrameNumber)
-    }
     instance.step()
 }
 ```
@@ -115,13 +117,14 @@ Within each frame, clean up closed channels before recording opens and applying
 entity changes. A replacement can reuse the old channel or entity ids.
 
 ```ts
+import { SERVER_TICK_RATE } from '../shared/network-config'
 import {
     AdaptiveInterpolator,
     Client
 } from 'nengi'
 import type { Frame } from 'nengi'
 
-const client = new Client(context, WebSocketClientAdapter, serverTickRate)
+const client = new Client(context, WebSocketClientAdapter, SERVER_TICK_RATE)
 const interpolator = new AdaptiveInterpolator(client)
 const channelByName = new Map<string, number>()
 const sprites = new Map<number, Sprite>()
@@ -136,10 +139,9 @@ client.setDisconnectHandler(() => {
     channelByName.clear()
     controlledNid = 0
 })
-client.setWebsocketErrorHandler(error => console.error('Network error', error))
 
-const connection = await client.connect('ws://localhost:8079')
-connected = connection.accepted
+await client.connect('ws://localhost:8079')
+connected = client.connectionState === 'connected'
 
 function applyNetworkFrame(frame: Frame) {
     frame.closedChannels.forEach(channel => {
@@ -193,11 +195,11 @@ function applyNetworkFrame(frame: Frame) {
     }
 }
 
-function render() {
-    const nids = Array.from(sprites.keys()).filter(nid => nid !== controlledNid)
-    const sample = interpolator.sampleEntities(nids, 100)
+function render(excludeNid?: number) {
+    const sample = interpolator.sampleEntities(sprites.keys(), 100)
 
     sample.entities.forEach(entity => {
+        if (entity.nid === excludeNid) return
         const sprite = sprites.get(entity.nid)
         if (sprite) {
             sprite.x = entity.x
@@ -221,6 +223,13 @@ function frame() {
     requestAnimationFrame(frame)
 }
 ```
+
+This non-predicting loop interpolates every player. Pass an `excludeNid` only
+when a complete local prediction path owns that player's rendering; the
+[prediction snippet](./canonical-snippets.md#predicted-movement-loop) shows that change.
+`sendMoveCommandsAtFixedRate` is application code: bound catch-up after stalls,
+clear held input when hidden, and enforce input time on the server. The
+[complete starter](./getting-started.md) instead sends a destination on each click.
 
 The client meaning comes from channel identity first, then entity type. A
 `Player` created in the world channel and a `Player` created in a separate

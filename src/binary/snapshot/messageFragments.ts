@@ -1,3 +1,4 @@
+import { assertBinaryWriteSize } from '../assertBinaryWriteSize'
 import { Instance } from '../../server/Instance'
 import { User } from '../../server/User'
 import { BinaryPayload } from '../../common/binary/BinaryAdapter'
@@ -45,6 +46,7 @@ function getSharedMessageFragment(user: User, instance: Instance, channel: Share
 
     const writer = user.networkAdapter.binary.createWriter(bytes)
     writeSnapshot(plan, instance.context, writer, protocol)
+    assertBinaryWriteSize(writer, bytes, 'Shared messages')
     if (measure) {
         writeMs = performance.now() - writeStart
     }

@@ -91,7 +91,9 @@ export class LocalState {
         this.children.get(parent.nid)!.add(cnid)
         this.parentByNid.set(cnid, parent.nid)
         this.rootByNid.set(cnid, this.rootByNid.get(parent.nid) || parent.nid)
-        this.invalidateEntityTreeCache(parent.nid)
+        // Starting at the new child invalidates its ancestors without visiting
+        // siblings whose descendant trees have not changed.
+        this.invalidateEntityTreeCache(cnid)
         return child
     }
 

@@ -1,0 +1,1502 @@
+{
+  "date": "2026-09-25",
+  "machine": "AMD Ryzen 7 7800X3D 8-Core Processor",
+  "node": "v22.17.1",
+  "scope": "Tracked sample recording with 200ms retention, and nearest ray query batches. No sockets, snapshot replication, physics, input validation or renderer. Setup and hit-set/retention checks are outside timing. Query percentiles describe batch averages; no GC/allocation-rate claim.",
+  "method": "Three fresh alternating runs per source variant. Final mixed suite has 28 scenarios; isolated comparisons select one case per process with 150 warmups and 300 measured trials. Median aggregation retains individual per-process medians.",
+  "sourceHashes": {
+    "before": {
+      "src/server/Historian2D.ts": "1163fd6c300ec52719d55fc7496a5a99c7c794897a319e3e4c3085be379df198",
+      "src/server/Historian3D.ts": "ce8b06122e59206a48f829d356e6092535c417e5ab86fea45c4ed1e338d4cd7c"
+    },
+    "initial-guards": {
+      "src/server/Historian2D.ts": "c0f1b302f7db27d45b1c227b00377afeb6f9677bdf909dc67ee7be3cbdf87c7e",
+      "src/server/Historian3D.ts": "e866b7cd51079e81ac2f05925d94621bdb6dbada7d165f9db3fe24ba5b0a1c08",
+      "src/server/historianGrid.ts": "a43b42fcaf3feeb583ddd63b1cc6be2c37285ef51213e5327a91ecdf28927ea8"
+    },
+    "final": {
+      "src/server/Historian2D.ts": "c0f1b302f7db27d45b1c227b00377afeb6f9677bdf909dc67ee7be3cbdf87c7e",
+      "src/server/Historian3D.ts": "e866b7cd51079e81ac2f05925d94621bdb6dbada7d165f9db3fe24ba5b0a1c08",
+      "src/server/historianGrid.ts": "e91ee234450d41c9533c04eca21c01380ca1787d0381254c8341e06bd1000df4"
+    },
+    "harnessInitial": "e8e89ca07bd7b6b3aab16672a85d2ce24f1d4ec728cff785f23378cac93ade1d",
+    "harnessFinal": "972976371fd587645c033763b0a9879f58d7c9efbbd6bf05a93ce40f1928be0d"
+  },
+  "initialMixed": {
+    "aggregation": "Median of three per-process medians; query medians are per-query batch averages.",
+    "rows": [
+      {
+        "dimensions": 2,
+        "name": "record-spread",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.38391699999999673,
+        "afterMedianMs": 0.42606100000000424,
+        "percent": 10.977372713375,
+        "perRunMediansMs": {
+          "before": [
+            0.38391699999999673,
+            0.45780100000001767,
+            0.3290219999999806
+          ],
+          "after": [
+            0.4183389999999463,
+            0.42987999999999715,
+            0.42606100000000424
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "record-dense",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.3164830000000052,
+        "afterMedianMs": 0.3142080000000078,
+        "percent": -0.7188379786583599,
+        "perRunMediansMs": {
+          "before": [
+            0.28857300000004216,
+            0.39379800000000387,
+            0.3164830000000052
+          ],
+          "after": [
+            0.351175000000012,
+            0.3073489999999879,
+            0.3142080000000078
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "record-oversized",
+        "count": 300,
+        "indexed": false,
+        "beforeMedianMs": 0.025269000000037067,
+        "afterMedianMs": 0.02577400000001262,
+        "percent": 1.9984961809917712,
+        "perRunMediansMs": {
+          "before": [
+            0.02557200000001103,
+            0.025269000000037067,
+            0.024919000000011238
+          ],
+          "after": [
+            0.025285999999994146,
+            0.02577400000001262,
+            0.025941999999986365
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 12,
+        "indexed": false,
+        "beforeMedianMs": 0.0008464843749997897,
+        "afterMedianMs": 0.001041093749999611,
+        "percent": 22.990309183187186,
+        "perRunMediansMs": {
+          "before": [
+            0.000817039062499969,
+            0.0008464843749997897,
+            0.0015014765625003257
+          ],
+          "after": [
+            0.001041093749999611,
+            0.001145375000000115,
+            0.0009607968750002804
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.05457893749999965,
+        "afterMedianMs": 0.05300471093750003,
+        "percent": -2.8843114846265117,
+        "perRunMediansMs": {
+          "before": [
+            0.05431483593749986,
+            0.05893926562500029,
+            0.05457893749999965
+          ],
+          "after": [
+            0.05300471093750003,
+            0.058114265624999994,
+            0.05247086718750005
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-dense",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.14032377343750024,
+        "afterMedianMs": 0.14275700000000047,
+        "percent": 1.7340087876014598,
+        "perRunMediansMs": {
+          "before": [
+            0.13577364843749962,
+            0.15001748437499973,
+            0.14032377343750024
+          ],
+          "after": [
+            0.14359743750000042,
+            0.1422651093749998,
+            0.14275700000000047
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-long",
+        "count": 300,
+        "indexed": false,
+        "beforeMedianMs": 0.003758999999945445,
+        "afterMedianMs": 0.0037399999999934153,
+        "percent": -0.5054535768104662,
+        "perRunMediansMs": {
+          "before": [
+            0.003758999999945445,
+            0.006353999999987536,
+            0.003400000000056025
+          ],
+          "after": [
+            0.0037399999999934153,
+            0.0035030000000233485,
+            0.004329999999981737
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "record-spread",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 1.2974799999999505,
+        "afterMedianMs": 1.4553230000000212,
+        "percent": 12.165351296365024,
+        "perRunMediansMs": {
+          "before": [
+            1.399267000000009,
+            1.2974799999999505,
+            1.2244220000000041
+          ],
+          "after": [
+            1.4724679999999353,
+            1.4553230000000212,
+            1.4541299999999637
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "record-dense",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 0.6379279999998744,
+        "afterMedianMs": 0.6623460000000705,
+        "percent": 3.827704693978151,
+        "perRunMediansMs": {
+          "before": [
+            0.6379279999998744,
+            0.6588590000001204,
+            0.5661250000000564
+          ],
+          "after": [
+            0.6623460000000705,
+            0.7053220000000238,
+            0.6465140000000247
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "record-oversized",
+        "count": 300,
+        "indexed": true,
+        "beforeMedianMs": 27.608718999999837,
+        "afterMedianMs": 0.025935000000117725,
+        "percent": -99.90606228416422,
+        "perRunMediansMs": {
+          "before": [
+            27.321449999999913,
+            33.181736999999885,
+            27.608718999999837
+          ],
+          "after": [
+            0.025935000000117725,
+            0.025615000000016153,
+            0.028123999999934313
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 12,
+        "indexed": true,
+        "beforeMedianMs": 0.000952585937501027,
+        "afterMedianMs": 0.001167773437501296,
+        "percent": 22.589825393054053,
+        "perRunMediansMs": {
+          "before": [
+            0.000890015625000018,
+            0.0014791171875003783,
+            0.000952585937501027
+          ],
+          "after": [
+            0.001167773437501296,
+            0.0011746953124998072,
+            0.0006091718750003139
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 0.0005703749999987906,
+        "afterMedianMs": 0.0005416484374993757,
+        "percent": -5.0364343632655295,
+        "perRunMediansMs": {
+          "before": [
+            0.0006274375000003829,
+            0.0005244687500010059,
+            0.0005703749999987906
+          ],
+          "after": [
+            0.0005416484374993757,
+            0.0005475156249996616,
+            0.000518570312500799
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-dense",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 0.2997442109375008,
+        "afterMedianMs": 0.30481041406249965,
+        "percent": 1.690175469662436,
+        "perRunMediansMs": {
+          "before": [
+            0.2997442109375008,
+            0.3214749609375005,
+            0.298216054687499
+          ],
+          "after": [
+            0.30481041406249965,
+            0.3237608750000014,
+            0.25163305468749897
+          ]
+        }
+      },
+      {
+        "dimensions": 2,
+        "name": "query-long",
+        "count": 300,
+        "indexed": true,
+        "beforeMedianMs": 1251.5922520000004,
+        "afterMedianMs": 0.007048000000395405,
+        "percent": -99.99943687730656,
+        "perRunMediansMs": {
+          "before": [
+            1255.6837829999995,
+            1247.6402339999995,
+            1251.5922520000004
+          ],
+          "after": [
+            0.011292000000139524,
+            0.007048000000395405,
+            0.003967000000102416
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "record-spread",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.3329599999997299,
+        "afterMedianMs": 0.2895260000000235,
+        "percent": -13.044810187332311,
+        "perRunMediansMs": {
+          "before": [
+            0.2936570000001666,
+            0.3380249999991065,
+            0.3329599999997299
+          ],
+          "after": [
+            0.28781400000025315,
+            0.2944520000000921,
+            0.2895260000000235
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "record-dense",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.30869999999958964,
+        "afterMedianMs": 0.30884999999989304,
+        "percent": 0.048590865015740725,
+        "perRunMediansMs": {
+          "before": [
+            0.310287000000244,
+            0.30869999999958964,
+            0.26867700000002515
+          ],
+          "after": [
+            0.28499699999974837,
+            0.30884999999989304,
+            0.35247000000003936
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "record-oversized",
+        "count": 300,
+        "indexed": false,
+        "beforeMedianMs": 0.025829000000157976,
+        "afterMedianMs": 0.04437099999995553,
+        "percent": 71.78752564824092,
+        "perRunMediansMs": {
+          "before": [
+            0.030134000000543892,
+            0.02556399999957648,
+            0.025829000000157976
+          ],
+          "after": [
+            0.04441900000028909,
+            0.04437099999995553,
+            0.04291699999998855
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 12,
+        "indexed": false,
+        "beforeMedianMs": 0.0009887187499941774,
+        "afterMedianMs": 0.001529039062500459,
+        "percent": 54.6485350368306,
+        "perRunMediansMs": {
+          "before": [
+            0.0016767343750103691,
+            0.0009887187499941774,
+            0.0008571484375039518
+          ],
+          "after": [
+            0.0007972421875024338,
+            0.001775750000000187,
+            0.001529039062500459
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.04822649218750996,
+        "afterMedianMs": 0.04890307812500083,
+        "percent": 1.402934169170389,
+        "perRunMediansMs": {
+          "before": [
+            0.04987007812499655,
+            0.04822649218750996,
+            0.04505064843749551
+          ],
+          "after": [
+            0.045001765624999024,
+            0.0515346953125011,
+            0.04890307812500083
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-dense",
+        "count": 3000,
+        "indexed": false,
+        "beforeMedianMs": 0.060707046874995285,
+        "afterMedianMs": 0.06093926562499874,
+        "percent": 0.3825235486773604,
+        "perRunMediansMs": {
+          "before": [
+            0.05744115624999324,
+            0.060707046874995285,
+            0.06425471874999289
+          ],
+          "after": [
+            0.06021946874999884,
+            0.0724316406249983,
+            0.06093926562499874
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-long",
+        "count": 300,
+        "indexed": false,
+        "beforeMedianMs": 0.00518499999998312,
+        "afterMedianMs": 0.0033009999997375417,
+        "percent": -36.335583418547955,
+        "perRunMediansMs": {
+          "before": [
+            0.00518499999998312,
+            0.00637300000016694,
+            0.0035790000001725275
+          ],
+          "after": [
+            0.0036290000002736633,
+            0.0033009999997375417,
+            0.0032799999999042484
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "record-spread",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 2.1890430000003107,
+        "afterMedianMs": 2.0930270000003475,
+        "percent": -4.386208950667014,
+        "perRunMediansMs": {
+          "before": [
+            2.1890430000003107,
+            2.212096000001111,
+            1.9357839999993303
+          ],
+          "after": [
+            2.0930270000003475,
+            2.2669120000000476,
+            1.8594929999999295
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "record-dense",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 0.8608500000009371,
+        "afterMedianMs": 1.2851660000001175,
+        "percent": 49.290352558368866,
+        "perRunMediansMs": {
+          "before": [
+            0.8152119999995193,
+            0.8608500000009371,
+            1.0352100000000064
+          ],
+          "after": [
+            1.4106179999998858,
+            1.2851660000001175,
+            1.0684889999997722
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "record-oversized",
+        "count": 300,
+        "indexed": true,
+        "beforeMedianMs": 13.462048999999752,
+        "afterMedianMs": 0.04336300000022675,
+        "percent": -99.677887073504,
+        "perRunMediansMs": {
+          "before": [
+            12.57372900000155,
+            15.598632999999609,
+            13.462048999999752
+          ],
+          "after": [
+            0.04336300000022675,
+            0.04843699999992168,
+            0.02749099999982718
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 12,
+        "indexed": true,
+        "beforeMedianMs": 0.0011793203124881302,
+        "afterMedianMs": 0.00164778124999998,
+        "percent": 39.72296012806655,
+        "perRunMediansMs": {
+          "before": [
+            0.0011678828125099017,
+            0.0011793203124881302,
+            0.0022544062499889606
+          ],
+          "after": [
+            0.0018184687499989138,
+            0.00164778124999998,
+            0.0014531171875020732
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 0.0015962656250110285,
+        "afterMedianMs": 0.0024679062500005955,
+        "percent": 54.604986246167186,
+        "perRunMediansMs": {
+          "before": [
+            0.0017006874999907495,
+            0.0015349218750060345,
+            0.0015962656250110285
+          ],
+          "after": [
+            0.0024679062500005955,
+            0.002180796874998947,
+            0.0026449843749993818
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-dense",
+        "count": 3000,
+        "indexed": true,
+        "beforeMedianMs": 0.17964588281250826,
+        "afterMedianMs": 0.1957172187499978,
+        "percent": 8.946119825224596,
+        "perRunMediansMs": {
+          "before": [
+            0.17964588281250826,
+            0.18177481250000938,
+            0.17584996875000058
+          ],
+          "after": [
+            0.19247690625000047,
+            0.23852845312499937,
+            0.1957172187499978
+          ]
+        }
+      },
+      {
+        "dimensions": 3,
+        "name": "query-long",
+        "count": 300,
+        "indexed": true,
+        "beforeMedianMs": 288.5195309999999,
+        "afterMedianMs": 0.003463000000010652,
+        "percent": -99.99879973463564,
+        "perRunMediansMs": {
+          "before": [
+            288.5195309999999,
+            282.10114299999987,
+            295.9608050000006
+          ],
+          "after": [
+            0.0035389999998187704,
+            0.003463000000010652,
+            0.003410999999687192
+          ]
+        }
+      }
+    ]
+  },
+  "isolated": [
+    {
+      "case": "record-dense-3-3000-grid",
+      "variants": {
+        "before": {
+          "medianMs": 1.0364229999998997,
+          "perRunMediansMs": [
+            0.9785809999999628,
+            1.0364229999998997,
+            1.0911419999999907
+          ]
+        },
+        "initial-guards": {
+          "medianMs": 1.1049409999999398,
+          "perRunMediansMs": [
+            0.9883919999999762,
+            1.165864000000056,
+            1.1049409999999398
+          ]
+        },
+        "final": {
+          "medianMs": 1.061174000000051,
+          "perRunMediansMs": [
+            1.0651399999999285,
+            1.0250810000000001,
+            1.061174000000051
+          ]
+        }
+      }
+    },
+    {
+      "case": "query-local-3-3000-grid",
+      "variants": {
+        "before": {
+          "medianMs": 0.0019110781250000208,
+          "perRunMediansMs": [
+            0.0019110781250000208,
+            0.0018604140625000376,
+            0.002040117187499746
+          ]
+        },
+        "initial-guards": {
+          "medianMs": 0.0019361718749997259,
+          "perRunMediansMs": [
+            0.0020170781249997383,
+            0.0019361718749997259,
+            0.0018458593749999253
+          ]
+        },
+        "final": {
+          "medianMs": 0.001998968749999719,
+          "perRunMediansMs": [
+            0.0020024843750001686,
+            0.001998968749999719,
+            0.001954632812499746
+          ]
+        }
+      }
+    },
+    {
+      "case": "record-spread-2-3000-grid",
+      "variants": {
+        "before": {
+          "medianMs": 1.4458580000000438,
+          "perRunMediansMs": [
+            1.4786550000000034,
+            1.4387659999999869,
+            1.4458580000000438
+          ]
+        },
+        "initial-guards": {
+          "medianMs": 1.5396360000002005,
+          "perRunMediansMs": [
+            1.4826510000000326,
+            1.5396360000002005,
+            1.5936550000000125
+          ]
+        },
+        "final": {
+          "medianMs": 1.555080000000089,
+          "perRunMediansMs": [
+            1.416003000000046,
+            1.5913629999998875,
+            1.555080000000089
+          ]
+        }
+      }
+    }
+  ],
+  "finalMixed": {
+    "aggregation": "Median of three per-process statistics; query percentiles describe per-query batch averages.",
+    "rows": [
+      {
+        "dimensions": 2,
+        "name": "record-spread",
+        "count": 3000,
+        "span": 20000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.42362499999998704,
+          "meanMs": 0.6896649166666649,
+          "p95Ms": 2.3379469999999856,
+          "perRunMediansMs": [
+            0.42362499999998704,
+            0.5113369999999975,
+            0.3538910000000044
+          ]
+        },
+        "final": {
+          "medianMs": 0.4178590000000213,
+          "meanMs": 0.6685569666666666,
+          "p95Ms": 1.7523050000000069,
+          "perRunMediansMs": [
+            0.46563299999999685,
+            0.4178590000000213,
+            0.31242399999999293
+          ]
+        },
+        "percent": -1.3611094718125494
+      },
+      {
+        "dimensions": 2,
+        "name": "record-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.367779999999982,
+          "meanMs": 0.5687188666666657,
+          "p95Ms": 1.8548210000000154,
+          "perRunMediansMs": [
+            0.3949220000000082,
+            0.367779999999982,
+            0.34927599999997483
+          ]
+        },
+        "final": {
+          "medianMs": 0.37320700000003626,
+          "meanMs": 0.5451320666666704,
+          "p95Ms": 1.4737059999999929,
+          "perRunMediansMs": [
+            0.3593139999999835,
+            0.3744619999999941,
+            0.37320700000003626
+          ]
+        },
+        "percent": 1.47561041928721
+      },
+      {
+        "dimensions": 2,
+        "name": "record-oversized",
+        "count": 300,
+        "span": 2000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.026542000000006283,
+          "meanMs": 0.032546999999997946,
+          "p95Ms": 0.06558100000000877,
+          "perRunMediansMs": [
+            0.02533299999998917,
+            0.02830099999999902,
+            0.026542000000006283
+          ]
+        },
+        "final": {
+          "medianMs": 0.025263999999992848,
+          "meanMs": 0.033254999999996926,
+          "p95Ms": 0.07129499999996369,
+          "perRunMediansMs": [
+            0.027054000000021006,
+            0.024653999999998177,
+            0.025263999999992848
+          ]
+        },
+        "percent": -4.815010172606183
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 12,
+        "span": 2000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.0013270000000003002,
+          "meanMs": 0.0013528276041667139,
+          "p95Ms": 0.0028020937499997345,
+          "perRunMediansMs": [
+            0.0008841562500001565,
+            0.0013270000000003002,
+            0.0014543749999997857
+          ]
+        },
+        "final": {
+          "medianMs": 0.0013127734374998035,
+          "meanMs": 0.001361460937499981,
+          "p95Ms": 0.002589320312500032,
+          "perRunMediansMs": [
+            0.0008918749999997644,
+            0.0013127734374998035,
+            0.0014640546875002158
+          ]
+        },
+        "percent": -1.072084589336364
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 3000,
+        "span": 20000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.05906933593750008,
+          "meanMs": 0.05895526770833325,
+          "p95Ms": 0.07089736718749995,
+          "perRunMediansMs": [
+            0.05906933593750008,
+            0.05386088281250023,
+            0.059836093749999986
+          ]
+        },
+        "final": {
+          "medianMs": 0.06190062499999982,
+          "meanMs": 0.06104385677083336,
+          "p95Ms": 0.07100500781249997,
+          "perRunMediansMs": [
+            0.058539179687499665,
+            0.062300421874999845,
+            0.06190062499999982
+          ]
+        },
+        "percent": 4.79316216707677
+      },
+      {
+        "dimensions": 2,
+        "name": "query-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.14997221875000033,
+          "meanMs": 0.15116895052083343,
+          "p95Ms": 0.16327071875000065,
+          "perRunMediansMs": [
+            0.14997221875000033,
+            0.15302733593750073,
+            0.14515402343749972
+          ]
+        },
+        "final": {
+          "medianMs": 0.15351733593749994,
+          "meanMs": 0.15313224843749992,
+          "p95Ms": 0.1802316796875001,
+          "perRunMediansMs": [
+            0.14677232812499952,
+            0.15970521093750012,
+            0.15351733593749994
+          ]
+        },
+        "percent": 2.3638492629153074
+      },
+      {
+        "dimensions": 2,
+        "name": "query-long",
+        "count": 300,
+        "span": 2000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.003975999999966007,
+          "meanMs": 0.00433433333330413,
+          "p95Ms": 0.005223999999998341,
+          "perRunMediansMs": [
+            0.003555000000005748,
+            0.003975999999966007,
+            0.006327999999939493
+          ]
+        },
+        "final": {
+          "medianMs": 0.0037409999999908905,
+          "meanMs": 0.004096000000041992,
+          "p95Ms": 0.00511000000005879,
+          "perRunMediansMs": [
+            0.0034650000000056025,
+            0.0037409999999908905,
+            0.0064549999999599095
+          ]
+        },
+        "percent": -5.910462776084646
+      },
+      {
+        "dimensions": 2,
+        "name": "record-spread",
+        "count": 3000,
+        "span": 20000,
+        "indexed": true,
+        "before": {
+          "medianMs": 1.4807690000000093,
+          "meanMs": 2.368434466666696,
+          "p95Ms": 6.967090999999982,
+          "perRunMediansMs": [
+            1.7327530000000024,
+            1.4807690000000093,
+            1.4254740000000083
+          ]
+        },
+        "final": {
+          "medianMs": 1.688413999999966,
+          "meanMs": 2.535105766666673,
+          "p95Ms": 6.654182999999989,
+          "perRunMediansMs": [
+            1.688413999999966,
+            1.5375420000000304,
+            1.7899910000001
+          ]
+        },
+        "percent": 14.022781406144746
+      },
+      {
+        "dimensions": 2,
+        "name": "record-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.6955129999998917,
+          "meanMs": 0.9089938500000054,
+          "p95Ms": 2.372628000000077,
+          "perRunMediansMs": [
+            0.7436860000000252,
+            0.6738350000000537,
+            0.6955129999998917
+          ]
+        },
+        "final": {
+          "medianMs": 0.84656700000005,
+          "meanMs": 1.342764366666669,
+          "p95Ms": 6.160628999999972,
+          "perRunMediansMs": [
+            0.84656700000005,
+            0.790230000000065,
+            0.8897249999999985
+          ]
+        },
+        "percent": 21.71835752892928
+      },
+      {
+        "dimensions": 2,
+        "name": "record-oversized",
+        "count": 300,
+        "span": 2000,
+        "indexed": true,
+        "before": {
+          "medianMs": 29.61625600000002,
+          "meanMs": 33.94169457142857,
+          "p95Ms": 70.44662499999981,
+          "perRunMediansMs": [
+            35.37884600000007,
+            27.716029000000162,
+            29.61625600000002
+          ]
+        },
+        "final": {
+          "medianMs": 0.026117999999996755,
+          "meanMs": 0.026306428571420577,
+          "p95Ms": 0.02899600000000646,
+          "perRunMediansMs": [
+            0.026117999999996755,
+            0.02525599999989936,
+            0.03132899999991423
+          ]
+        },
+        "percent": -99.91181194543971
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 12,
+        "span": 2000,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.0014035234374993877,
+          "meanMs": 0.004276660416666663,
+          "p95Ms": 0.05131853125000063,
+          "perRunMediansMs": [
+            0.0014035234374993877,
+            0.0008301328125011054,
+            0.0015883281250008707
+          ]
+        },
+        "final": {
+          "medianMs": 0.0014818906249995933,
+          "meanMs": 0.0029982979166664593,
+          "p95Ms": 0.016944023437499567,
+          "perRunMediansMs": [
+            0.0013124687499992405,
+            0.0014818906249995933,
+            0.0015291328125002224
+          ]
+        },
+        "percent": 5.583603765094924
+      },
+      {
+        "dimensions": 2,
+        "name": "query-local",
+        "count": 3000,
+        "span": 20000,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.00055921093750122,
+          "meanMs": 0.0006448223958335812,
+          "p95Ms": 0.0012055312499992255,
+          "perRunMediansMs": [
+            0.0005091406250006258,
+            0.00055921093750122,
+            0.0006827499999992881
+          ]
+        },
+        "final": {
+          "medianMs": 0.0008300546874995263,
+          "meanMs": 0.0008187468750000686,
+          "p95Ms": 0.0016386796875007548,
+          "perRunMediansMs": [
+            0.0008300546874995263,
+            0.000866710937501125,
+            0.000590796875000521
+          ]
+        },
+        "percent": 48.43319968106228
+      },
+      {
+        "dimensions": 2,
+        "name": "query-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.32834813281249886,
+          "meanMs": 0.33044598593750035,
+          "p95Ms": 0.3556670312500003,
+          "perRunMediansMs": [
+            0.32834813281249886,
+            0.3370994453125,
+            0.3235293750000032
+          ]
+        },
+        "final": {
+          "medianMs": 0.31609864062500037,
+          "meanMs": 0.31690305885416664,
+          "p95Ms": 0.35327462500000095,
+          "perRunMediansMs": [
+            0.31609864062500037,
+            0.3498224062500004,
+            0.29314676562499997
+          ]
+        },
+        "percent": -3.73064164628385
+      },
+      {
+        "dimensions": 2,
+        "name": "query-long",
+        "count": 300,
+        "span": 2000,
+        "indexed": true,
+        "before": {
+          "medianMs": 1401.9264269999994,
+          "meanMs": 1386.4519613333332,
+          "p95Ms": 1417.1001660000002,
+          "perRunMediansMs": [
+            1416.8594650000005,
+            1380.8163139999997,
+            1401.9264269999994
+          ]
+        },
+        "final": {
+          "medianMs": 0.007458000000042375,
+          "meanMs": 0.00715066666665128,
+          "p95Ms": 0.008514999999988504,
+          "perRunMediansMs": [
+            0.007458000000042375,
+            0.01235099999985323,
+            0.007379000000128144
+          ]
+        },
+        "percent": -99.99946801773214
+      },
+      {
+        "dimensions": 3,
+        "name": "record-spread",
+        "count": 3000,
+        "span": 20000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.789704000000711,
+          "meanMs": 0.8675389000000299,
+          "p95Ms": 1.4096129999998084,
+          "perRunMediansMs": [
+            0.3335940000015398,
+            0.789704000000711,
+            0.8367410000009841
+          ]
+        },
+        "final": {
+          "medianMs": 0.41265599999996994,
+          "meanMs": 0.4537660500000053,
+          "p95Ms": 1.4503780000000006,
+          "perRunMediansMs": [
+            0.38714200000003984,
+            0.8400930000002518,
+            0.41265599999996994
+          ]
+        },
+        "percent": -47.74548438407322
+      },
+      {
+        "dimensions": 3,
+        "name": "record-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.7956500000000233,
+          "meanMs": 0.8627042833333689,
+          "p95Ms": 1.3895569999986037,
+          "perRunMediansMs": [
+            0.41869000000042433,
+            0.7956500000000233,
+            0.8122019999991608
+          ]
+        },
+        "final": {
+          "medianMs": 0.437076000000161,
+          "meanMs": 0.49848244999999075,
+          "p95Ms": 1.1647130000001198,
+          "perRunMediansMs": [
+            0.3195909999999458,
+            0.4558510000001661,
+            0.437076000000161
+          ]
+        },
+        "percent": -45.06680072894511
+      },
+      {
+        "dimensions": 3,
+        "name": "record-oversized",
+        "count": 300,
+        "span": 2000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.08673999999882653,
+          "meanMs": 0.08820428571432005,
+          "p95Ms": 0.12645599999996193,
+          "perRunMediansMs": [
+            0.04713600000104634,
+            0.08929400000124588,
+            0.08673999999882653
+          ]
+        },
+        "final": {
+          "medianMs": 0.031383999999889056,
+          "meanMs": 0.04522642857143312,
+          "p95Ms": 0.04937199999994846,
+          "perRunMediansMs": [
+            0.031383999999889056,
+            0.046370999999908236,
+            0.03042100000038772
+          ]
+        },
+        "percent": -63.81830758552728
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 12,
+        "span": 2000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.0011047343749908123,
+          "meanMs": 0.0013071072916659432,
+          "p95Ms": 0.0022441953124996417,
+          "perRunMediansMs": [
+            0.0010815156250032487,
+            0.001188179687488855,
+            0.0011047343749908123
+          ]
+        },
+        "final": {
+          "medianMs": 0.0017010703125031057,
+          "meanMs": 0.0017764005208330028,
+          "p95Ms": 0.003582156249997581,
+          "perRunMediansMs": [
+            0.0015749765625017176,
+            0.0018649218749970942,
+            0.0017010703125031057
+          ]
+        },
+        "percent": 53.980029137524845
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 3000,
+        "span": 20000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.05669639843750929,
+          "meanMs": 0.05754280729166889,
+          "p95Ms": 0.07840297656250073,
+          "perRunMediansMs": [
+            0.055891062500009525,
+            0.05669639843750929,
+            0.05808034374999238
+          ]
+        },
+        "final": {
+          "medianMs": 0.05712426562499928,
+          "meanMs": 0.05626293020833349,
+          "p95Ms": 0.0732532890624995,
+          "perRunMediansMs": [
+            0.050804085937500076,
+            0.05712426562499928,
+            0.07087129687499782
+          ]
+        },
+        "percent": 0.754663786909826
+      },
+      {
+        "dimensions": 3,
+        "name": "query-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.06670557031249302,
+          "meanMs": 0.06875469375000212,
+          "p95Ms": 0.08633127343749436,
+          "perRunMediansMs": [
+            0.0656280000000038,
+            0.06670557031249302,
+            0.06864482812500228
+          ]
+        },
+        "final": {
+          "medianMs": 0.06741561718749978,
+          "meanMs": 0.06827850520833346,
+          "p95Ms": 0.08508360156250205,
+          "perRunMediansMs": [
+            0.0666045000000004,
+            0.06741561718749978,
+            0.07003151562500065
+          ]
+        },
+        "percent": 1.0644491482201923
+      },
+      {
+        "dimensions": 3,
+        "name": "query-long",
+        "count": 300,
+        "span": 2000,
+        "indexed": false,
+        "before": {
+          "medianMs": 0.0034099999993486563,
+          "meanMs": 0.0034229999995053126,
+          "p95Ms": 0.0038949999998294516,
+          "perRunMediansMs": [
+            0.003237999999328167,
+            0.0034099999993486563,
+            0.005021000000851927
+          ]
+        },
+        "final": {
+          "medianMs": 0.005688999999620137,
+          "meanMs": 0.005942999999964134,
+          "p95Ms": 0.0060920000000805885,
+          "perRunMediansMs": [
+            0.0060920000000805885,
+            0.005688999999620137,
+            0.0033450000000811997
+          ]
+        },
+        "percent": 66.83284459550708
+      },
+      {
+        "dimensions": 3,
+        "name": "record-spread",
+        "count": 3000,
+        "span": 20000,
+        "indexed": true,
+        "before": {
+          "medianMs": 2.1033210000005056,
+          "meanMs": 3.5142448833332915,
+          "p95Ms": 8.940684999999576,
+          "perRunMediansMs": [
+            1.9575670000012906,
+            2.1033210000005056,
+            2.712119999998322
+          ]
+        },
+        "final": {
+          "medianMs": 2.2869630000000143,
+          "meanMs": 3.1307555166666057,
+          "p95Ms": 6.687671000000137,
+          "perRunMediansMs": [
+            2.206601999999748,
+            2.2869630000000143,
+            2.352861999999732
+          ]
+        },
+        "percent": 8.731049611517427
+      },
+      {
+        "dimensions": 3,
+        "name": "record-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": true,
+        "before": {
+          "medianMs": 1.1037870000000112,
+          "meanMs": 1.4267226666666224,
+          "p95Ms": 3.849335000000792,
+          "perRunMediansMs": [
+            1.1037870000000112,
+            1.1017470000006142,
+            1.6241609999997308
+          ]
+        },
+        "final": {
+          "medianMs": 1.2178859999999077,
+          "meanMs": 1.4403707333333007,
+          "p95Ms": 2.8077519999997094,
+          "perRunMediansMs": [
+            1.1181730000002972,
+            1.2763890000001084,
+            1.2178859999999077
+          ]
+        },
+        "percent": 10.337048724065001
+      },
+      {
+        "dimensions": 3,
+        "name": "record-oversized",
+        "count": 300,
+        "span": 2000,
+        "indexed": true,
+        "before": {
+          "medianMs": 15.027098999998998,
+          "meanMs": 16.61279742857109,
+          "p95Ms": 23.893740000001344,
+          "perRunMediansMs": [
+            14.772291999999652,
+            15.027098999998998,
+            18.400222000000213
+          ]
+        },
+        "final": {
+          "medianMs": 0.028040000000146392,
+          "meanMs": 0.031432285714280236,
+          "p95Ms": 0.047251999999843974,
+          "perRunMediansMs": [
+            0.03913300000021991,
+            0.028040000000146392,
+            0.02660299999979543
+          ]
+        },
+        "percent": -99.81340377141224
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 12,
+        "span": 2000,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.0011707265625062746,
+          "meanMs": 0.0014432911458319116,
+          "p95Ms": 0.0035120546875049286,
+          "perRunMediansMs": [
+            0.0011707265625062746,
+            0.001139578125005869,
+            0.0014680781250007158
+          ]
+        },
+        "final": {
+          "medianMs": 0.000982132812499259,
+          "meanMs": 0.0012296609374994698,
+          "p95Ms": 0.003380437499998834,
+          "perRunMediansMs": [
+            0.000927484374997789,
+            0.0015376015625001571,
+            0.000982132812499259
+          ]
+        },
+        "percent": -16.10912027171202
+      },
+      {
+        "dimensions": 3,
+        "name": "query-local",
+        "count": 3000,
+        "span": 20000,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.0026406328125005984,
+          "meanMs": 0.00371819322916546,
+          "p95Ms": 0.009856890624988068,
+          "perRunMediansMs": [
+            0.0023938828124983047,
+            0.002754835937494704,
+            0.0026406328125005984
+          ]
+        },
+        "final": {
+          "medianMs": 0.002254859375000251,
+          "meanMs": 0.003105713020833652,
+          "p95Ms": 0.013716210937499085,
+          "perRunMediansMs": [
+            0.002237109375002433,
+            0.002254859375000251,
+            0.002431804687500261
+          ]
+        },
+        "percent": -14.609128375369684
+      },
+      {
+        "dimensions": 3,
+        "name": "query-dense",
+        "count": 3000,
+        "span": 128,
+        "indexed": true,
+        "before": {
+          "medianMs": 0.22784429687500563,
+          "meanMs": 0.23081096197916603,
+          "p95Ms": 0.24622032812499128,
+          "perRunMediansMs": [
+            0.20299172656250164,
+            0.22784429687500563,
+            0.23327714843749447
+          ]
+        },
+        "final": {
+          "medianMs": 0.22973826562499866,
+          "meanMs": 0.23076547187500082,
+          "p95Ms": 0.24849335156250163,
+          "perRunMediansMs": [
+            0.20297768750000245,
+            0.22973826562499866,
+            0.2353890000000014
+          ]
+        },
+        "percent": 0.8312557197918569
+      },
+      {
+        "dimensions": 3,
+        "name": "query-long",
+        "count": 300,
+        "span": 2000,
+        "indexed": true,
+        "before": {
+          "medianMs": 321.35861900000054,
+          "meanMs": 320.8151370000002,
+          "p95Ms": 332.6359800000009,
+          "perRunMediansMs": [
+            314.6717379999991,
+            321.35861900000054,
+            346.6347740000001
+          ]
+        },
+        "final": {
+          "medianMs": 0.006345999999666674,
+          "meanMs": 0.006214666666589134,
+          "p95Ms": 0.006519000000025699,
+          "perRunMediansMs": [
+            0.0034559999999146385,
+            0.007368999999926018,
+            0.006345999999666674
+          ]
+        },
+        "percent": -99.99802525912658
+      }
+    ]
+  },
+  "tradeoff": "The fallback prevents area/volume expansion and non-progressing cell loops. Normal indexing is not free: final mixed median recording differences were +9% to +22% for 3000 samples (about 0.1 to 0.2ms); isolated selected cases showed about +2% to +8%. Microsecond local queries were noisier across mixed runs. These are workload and machine observations, not portable budgets.",
+  "limits": [
+    "Finite game geometry and sensible world scale remain required for numerical accuracy.",
+    "Hit-set/retention checks pass; ray geometry and time/existence semantics are unchanged.",
+    "No socket/game capacity, allocation-rate or GC-pause conclusions."
+  ]
+}

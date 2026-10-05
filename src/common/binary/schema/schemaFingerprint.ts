@@ -1,5 +1,14 @@
-import { Context } from '../../Context'
+import type { Context } from '../../Context'
 import { Schema } from './Schema'
+
+// Registered protocol definitions are setup data. Context invalidates this
+// cache when registrations change; runtime update-group counters are excluded.
+const fingerprints = new WeakMap<Context, string>()
+
+/** Internal registration hook; not part of the package's public API. */
+export function invalidateSchemaFingerprint(context: Context) {
+    fingerprints.delete(context)
+}
 
 function describeSchema(schema: Schema) {
     const props = schema.keys.map(prop => [
@@ -47,7 +56,12 @@ function fnv1a32(value: string) {
 }
 
 export function createSchemaFingerprint(context: Context) {
-    return fnv1a32(stableSchemaString(context))
+    let fingerprint = fingerprints.get(context)
+    if (fingerprint === undefined) {
+        fingerprint = fnv1a32(stableSchemaString(context))
+        fingerprints.set(context, fingerprint)
+    }
+    return fingerprint
 }
 
 export function describeSchemaFingerprint(context: Context) {

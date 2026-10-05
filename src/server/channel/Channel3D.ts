@@ -7,7 +7,7 @@ import { User } from '../User'
 import { Channel, ChannelOptions } from './Channel'
 import { ICulledChannel } from './IChannel'
 import { Point3D } from './Point3D'
-import { SpatialGrid3D } from './SpatialGrid'
+import { SpatialGrid3D, SpatialGridCell } from './SpatialGrid'
 import { normalizeSpatialView3D, objectInSpatialView3D, SpatialView3D } from './SpatialView'
 import { ChannelSnapshotOutput } from './ChannelSnapshotOutput'
 import { createCellFragmentChannelOutput } from './CellFragmentChannelOutput'
@@ -38,8 +38,13 @@ export class Channel3D extends Channel implements ICulledChannel<SpatialEntity3D
     private visibleCellKeyCache: Map<number, { viewVersion: number, keys: string[] }> = new Map()
     private visibleEntityCache: Map<number, { viewVersion: number, membershipVersion: number, nids: number[] }> = new Map()
     private spatialVisibleNetworkedNidsCache: Map<number, { viewVersion: number, membershipVersion: number, entityTreeVersion: number, nids: number[] }> = new Map()
-    private rememberedCells: Map<number, Map<string, number[]>> = new Map()
+    private rememberedCells: Map<number, Map<string, readonly number[]>> = new Map()
     private rememberedCellSignatures: Map<number, string> = new Map()
+    private cellDeleteNids = new WeakMap<SpatialGridCell<SpatialEntity3D>, {
+        cellVersion: number
+        entityTreeVersion: number
+        nids: readonly number[]
+    }>()
     private movedRoots: SpatialMove3D[] = []
     private structuralDeltas = false
     cellSize: number
@@ -122,16 +127,23 @@ export class Channel3D extends Channel implements ICulledChannel<SpatialEntity3D
         return nids
     }
 
-    private getCellDeleteNids(key: string) {
-        const nids: number[] = []
+    private getCellDeleteNids(key: string): readonly number[] {
         const cell = this.grid.cells.get(key)
-        if (!cell) {
-            return nids
+        if (!cell) return []
+
+        const entityTreeVersion = this.localState.entityTreeVersion
+        const cached = this.cellDeleteNids.get(cell)
+        if (cached && cached.cellVersion === cell.version && cached.entityTreeVersion === entityTreeVersion) {
+            return cached.nids
         }
 
+        // Replace the result: subscribers can still retain the previous version.
+        // The WeakMap does not retain cells after the grid releases them.
+        const nids: number[] = []
         for (let i = 0; i < cell.ids.length; i++) {
             this.localState.collectEntityTreeDeletes(cell.ids[i], nids)
         }
+        this.cellDeleteNids.set(cell, { cellVersion: cell.version, entityTreeVersion, nids })
         return nids
     }
 
@@ -330,7 +342,9 @@ export class Channel3D extends Channel implements ICulledChannel<SpatialEntity3D
 
     private getVisibleCellVersionSignature(userId: number) {
         const keys = this.getVisibleCellKeys(userId)
-        let signature = ''
+        // Grid-wide revisions distinguish recreated cells. Unrelated root moves
+        // need not invalidate this view; hierarchy changes still do.
+        let signature = `${this.localState.entityTreeVersion}|`
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i]
             signature += `${key}:${this.getCellVersion(key)}|`
@@ -399,13 +413,16 @@ export class Channel3D extends Channel implements ICulledChannel<SpatialEntity3D
     }
 
     rememberVisibleCells(userId: number) {
-        const remembered = new Map<string, number[]>()
+        const signature = this.getVisibleCellVersionSignature(userId)
+        if (this.rememberedCellSignatures.get(userId) === signature) return
+
+        const remembered = new Map<string, readonly number[]>()
         const keys = this.getVisibleCellKeys(userId)
         for (let i = 0; i < keys.length; i++) {
             remembered.set(keys[i], this.getCellDeleteNids(keys[i]))
         }
         this.rememberedCells.set(userId, remembered)
-        this.rememberedCellSignatures.set(userId, this.getVisibleCellVersionSignature(userId))
+        this.rememberedCellSignatures.set(userId, signature)
     }
 
     rememberSnapshotVisibility(userId: number) {

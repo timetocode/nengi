@@ -3,12 +3,13 @@ import { BinarySection } from '../../common/binary/BinarySection'
 import { ProtocolConfig } from '../../common/binary/Protocol'
 import { Instance } from '../Instance'
 import { User } from '../User'
-import { ChannelHeaderUpdate } from '../../binary/snapshot/SnapshotPlan'
+import { ChannelHeaderUpdate, EMPTY_SNAPSHOT_ARRAY } from '../../binary/snapshot/SnapshotPlan'
 import { collectScopedChannelMessages } from '../../binary/snapshot/channelMessages'
 import {
     SnapshotChunk
 } from '../../binary/snapshot/SnapshotChunk'
 import {
+    collectManualGroupBatches,
     countEcsManualUpdateBytes,
     countManualGroupedProps,
     EcsManualUpdateLog,
@@ -60,18 +61,31 @@ export type EcsChannelSnapshotChannel = {
 }
 
 type EcsChannelVisibilityFrame = {
-    ecsCreateEntities: number[]
-    ecsCreateComponents: any[]
-    ecsDeleteEntities: number[]
-    deleteEntities: number[]
+    ecsCreateEntities: readonly number[]
+    ecsCreateComponents: readonly any[]
+    ecsDeleteEntities: readonly number[]
+    deleteEntities: readonly number[]
 }
 
 type EcsChannelChannelSections = {
     headerVersion?: number
-    headerUpdates: ChannelHeaderUpdate[]
-    messages: any[]
-    interpolatedMessages: any[]
+    headerUpdates: readonly ChannelHeaderUpdate[]
+    messages: readonly any[]
+    interpolatedMessages: readonly any[]
 }
+
+const EMPTY_VISIBILITY_FRAME: EcsChannelVisibilityFrame = Object.freeze({
+    ecsCreateEntities: EMPTY_SNAPSHOT_ARRAY,
+    ecsCreateComponents: EMPTY_SNAPSHOT_ARRAY,
+    ecsDeleteEntities: EMPTY_SNAPSHOT_ARRAY,
+    deleteEntities: EMPTY_SNAPSHOT_ARRAY
+})
+
+const EMPTY_CHANNEL_SECTIONS: EcsChannelChannelSections = Object.freeze({
+    headerUpdates: EMPTY_SNAPSHOT_ARRAY,
+    messages: EMPTY_SNAPSHOT_ARRAY,
+    interpolatedMessages: EMPTY_SNAPSHOT_ARRAY
+})
 
 function collectChannelHeaderUpdate(
     user: User,
@@ -81,7 +95,7 @@ function collectChannelHeaderUpdate(
     const header = channel.header
     const headerVersion = channel.headerVersion || 0
     if (!hasSchemaBackedChannelHeader(header) || headerVersion <= 0) {
-        return {}
+        return
     }
 
     const knownVersion = user.knownChannelHeaderVersions.get(channel.nid)
@@ -98,7 +112,7 @@ function collectChannelHeaderUpdate(
     }
 
     if (knownVersion >= headerVersion) {
-        return {}
+        return
     }
 
     const diffs = instance.cache.getAndDiffGrouped(instance.tick, header, nschema)
@@ -143,16 +157,17 @@ function collectEcsChannelChannelSections(
     instance: Instance,
     channel: EcsChannelSnapshotChannel
 ) {
-    const sections: EcsChannelChannelSections = {
-        headerUpdates: [],
-        messages: [],
-        interpolatedMessages: []
-    }
     const header = collectChannelHeaderUpdate(user, instance, channel)
-    if (header.headerVersion !== undefined) {
-        sections.headerVersion = header.headerVersion
+    if (!header && user.scopedMessageQueue.length === 0 && user.scopedInterpolatedMessageQueue.length === 0) {
+        return EMPTY_CHANNEL_SECTIONS
     }
-    if (header.headerUpdate) {
+    const sections = {
+        headerVersion: header?.headerVersion,
+        headerUpdates: [] as ChannelHeaderUpdate[],
+        messages: [] as any[],
+        interpolatedMessages: [] as any[]
+    }
+    if (header?.headerUpdate) {
         sections.headerUpdates.push(header.headerUpdate)
     }
     collectScopedChannelMessages(user, channel.nid, sections.messages, sections.interpolatedMessages)
@@ -194,11 +209,14 @@ function countChannelSectionGroupedProps(sections: EcsChannelChannelSections) {
 }
 
 function collectVisibilityFrame(channel: EcsChannelSnapshotChannel, snapshot: EcsChannelUserSnapshot): EcsChannelVisibilityFrame {
-    const frame: EcsChannelVisibilityFrame = {
-        ecsCreateEntities: [],
-        ecsCreateComponents: [],
-        ecsDeleteEntities: [],
-        deleteEntities: []
+    if (snapshot.toCreate.length === 0 && snapshot.toDelete.length === 0) {
+        return EMPTY_VISIBILITY_FRAME
+    }
+    const frame = {
+        ecsCreateEntities: [] as number[],
+        ecsCreateComponents: [] as any[],
+        ecsDeleteEntities: [] as number[],
+        deleteEntities: [] as number[]
     }
 
     for (let i = 0; i < snapshot.toCreate.length; i++) {
@@ -310,21 +328,22 @@ function getEcsChannelCellUpdateFragment(
 }
 
 function mergeVisibleCellLogs(channel: EcsChannelSnapshotChannel, cellKeys: string[]) {
-    const merged: EcsManualUpdateLog = {
-        manualPropNids: [],
-        manualPropSchemas: [],
-        manualPropValues: [],
-        manualGroupNids: [],
-        manualGroupNTypes: [],
-        manualGroupSchemas: [],
-        manualGroupValueOffsets: [],
-        manualGroupValues: []
-    }
+    let merged: EcsManualUpdateLog | undefined
 
     for (let i = 0; i < cellKeys.length; i++) {
         const log = channel.getManualCellUpdateLog(cellKeys[i])
         if (!log) {
             continue
+        }
+        merged ??= {
+            manualPropNids: [],
+            manualPropSchemas: [],
+            manualPropValues: [],
+            manualGroupNids: [],
+            manualGroupNTypes: [],
+            manualGroupSchemas: [],
+            manualGroupValueOffsets: [],
+            manualGroupValues: []
         }
         for (let j = 0; j < log.manualPropNids.length; j++) {
             merged.manualPropNids.push(log.manualPropNids[j])
@@ -353,13 +372,15 @@ function getEcsChannelGroupUpdateFragment(
     channel: EcsChannelSnapshotChannel,
     group: EcsChannelVisibilityGroup
 ) {
-    if (group.sharedUpdateFragment) {
-        instance.network.recordSharedFragmentHit()
+    if (group.sharedUpdateFragment !== undefined) {
+        if (group.sharedUpdateFragment) instance.network.recordSharedFragmentHit()
         return group.sharedUpdateFragment
     }
 
     const merged = mergeVisibleCellLogs(channel, group.visibleCellKeys)
-    if (merged.manualPropNids.length === 0 && merged.manualGroupNids.length === 0) {
+    if (!merged || (merged.manualPropNids.length === 0 && merged.manualGroupNids.length === 0)) {
+        // The group belongs to this tick. Remember absence as well as payloads.
+        group.sharedUpdateFragment = null
         return null
     }
     const fragment = getManualUpdateFragment(user, instance, { nid: channel.nid, ...merged }, `ecs-channel-group:${group.cellSignature}`)
@@ -368,11 +389,15 @@ function getEcsChannelGroupUpdateFragment(
 }
 
 function countDirectManualFragments(logs: EcsManualUpdateLog[]) {
-    return logs.reduce((total, log) => ({
-        props: total.props + log.manualPropNids.length,
-        groups: total.groups + log.manualGroupNids.length,
-        groupedProps: total.groupedProps + countManualGroupedProps(log)
-    }), { props: 0, groups: 0, groupedProps: 0 })
+    let props = 0
+    let groups = 0
+    let groupedProps = 0
+    for (let i = 0; i < logs.length; i++) {
+        props += logs[i].manualPropNids.length
+        groups += logs[i].manualGroupNids.length
+        groupedProps += countManualGroupedProps(logs[i])
+    }
+    return { props, groups, groupedProps }
 }
 
 export function createEcsCulledChannelOutput(
@@ -403,13 +428,12 @@ export function createEcsCulledChannelOutput(
 
     const updateFragments: ManualUpdateFragment[] = []
     const directLogs: EcsManualUpdateLog[] = []
-    const groupFragment = blockedNids.size === 0 &&
+    const useGroupFragment = blockedNids.size === 0 &&
         instance.network.sharedUpdateFragmentsEnabled &&
         !instance.network.diagnosticBinaryWrites
-        ? getEcsChannelGroupUpdateFragment(user, instance, channel, snapshot.group)
-        : null
-    if (groupFragment) {
-        updateFragments.push(groupFragment)
+    if (useGroupFragment) {
+        const groupFragment = getEcsChannelGroupUpdateFragment(user, instance, channel, snapshot.group)
+        if (groupFragment) updateFragments.push(groupFragment)
     } else {
         for (let i = 0; i < snapshot.group.visibleCellKeys.length; i++) {
             const cellKey = snapshot.group.visibleCellKeys[i]
@@ -464,32 +488,34 @@ export function createEcsCulledChannelOutput(
         ))
     }
     for (let i = 0; i < directLogs.length; i++) {
+        const log = directLogs[i]
+        const batches = collectManualGroupBatches(log)
         chunks.push(createChannelScopeChunk(channel.nid, protocol))
         chunks.push({
             label: 'EcsChannelManualUpdates',
-            bytes: countEcsManualUpdateBytes(directLogs[i], protocol),
+            bytes: countEcsManualUpdateBytes(log, protocol, batches),
             write(writer) {
-                writeEcsManualUpdates(directLogs[i], writer, protocol)
+                writeEcsManualUpdates(log, writer, protocol, batches)
             }
         })
     }
 
-    const directCounts = countDirectManualFragments(directLogs)
+    const directCounts = instance.network.snapshotPerformanceEnabled ? countDirectManualFragments(directLogs) : null
 
     return createChunkedChannelSnapshotOutput({
         channelId: channel.nid,
         chunks,
-        stats: {
+        stats: instance.network.snapshotPerformanceEnabled ? {
             creates: visibilityFrame.ecsCreateEntities.length + visibilityFrame.ecsCreateComponents.length,
-            updateProps: directCounts.props + updateFragments.reduce((total, fragment) => total + fragment.updateProps, 0),
-            updateGroups: directCounts.groups + updateFragments.reduce((total, fragment) => total + fragment.updateGroups, 0),
-            groupedUpdateProps: directCounts.groupedProps +
+            updateProps: directCounts!.props + updateFragments.reduce((total, fragment) => total + fragment.updateProps, 0),
+            updateGroups: directCounts!.groups + updateFragments.reduce((total, fragment) => total + fragment.updateGroups, 0),
+            groupedUpdateProps: directCounts!.groupedProps +
                 updateFragments.reduce((total, fragment) => total + fragment.groupedUpdateProps, 0) +
                 countChannelSectionGroupedProps(channelSections),
             deletes: visibilityFrame.ecsDeleteEntities.length + visibilityFrame.deleteEntities.length,
             messages: channelSections.messages.length + channelSections.interpolatedMessages.length,
             usedSharedFragments: updateFragments.length > 0
-        },
+        } : null,
         commit() {
             if (channelSections.headerVersion !== undefined) {
                 user.knownChannelHeaderVersions.set(channel.nid, channelSections.headerVersion)

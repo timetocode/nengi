@@ -33,9 +33,60 @@ export type SnapshotSendError = {
 }
 export type SnapshotSendErrorHandler = (event: SnapshotSendError) => void
 
+/** Local diagnostic; the error and any private details are never sent to the client. */
+export type ServerRequestError = {
+    user: User
+    requestId: number
+    endpointId: number
+    phase: 'handler' | 'response'
+    code: 'HANDLER_ERROR' | 'HANDLER_REJECTED' | 'RESPONSE_ENCODING_ERROR' | 'RESPONSE_TOO_LARGE'
+    error: unknown
+}
+
+/** A snapshot step changed replication state and then failed. This instance is terminal. */
+export class InstanceStepError extends Error {
+    readonly tick: number
+    readonly cause: unknown
+
+    constructor(tick: number, cause: unknown) {
+        let detail = 'See cause for the original failure.'
+        try {
+            detail = cause instanceof Error ? cause.message : String(cause)
+        } catch {
+            // Even an unprintable thrown value must leave the instance terminal.
+        }
+        super(`nengi Instance.step() failed at tick ${tick}. Stop this instance and recreate it before resuming replication.\n${detail}`)
+        this.name = 'InstanceStepError'
+        this.tick = tick
+        this.cause = cause
+    }
+}
+
 export type ResponseEndpoint = {
     endpoint: EndpointDefinition | null,
     callback: ResponseHandler
+}
+
+export type ConnectionAcceptance<ServerData = unknown, ClientData = unknown> = {
+    /** Server-local context, passed by reference as UserConnected's event.payload. */
+    serverData?: ServerData
+    /** Optional JSON-serializable setup data returned by the client's connect(). */
+    clientData?: ClientData
+    deny?: never
+}
+
+export type ConnectionDenial<Detail = unknown> = {
+    /** Deliberately public JSON detail returned in ClientConnectionError.detail. */
+    deny: Detail
+    serverData?: never
+    clientData?: never
+}
+
+export type ConnectionAttemptContext = {
+    /** Provisional identity: no accepted user id or instance until acceptance. */
+    readonly user: User
+    /** Aborted on failure before acceptance; not a session-disconnect signal. */
+    readonly signal: AbortSignal
 }
 
 export type InstanceOptions = {
@@ -57,21 +108,32 @@ function positiveDuration(name: string, value: number | undefined, fallback: num
 }
 
 export class Instance {
-    context: Context
-    localState: LocalState
-    network: InstanceNetwork
-    queue: NQueue<INetworkEvent>
-    users: Map<number, User>
+    private stepFailure: InstanceStepError | null = null
+    readonly context: Context
+    readonly localState: LocalState
+    readonly network: InstanceNetwork
+    readonly queue: NQueue<INetworkEvent>
+    /** @internal */
+    readonly connectedUsers: Map<number, User>
+
+    get users(): ReadonlyMap<number, User> {
+        return this.connectedUsers
+    }
+    /** @internal */
     incrementalUserId: number
+    /** @internal */
     cache: EntityCache
     tick: number
     pingIntervalMs: number
     pongTimeoutMs: number
     handshakeTimeoutMs: number
     readonly now: TimeSource
-    readonly limits: NetworkLimits
+    readonly limits: Readonly<NetworkLimits>
     /** Diagnostic only; the offending connection has already been closed. */
     onNetworkLimit: (event: NetworkLimitEvent) => void = () => {}
+    /** Handler/reply failures, including failures after a reply or disconnect. Observer exceptions are contained. */
+    onRequestError: (event: ServerRequestError) => void = () => {}
+    /** @internal */
     responseEndPoints: Map<number, ResponseEndpoint>
     /**
      * Observes malformed or otherwise unreadable inbound network messages before
@@ -85,22 +147,27 @@ export class Instance {
     onSnapshotSendError: SnapshotSendErrorHandler
     /**
      * Override this to accept or reject incoming connections. Return `false` to
-     * deny the connection. Any other resolved value accepts the connection and
-     * becomes the `payload` on the queued `UserConnected` event.
+     * deny the connection, `{ deny: detail }` to deny with public JSON detail,
+     * `true` to accept without data, or an acceptance object.
+     * Its `serverData` becomes the queued `UserConnected` event's `payload`;
+     * only `clientData` is serialized and returned by the client's `connect()`.
+     * The context's signal cancels abandoned setup, including encoding/send
+     * failures after this handler returns. Resources remain application-owned
+     * until acceptance; accepted sessions use normal disconnect cleanup.
      *
      * ```ts
-     * instance.onConnect = async (handshake: any) => {
-     *     const session = await authenticateUser(handshake)
-     *     return session || false
+     * instance.onConnect = async (handshake, { signal }) => {
+     *     const session = await authenticateUser(handshake, { signal })
+     *     return session ? { serverData: session } : false
      * }
      * ```
      */
-    onConnect: (handshake: any) => Promise<any>
+    onConnect: (handshake: any, context: ConnectionAttemptContext) => Promise<boolean | ConnectionAcceptance | ConnectionDenial>
 
     constructor(context: Context, options: InstanceOptions = {}) {
         this.context = context
         this.localState = new LocalState()
-        this.users = new Map()
+        this.connectedUsers = new Map()
         this.queue = new NQueue(event => this.network.releaseQueuedInput(event))
         this.limits = resolveNetworkLimits(options.limits)
         this.incrementalUserId = 0
@@ -115,11 +182,16 @@ export class Instance {
         this.onSnapshotSendError = () => {}
 
         this.onConnect = () => {
-            console.warn('Please define an instance.onConnect handler. Return false to deny, or return a payload to accept. Connection denied.')
+            console.warn('Please define an instance.onConnect handler. Return false or { deny: detail } to deny, true to accept, or { serverData, clientData } to accept with setup data. Connection denied.')
             return Promise.resolve(false)
         }
 
         this.network = new InstanceNetwork(this)
+    }
+
+    /** A narrow typed view of the existing network, with no per-packet proxy. */
+    get adapterHost(): import('./adapter/IServerNetworkAdapter').ServerAdapterHost {
+        return this.network
     }
 
     attachChild(parent: IEntity, child: IEntity) {
@@ -156,18 +228,25 @@ export class Instance {
         return this.network.processRequests(max)
     }
 
+    /** First terminal snapshot-step error. Application code owns stopping the loop and adapters. */
+    get failure() {
+        return this.stepFailure
+    }
+
     step() {
+        if (this.stepFailure) throw this.stepFailure
+
         const serverTimeMs = this.now()
         if (!Number.isFinite(serverTimeMs)) {
             throw new Error('instance.now must return a finite monotonic server time.')
         }
         this.network.disconnectTimedOutUsers(serverTimeMs)
 
-        this.tick++
-        this.cache.createCachesForTick(this.tick)
-        this.network.resetSharedUpdateFragments()
-
         try {
+            this.tick++
+            this.cache.createCachesForTick(this.tick)
+            this.network.resetSharedUpdateFragments()
+
             Array.from(this.users.values()).forEach(user => {
                 const ping = user.shouldSendPing(serverTimeMs, this.pingIntervalMs)
                     ? {
@@ -200,18 +279,28 @@ export class Instance {
                     user.lastSentInstanceTick = this.tick
                 }
             })
+        } catch (error) {
+            this.stepFailure = new InstanceStepError(this.tick, error)
+            throw this.stepFailure
         } finally {
-            this.cache.deleteCachesForTick(this.tick)
-            this.localState.channels.forEach(channel => {
-                channel.clearBroadcastMessages?.()
-                channel.clearSnapshotDeltas?.()
-            })
-            // A diff baseline belongs to this lifetime of the id. Release it
-            // before the allocator can assign that id to a different schema.
-            for (const nid of this.localState.nidPool.deferredIds) {
-                delete this.cache.cache[nid]
+            try {
+                this.cache.deleteCachesForTick(this.tick)
+                this.localState.channels.forEach(channel => {
+                    channel.clearBroadcastMessages?.()
+                    channel.clearSnapshotDeltas?.()
+                })
+                // A diff baseline belongs to this lifetime of the id. Release it
+                // before the allocator can assign that id to a different schema.
+                for (const nid of this.localState.nidPool.deferredIds) {
+                    delete this.cache.cache[nid]
+                }
+                this.localState.releaseDeferredIds()
+            } catch (error) {
+                // Cleanup must not hide the original serialization failure.
+                this.stepFailure ??= new InstanceStepError(this.tick, error)
+                // eslint-disable-next-line no-unsafe-finally -- Cleanup already threw; retain the first failure.
+                throw this.stepFailure
             }
-            this.localState.releaseDeferredIds()
         }
     }
 

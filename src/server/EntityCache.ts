@@ -3,6 +3,7 @@ import {
     compareAndUpdateNObject,
     compareAndUpdateNObjectGrouped,
     copyNObject,
+    EntityChange,
     EntityDiffResult,
     updateNObject
 } from '../common/binary/schema/util'
@@ -17,7 +18,7 @@ function diff(entity: IEntity, cache: IEntity, nschema: Schema) {
 
 export class EntityCache {
     cache: { [tick: number]: IEntity }
-    diffCache: { [tick: number]: { [nid: number]: any[] } }
+    diffCache: { [tick: number]: { [nid: number]: readonly EntityChange[] } }
     groupedDiffCache: { [tick: number]: { [nid: number]: EntityDiffResult } }
 
     constructor() {

@@ -1,5 +1,5 @@
 import { Binary } from './binary/Binary'
-import { defineMessageSchema, definePayloadSchema } from './binary/schema/defineSchema'
+import { defineEntitySchema, defineMessageSchema, definePayloadSchema } from './binary/schema/defineSchema'
 import { Context } from './Context'
 import { defineEndpoint } from './Endpoint'
 import { createSchemaFingerprint } from './binary/schema/schemaFingerprint'
@@ -56,5 +56,51 @@ describe('Context', () => {
         second.registerEndpoint(secondEndpoint)
 
         expect(createSchemaFingerprint(first)).not.toBe(createSchemaFingerprint(second))
+    })
+
+    it('invalidates cached fingerprints after new registrations and preserves registration-order independence', () => {
+        const context = new Context()
+        const empty = createSchemaFingerprint(context)
+        const schema = defineMessageSchema({ value: Binary.UInt8 })
+        context.register(256, schema)
+        const withSchema = createSchemaFingerprint(context)
+        expect(withSchema).not.toBe(empty)
+
+        const endpoint = defineEndpoint(7, { requestSchema: definePayloadSchema({ value: Binary.UInt16 }) })
+        context.registerEndpoint(endpoint)
+        const withEndpoint = createSchemaFingerprint(context)
+        expect(withEndpoint).not.toBe(withSchema)
+
+        const reversed = new Context()
+        reversed.registerEndpoint(endpoint)
+        reversed.register(256, schema)
+        expect(createSchemaFingerprint(reversed)).toBe(withEndpoint)
+    })
+
+    it('reuses fingerprints without traversing unchanged definitions or runtime update-group state', () => {
+        const context = new Context()
+        const schema = defineEntitySchema({
+            x: Binary.Float32,
+            y: Binary.Float32,
+            $options: { updateGroups: { position: ['x', 'y'] } }
+        })
+        const endpoint = defineEndpoint(7)
+        context.register(1, schema)
+        context.registerEndpoint(endpoint)
+        const fingerprint = createSchemaFingerprint(context)
+        const schemas = jest.spyOn(context.schemas, 'entries')
+        const endpoints = jest.spyOn(context.endpointDefinitions, 'entries')
+        try {
+            context.registerEndpoint(endpoint)
+            schema.updateGroupGeneration++
+            schema.updateGroups[0].lastEmitGeneration++
+            expect(createSchemaFingerprint(context)).toBe(fingerprint)
+            expect(createSchemaFingerprint(context)).toBe(fingerprint)
+            expect(schemas).not.toHaveBeenCalled()
+            expect(endpoints).not.toHaveBeenCalled()
+        } finally {
+            schemas.mockRestore()
+            endpoints.mockRestore()
+        }
     })
 })

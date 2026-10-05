@@ -1,6 +1,7 @@
 import { Channel } from '../../server/channel/Channel'
 import { EcsManualUpdateLog, ManualUpdateLog } from './manualUpdates'
 import { ChannelHeader } from '../../common/ChannelHeader'
+import type { CellEntityFragment } from './cellEntityFragments'
 
 // Snapshot mode checks are intentionally structural. Channel classes expose a
 // small set of hot-path marker fields and arrays, and the snapshot writer uses
@@ -43,6 +44,9 @@ export type ManualCellFragmentChannel = CellFragmentChannel & {
     dirtyCells: Set<string>
     getManualCellUpdateLog(cellKey: string): ManualUpdateLog | null
     cellHasManualUpdates(cellKey: string): boolean
+    prepareVisibilityPlan?(tick: number): {
+        cellUpdateFragments?: Map<string, CellEntityFragment>
+    }
     getMovedRoots(): { entity: any, fromCell: string, toCell: string }[]
     hasStructuralDeltas(): boolean
 }
@@ -61,7 +65,7 @@ export type CellFragmentChannel = {
     getCellEntityNids(key: string): number[]
     getCellVersion(key: string): number
     getRememberedCellKeys(userId: number): string[]
-    getRememberedCellNids(userId: number, key: string): number[]
+    getRememberedCellNids(userId: number, key: string): readonly number[]
     collectSnapshotVisibility(userId: number): {
         toCreate: number[]
         toUpdate: number[]

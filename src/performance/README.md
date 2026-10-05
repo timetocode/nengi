@@ -1,8 +1,120 @@
 # Performance Harnesses
 
+Start with [performance ambition and demonstrated results](./PERFORMANCE.md)
+for the capabilities these workloads help us remember. It records intentions,
+measured achievements and their context, while leaving implementation choices open.
+
 These scripts are local profiling tools for nengi hot paths. They are not
 product tests and their numbers are machine-dependent. Use them to compare
 variants on the same machine in the same session.
+
+## Large all-visible channels
+
+Exercise idle and sparse workloads as well as dense movement. A mostly stationary
+world can expose per-subscriber membership copies that dense serialization hides:
+
+```bash
+PROFILE_SUITE=plain-fanout PROFILE_ENTITIES=10000 PROFILE_USERS=100 PROFILE_MOVE_FRACTION=0 npm run profile:snapshot
+PROFILE_SUITE=plain-fanout PROFILE_ENTITIES=10000 PROFILE_USERS=100 PROFILE_MOVE_FRACTION=0.01 npm run profile:snapshot
+PROFILE_SCENARIO=ecs-channel-churn PROFILE_ENTITIES=10000 PROFILE_USERS=100 PROFILE_CHURN=1 PROFILE_MOVE_FRACTION=0 npm run profile:snapshot
+```
+
+`plain-fanout` runs automatic Channel, ManualChannel, and EcsChannel. ECS has
+three components plus its root, so the same root count has four times as many
+network IDs; compare each workload before/after rather than treating those rows
+as equal object counts. The churn case replaces roots after their first snapshot.
+
+`manual-channel-2d` and `manual-channel-3d` also accept `PROFILE_CHURN`: each tick
+after initial creation, they replace that many existing roots after the movement
+writes and before snapshot output. This exercises filtering of removed writes
+and fragment-cache invalidation. Compare with zero churn and with shared updates
+both enabled and disabled; newly added roots survive at least their first snapshot.
+
+Repeat sparse cases with `PROFILE_SHARED_UPDATES=0` and `1` to distinguish
+membership bookkeeping from repeated encoding. Also retain a small, densely
+changing control and a spatial-channel control. Record individual repeats,
+p95, wire bytes and decoded-state checks. Heap after explicit GC measures retained
+state, not allocation rate. These scripts use an in-process counting transport;
+rerun the game bots before drawing socket or server-capacity conclusions.
+
+## Entity tree attachment and removal
+
+`EntityTree.performance.ts` measures building wide child trees, adding children
+after caches have been populated, attachment beneath a nested parent, and a
+root-removal control:
+
+```bash
+node --import tsx src/performance/EntityTree.performance.ts
+```
+
+Defaults are two warmups and seven measured trials per case. Override with
+`PROFILE_WARMUP` and `PROFILE_TRIALS`. Child records are preallocated; setup,
+initial cache population, and verification are outside the timed interval.
+Separate disposable instances count recursive invalidation visits without
+instrumenting the timing runs. These measurements exclude snapshot output.
+
+Use `channel-churn` with `PROFILE_CHILDREN` for the complete mutation/snapshot
+pipeline, and retain small-child and steady-state controls. Report pre-step work
+as well as snapshot time: attachment happens before `Instance.step()`. Compare
+fresh sequential source variants using the same harness and binary backend.
+
+## ECS binding mutations
+
+`EcsBinding.performance.ts` measures the binding convenience API separately from
+snapshot output. The snapshot harness mostly uses raw writers, so it cannot by
+itself establish the cost of `bindEcsChannel` mutation helpers:
+
+```bash
+PROFILE_CHANNEL=2d PROFILE_OPERATION=prop node --import tsx src/performance/EcsBinding.performance.ts
+PROFILE_CHANNEL=2d PROFILE_OPERATION=group node --import tsx src/performance/EcsBinding.performance.ts
+PROFILE_CHANNEL=2d PROFILE_OPERATION=raw-group node --import tsx src/performance/EcsBinding.performance.ts
+```
+
+Channels are `plain`, `2d`, and `3d`; operations are `prop`, `group`, `patch`,
+`raw-prop`, and `raw-group`. The group and patch update x/y/rotation; the property
+case updates only x. Raw controls assign the same state and emit through the raw
+component writer. All roots/components survive initial creation before mutation.
+
+Defaults are 10,000 roots with one component each, 50 warmup ticks and 150 measured
+ticks. Override with `PROFILE_ENTITIES`, `PROFILE_WARMUP`, and `PROFILE_TICKS`.
+Spatial components remain within one cell. Output reports mutation time separately
+from mutation plus pending spatial-write flush and `Instance.step()` cleanup.
+There are no subscribers, sockets, or serialization in this workload. Compare
+matched operations before/after, and use the snapshot harness and game bots to
+establish the effect in a complete replication workload. Separate decode/apply
+checks are still needed; timing the writes does not establish their correctness.
+
+## Server historian indexing
+
+`Historian.performance.ts` compares tracked recording and nearest-ray queries in
+2D and 3D, with the grid enabled and disabled:
+
+```bash
+node --import tsx src/performance/Historian.performance.ts
+PROFILE_CASE=record-dense:3:3000:grid PROFILE_WARMUP=150 PROFILE_TRIALS=300 node --import tsx src/performance/Historian.performance.ts
+```
+
+The seeded populations include 3,000 spread-out or densely clustered bodies,
+12-body local queries, 300-body long rays and recording with one oversized body.
+Recording retains 200 ms of frames at 50 ms intervals. Setup, retention checks
+and indexed-versus-scan hit-set checks are outside timing. Query trials report
+per-query averages over batches, except the long-ray probes, which time one ray.
+The JSON retains individual trials, means, medians and p95s. There are no sockets,
+snapshot replication, physics, renderer or allocation-rate measurements.
+
+`PROFILE_CASE` selects `name:dimensions:population:grid-or-scan`; each full run
+prints the available names and populations. `PROFILE_WARMUP` and `PROFILE_TRIALS`
+override the selected case's repetitions. Use fresh isolated cases with longer
+warmup when the mixed suite shows an unexplained regression, and retain both
+results. Long-ray probes on the old index can take seconds per repetition, so
+do not apply a large repetition override to the entire suite.
+
+Run identical copies of the harness against before/after sources in fresh,
+alternating processes. Keep normal recording and local-query controls with the
+large-span cases: the index should preserve useful local acceleration while
+avoiding unbounded work. The current recording entry allowance and query fallback
+threshold are internal performance choices, not public tuning APIs or universal
+optimal values. Changes to them need matching workloads and hit-set checks.
 
 ## Client History
 
@@ -12,6 +124,7 @@ history without a transport or renderer. Run one scenario and phase at a time:
 ```bash
 PROFILE_SCENARIO=sparse PROFILE_PHASE=prune npm run profile:history
 PROFILE_SCENARIO=sparse PROFILE_PHASE=sample npm run profile:history
+PROFILE_SCENARIO=selective PROFILE_PHASE=sample PROFILE_VALUE_SHAPE=mutable npm run profile:history
 PROFILE_CHROMIUM_PATH=/absolute/path/to/chrome PROFILE_SCENARIO=sparse PROFILE_PHASE=sample npm run profile:history:browser
 ```
 
@@ -22,6 +135,25 @@ at most 500 IDs from a larger sparse population). Defaults are 50,000 entities,
 or 10,000 for `dense` and `ecs`, 240 history frames, 60 warmup iterations, and
 120 measured iterations. Override with `PROFILE_ENTITIES`,
 `PROFILE_HISTORY_FRAMES`, `PROFILE_WARMUP`, and `PROFILE_ITERATIONS`.
+
+`PROFILE_ENTITY_HISTORY=off` opts out of entity recording for the `prune`
+(frame-processing) phase. Recent frames remain retained; history and expiration
+index counts should be zero and `pruneMs` null. Compare with the default `on`
+using identical inputs, and keep a before/after `on` control when changing this
+path. The `sample` phase requires history and rejects `off`.
+
+`PROFILE_VALUE_SHAPE=scalar` (default) uses interpolated x/y numbers, health and
+a label. `mutable` adds an interpolated Vector3 and a non-interpolated 64-byte
+UInt8Array; both change alongside x/y. This separates scalar sampling work from
+the cost of creating independent mutable values. Both Node and browser runners
+accept this option.
+
+For the sample phase, `PROFILE_SAMPLING=allocate` (default) uses the regular API;
+`reuse` uses one `InterpolationOutput` throughout warmup and measurement.
+`PROFILE_SELECTION=rotating` with `PROFILE_SCENARIO=selective` shifts the selected
+window by 50 IDs per sample, exercising removal/admission without allocating a
+new selection array. The default selection is `stable`. Compare both selection
+patterns and both value shapes before drawing conclusions about output reuse.
 
 The prune phase reports both the whole frame-processing duration and its nested
 pruning duration, so the cost of recording the expiration index is included in
@@ -46,6 +178,29 @@ sequentially on the same machine. The browser runner accepts
 that checkout using the current checkout's tsx loader. Do not benchmark both
 versions concurrently. Dense workloads retain millions of records and require
 substantial heap space. Keep full JSON results outside the published package.
+
+## Client grouped-update decoding
+
+`ClientDecode.performance.ts` captures one initial snapshot and two alternating
+updates from a manual channel, then measures client decode plus frame application.
+Each moving body has six Float64 fields in two update groups. Encoding, transport,
+physics, game checkpoint reconstruction and rendering are outside the timing.
+The final values, applied field count and packet sizes are checked/reported.
+
+```bash
+PROFILE_BINARY_MODULE=/absolute/path/to/nengi-buffers/build/BufferBinary.js \
+PROFILE_ENTITIES=65 PROFILE_MOVING=59 PROFILE_ENTITY_HISTORY=off \
+node --expose-gc --import tsx src/performance/ClientDecode.performance.ts
+```
+
+Omit `PROFILE_ENTITY_HISTORY` for normal history recording. Other settings are
+`PROFILE_WARMUP` (default 1,000) and `PROFILE_ITERATIONS` (default 5,000).
+Without `PROFILE_BINARY_MODULE` the harness uses the test Buffer backend; keep
+the backend identical when comparing sources. Output includes receive timings,
+history size and GC events observed during the measured loop. Explicit setup
+and final GC are excluded. Heap readings describe occupancy/retention, not
+total allocated bytes. Results are synthetic client costs, not complete game
+frame times. Compare fresh processes sequentially with rotated source order.
 
 ## Snapshot Pipeline
 
@@ -166,6 +321,12 @@ Scenarios:
 - `Channel2D` and `Channel3D` are backed by the shared
   `SpatialGrid` core; the older grid comparison channels were removed after the
   retained spatial channels adopted the same bookkeeping.
+  To measure visibility locality, also use a large distributed world with small
+  views and sparse movement across cells. A broad shared view alone cannot show
+  the benefit of leaving unrelated subscribers on their stable path. Retain idle,
+  dense, child-tree and manual/ECS controls, and include index time when changing
+  the shared grid. `PROFILE_CHURN` does not add root churn to `channel-2d` or
+  `channel-3d`; use lifecycle regressions and a separate churn workload for that.
 - `channel-churn`: all users share one plain all-visible channel while the
   server removes and adds `PROFILE_CHURN` roots per tick. `PROFILE_CHILDREN`
   attaches child entities to each created root so create/delete fragments cover

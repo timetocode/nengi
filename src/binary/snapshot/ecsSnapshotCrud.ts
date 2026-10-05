@@ -4,14 +4,14 @@ import { EcsSnapshotChannel } from './channelModes'
 export function addEcsVisibilityCrud(
     plan: SnapshotPlan,
     channel: EcsSnapshotChannel,
-    toCreate: number[],
-    toDelete: number[]
+    toCreate: readonly number[],
+    toDelete: readonly number[]
 ) {
     addEcsCreates(plan, channel, toCreate)
     addEcsDeletes(plan, channel, toDelete)
 }
 
-function addEcsCreates(plan: SnapshotPlan, channel: EcsSnapshotChannel, toCreate: number[]) {
+function addEcsCreates(plan: SnapshotPlan, channel: EcsSnapshotChannel, toCreate: readonly number[]) {
     for (let i = 0; i < toCreate.length; i++) {
         const nid = toCreate[i]
         if (channel.isRootNid(nid)) {
@@ -25,7 +25,7 @@ function addEcsCreates(plan: SnapshotPlan, channel: EcsSnapshotChannel, toCreate
     }
 }
 
-function addEcsDeletes(plan: SnapshotPlan, channel: EcsSnapshotChannel, toDelete: number[]) {
+function addEcsDeletes(plan: SnapshotPlan, channel: EcsSnapshotChannel, toDelete: readonly number[]) {
     for (let i = 0; i < toDelete.length; i++) {
         const nid = toDelete[i]
         if (channel.isRootNid(nid)) {

@@ -4,21 +4,11 @@ import { Context } from '../common/Context'
 import { Client } from './Client'
 import { FixedStepInterpolator, FixedStepInterpolatorOptions } from './FixedStepInterpolator'
 import { Snapshot } from './Snapshot'
-import { testBinaryAdapter } from '../testSupport/BufferBinary'
+import { TestClientTransport } from '../testSupport/ClientTransport'
 import { ChannelType, createChannelHeader } from '../common/ChannelHeader'
 
 const TEST_CHANNEL_ID = 1
 
-class MockAdapter {
-    binary = testBinaryAdapter
-    constructor() {
-    }
-    connect() {
-        return Promise.resolve({ accepted: true })
-    }
-    flush() {
-    }
-}
 
 export function createInterpolationTestContext() {
     const context = new Context()
@@ -64,14 +54,14 @@ export function createTestSnapshot(args: Partial<Snapshot>): Snapshot {
 }
 
 export function createInterpolationTestClient(tickRate = 20) {
-    return new Client(createInterpolationTestContext(), MockAdapter, tickRate)
+    return new Client(createInterpolationTestContext(), TestClientTransport, tickRate)
 }
 
 export function applyTestSnapshot(client: Client, snapshot: Partial<Snapshot>, receivedAtMs: number) {
     const fullSnapshot = createTestSnapshot(snapshot)
     const frame = client.network.store.applySnapshot(fullSnapshot, client.network.frameTick, receivedAtMs)
     client.network.frameTick++
-    client.network.frames.push(frame)
+    client.network.frames = [...client.network.frames, frame]
     client.network.latestFrame = frame
     return frame
 }
@@ -84,7 +74,7 @@ export class InterpolationTestHarness {
 
     constructor(options: FixedStepInterpolatorOptions = {}, now = 1000, tickRate = 20) {
         this.context = createInterpolationTestContext()
-        this.client = new Client(this.context, MockAdapter, tickRate)
+        this.client = new Client(this.context, TestClientTransport, tickRate)
         this.interpolator = new FixedStepInterpolator(this.client, options)
         this.now = now
     }
